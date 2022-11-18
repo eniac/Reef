@@ -1,50 +1,33 @@
-use regex_syntax::Parser;
-use regex_syntax::hir::Hir;
-
+#![allow(missing_docs)]
 use structopt::StructOpt;
-use std::path::PathBuf;
 
-use std::fmt::Display;
+pub mod parser;
+pub mod deriv;
+pub mod poly;
 
-fn regex_parser(r: &str) -> Hir {
-    Parser::new().parse(r).unwrap()
-}
-
-fn backend_parser(a: &str) -> Backend {
-    if a == "nova" || a == "Nova" || a == "n" {
-            Backend::Nova
-    } else if a == "spartan" || a == "Spartan" || a == "n" {
-            Backend::Spartan
-    } else {
-            panic!("Unknown backend option {}", a)
-    }
-}
+use crate::parser::regex_parser;
+use crate::poly::mk_poly;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
 struct Options {
+    #[structopt(short = "ab", long = "alphabet", parse(from_str))]
+    alphabet: String,
+
     /// regular expression
-    #[structopt(short = "r", long = "regex", parse(from_str = regex_parser))]
-    regex: Hir,
+    #[structopt(short = "r", long = "regex", parse(from_str))]
+    regex: String,
 
-    #[structopt(short = "i", long = "input", parse(from_os_str))]
-    input: PathBuf,
-
-    #[structopt(long = "r1cs", default_value, parse(from_str = backend_parser))]
-    backend: Backend,
-}
-
-#[derive(Debug, Default, enum_display_derive::Display)]
-enum Backend {
-    /// Nova (hide recursion length)
-    #[default]
-    Nova,
-    /// Spartan R1CS back-end (public doc length)
-    Spartan
+    #[structopt(short = "i", long = "input", parse(from_str))]
+    input: String,
 }
 
 fn main() {
   let opt = Options::from_args();
+  let ab = opt.alphabet;
+  let r = regex_parser(&opt.regex, &ab);
+  let pdfa = mk_poly(&r, &ab);
 
-  println!("{}", opt.regex);
+  let doc = opt.input;
+  println!("Your regex {:?} matches input {}: {}", r, doc, pdfa.is_match(&doc));
 }
