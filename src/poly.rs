@@ -60,15 +60,32 @@ fn nth(d: &Radix2DomainVar<Fr>, n: u64) -> Fr {
     }
 }
 
+/// Ceil[log2(n)]
+fn num_bits(n: u64) -> u64 {
+    let mut a = 0;
+    let mut e = n;
+    while e > 0 {
+        e = e >> 1;
+        a += 1;
+    }
+    return a;
+}
+
 /// End-to-end: From Regex -> DFA -> PolyDFA
 pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
+    // Construct DFA
     let mut dfa = DFA::new();
     mk_dfa(q0, ab, &mut dfa);
-    let gen = Fr::get_root_of_unity(1 << dfa.n).unwrap();
+
+    // Upper bound number of states n = ceil[log2(dfa.n)]
+    let n = num_bits(dfa.n);
+
+    // Generator 2^n
+    let gen = Fr::get_root_of_unity(1 << n).unwrap();
     let domain = Radix2DomainVar {
         gen,
         offset: FpVar::one(),
-        dim: dfa.n // 2^n
+        dim: n // 2^n
     };
 
     // Get G^q0 is the initial state
@@ -81,24 +98,27 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
     let mut pdfa = PolyDFA::new(init, &HashSet::from_iter(fin));
 
     for c in ab.chars() {
-        let deltas = dfa.deltas();           // For all transitions....
-        let mut garbage = deltas       // For all transitions....
+        let ds = dfa.deltas();
+
+        let mut pairs = ds // For all transitions....
                 .iter()
                 .filter(|(_, x, _)|*x == c)
                 .collect::<Vec<_>>();
 
-        garbage
-                .sort_by(|(a,_,_),(b,_,_)| a.cmp(b));
+        // Pad to 2^n
+        let dummy = (0, c, 0);
+        while pairs.len() < (1<<n) {
+            pairs.push(&dummy);
+        }
 
+        // Sort by x
+        pairs.sort_by(|(a,_,_),(b,_,_)| a.cmp(b));
+
+        // Take ys
         let yys =
-                garbage.iter()
-                .map(|(from,_,to)|
-                        (
-                        FpVar::constant(nth(&domain, *from)),
-                        FpVar::constant(nth(&domain, *to))
-                     ))
-                .unzip::<_, _, Vec<_>, Vec<_>>()
-                .1;
+                pairs.iter()
+                .map(|(_,_,to)| FpVar::constant(nth(&domain, *to)))
+                .collect::<Vec<_>>();
 
         // Make lagrange
         let poly = EvaluationsVar::from_vec_and_domain(yys, domain.clone(), true);
