@@ -8,6 +8,8 @@ use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
 use ark_r1cs_std::R1CSVar;
 use ark_ff::FftField;
 use ark_bls12_381::Fr;
+use ark_r1cs_std::bits::ToBitsGadget;
+use ark_r1cs_std::select::CondSelectGadget;
 
 use std::vec::Vec;
 
@@ -32,6 +34,29 @@ impl PolyDFA {
 
     pub fn add(&mut self, c: char, p: &EvaluationsVar<Fr>) {
        self.poly.insert(c, p.clone());
+    }
+
+    pub fn get(&self, c: char) -> &EvaluationsVar<Fr> {
+        &self.poly[&c]
+    }
+
+    /// This creates the big switch across polynomials used in the outer loop
+    /// across the document
+    /// Arguments
+    ///
+    /// c: A private witness, the *index* of the current character in the alphabet,
+    ///    so if alphabet is ASCII, character = 'D' then c = '68'
+    /// state: A private witness to the current state
+    pub fn to_cs(self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
+        let index = c.to_bits_le().unwrap();
+        let ps = self.poly
+            .into_iter().map(|(_, p)|
+              p
+                .interpolate_and_evaluate(&state)
+                .unwrap())
+            .collect::<Vec<_>>();
+
+        CondSelectGadget::conditionally_select_power_of_two_vector(&index, &ps).unwrap()
     }
 
     // For testing
@@ -84,18 +109,14 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
     let gen = Fr::get_root_of_unity(1 << n).unwrap();
     let domain = Radix2DomainVar {
         gen,
-        offset: FpVar::one(),
-        dim: n // 2^n
+        offset: FpVar::constant(Fr::multiplicative_generator()),
+        dim: n, // 2^4 = 16
     };
 
     // Get G^q0 is the initial state
     let init = nth(&domain, dfa.get_state_num(q0));
-    let mut fin = Vec::new();
-    for i in dfa.get_final_states() {
-        fin.push(nth(&domain, i).clone());
-    }
-
-    let mut pdfa = PolyDFA::new(init, &HashSet::from_iter(fin));
+    let fin = dfa.get_final_states().into_iter().map(|i| nth(&domain, i)).collect::<HashSet<_>>();
+    let mut pdfa = PolyDFA::new(init, &fin);
 
     for c in ab.chars() {
         let ds = dfa.deltas();
@@ -115,18 +136,17 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
         pairs.sort_by(|(a,_,_),(b,_,_)| a.cmp(b));
 
         // Take ys
-        let yys =
+        let evals =
                 pairs.iter()
                 .map(|(_,_,to)| FpVar::constant(nth(&domain, *to)))
                 .collect::<Vec<_>>();
 
-        // Make lagrange
-        let poly = EvaluationsVar::from_vec_and_domain(yys, domain.clone(), true);
+        let poly = EvaluationsVar::from_vec_and_domain(evals, domain.clone(), true);
 
         // Lagrange interpolation; P_c(x) intersects (xs, ys)
         pdfa.add(c, &poly);
     }
-    // println!("DFA: {:?}, PolyDFA: {:?}", dfa, pdfa);
     pdfa
 }
+
 

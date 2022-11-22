@@ -10,6 +10,8 @@ hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch 
 structopt = "0.3"
 ark-ec = { version = "^0.3.0" }
 ark-ff = { version = "^0.3.0", features=["std"] }
+ark-std = "^0.3.0"
+ark-relations = "^0.3.0"
 ark-r1cs-std = { version = "^0.3.0", features = ["std"] }
 ark-bls12-381 = "^0.3.0"
 regex-syntax = "0.6"

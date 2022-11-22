@@ -439,6 +439,8 @@ dependencies = [
  "ark-ec",
  "ark-ff",
  "ark-r1cs-std",
+ "ark-relations",
+ "ark-std",
  "hashconsing",
  "itertools",
  "regex-syntax",
