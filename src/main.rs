@@ -1,8 +1,19 @@
 #![allow(missing_docs)]
 use structopt::StructOpt;
+type G1 = pasta_curves::pallas::Point;
+type G2 = pasta_curves::vesta::Point;
+use ::bellperson::{gadgets::num::AllocatedNum, ConstraintSystem, SynthesisError};
+use ff::PrimeField;
+use nova_snark::{
+    traits::{
+        circuit::{StepCircuit, TrivialTestCircuit},
+        Group,
+    },
+    CompressedSNARK, PublicParams, RecursiveSNARK,
+};
 
-pub mod parser;
 pub mod deriv;
+pub mod parser;
 pub mod poly;
 
 use crate::parser::regex_parser;
@@ -23,11 +34,13 @@ struct Options {
 }
 
 fn main() {
-  let opt = Options::from_args();
-  let ab = opt.alphabet;
-  let r = regex_parser(&opt.regex, &ab);
-  let pdfa = mk_poly(&r, &ab);
+    let opt = Options::from_args();
+    /*
+      let ab = opt.alphabet;
+      let r = regex_parser(&opt.regex, &ab);
+      let pdfa = mk_poly(&r, &ab);
 
-  let doc = opt.input;
-  println!("Your regex {:?} matches input {}: {}", r, doc, pdfa.is_match(&doc));
+      let doc = opt.input;
+      println!("Your regex {:?} matches input {}: {}", r, doc, pdfa.is_match(&doc));
+    */
 }
