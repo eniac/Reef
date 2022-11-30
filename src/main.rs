@@ -41,8 +41,9 @@ struct DFAStepWitness<F: PrimeField> {
 
 impl<F: PrimeField> DFAStepWitness<F> {
     // sample witness
-    fn new(num_iters: usize, x_0: &F) -> (Vec<F>, Vec<Self>) {
-        let mut vars = Vec::new();
+    fn new(x_0: &F) -> (Vec<F>, Self) {
+        //Vec<Self>) {
+        //let mut vars = Vec::new();
 
         //let mut hash_i = *hash_0;
         let mut x_i = *x_0;
@@ -50,9 +51,10 @@ impl<F: PrimeField> DFAStepWitness<F> {
         // note in final version, we will likely do many iters per step
         let x_i_plus_1 = x_i * x_i;
 
-        vars.push(Self { x_i, x_i_plus_1 });
+        //vars.push(
+        let vars = Self { x_i, x_i_plus_1 };
 
-        x_i = x_i_plus_1;
+        //x_i = x_i_plus_1;
 
         let z_0 = vec![*x_0];
 
@@ -177,20 +179,28 @@ fn main() {
         pp.num_variables().1
     );
 
-    // produce witnesses
-    let (z0_primary, dfa_witnesses) = DFAStepWitness::new(
-        num_steps,
-        // &<G1 as Group>::Scalar::zero(), //hash_0
-        &<G1 as Group>::Scalar::one(), //x_0
-    );
-
     // circuit
     let mut circuits_primary = Vec::new();
+
+    // witness #0
+    let (z0_primary, dfa_witness) = DFAStepWitness::new(
+        // &<G1 as Group>::Scalar::zero(), //hash_0
+        &(<G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one()), //x_0 = 2
+    );
     for i in 0..num_steps {
+        // witnesses
+        if i != 0 {
+            let (_z0_primary, dfa_witness) = DFAStepWitness::new(
+                // &<G1 as Group>::Scalar::zero(), //hash_0
+                &dfa_witness.x_i_plus_1, //x_0
+            );
+        }
+        println!("{:#?}\n{:#?}", z0_primary, dfa_witness);
+        // fill circuit w/wit
         let circuit = DFAStepCircuit {
             wit: DFAStepWitness {
-                x_i: dfa_witnesses[i].x_i,
-                x_i_plus_1: dfa_witnesses[i].x_i_plus_1,
+                x_i: dfa_witness.x_i,
+                x_i_plus_1: dfa_witness.x_i_plus_1,
             },
         };
         circuits_primary.push(circuit);
