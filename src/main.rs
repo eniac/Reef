@@ -64,10 +64,40 @@ impl<F: PrimeField> DFAStepWitness<F> {
 
 #[derive(Clone, Debug)]
 struct DFAStepCircuit<F: PrimeField> {
-    wit: DFAStepWitness<F>, // later this will be an array
+    wit: DFAStepWitness<F>,
 }
 
-// sample F: x_{i+1} = 2 * x_i
+impl<F> DFAStepCircuit<F>
+where
+    F: PrimeField,
+{
+    fn new(num_steps: usize, x0: F) -> (Vec<F>, Vec<Self>) {
+        let z0 = vec![x0];
+        let mut circuits = Vec::new();
+        let (mut zi, mut dfa_witness) = DFAStepWitness::new(&x0);
+        let circuit = DFAStepCircuit {
+            wit: dfa_witness.clone(),
+        };
+        println!("{:#?}", circuit);
+        circuits.push(circuit);
+
+        for i in 1..num_steps {
+            (zi, dfa_witness) = DFAStepWitness::new(&dfa_witness.x_i_plus_1);
+
+            let circuit = DFAStepCircuit {
+                wit: dfa_witness.clone(),
+            };
+            println!("{:#?}", circuit);
+            circuits.push(circuit);
+        }
+
+        (z0, circuits)
+    }
+
+    // helper methods here (?)
+}
+
+// sample F: x_{i+1} = x_i * x_i
 impl<F> StepCircuit<F> for DFAStepCircuit<F>
 where
     F: PrimeField,
@@ -88,14 +118,11 @@ where
         let mut z_out: Result<Vec<AllocatedNum<F>>, SynthesisError> =
             Err(SynthesisError::AssignmentMissing);
 
-        // starting inputs
-        let x_0 = z[0].clone();
-
-        // variables to hold running x_i and y_i
         // let mut hash_i = hash_0;
-        let mut x_i = x_0;
+        // let mut x_i = z[0].clone();;
 
         // non deterministic advice
+        let x_i = AllocatedNum::alloc(cs.namespace(|| format!("x_i")), || Ok(self.wit.x_i))?;
         let x_i_plus_1 = AllocatedNum::alloc(cs.namespace(|| format!("x_i_plus_1")), || {
             Ok(self.wit.x_i_plus_1)
         })?;
@@ -180,31 +207,10 @@ fn main() {
     );
 
     // circuit
-    let mut circuits_primary = Vec::new();
-
-    // witness #0
-    let (z0_primary, dfa_witness) = DFAStepWitness::new(
-        // &<G1 as Group>::Scalar::zero(), //hash_0
-        &(<G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one()), //x_0 = 2
+    let (z0_primary, circuits_primary) = DFAStepCircuit::new(
+        num_steps,
+        <G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one(),
     );
-    for i in 0..num_steps {
-        // witnesses
-        if i != 0 {
-            let (_z0_primary, dfa_witness) = DFAStepWitness::new(
-                // &<G1 as Group>::Scalar::zero(), //hash_0
-                &dfa_witness.x_i_plus_1, //x_0
-            );
-        }
-        println!("{:#?}\n{:#?}", z0_primary, dfa_witness);
-        // fill circuit w/wit
-        let circuit = DFAStepCircuit {
-            wit: DFAStepWitness {
-                x_i: dfa_witness.x_i,
-                x_i_plus_1: dfa_witness.x_i_plus_1,
-            },
-        };
-        circuits_primary.push(circuit);
-    }
 
     // trivial
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
