@@ -2,7 +2,10 @@
 use structopt::StructOpt;
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-use ::bellperson::{gadgets::num::AllocatedNum, ConstraintSystem, SynthesisError};
+use ::bellperson::{gadgets::num::AllocatedNum, SynthesisError};
+use ark_bls12_381::Fr;
+use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
+use ark_relations::r1cs::ConstraintSystemRef;
 use ff::PrimeField;
 use nova_snark::{
     traits::{
@@ -11,7 +14,6 @@ use nova_snark::{
     },
     CompressedSNARK, PublicParams, RecursiveSNARK,
 };
-
 pub mod deriv;
 pub mod parser;
 pub mod poly;
@@ -65,6 +67,7 @@ impl<F: PrimeField> DFAStepWitness<F> {
 #[derive(Clone, Debug)]
 struct DFAStepCircuit<F: PrimeField> {
     wit: DFAStepWitness<F>,
+    //arkcs:
 }
 
 impl<F> DFAStepCircuit<F>
@@ -78,7 +81,7 @@ where
         let circuit = DFAStepCircuit {
             wit: dfa_witness.clone(),
         };
-        println!("{:#?}", circuit);
+        // println!("{:#?}", circuit);
         circuits.push(circuit);
 
         for i in 1..num_steps {
@@ -87,7 +90,7 @@ where
             let circuit = DFAStepCircuit {
                 wit: dfa_witness.clone(),
             };
-            println!("{:#?}", circuit);
+            // println!("{:#?}", circuit);
             circuits.push(circuit);
         }
 
@@ -110,7 +113,7 @@ where
 
     // make circuit for a computation step
     // return variable corresponding to output of step z_{i+1}
-    fn synthesize<CS: ConstraintSystem<F>>(
+    fn synthesize<CS: bellperson::ConstraintSystem<F>>(
         &self,
         cs: &mut CS,
         z: &[AllocatedNum<F>],
@@ -157,17 +160,40 @@ where
 
 fn main() {
     let opt = Options::from_args();
-    /*
-      let ab = opt.alphabet;
-      let r = regex_parser(&opt.regex, &ab);
-      let pdfa = mk_poly(&r, &ab);
 
-      let doc = opt.input;
-      println!("Your regex {:?} matches input {}: {}", r, doc, pdfa.is_match(&doc));
-    */
+    let ab = opt.alphabet;
+    let r = regex_parser(&opt.regex, &ab);
+    let pdfa = mk_poly(&r, &ab);
+
+    let doc = opt.input;
+    println!(
+        "Your regex {:?} matches input {}: {}",
+        r,
+        doc,
+        pdfa.is_match(&doc)
+    );
+
+    let ark_cs: ConstraintSystemRef<Fr> = ark_relations::r1cs::ConstraintSystem::new_ref();
+    let mut state = FpVar::constant(pdfa.init); // starting state (folding wit carrying CS)
 
     // nova recursions
-    let num_steps = 3; // len of document
+    let num_steps = doc.chars().count(); // len of document
+    println!("Doc len is {}", num_steps);
+
+    for i in 0..num_steps {
+        let c_i = FpVar::new_witness(ns!(ark_cs, "character_i") || Ok(doc.get(i)))?;
+        state = pdfa.to_cs(c_i, state);
+
+        // TODO: convert state to circuit
+    }
+
+    // check ark_cs looks good
+    assert!(ark_cs.is_satisfied().unwrap());
+    println!("number of ark constraints: {}", ark_cs.num_constraints());
+
+    // TODO: check conversion is good
+
+    // NOVA
 
     // main circuit F w/empty witness
     let circuit_primary = DFAStepCircuit {
@@ -206,50 +232,52 @@ fn main() {
         pp.num_variables().1
     );
 
-    // circuit
-    let (z0_primary, circuits_primary) = DFAStepCircuit::new(
-        num_steps,
-        <G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one(),
-    );
-
-    // trivial
-    let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
-
-    type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
-    type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
-
-    // recursive SNARK
-    let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
-
-    for (i, circuit_primary) in circuits_primary.iter().take(num_steps).enumerate() {
-        let result = RecursiveSNARK::prove_step(
-            &pp,
-            recursive_snark,
-            circuit_primary.clone(),
-            circuit_secondary.clone(),
-            z0_primary.clone(),
-            z0_secondary.clone(),
+    /*
+        // circuit
+        let (z0_primary, circuits_primary) = DFAStepCircuit::new(
+            num_steps,
+            <G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one(),
         );
-        assert!(result.is_ok());
-        println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
-        recursive_snark = Some(result.unwrap());
-    }
 
-    assert!(recursive_snark.is_some());
-    let recursive_snark = recursive_snark.unwrap();
+        // trivial
+        let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
-    // verify recursive
-    let res = recursive_snark.verify(&pp, num_steps, z0_primary.clone(), z0_secondary.clone());
-    assert!(res.is_ok());
+        type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
+        type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
 
-    // compressed SNARK
-    type S1 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G1>;
-    type S2 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G2>;
-    let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
-    assert!(res.is_ok());
-    let compressed_snark = res.unwrap();
+        // recursive SNARK
+        let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
 
-    // verify compressed
-    let res = compressed_snark.verify(&pp, num_steps, z0_primary, z0_secondary);
-    assert!(res.is_ok());
+        for (i, circuit_primary) in circuits_primary.iter().take(num_steps).enumerate() {
+            let result = RecursiveSNARK::prove_step(
+                &pp,
+                recursive_snark,
+                circuit_primary.clone(),
+                circuit_secondary.clone(),
+                z0_primary.clone(),
+                z0_secondary.clone(),
+            );
+            assert!(result.is_ok());
+            println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
+            recursive_snark = Some(result.unwrap());
+        }
+
+        assert!(recursive_snark.is_some());
+        let recursive_snark = recursive_snark.unwrap();
+
+        // verify recursive
+        let res = recursive_snark.verify(&pp, num_steps, z0_primary.clone(), z0_secondary.clone());
+        assert!(res.is_ok());
+
+        // compressed SNARK
+        type S1 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G1>;
+        type S2 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G2>;
+        let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
+        assert!(res.is_ok());
+        let compressed_snark = res.unwrap();
+
+        // verify compressed
+        let res = compressed_snark.verify(&pp, num_steps, z0_primary, z0_secondary);
+        assert!(res.is_ok());
+    */
 }

@@ -1,19 +1,16 @@
+use ark_bls12_381::Fr;
+use ark_ff::FftField;
+use ark_r1cs_std::bits::ToBitsGadget;
+use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
+use ark_r1cs_std::poly::{domain::Radix2DomainVar, evaluations::univariate::*};
+use ark_r1cs_std::select::CondSelectGadget;
+use ark_r1cs_std::R1CSVar;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use ark_r1cs_std::poly::{
-    domain::Radix2DomainVar,
-    evaluations::univariate::*
-    };
-use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
-use ark_r1cs_std::R1CSVar;
-use ark_ff::FftField;
-use ark_bls12_381::Fr;
-use ark_r1cs_std::bits::ToBitsGadget;
-use ark_r1cs_std::select::CondSelectGadget;
 
 use std::vec::Vec;
 
-use crate::deriv::{DFA, mk_dfa};
+use crate::deriv::{mk_dfa, DFA};
 use crate::parser::re::Regex;
 
 /// DFA encoding using Lagrange polynomials
@@ -22,18 +19,22 @@ pub struct PolyDFA {
     /// Another encoding of the DFA's delta function
     poly: HashMap<char, EvaluationsVar<Fr>>,
     /// Initial state
-    init: Fr,
+    pub init: Fr,
     /// Final state
-    fin: HashSet<Fr>
+    fin: HashSet<Fr>,
 }
 
 impl PolyDFA {
     pub fn new(init: Fr, fin: &HashSet<Fr>) -> Self {
-       Self { poly: HashMap::new(), init, fin: fin.clone() }
+        Self {
+            poly: HashMap::new(),
+            init,
+            fin: fin.clone(),
+        }
     }
 
     pub fn add(&mut self, c: char, p: &EvaluationsVar<Fr>) {
-       self.poly.insert(c, p.clone());
+        self.poly.insert(c, p.clone());
     }
 
     pub fn get(&self, c: char) -> &EvaluationsVar<Fr> {
@@ -49,11 +50,10 @@ impl PolyDFA {
     /// state: A private witness to the current state
     pub fn to_cs(self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
         let index = c.to_bits_le().unwrap();
-        let ps = self.poly
-            .into_iter().map(|(_, p)|
-              p
-                .interpolate_and_evaluate(&state)
-                .unwrap())
+        let ps = self
+            .poly
+            .into_iter()
+            .map(|(_, p)| p.interpolate_and_evaluate(&state).unwrap())
             .collect::<Vec<_>>();
 
         CondSelectGadget::conditionally_select_power_of_two_vector(&index, &ps).unwrap()
@@ -61,15 +61,15 @@ impl PolyDFA {
 
     // For testing
     pub fn is_match(&self, doc: &String) -> bool {
-       let mut s = self.init;
-       // For "abb" compute [P_b(P_b(P_a(init)))]
-       for c in doc.chars() {
-          let ss = self.poly[&c].interpolate_and_evaluate(&FpVar::constant(s));
-          println!("{:?} -> {:?}", s, ss);
-          s = ss.unwrap().value().unwrap();
-       }
-       // If it is in the final states, then success
-       self.fin.contains(&s)
+        let mut s = self.init;
+        // For "abb" compute [P_b(P_b(P_a(init)))]
+        for c in doc.chars() {
+            let ss = self.poly[&c].interpolate_and_evaluate(&FpVar::constant(s));
+            println!("{:?} -> {:?}", s, ss);
+            s = ss.unwrap().value().unwrap();
+        }
+        // If it is in the final states, then success
+        self.fin.contains(&s)
     }
 }
 
@@ -78,8 +78,8 @@ fn nth(d: &Radix2DomainVar<Fr>, n: u64) -> Fr {
     if n == 0 {
         cur
     } else {
-        for _ in 0..(n-1) {
-           cur = cur * cur;
+        for _ in 0..(n - 1) {
+            cur = cur * cur;
         }
         cur
     }
@@ -115,31 +115,35 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
 
     // Get G^q0 is the initial state
     let init = nth(&domain, dfa.get_state_num(q0));
-    let fin = dfa.get_final_states().into_iter().map(|i| nth(&domain, i)).collect::<HashSet<_>>();
+    let fin = dfa
+        .get_final_states()
+        .into_iter()
+        .map(|i| nth(&domain, i))
+        .collect::<HashSet<_>>();
     let mut pdfa = PolyDFA::new(init, &fin);
 
     for c in ab.chars() {
         let ds = dfa.deltas();
 
         let mut pairs = ds // For all transitions....
-                .iter()
-                .filter(|(_, x, _)|*x == c)
-                .collect::<Vec<_>>();
+            .iter()
+            .filter(|(_, x, _)| *x == c)
+            .collect::<Vec<_>>();
 
         // Pad to 2^n
         let dummy = (0, c, 0);
-        while pairs.len() < (1<<n) {
+        while pairs.len() < (1 << n) {
             pairs.push(&dummy);
         }
 
         // Sort by x
-        pairs.sort_by(|(a,_,_),(b,_,_)| a.cmp(b));
+        pairs.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
 
         // Take ys
-        let evals =
-                pairs.iter()
-                .map(|(_,_,to)| FpVar::constant(nth(&domain, *to)))
-                .collect::<Vec<_>>();
+        let evals = pairs
+            .iter()
+            .map(|(_, _, to)| FpVar::constant(nth(&domain, *to)))
+            .collect::<Vec<_>>();
 
         let poly = EvaluationsVar::from_vec_and_domain(evals, domain.clone(), true);
 
@@ -148,5 +152,3 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
     }
     pdfa
 }
-
-

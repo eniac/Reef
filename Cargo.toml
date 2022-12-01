@@ -14,6 +14,7 @@ ark-std = "^0.3.0"
 ark-relations = "^0.3.0"
 ark-r1cs-std = { version = "^0.3.0", features = ["std"] }
 ark-bls12-381 = "^0.3.0"
+ark-pallas = "^0.4.0-alpha.1"
 regex-syntax = "0.6"
 itertools = "0.10"
 nova-snark = "0.8.1" # backend
