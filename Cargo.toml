@@ -21,4 +21,7 @@ nova-snark = "0.8.1" # backend
 bellperson = { version = "0.22", default-features = false }
 pasta_curves = { version = "0.4.0", features = ["repr-c"] }
 ff = "0.12.0"
+ark-poly = { version = "^0.3.0", default-features = false }
+ark-test-curves = { version = "^0.3.0", default-features = false, features = ["bls12_381_scalar_field", "bls12_381_curve", "mnt4_753_scalar_field"] }
+
 

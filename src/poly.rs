@@ -14,6 +14,7 @@ use crate::deriv::{mk_dfa, DFA};
 use crate::parser::re::Regex;
 
 /// DFA encoding using Lagrange polynomials
+#[derive(Clone)]
 pub struct PolyDFA {
     /// For each [char], a characteristic polynomial P(state_id) = state_id'
     /// Another encoding of the DFA's delta function
@@ -73,7 +74,7 @@ impl PolyDFA {
     }
 }
 
-fn nth(d: &Radix2DomainVar<Fr>, n: u64) -> Fr {
+pub fn nth(d: &Radix2DomainVar<Fr>, n: u64) -> Fr {
     let mut cur = d.gen;
     if n == 0 {
         cur
@@ -94,6 +95,20 @@ fn num_bits(n: u64) -> u64 {
         a += 1;
     }
     return a;
+}
+
+pub fn get_domain(size: u64) -> Radix2DomainVar<Fr> {
+    let n = num_bits(size);
+
+    // Generator 2^n
+    let gen = Fr::get_root_of_unity(1 << n).unwrap();
+    let domain = Radix2DomainVar {
+        gen,
+        offset: FpVar::constant(Fr::multiplicative_generator()),
+        dim: n, // 2^4 = 16
+    };
+
+    return domain;
 }
 
 /// End-to-end: From Regex -> DFA -> PolyDFA
