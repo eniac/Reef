@@ -175,56 +175,61 @@ fn main() {
     let domain = get_domain(ab.chars().count() as u64);
 
     let r = regex_parser(&opt.regex, &ab);
-    let pdfa = mk_poly(&r, &ab);
+    //let pdfa = mk_poly(&r, &ab);
 
     let doc = opt.input;
 
-    let mut rng = test_rng();
-    let poly = DensePolynomial::rand(15, &mut rng);
-    let gen = Fr::get_root_of_unity(1 << 4).unwrap();
-    assert_eq!(gen.pow(&[1 << 4]), Fr::one());
-    let domain = Radix2DomainVar {
-        gen,
-        offset: FpVar::constant(Fr::rand(&mut rng)),
-        dim: 4, // 2^4 = 16
-    };
-    let mut coset_point = domain.offset.value().unwrap();
-    let mut oracle_evals = Vec::new();
-    for _ in 0..(1 << 4) {
-        oracle_evals.push(poly.evaluate(&coset_point));
-        coset_point *= gen;
-    }
+    // make the (single) F circuit
     let cs = ConstraintSystem::new_ref();
-    let evaluations_fp: Vec<_> = oracle_evals
-        .iter()
-        .map(|x| FpVar::new_input(ns!(cs, "evaluations"), || Ok(x)).unwrap())
-        .collect();
-    let evaluations_var = EvaluationsVar::from_vec_and_domain(evaluations_fp, domain, true);
 
-    let interpolate_point = Fr::rand(&mut rng);
-    let interpolate_point_fp =
-        FpVar::new_input(ns!(cs, "interpolate point"), || Ok(interpolate_point)).unwrap();
+    let pdfa = mk_poly(&r, &ab);
 
-    let expected = poly.evaluate(&interpolate_point);
+    // allocate polys + needed constraints as constants
 
-    let actual = evaluations_var
-        .interpolate_and_evaluate(&interpolate_point_fp)
-        .unwrap()
-        .value()
-        .unwrap();
+    // allocate dummy witnesses
+    let c_i = FpVar::new_witness(ns!(cs, "dummy char"), || Ok(pdfa.init)).unwrap(); // todo
+    let init_state = FpVar::new_witness(ns!(cs, "dummy state"), || Ok(pdfa.init)).unwrap();
 
-    assert_eq!(actual, expected);
+    // make circuit
+    pdfa.clone().to_cs(c_i, init_state.clone());
     assert!(cs.is_satisfied().unwrap());
-    println!("number of constraints: {}", cs.num_constraints())
+    println!("number of constraints per round: {}", cs.num_constraints());
+    // TODO: optimize, finalize
+    cs.finalize();
+    println!("number of constraints per round: {}", cs.num_constraints());
 
-    //let ark_cs: ConstraintSystemRef<Fr> = ark_relations::r1cs::ConstraintSystem::new_ref();
-    //assert!(!ark_cs.into_inner().is_none());
+    //println!("should construct ABC? {}", cs.should_construct_matrices());
+    let ark_matrices = cs.to_matrices().unwrap();
+
+    // use dummy circuit to generate nova F (don't translate witnesses)
+
+    // iterations
+    let num_steps = doc.chars().count(); // len of document
+    println!("Doc len is {}", num_steps);
+
+    let mut next_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(pdfa.init)).unwrap();
+    for i in 0..num_steps {
+        let cs_i = ConstraintSystem::new_ref();
+        // allocate real witnesses for round i
+        let c_i = FpVar::new_witness(ns!(cs_i, "char i"), || Ok(pdfa.init)).unwrap();
+
+        // regenerate circuit (only needed for validation, not for nova)
+        next_state = pdfa.clone().to_cs(c_i, init_state.clone());
+        assert!(cs_i.is_satisfied().unwrap());
+
+        // generate nova witness vector i
+        println!("# wit: {}", cs_i.num_witness_variables());
+        //println!("wit: {:#?}", cs_i.borrow().unwrap().witness_assignment);
+        //println!("inp: {:#?}", cs_i.borrow().unwrap().instance_assignment);
+
+        let wit = cs_i.borrow().unwrap().witness_assignment.clone();
+        let inp = cs_i.borrow().unwrap().instance_assignment.clone();
+    }
+
+    // fold + compile nova
 
     //    let init_state = FpVar::constant(pdfa.init); // starting state (folding wit carrying CS)
     /*
-        // nova recursions
-        let num_steps = doc.chars().count(); // len of document
-        println!("Doc len is {}", num_steps);
 
         let c = doc.chars().next().unwrap();
         //for c in doc.chars() {

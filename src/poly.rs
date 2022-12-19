@@ -57,7 +57,8 @@ impl PolyDFA {
             .map(|(_, p)| p.interpolate_and_evaluate(&state).unwrap())
             .collect::<Vec<_>>();
 
-        CondSelectGadget::conditionally_select_power_of_two_vector(&index, &ps).unwrap()
+        ps[0].clone()
+        //CondSelectGadget::conditionally_select_power_of_two_vector(&index, &ps).unwrap()
     }
 
     // For testing
