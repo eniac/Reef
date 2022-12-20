@@ -1,4 +1,4 @@
-use ark_bls12_381::Fr;
+use ark_pallas::Fr;
 use ark_ff::FftField;
 use ark_r1cs_std::bits::ToBitsGadget;
 use ark_r1cs_std::fields::{fp::FpVar, FieldVar};

@@ -30,7 +30,7 @@ use ark_poly::polynomial::univariate::DensePolynomial;
 use ark_poly::{Polynomial, UVPolynomial};
 use ark_relations::r1cs::ConstraintSystem;
 use ark_std::test_rng;
-use ark_test_curves::bls12_381::Fr;
+use ark_pallas::Fr;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
@@ -180,7 +180,7 @@ fn main() {
     let doc = opt.input;
 
     // make the (single) F circuit
-    let cs = ConstraintSystem::new_ref();
+//    let cs = ConstraintSystem::new_ref();
 
     let pdfa = mk_poly(&r, &ab);
 
