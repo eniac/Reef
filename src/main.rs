@@ -26,11 +26,11 @@ use ark_r1cs_std::poly::evaluations::univariate::EvaluationsVar;
 use ark_r1cs_std::R1CSVar;
 
 use ark_ff::{FftField, Field, One, UniformRand};
+use ark_pallas::Fr;
 use ark_poly::polynomial::univariate::DensePolynomial;
 use ark_poly::{Polynomial, UVPolynomial};
 use ark_relations::r1cs::ConstraintSystem;
 use ark_std::test_rng;
-use ark_pallas::Fr;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
@@ -180,7 +180,7 @@ fn main() {
     let doc = opt.input;
 
     // make the (single) F circuit
-//    let cs = ConstraintSystem::new_ref();
+    let cs = ConstraintSystem::new_ref();
 
     let pdfa = mk_poly(&r, &ab);
 
@@ -206,15 +206,19 @@ fn main() {
     // iterations
     let num_steps = doc.chars().count(); // len of document
     println!("Doc len is {}", num_steps);
+    let mut chars = doc.chars();
 
+    let mut cs_i = ConstraintSystem::new_ref();
     let mut next_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(pdfa.init)).unwrap();
+
     for i in 0..num_steps {
-        let cs_i = ConstraintSystem::new_ref();
         // allocate real witnesses for round i
-        let c_i = FpVar::new_witness(ns!(cs_i, "char i"), || Ok(pdfa.init)).unwrap();
+        let c_i = nth(&domain, chars.next().unwrap() as u64);
+        let civar = FpVar::new_witness(ns!(cs_i, "char i"), || Ok(c_i)).unwrap();
 
         // regenerate circuit (only needed for validation, not for nova)
-        next_state = pdfa.clone().to_cs(c_i, init_state.clone());
+        next_state = pdfa.clone().to_cs(civar, next_state.clone());
+
         assert!(cs_i.is_satisfied().unwrap());
 
         // generate nova witness vector i
@@ -224,6 +228,12 @@ fn main() {
 
         let wit = cs_i.borrow().unwrap().witness_assignment.clone();
         let inp = cs_i.borrow().unwrap().instance_assignment.clone();
+
+        // translate wit to nova, fold
+
+        // for next i+1 round
+        cs_i = ConstraintSystem::new_ref();
+        //FpVar::new_witness(ns!(cs_i, "state i"), || Ok(next_state)).unwrap();
     }
 
     // fold + compile nova
