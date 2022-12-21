@@ -29,8 +29,9 @@ use ark_ff::{FftField, Field, One, UniformRand};
 use ark_pallas::Fr;
 use ark_poly::polynomial::univariate::DensePolynomial;
 use ark_poly::{Polynomial, UVPolynomial};
-use ark_relations::r1cs::ConstraintSystem;
+use ark_relations::r1cs::{ConstraintSystem, OptimizationGoal};
 use ark_std::test_rng;
+use ark_std::Zero;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
@@ -172,7 +173,7 @@ where
 fn main() {
     let opt = Options::from_args();
     let ab = opt.alphabet;
-    let domain = get_domain(ab.chars().count() as u64);
+    let domain = get_domain(3); //ab.chars().count() as u64);
 
     let r = regex_parser(&opt.regex, &ab);
     //let pdfa = mk_poly(&r, &ab);
@@ -181,6 +182,7 @@ fn main() {
 
     // make the (single) F circuit
     let cs = ConstraintSystem::new_ref();
+    cs.set_optimization_goal(OptimizationGoal::None);
 
     let pdfa = mk_poly(&r, &ab);
 
@@ -200,6 +202,7 @@ fn main() {
 
     //println!("should construct ABC? {}", cs.should_construct_matrices());
     let ark_matrices = cs.to_matrices().unwrap();
+    //println!("DUMMY {:#?}", ark_matrices);
 
     // use dummy circuit to generate nova F (don't translate witnesses)
 
@@ -209,16 +212,19 @@ fn main() {
     let mut chars = doc.chars();
 
     let mut cs_i = ConstraintSystem::new_ref();
-    let mut next_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(pdfa.init)).unwrap();
-
+    let mut curr_state =
+        FpVar::new_witness(ns!(cs_i, "state i"), || Ok(pdfa.init + Fr::one())).unwrap();
     for i in 0..num_steps {
         // allocate real witnesses for round i
         let c_i = nth(&domain, chars.next().unwrap() as u64);
         let civar = FpVar::new_witness(ns!(cs_i, "char i"), || Ok(c_i)).unwrap();
 
         // regenerate circuit (only needed for validation, not for nova)
-        next_state = pdfa.clone().to_cs(civar, next_state.clone());
-
+        let next_state = pdfa
+            .clone()
+            .to_cs(civar, curr_state.clone())
+            .value()
+            .unwrap();
         assert!(cs_i.is_satisfied().unwrap());
 
         // generate nova witness vector i
@@ -228,14 +234,20 @@ fn main() {
 
         let wit = cs_i.borrow().unwrap().witness_assignment.clone();
         let inp = cs_i.borrow().unwrap().instance_assignment.clone();
+        cs_i.finalize();
+        let ark_matrices = cs_i.to_matrices().unwrap();
+        //println!("DUMMY {:#?}", ark_matrices);
 
         // translate wit to nova, fold
 
         // for next i+1 round
         cs_i = ConstraintSystem::new_ref();
-        //FpVar::new_witness(ns!(cs_i, "state i"), || Ok(next_state)).unwrap();
-    }
+        cs_i.set_optimization_goal(OptimizationGoal::None);
+        println!("in state {:#?}", curr_state.value().unwrap());
+        println!("out state {:#?}", next_state);
 
+        curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(next_state)).unwrap();
+    }
     // fold + compile nova
 
     //    let init_state = FpVar::constant(pdfa.init); // starting state (folding wit carrying CS)

@@ -1,5 +1,5 @@
-use ark_pallas::Fr;
 use ark_ff::FftField;
+use ark_pallas::Fr;
 use ark_r1cs_std::bits::ToBitsGadget;
 use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
 use ark_r1cs_std::poly::{domain::Radix2DomainVar, evaluations::univariate::*};
@@ -12,6 +12,8 @@ use std::vec::Vec;
 
 use crate::deriv::{mk_dfa, DFA};
 use crate::parser::re::Regex;
+
+use ark_std::One;
 
 /// DFA encoding using Lagrange polynomials
 #[derive(Clone)]
@@ -57,6 +59,8 @@ impl PolyDFA {
             .map(|(_, p)| p.interpolate_and_evaluate(&state).unwrap())
             .collect::<Vec<_>>();
 
+        //println!("{:#?}", ps);
+        //println!("{:#?}", self.poly.len());
         ps[0].clone()
         //CondSelectGadget::conditionally_select_power_of_two_vector(&index, &ps).unwrap()
     }
@@ -76,12 +80,12 @@ impl PolyDFA {
 }
 
 pub fn nth(d: &Radix2DomainVar<Fr>, n: u64) -> Fr {
-    let mut cur = d.gen;
+    let mut cur = d.offset.value().unwrap();
     if n == 0 {
         cur
     } else {
-        for _ in 0..(n - 1) {
-            cur = cur * cur;
+        for _ in 0..n {
+            cur *= d.gen;
         }
         cur
     }
@@ -117,25 +121,25 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
     // Construct DFA
     let mut dfa = DFA::new();
     mk_dfa(q0, ab, &mut dfa);
+    println!("dfa: {:#?}, {:#?}", dfa.states, dfa.trans);
 
     // Upper bound number of states n = ceil[log2(dfa.n)]
     let n = num_bits(dfa.n);
-
-    // Generator 2^n
-    let gen = Fr::get_root_of_unity(1 << n).unwrap();
-    let domain = Radix2DomainVar {
-        gen,
-        offset: FpVar::constant(Fr::multiplicative_generator()),
-        dim: n, // 2^4 = 16
-    };
+    let domain = get_domain(dfa.n);
 
     // Get G^q0 is the initial state
-    let init = nth(&domain, dfa.get_state_num(q0));
+    let init = nth(&domain, 2); // dfa.get_state_num(q0));
+    println!("when init state created: {:#?}", init);
     let fin = dfa
         .get_final_states()
         .into_iter()
         .map(|i| nth(&domain, i))
         .collect::<HashSet<_>>();
+
+    for i in 0..6 {
+        println!("{:#?} is {:#?}", i, nth(&domain, i));
+    }
+    println!("init {:#?}, fin {:#?}", init, fin);
     let mut pdfa = PolyDFA::new(init, &fin);
 
     for c in ab.chars() {
@@ -146,8 +150,11 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
             .filter(|(_, x, _)| *x == c)
             .collect::<Vec<_>>();
 
+        pairs = vec![&(0, 'a', 0), &(1, 'a', 1), &(2, 'a', 2), &(3, 'a', 3)]; // [&(3, 'a', 0)];
+
         // Pad to 2^n
-        let dummy = (0, c, 0);
+        println!("dfa n is {:#?}", n);
+        let dummy = (3, c, 1);
         while pairs.len() < (1 << n) {
             pairs.push(&dummy);
         }
@@ -155,11 +162,23 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
         // Sort by x
         pairs.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
 
+        println!("PAIRS {:#?}", pairs);
+
+        let mut result = Vec::new();
+        result.push(domain.offset.clone());
+        for _ in 1..(1 << domain.dim) {
+            let new_element = result.last().unwrap() * domain.gen;
+            result.push(new_element);
+        }
+        println!("ELEMENTS! {:#?}", result);
+
         // Take ys
         let evals = pairs
             .iter()
             .map(|(_, _, to)| FpVar::constant(nth(&domain, *to)))
             .collect::<Vec<_>>();
+
+        println!("EVALS {:#?}", evals);
 
         let poly = EvaluationsVar::from_vec_and_domain(evals, domain.clone(), true);
 
