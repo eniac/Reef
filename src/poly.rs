@@ -14,7 +14,7 @@ use crate::deriv::{mk_dfa, DFA};
 use crate::parser::re::Regex;
 
 use ark_std::One;
-
+use ark_std::Zero;
 /// DFA encoding using Lagrange polynomials
 #[derive(Clone)]
 pub struct PolyDFA {
@@ -53,6 +53,7 @@ impl PolyDFA {
     /// state: A private witness to the current state
     pub fn to_cs(self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
         let index = c.to_bits_le().unwrap();
+
         let ps = self
             .poly
             .into_iter()
@@ -77,6 +78,14 @@ impl PolyDFA {
         // If it is in the final states, then success
         self.fin.contains(&s)
     }
+}
+
+pub fn frth(n: u64) -> Fr {
+    let mut curr = Fr::zero();
+    for _ in 0..n {
+        curr += Fr::one();
+    }
+    curr
 }
 
 pub fn nth(d: &Radix2DomainVar<Fr>, n: u64) -> Fr {
@@ -128,7 +137,7 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
     let domain = get_domain(dfa.n);
 
     // Get G^q0 is the initial state
-    let init = nth(&domain, 2); // dfa.get_state_num(q0));
+    let init = nth(&domain, dfa.get_state_num(q0));
     println!("when init state created: {:#?}", init);
     let fin = dfa
         .get_final_states()
@@ -175,7 +184,7 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
         // Take ys
         let evals = pairs
             .iter()
-            .map(|(_, _, to)| FpVar::constant(nth(&domain, *to)))
+            .map(|(_, _, to)| FpVar::constant(nth(&domain, *to))) //nth(&domain, *to)))
             .collect::<Vec<_>>();
 
         println!("EVALS {:#?}", evals);

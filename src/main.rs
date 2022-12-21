@@ -173,7 +173,7 @@ where
 fn main() {
     let opt = Options::from_args();
     let ab = opt.alphabet;
-    let domain = get_domain(3); //ab.chars().count() as u64);
+    let domain = get_domain(2); //ab.chars().count() as u64);
 
     let r = regex_parser(&opt.regex, &ab);
     //let pdfa = mk_poly(&r, &ab);
@@ -212,8 +212,7 @@ fn main() {
     let mut chars = doc.chars();
 
     let mut cs_i = ConstraintSystem::new_ref();
-    let mut curr_state =
-        FpVar::new_witness(ns!(cs_i, "state i"), || Ok(pdfa.init + Fr::one())).unwrap();
+    let mut curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(pdfa.init)).unwrap();
     for i in 0..num_steps {
         // allocate real witnesses for round i
         let c_i = nth(&domain, chars.next().unwrap() as u64);
