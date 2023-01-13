@@ -53,8 +53,6 @@ impl PolyDFA {
     /// state: A private witness to the current state
     pub fn to_cs(self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
         let temp = &self.poly[&'a'];
-        temp.interpolate_and_evaluate(&state);
-
         let index = c.to_bits_le().unwrap();
 
         let ps = self
@@ -200,3 +198,12 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
     }
     pdfa
 }
+
+#[test]
+pub fn test_num_bits() {
+    assert_eq!(num_bits(0), 0);
+    assert_eq!(num_bits(1), 1);
+    assert_eq!(num_bits(3), 2);
+    assert_eq!(num_bits(4), 3);
+}
+
