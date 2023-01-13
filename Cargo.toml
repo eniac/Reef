@@ -14,5 +14,16 @@ ark-std = "^0.3.0"
 ark-relations = "^0.3.0"
 ark-r1cs-std = { version = "^0.3.0", features = ["std"] }
 ark-bls12-381 = "^0.3.0"
+ark-pallas = "^0.3.0"
 regex-syntax = "0.6"
 itertools = "0.10"
+nova-snark = "0.8.1" # backend
+bellperson = { version = "0.22", default-features = false }
+pasta_curves = { version = "0.4.0", features = ["repr-c"] }
+ff = "0.12.0"
+ark-poly = { version = "^0.3.0", default-features = false }
+prettyprint = "0.8.1"
+#ark-test-curves = { version = "^0.3.0", default-features = false, features
+#= ["bls12_381_scalar_field", "bls12_381_curve", "mnt4_753_scalar_field"] }
+
+
