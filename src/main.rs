@@ -173,7 +173,7 @@ where
 fn main() {
     let opt = Options::from_args();
     let ab = opt.alphabet;
-    let domain = get_domain(2); //ab.chars().count() as u64);
+    let domain = get_domain(4); //ab.chars().count() as u64);
 
     let r = regex_parser(&opt.regex, &ab);
     //let pdfa = mk_poly(&r, &ab);

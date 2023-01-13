@@ -116,7 +116,7 @@ fn num_bits(n: u64) -> u64 {
 }
 
 pub fn get_domain(size: u64) -> Radix2DomainVar<Fr> {
-    let n = num_bits(size);
+    let n = num_bits(size - 1);
 
     // Generator 2^n
     let gen = Fr::get_root_of_unity(1 << n).unwrap();
@@ -137,7 +137,7 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
     println!("dfa: {:#?}, {:#?}", dfa.states, dfa.trans);
 
     // Upper bound number of states n = ceil[log2(dfa.n)]
-    let n = num_bits(dfa.n);
+    let n = num_bits(dfa.n - 1);
     let domain = get_domain(dfa.n);
 
     // Get G^q0 is the initial state
