@@ -2,7 +2,7 @@ use ark_ff::FftField;
 use ark_pallas::Fr;
 use ark_r1cs_std::bits::ToBitsGadget;
 use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
-use ark_r1cs_std::poly::{domain::Radix2DomainVar, evaluations::univariate::*};
+use ark_r1cs_std::poly::{domain::Radix2DomainVar};
 use ark_r1cs_std::select::CondSelectGadget;
 use ark_r1cs_std::R1CSVar;
 use std::collections::HashMap;
@@ -15,72 +15,47 @@ use crate::parser::re::Regex;
 
 use ark_std::One;
 use ark_std::Zero;
-/// DFA encoding using Lagrange polynomials
-#[derive(Clone)]
-pub struct PolyDFA {
-    /// For each [char], a characteristic polynomial P(state_id) = state_id'
-    /// Another encoding of the DFA's delta function
-    poly: HashMap<char, EvaluationsVar<Fr>>,
-    /// Initial state
-    pub init: Fr,
-    /// Final state
-    fin: HashSet<Fr>,
+
+
+/// This creates the big switch across polynomials used in the outer loop
+/// across the document
+/// Arguments
+///
+/// c: A private witness, the *index* of the current character in the alphabet,
+///    so if alphabet is ASCII, character = 'D' then c = '68'
+/// state: A private witness to the current state
+pub fn dfa_to_cs(self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
+
+    CondSelectGadget::conditionally_select_power_of_two_vector(&index, &ps).unwrap()
+
+    let temp = &self.poly[&'a'];
+    let index = c.to_bits_le().unwrap();
+
+    let ps = self
+        .poly.clone()
+        .into_iter()
+        .map(|(_, p)| p.interpolate_and_evaluate(&state).unwrap())
+        .collect::<Vec<_>>();
+
+
+    //println!("{:#?}", ps);
+    //println!("{:#?}", self.poly.len());
+    ps[0].clone()
 }
 
-impl PolyDFA {
-    pub fn new(init: Fr, fin: &HashSet<Fr>) -> Self {
-        Self {
-            poly: HashMap::new(),
-            init,
-            fin: fin.clone(),
-        }
-    }
-
-    pub fn add(&mut self, c: char, p: &EvaluationsVar<Fr>) {
-        self.poly.insert(c, p.clone());
-    }
-
-    pub fn get(&self, c: char) -> &EvaluationsVar<Fr> {
-        &self.poly[&c]
-    }
-
-    /// This creates the big switch across polynomials used in the outer loop
-    /// across the document
-    /// Arguments
-    ///
-    /// c: A private witness, the *index* of the current character in the alphabet,
-    ///    so if alphabet is ASCII, character = 'D' then c = '68'
-    /// state: A private witness to the current state
-    pub fn to_cs(self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
-        let temp = &self.poly[&'a'];
-        let index = c.to_bits_le().unwrap();
-
-        let ps = self
-            .poly.clone()
-            .into_iter()
-            .map(|(_, p)| p.interpolate_and_evaluate(&state).unwrap())
-            .collect::<Vec<_>>();
-
-
-        //println!("{:#?}", ps);
-        //println!("{:#?}", self.poly.len());
-        ps[0].clone()
-        //CondSelectGadget::conditionally_select_power_of_two_vector(&index, &ps).unwrap()
-    }
-
-    // For testing
-    pub fn is_match(&self, doc: &String) -> bool {
-        let mut s = self.init;
-        // For "abb" compute [P_b(P_b(P_a(init)))]
-        for c in doc.chars() {
-            let ss = self.poly[&c].interpolate_and_evaluate(&FpVar::constant(s));
-            println!("{:?} -> {:?}", s, ss);
-            s = ss.unwrap().value().unwrap();
-        }
-        // If it is in the final states, then success
-        self.fin.contains(&s)
-    }
-}
+      // For testing
+      pub fn is_match(&self, doc: &String) -> bool {
+          let mut s = self.init;
+          // For "abb" compute [P_b(P_b(P_a(init)))]
+          for c in doc.chars() {
+              let ss = self.poly[&c].interpolate_and_evaluate(&FpVar::constant(s));
+              println!("{:?} -> {:?}", s, ss);
+              s = ss.unwrap().value().unwrap();
+          }
+          // If it is in the final states, then success
+          self.fin.contains(&s)
+      }
+  }
 
 pub fn frth(n: u64) -> Fr {
     let mut curr = Fr::zero();

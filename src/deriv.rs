@@ -1,19 +1,5 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
-
 use crate::parser::re::{self, Regex, RegexF};
-
-// TODO: Find a good place for this
-/* use hashconsing::{*, hash_coll::*};
-fn memoize<T: Hash, R>(f: fn(HCons<T>, R)) -> fn(HCons<T>, R) {
-    static MEMO: HConMap<HCons<T>, R> = HConMap::with_capacity(100);
-    |a| MEMO.get(a).unwrap_or({
-        let res = f(a);
-        MEMO.insert(a, res);
-        res
-    })
-}
-*/
+use crate::dfa::DFA;
 
 pub fn nullable(r: &Regex) -> bool {
     match &**r {
@@ -38,59 +24,6 @@ pub fn deriv(c: char, r: &Regex) -> Regex {
         RegexF::App(ref a, ref b) => re::app(deriv(c, a), b.clone()),
         RegexF::Alt(ref a, ref b) => re::alt(deriv(c, a), deriv(c, b)),
         RegexF::Star(ref a) => re::app(deriv(c, a), re::star(a.clone())),
-    }
-}
-
-#[derive(Debug)]
-pub struct DFA {
-    /// Number of states
-    pub n: u64,
-    /// Set of states (and their index)
-    pub states: HashMap<Regex, u64>,
-    /// Transition relation from [state -> state], given [char]
-    pub trans: HashSet<(Regex, char, Regex)>,
-}
-
-impl DFA {
-    pub fn new() -> Self {
-        Self {
-            n: 0,
-            states: HashMap::new(),
-            trans: HashSet::new(),
-        }
-    }
-    pub fn add_transition(&mut self, from: &Regex, c: char, to: &Regex) {
-        self.trans.insert((from.clone(), c, to.clone()));
-    }
-
-    pub fn add_state(&mut self, new_state: &Regex) {
-        if self.states.insert(new_state.clone(), self.n).is_none() {
-            self.n = self.n + 1;
-        }
-    }
-
-    pub fn contains_state(&self, state: &Regex) -> bool {
-        self.states.contains_key(state)
-    }
-
-    pub fn get_state_num(&self, state: &Regex) -> u64 {
-        self.states[state]
-    }
-
-    pub fn get_final_states(&self) -> HashSet<u64> {
-        self.states
-            .clone()
-            .into_iter()
-            .filter_map(|(k, v)| if nullable(&k) { Some(v) } else { None })
-            .collect()
-    }
-
-    pub fn deltas(&self) -> Vec<(u64, char, u64)> {
-        self.trans
-            .clone()
-            .into_iter()
-            .map(|(a, b, c)| (self.get_state_num(&a), b, self.get_state_num(&c)))
-            .collect()
     }
 }
 

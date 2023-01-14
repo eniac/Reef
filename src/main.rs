@@ -5,8 +5,8 @@ type G2 = pasta_curves::vesta::Point;
 use ::bellperson::{gadgets::num::AllocatedNum, SynthesisError};
 //use ark_bls12_381::Fr;
 use ark_r1cs_std::alloc::AllocVar;
-use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
-use ark_relations::{ns, r1cs::ConstraintSystemRef};
+use ark_r1cs_std::fields::{fp::FpVar};
+use ark_relations::ns;
 use ff::PrimeField;
 use nova_snark::{
     traits::{
@@ -17,16 +17,19 @@ use nova_snark::{
 };
 pub mod deriv;
 pub mod parser;
-pub mod poly;
+pub mod dfa;
+pub mod domain;
 
 use crate::parser::regex_parser;
-use crate::poly::{get_domain, mk_poly, nth};
+use crate::domain::DomainRadix2;
+use crate::dfa::DFA;
+use crate::deriv::mk_dfa;
+
 use ark_r1cs_std::poly::domain::Radix2DomainVar;
 use ark_r1cs_std::poly::evaluations::univariate::EvaluationsVar;
 use ark_r1cs_std::R1CSVar;
 
 use ark_ff::{FftField, Field, One, UniformRand};
-use ark_pallas::Fr;
 use ark_poly::polynomial::univariate::DensePolynomial;
 use ark_poly::{Polynomial, UVPolynomial};
 use ark_relations::r1cs::{ConstraintSystem, OptimizationGoal};
@@ -172,29 +175,37 @@ where
 
 fn main() {
     let opt = Options::from_args();
+    // Alphabet
     let ab = opt.alphabet;
-    let domain = get_domain(4); //ab.chars().count() as u64);
 
+      // Regular expresion
     let r = regex_parser(&opt.regex, &ab);
-    //let pdfa = mk_poly(&r, &ab);
 
+    // Input document
     let doc = opt.input;
 
     // make the (single) F circuit
     let cs = ConstraintSystem::new_ref();
     cs.set_optimization_goal(OptimizationGoal::None);
 
-    let pdfa = mk_poly(&r, &ab);
+    // Convert the Regex to a DFA
+    let mut dfa = DFA::new(&ab[..]);
+    mk_dfa(&r, &ab, &mut dfa);
 
-    // allocate polys + needed constraints as constants
+    // Domain of characters
+    let domain_ab = DomainRadix2::new(dfa.nab());
+    // Domain of states
+    let domain_states = DomainRadix2::new(dfa.nstates());
 
     // allocate dummy witnesses
-    let c_i = FpVar::new_witness(ns!(cs, "dummy char"), || Ok(pdfa.init)).unwrap(); // todo
-    let init_state = FpVar::new_witness(ns!(cs, "dummy state"), || Ok(pdfa.init)).unwrap();
+    let c_i = FpVar::new_witness(ns!(cs, "dummy char"), || Ok(domain_ab.get_offset())).unwrap(); // todo
+    let init_state = FpVar::new_witness(ns!(cs, "dummy state"), || Ok(domain_states.get_offset())).unwrap();
 
-    // make circuit
-    pdfa.clone().to_cs(c_i, init_state.clone());
+    // make circuit for first step
+    let next_state = dfa.cond_delta(c_i, init_state, &domain_states);
+
     assert!(cs.is_satisfied().unwrap());
+
     println!("number of constraints per round: {}", cs.num_constraints());
     // TODO: optimize, finalize
     cs.finalize();
@@ -212,18 +223,14 @@ fn main() {
     let mut chars = doc.chars();
 
     let mut cs_i = ConstraintSystem::new_ref();
-    let mut curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(pdfa.init)).unwrap();
+    let mut curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(domain_states.get_offset())).unwrap();
     for i in 0..num_steps {
         // allocate real witnesses for round i
-        let c_i = nth(&domain, chars.next().unwrap() as u64);
+        let c_i = domain_ab.get(chars.next().unwrap() as u64);
         let civar = FpVar::new_witness(ns!(cs_i, "char i"), || Ok(c_i)).unwrap();
 
         // regenerate circuit (only needed for validation, not for nova)
-        let next_state = pdfa
-            .clone()
-            .to_cs(civar, curr_state.clone())
-            .value()
-            .unwrap();
+        let next_state = dfa.cond_delta(civar, curr_state.clone(), &domain_states).value().unwrap();
         assert!(cs_i.is_satisfied().unwrap());
 
         // generate nova witness vector i
