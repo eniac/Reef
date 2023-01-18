@@ -1,5 +1,5 @@
-use crate::parser::re::{self, Regex, RegexF};
 use crate::dfa::DFA;
+use crate::parser::re::{self, Regex, RegexF};
 
 pub fn nullable(r: &Regex) -> bool {
     match &**r {

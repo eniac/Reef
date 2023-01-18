@@ -1,17 +1,20 @@
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::io::{Result, Error, ErrorKind};
-use itertools::Itertools;
+use std::io::{Error, ErrorKind, Result};
 
-use ark_r1cs_std::bits::ToBitsGadget;
+use ark_pallas::Fr;
+use ark_r1cs_std::bits::{boolean::Boolean, ToBitsGadget};
 use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
 use ark_r1cs_std::select::CondSelectGadget;
 use ark_r1cs_std::R1CSVar;
-use ark_pallas::Fr;
+use ark_relations::ns;
+use ark_std::One;
+use ark_std::Zero;
 
-use crate::parser::re::Regex;
 use crate::deriv::nullable;
-use crate::domain::DomainRadix2;
+use crate::domain::{frth, num_bits, DomainRadix2};
+use crate::parser::re::Regex;
 
 #[derive(Debug)]
 pub struct DFA<'a> {
@@ -36,14 +39,9 @@ impl<'a> DFA<'a> {
         self.states.len()
     }
 
-    pub fn nab(&self) -> usize {
-        self.ab.len()
-    }
-
     pub fn add_transition(&mut self, from: &Regex, c: char, to: &Regex) {
         self.trans.insert((from.clone(), c, to.clone()));
     }
-
 
     pub fn add_state(&mut self, new_state: &Regex) {
         self.states.insert(new_state.clone(), self.nstates() as u64);
@@ -73,19 +71,20 @@ impl<'a> DFA<'a> {
 
     /// DFA step function [delta(s, c) = s'] function
     fn delta(&self, state: u64, ch: char) -> Result<u64> {
-       let res : Vec<u64> = self.deltas()
+        let res: Vec<u64> = self
+            .deltas()
             .clone()
             .into_iter()
-            .filter_map(|(s, c, t)|
-                if s == state && c == ch {
-                    Some(t)
-                } else { None })
+            .filter_map(|(s, c, t)| if s == state && c == ch { Some(t) } else { None })
             .collect();
 
         if res.len() == 1 {
             Ok(res[0])
         } else {
-            Err(Error::new(ErrorKind::InvalidInput, "Invalidated DFA invariant"))
+            Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Invalidated DFA invariant",
+            ))
         }
     }
 
@@ -100,20 +99,41 @@ impl<'a> DFA<'a> {
     /// Make a DFA delta function into a circuit
     /// Both [c] and [state] are in index
     /// form in a [DomainRadix2] in [src/domain.rs]
-    pub fn cond_delta(&self, c: FpVar<Fr>, state: FpVar<Fr>, state_domain: &DomainRadix2) -> FpVar<Fr> {
-        let ic = c.to_bits_le().unwrap();
-        let istate = state.to_bits_le().unwrap();
+    pub fn cond_delta(&self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
+        println!(
+            "state {:#?}, c {:#?}",
+            state.value().unwrap(),
+            c.value().unwrap()
+        );
+
+        let index = (state * frth(self.ab.len() as u64) + c)
+            .to_bits_le()
+            .unwrap();
+
+        let mut bits = Vec::new();
+        for i in 0..num_bits(self.deltas().len() as u64) {
+            bits.push(index[i as usize].clone());
+        }
+        println!("Bits {:#?}", bits.value().unwrap());
 
         // Sort so indexing by (state, char) works correctly in the CondGadget
-        let ds: Vec<FpVar<Fr>> = self.deltas()
+        let mut ds: Vec<FpVar<Fr>> = self
+            .deltas()
             .into_iter()
             .sorted()
-            .map(|(_, _ ,c)| FpVar::constant(state_domain.get(c)))
+            .map(|(_, _, c)| FpVar::constant(frth(c)))
             .collect();
-        // Concat the bits of [istate] and [ic], warning did not debug this yet!
-        let index = [&istate[..], &ic[..]].concat();
 
-        CondSelectGadget::conditionally_select_power_of_two_vector(&index, &ds).unwrap()
+        println!("Deltas {:#?}", self.deltas());
+
+        // pad ds
+        let dummy = FpVar::constant(Fr::zero());
+        while ds.len() < (1 << num_bits(self.deltas().len() as u64)) {
+            ds.push(dummy.clone());
+        }
+
+        println!("ds = {:#?}", ds);
+
+        CondSelectGadget::conditionally_select_power_of_two_vector(&bits, &ds).unwrap()
     }
 }
-

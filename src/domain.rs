@@ -1,8 +1,10 @@
-use ark_pallas::Fr;
 use ark_ff::FftField;
+use ark_pallas::Fr;
 use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
-use ark_r1cs_std::R1CSVar;
 use ark_r1cs_std::poly::domain::Radix2DomainVar;
+use ark_r1cs_std::R1CSVar;
+use ark_std::One;
+use ark_std::Zero;
 
 /// This object abstracts the details of padding
 /// a continuous domain 0..n to a Radix2 domain
@@ -17,8 +19,16 @@ pub struct DomainRadix2 {
     pub inner: Radix2DomainVar<Fr>,
 }
 
+pub fn frth(n: u64) -> Fr {
+    let mut curr = Fr::zero();
+    for _ in 0..n {
+        curr += Fr::one();
+    }
+    curr
+}
+
 /// Ceil[log2(n)]
-fn num_bits(n: u64) -> u64 {
+pub fn num_bits(n: u64) -> u64 {
     let mut a = 0;
     let mut e = n;
     while e > 0 {
@@ -29,8 +39,7 @@ fn num_bits(n: u64) -> u64 {
 }
 
 impl DomainRadix2 {
-    pub fn new(size: usize) -> Self {
-        let n = size as u64;
+    pub fn new(n: u64) -> Self {
         // Upper bound number of states n = ceil[log2(dfa.nstates-1)]
         let lg2n = num_bits(n - 1);
 
@@ -71,5 +80,4 @@ impl DomainRadix2 {
             cur
         }
     }
-
 }

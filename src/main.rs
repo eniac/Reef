@@ -3,9 +3,8 @@ use structopt::StructOpt;
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 use ::bellperson::{gadgets::num::AllocatedNum, SynthesisError};
-//use ark_bls12_381::Fr;
 use ark_r1cs_std::alloc::AllocVar;
-use ark_r1cs_std::fields::{fp::FpVar};
+use ark_r1cs_std::fields::fp::FpVar;
 use ark_relations::ns;
 use ff::PrimeField;
 use nova_snark::{
@@ -16,20 +15,20 @@ use nova_snark::{
     CompressedSNARK, PublicParams, RecursiveSNARK,
 };
 pub mod deriv;
-pub mod parser;
 pub mod dfa;
 pub mod domain;
+pub mod parser;
 
-use crate::parser::regex_parser;
-use crate::domain::DomainRadix2;
-use crate::dfa::DFA;
 use crate::deriv::mk_dfa;
+use crate::dfa::DFA;
+use crate::domain::frth;
+use crate::parser::regex_parser;
 
-use ark_r1cs_std::poly::domain::Radix2DomainVar;
 use ark_r1cs_std::poly::evaluations::univariate::EvaluationsVar;
 use ark_r1cs_std::R1CSVar;
 
 use ark_ff::{FftField, Field, One, UniformRand};
+use ark_pallas::Fr;
 use ark_poly::polynomial::univariate::DensePolynomial;
 use ark_poly::{Polynomial, UVPolynomial};
 use ark_relations::r1cs::{ConstraintSystem, OptimizationGoal};
@@ -178,7 +177,7 @@ fn main() {
     // Alphabet
     let ab = opt.alphabet;
 
-      // Regular expresion
+    // Regular expresion
     let r = regex_parser(&opt.regex, &ab);
 
     // Input document
@@ -192,17 +191,12 @@ fn main() {
     let mut dfa = DFA::new(&ab[..]);
     mk_dfa(&r, &ab, &mut dfa);
 
-    // Domain of characters
-    let domain_ab = DomainRadix2::new(dfa.nab());
-    // Domain of states
-    let domain_states = DomainRadix2::new(dfa.nstates());
-
     // allocate dummy witnesses
-    let c_i = FpVar::new_witness(ns!(cs, "dummy char"), || Ok(domain_ab.get_offset())).unwrap(); // todo
-    let init_state = FpVar::new_witness(ns!(cs, "dummy state"), || Ok(domain_states.get_offset())).unwrap();
+    let c_i = FpVar::new_witness(ns!(cs, "dummy char"), || Ok(Fr::zero())).unwrap(); // todo
+    let init_state = FpVar::new_witness(ns!(cs, "dummy state"), || Ok(Fr::zero())).unwrap();
 
     // make circuit for first step
-    let next_state = dfa.cond_delta(c_i, init_state, &domain_states);
+    let next_state = dfa.cond_delta(c_i, init_state);
 
     assert!(cs.is_satisfied().unwrap());
 
@@ -223,14 +217,14 @@ fn main() {
     let mut chars = doc.chars();
 
     let mut cs_i = ConstraintSystem::new_ref();
-    let mut curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(domain_states.get_offset())).unwrap();
+    let mut curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(Fr::zero())).unwrap();
     for i in 0..num_steps {
         // allocate real witnesses for round i
-        let c_i = domain_ab.get(chars.next().unwrap() as u64);
+        let c_i = frth(chars.next().unwrap() as u64);
         let civar = FpVar::new_witness(ns!(cs_i, "char i"), || Ok(c_i)).unwrap();
 
         // regenerate circuit (only needed for validation, not for nova)
-        let next_state = dfa.cond_delta(civar, curr_state.clone(), &domain_states).value().unwrap();
+        let next_state = dfa.cond_delta(civar, curr_state.clone()).value().unwrap();
         assert!(cs_i.is_satisfied().unwrap());
 
         // generate nova witness vector i
