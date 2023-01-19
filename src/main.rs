@@ -190,13 +190,14 @@ fn main() {
     // Convert the Regex to a DFA
     let mut dfa = DFA::new(&ab[..]);
     mk_dfa(&r, &ab, &mut dfa);
+    println!("dfa: {:#?}", dfa);
 
     // allocate dummy witnesses
-    let c_i = FpVar::new_witness(ns!(cs, "dummy char"), || Ok(Fr::zero())).unwrap(); // todo
-    let init_state = FpVar::new_witness(ns!(cs, "dummy state"), || Ok(Fr::zero())).unwrap();
+    let dummy_c = FpVar::new_witness(ns!(cs, "dummy char"), || Ok(Fr::zero())).unwrap(); // todo
+    let dummy_state = FpVar::new_witness(ns!(cs, "dummy state"), || Ok(Fr::zero())).unwrap();
 
     // make circuit for first step
-    let next_state = dfa.cond_delta(c_i, init_state);
+    let next_state = dfa.cond_delta(dummy_c, dummy_state);
 
     assert!(cs.is_satisfied().unwrap());
 
@@ -220,7 +221,7 @@ fn main() {
     let mut curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(Fr::zero())).unwrap();
     for i in 0..num_steps {
         // allocate real witnesses for round i
-        let c_i = frth(chars.next().unwrap() as u64);
+        let c_i = frth(dfa.ab_to_num(chars.next().unwrap()));
         let civar = FpVar::new_witness(ns!(cs_i, "char i"), || Ok(c_i)).unwrap();
 
         // regenerate circuit (only needed for validation, not for nova)

@@ -35,6 +35,12 @@ impl<'a> DFA<'a> {
         }
     }
 
+    pub fn ab_to_num(&self, c: char) -> u64 {
+        let sorted_ab = self.ab.chars().sorted().collect::<String>();
+        let num = sorted_ab.chars().position(|x| x == c).unwrap();
+        num as u64
+    }
+
     pub fn nstates(&self) -> usize {
         self.states.len()
     }
@@ -100,21 +106,24 @@ impl<'a> DFA<'a> {
     /// Both [c] and [state] are in index
     /// form in a [DomainRadix2] in [src/domain.rs]
     pub fn cond_delta(&self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
-        println!(
-            "state {:#?}, c {:#?}",
+        /* println!(
+            "state {:#?}, c {:#?}, len {:#?}",
             state.value().unwrap(),
-            c.value().unwrap()
-        );
+            c.value().unwrap(),
+            frth(self.ab.len() as u64)
+        ); */
 
         let index = (state * frth(self.ab.len() as u64) + c)
             .to_bits_le()
             .unwrap();
 
+        // println!("index {:#?}", index.value().unwrap());
+
         let mut bits = Vec::new();
         for i in 0..num_bits(self.deltas().len() as u64) {
             bits.push(index[i as usize].clone());
         }
-        println!("Bits {:#?}", bits.value().unwrap());
+        // println!("Bits {:#?}", bits.value().unwrap());
 
         // Sort so indexing by (state, char) works correctly in the CondGadget
         let mut ds: Vec<FpVar<Fr>> = self
@@ -124,15 +133,13 @@ impl<'a> DFA<'a> {
             .map(|(_, _, c)| FpVar::constant(frth(c)))
             .collect();
 
-        println!("Deltas {:#?}", self.deltas());
+        // println!("Deltas {:#?}", self.deltas().into_iter().sorted());
 
         // pad ds
         let dummy = FpVar::constant(Fr::zero());
         while ds.len() < (1 << num_bits(self.deltas().len() as u64)) {
             ds.push(dummy.clone());
         }
-
-        println!("ds = {:#?}", ds);
 
         CondSelectGadget::conditionally_select_power_of_two_vector(&bits, &ds).unwrap()
     }
