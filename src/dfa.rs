@@ -243,3 +243,68 @@ impl<'a> DFA<'a> {
 
     */
 }
+
+#[cfg(test)]
+mod tests {
+
+    use crate::deriv::{mk_dfa, nullable};
+    use crate::dfa::DFA;
+    use crate::domain::{frth, num_bits, DomainRadix2};
+    use crate::parser::regex_parser;
+    use itertools::Itertools;
+    use std::collections::HashMap;
+    use std::collections::HashSet;
+    use std::io::{Error, ErrorKind, Result};
+
+    fn set_up_delta_test(r: &str, alpha: &str, tocheck: &str) -> bool {
+        let ab = String::from(alpha);
+        let regex = regex_parser(&String::from(r), &ab);
+        let input = String::from(tocheck);
+
+        let mut dfa = DFA::new(&ab[..]);
+        mk_dfa(&regex, &ab, &mut dfa);
+        let mut s = dfa.get_init_state();
+
+        for i in 0..input.len() {
+            s = dfa.delta(s, input.chars().nth(i).unwrap()).unwrap();
+        }
+        let re_match = dfa.get_final_states().contains(&s);
+        return re_match;
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_basic() {
+        let re_match = set_up_delta_test("a", "ab", "a");
+        assert!(re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_basic_nonmatch() {
+        let re_match = set_up_delta_test("a", "ab", "b");
+        assert!(!re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit() {
+        let re_match = set_up_delta_test("aba", "ab", "aba");
+        assert!(re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_nonmatch() {
+        let re_match = set_up_delta_test("aba", "ab", "ab");
+        assert!(!re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_star() {
+        let re_match = set_up_delta_test("a.*a", "ab", "abba");
+        assert!(re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_stat_nonmatch() {
+        let re_match = set_up_delta_test("a.*a", "ab", "abb");
+        assert!(!re_match);
+    }
+}
