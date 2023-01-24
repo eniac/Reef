@@ -15,11 +15,15 @@ use circ::target::r1cs::trans::to_r1cs;
 
 use rug::Integer;
 
-fn new_field<I>(i: I) -> Term
+fn new_const<I>(i: I) -> Term
 where
     Integer: From<I>,
 {
     leaf_term(Op::Const(Value::Field(cfg().field().new_v(i))))
+}
+
+fn new_var(name: String) -> Term {
+    leaf_term(Op::Var(name, Sort::Field(cfg().field().clone())))
 }
 
 #[derive(Debug)]
@@ -109,32 +113,47 @@ impl<'a> DFA<'a> {
     }
 
     pub fn to_lookup_comp(&self) {
-        let ite = term(
-            Op::Eq,
-            vec![
-                leaf_term(Op::Var(
-                    "next_state".to_owned(),
-                    Sort::Field(cfg().field().clone()),
-                )),
-                term(
-                    Op::Ite,
-                    vec![
-                        term(
-                            Op::Eq,
-                            vec![
-                                leaf_term(Op::Var(
-                                    "char".to_owned(),
-                                    Sort::Field(cfg().field().clone()),
-                                )),
-                                new_field(0),
-                            ],
-                        ),
-                        new_field(1),
-                        new_field(2),
-                    ],
-                ),
-            ],
-        );
+        let sorted_ab = self.ab.chars().sorted();
+
+        let mut char_bottom = new_const(self.nstates()); //TODO
+        let mut i = 0; // position of char
+        for c in sorted_ab {
+            // for each char
+            let mut state_bottom = new_const(self.nstates()); //TODO dummy state that is returned in case of no match
+                                                              // perhaps better way todo
+                                                              // make each state ite
+            for (s, ch, t) in self.deltas() {
+                if ch == c {
+                    // if this char is transition
+                    state_bottom = term(
+                        Op::Ite,
+                        vec![
+                            term(
+                                Op::Eq,
+                                vec![new_var("current state".to_owned()), new_const(s)],
+                            ), // if match on this state
+                            new_const(t), // true (??)
+                            state_bottom, // false
+                        ],
+                    );
+                }
+            }
+
+            // add to char ite (outer)
+            char_bottom = term(
+                Op::Ite,
+                vec![
+                    term(Op::Eq, vec![new_var("char".to_owned()), new_const(i)]),
+                    state_bottom,
+                    char_bottom,
+                ],
+            );
+            i += 1;
+        }
+
+        let ite = term(Op::Eq, vec![new_var("next_state".to_owned()), char_bottom]);
+
+        //println!("ITE {:#?}", ite);
 
         let assertions = vec![ite];
         let pub_inputs = vec![];
@@ -175,73 +194,6 @@ impl<'a> DFA<'a> {
 
         println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
     }
-
-    /*
-
-        pub fn to_poly(&self, p: BigInt) -> Vec<BigInt> {
-            let coefs = Vec::new();
-
-            for i in 0..n {
-                let mut term = f[i].y;
-                // A good old nested for loop :)
-                for j in 0..n {
-                    if i != j {
-                        // X's should be unique
-                        assert!(f[i].x - f[j].x != 0.0);
-                        let denominator = f[i].x - f[j].x;
-                        let numerator = - f[j].x;
-                        term = term * (numerator/denominator);
-                    }
-                }
-                result += term;
-                result = result.mod_euc(p)
-            }
-    */
-    /*
-        /// Make a DFA delta function into a circuit
-        /// Both [c] and [state] are in index
-        /// form in a [DomainRadix2] in [src/domain.rs]
-        pub fn cond_delta(&self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
-            /* println!(
-                "state {:#?}, c {:#?}, len {:#?}",
-                state.value().unwrap(),
-                c.value().unwrap(),
-                frth(self.ab.len() as u64)
-            ); */
-
-    //        let index = (state * frth(self.ab.len() as u64) + c)
-
-            // println!("index {:#?}", index.value().unwrap());
-
-            let mut bits = Vec::new();
-            for i in 0..num_bits(self.deltas().len() as u64) {
-                bits.push(index[i as usize].clone());
-            }
-            // println!("Bits {:#?}", bits.value().unwrap());
-
-            // Sort so indexing by (state, char) works correctly in the CondGadget
-            let mut ds: Vec<FpVar<Fr>> = self
-                .deltas()
-                .into_iter()
-                .sorted()
-    //            .map(|(_, _, c)| FpVar::constant(frth(c)))
-                .collect();
-
-            // println!("Deltas {:#?}", self.deltas().into_iter().sorted());
-
-            // pad ds
-            let dummy = FpVar::constant(Fr::zero());
-            while ds.len() < (1 << num_bits(self.deltas().len() as u64)) {
-                ds.push(dummy.clone());
-            }
-
-            CondSelectGadget::conditionally_select_power_of_two_vector(&bits, &ds).unwrap()
-
-            //let b = Boolean::new_witness(
-            //CondSelectGadget::conditionally_select(b, FpVar::constant(frth(1)), FpVar::constant(frth(2)));
-        }
-
-    */
 }
 
 #[cfg(test)]

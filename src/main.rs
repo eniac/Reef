@@ -200,7 +200,7 @@ fn main() {
 
     // set up CirC library
     let mut circ: CircOpt = Default::default();
-    circ.field.custom_modulus = "7".to_owned(); //TODO
+    circ.field.custom_modulus = "17".to_owned(); //TODO
     cfg::set(&circ);
 
     // Convert the Regex to a DFA
