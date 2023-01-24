@@ -5,6 +5,8 @@ type G2 = pasta_curves::vesta::Point;
 use ::bellperson::{gadgets::num::AllocatedNum, SynthesisError};
 use circ::cfg;
 use circ::cfg::CircOpt;
+use circ::target::r1cs::bellman::*;
+use circ::target::r1cs::R1cs;
 use ff::PrimeField;
 use nova_snark::{
     traits::{
@@ -13,6 +15,7 @@ use nova_snark::{
     },
     CompressedSNARK, PublicParams, RecursiveSNARK,
 };
+use std::collections::HashMap;
 
 pub mod deriv;
 pub mod dfa;
@@ -70,21 +73,22 @@ impl<F: PrimeField> DFAStepWitness<F> {
 }
 
 #[derive(Clone, Debug)]
-struct DFAStepCircuit<F: PrimeField> {
+struct DFAStepCircuit<F: PrimeField, S> {
     wit: DFAStepWitness<F>,
-    //arkcs:
+    r1cs: R1cs<S>,
 }
 
-impl<F> DFAStepCircuit<F>
+impl<F, S> DFAStepCircuit<F>
 where
     F: PrimeField,
 {
-    fn new(num_steps: usize, x0: F) -> (Vec<F>, Vec<Self>) {
+    fn new(num_steps: usize, x0: F, circ_r1cs: R1cs<S>) -> (Vec<F>, Vec<Self>) {
         let z0 = vec![x0];
         let mut circuits = Vec::new();
         let (mut zi, mut dfa_witness) = DFAStepWitness::new(&x0);
         let circuit = DFAStepCircuit {
             wit: dfa_witness.clone(),
+            r1cs: circ_r1cs.clone(),
         };
         // println!("{:#?}", circuit);
         circuits.push(circuit);
@@ -94,6 +98,7 @@ where
 
             let circuit = DFAStepCircuit {
                 wit: dfa_witness.clone(),
+                r1cs: circ_r1cs.clone(),
             };
             // println!("{:#?}", circuit);
             circuits.push(circuit);
@@ -123,6 +128,24 @@ where
         cs: &mut CS,
         z: &[AllocatedNum<F>],
     ) -> Result<Vec<AllocatedNum<F>>, SynthesisError> {
+        // TODO check modulus
+
+        let mut uses = HashMap::with_capacity(self.r1cs.next_idx);
+        for (a, b, c) in self.r1cs.constraints.iter() {
+            [a, b, c].iter().for_each(|y| {
+                y.monomials.keys().for_each(|k| {
+                    uses.get_mut(k)
+                        .map(|i| {
+                            *i += 1;
+                        })
+                        .or_else(|| {
+                            uses.insert(*k, 1);
+                            None
+                        });
+                })
+            });
+        }
+
         let mut z_out: Result<Vec<AllocatedNum<F>>, SynthesisError> =
             Err(SynthesisError::AssignmentMissing);
 

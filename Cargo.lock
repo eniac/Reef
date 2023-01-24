@@ -126,13 +126,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
 
 [[package]]
+name = "bellman"
+version = "0.13.1"
+source = "git+https://github.com/alex-ozdemir/bellman.git?branch=mirage#60176d5b003bd409d1f62aa802e4b3b9bc35b66b"
+dependencies = [
+ "bitvec",
+ "blake2s_simd 1.0.0",
+ "byteorder 1.4.3",
+ "crossbeam-channel",
+ "ff",
+ "group",
+ "lazy_static",
+ "log",
+ "merlin 3.0.0",
+ "num_cpus",
+ "pairing",
+ "rand_chacha",
+ "rand_core 0.6.4",
+ "rayon",
+ "subtle",
+]
+
+[[package]]
 name = "bellperson"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3de1da3f8f3ab6debddec738d15f97ce539d9256cb2fe2364aa7533c06ce7d56"
 dependencies = [
  "bincode",
- "blake2s_simd",
+ "blake2s_simd 0.5.11",
  "blstrs",
  "byteorder 1.4.3",
  "crossbeam-channel",
@@ -228,6 +250,17 @@ checksum = "9e461a7034e85b211a4acb57ee2e6730b32912b06c08cc242243c39fc21ae6a2"
 dependencies = [
  "arrayref",
  "arrayvec 0.5.2",
+ "constant_time_eq",
+]
+
+[[package]]
+name = "blake2s_simd"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db539cc2b5f6003621f1cd9ef92d7ded8ea5232c7de0f9faa2de251cd98730d4"
+dependencies = [
+ "arrayref",
+ "arrayvec 0.7.2",
  "constant_time_eq",
 ]
 
@@ -358,22 +391,29 @@ name = "circ"
 version = "0.1.0"
 source = "git+https://github.com/jkwoods/circ?branch=nova2#5e36d4ba03ca26b85aba9ece2884267605f2d17b"
 dependencies = [
+ "bellman",
+ "bincode",
  "circ_fields",
  "circ_hc",
  "circ_opt",
+ "ff",
  "fxhash",
+ "gmp-mpfr-sys",
+ "group",
  "ieee754",
  "im",
  "itertools 0.10.5",
  "log",
  "logos",
  "once_cell",
+ "pairing",
  "paste",
  "petgraph",
  "rand",
  "rsmt2",
  "rug",
  "serde",
+ "serde_bytes",
  "serde_json",
  "thiserror",
  "typed-arena",
@@ -1360,6 +1400,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "merlin"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58c38e2799fc0978b65dfff8023ec7843e2330bb462f19198840b34b6582397d"
+dependencies = [
+ "byteorder 1.4.3",
+ "keccak",
+ "rand_core 0.6.4",
+ "zeroize",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1375,7 +1427,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed0129ad1c98c9cf429cc681c55df6658f1281b986c25798664325c0a422c1d9"
 dependencies = [
  "bellperson",
- "blake2s_simd",
+ "blake2s_simd 0.5.11",
  "blstrs",
  "byteorder 1.4.3",
  "execute",
@@ -1404,7 +1456,7 @@ dependencies = [
  "flate2",
  "generic-array 0.14.6",
  "itertools 0.9.0",
- "merlin",
+ "merlin 2.0.1",
  "neptune",
  "num-bigint 0.4.3",
  "num-traits",
@@ -1981,6 +2033,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d193d69bae983fc11a79df82342761dfbf28a99fc8d203dca4c3c1b590948965"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "718dc5fff5b36f99093fc49b280cfc96ce6fc824317783bff5a1fed0c7a64819"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
