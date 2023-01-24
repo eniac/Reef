@@ -210,10 +210,7 @@ fn main() {
 
     dfa.to_lookup_comp();
 
-    // let next_state = dfa.cond_delta(dummy_c, dummy_state);
-
-    // use dummy circuit to generate nova F (don't translate witnesses)
-    //ark_mat_to_nova(ark_matrices.a);
+    // use "empty" (witness-less) circuit to generate nova F
 
     // iterations
     let num_steps = doc.chars().count(); // len of document
