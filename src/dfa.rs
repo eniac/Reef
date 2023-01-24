@@ -3,18 +3,24 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Result};
 
-use ark_pallas::Fr;
-use ark_r1cs_std::bits::{boolean::Boolean, ToBitsGadget};
-use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
-use ark_r1cs_std::select::CondSelectGadget;
-use ark_r1cs_std::R1CSVar;
-use ark_relations::ns;
-use ark_std::One;
-use ark_std::Zero;
-
 use crate::deriv::nullable;
-use crate::domain::{frth, num_bits, DomainRadix2};
 use crate::parser::re::Regex;
+
+use circ::cfg::cfg;
+use circ::ir::opt::*;
+use circ::ir::proof::Constraints;
+use circ::ir::term::*;
+use circ::target::r1cs::opt::reduce_linearities;
+use circ::target::r1cs::trans::to_r1cs;
+
+use rug::Integer;
+
+fn new_field<I>(i: I) -> Term
+where
+    Integer: From<I>,
+{
+    leaf_term(Op::Const(Value::Field(cfg().field().new_v(i))))
+}
 
 #[derive(Debug)]
 pub struct DFA<'a> {
@@ -102,45 +108,138 @@ impl<'a> DFA<'a> {
             .collect()
     }
 
-    /// Make a DFA delta function into a circuit
-    /// Both [c] and [state] are in index
-    /// form in a [DomainRadix2] in [src/domain.rs]
-    pub fn cond_delta(&self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
-        /* println!(
-            "state {:#?}, c {:#?}, len {:#?}",
-            state.value().unwrap(),
-            c.value().unwrap(),
-            frth(self.ab.len() as u64)
-        ); */
+    pub fn to_lookup_comp(&self) {
+        let ite = term(
+            Op::Eq,
+            vec![
+                leaf_term(Op::Var(
+                    "next_state".to_owned(),
+                    Sort::Field(cfg().field().clone()),
+                )),
+                term(
+                    Op::Ite,
+                    vec![
+                        term(
+                            Op::Eq,
+                            vec![
+                                leaf_term(Op::Var(
+                                    "char".to_owned(),
+                                    Sort::Field(cfg().field().clone()),
+                                )),
+                                new_field(0),
+                            ],
+                        ),
+                        new_field(1),
+                        new_field(2),
+                    ],
+                ),
+            ],
+        );
 
-        let index = (state * frth(self.ab.len() as u64) + c)
-            .to_bits_le()
-            .unwrap();
+        let assertions = vec![ite];
+        let pub_inputs = vec![];
 
-        // println!("index {:#?}", index.value().unwrap());
+        let cs = Computation::from_constraint_system_parts(assertions, pub_inputs);
 
-        let mut bits = Vec::new();
-        for i in 0..num_bits(self.deltas().len() as u64) {
-            bits.push(index[i as usize].clone());
-        }
-        // println!("Bits {:#?}", bits.value().unwrap());
+        let mut css = Computations::new();
+        css.comps.insert("main".to_string(), cs);
 
-        // Sort so indexing by (state, char) works correctly in the CondGadget
-        let mut ds: Vec<FpVar<Fr>> = self
-            .deltas()
-            .into_iter()
-            .sorted()
-            .map(|(_, _, c)| FpVar::constant(frth(c)))
-            .collect();
+        let opt_css = opt(
+            css,
+            vec![
+                Opt::ScalarizeVars,
+                Opt::Flatten,
+                Opt::Sha,
+                Opt::ConstantFold(Box::new([])),
+                // Tuples must be eliminated before oblivious array elim
+                Opt::Tuple,
+                Opt::ConstantFold(Box::new([])),
+                Opt::Obliv,
+                // The obliv elim pass produces more tuples, that must be eliminated
+                Opt::Tuple,
+                Opt::LinearScan,
+                // The linear scan pass produces more tuples, that must be eliminated
+                Opt::Tuple,
+                Opt::Flatten,
+                Opt::ConstantFold(Box::new([])),
+            ],
+        );
 
-        // println!("Deltas {:#?}", self.deltas().into_iter().sorted());
+        let (mut prover_data, verifier_data) = to_r1cs(opt_css.get("main").clone(), cfg());
 
-        // pad ds
-        let dummy = FpVar::constant(Fr::zero());
-        while ds.len() < (1 << num_bits(self.deltas().len() as u64)) {
-            ds.push(dummy.clone());
-        }
+        println!(
+            "Pre-opt R1cs size: {}",
+            prover_data.r1cs.constraints().len()
+        );
+        prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
 
-        CondSelectGadget::conditionally_select_power_of_two_vector(&bits, &ds).unwrap()
+        println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
     }
+
+    /*
+
+        pub fn to_poly(&self, p: BigInt) -> Vec<BigInt> {
+            let coefs = Vec::new();
+
+            for i in 0..n {
+                let mut term = f[i].y;
+                // A good old nested for loop :)
+                for j in 0..n {
+                    if i != j {
+                        // X's should be unique
+                        assert!(f[i].x - f[j].x != 0.0);
+                        let denominator = f[i].x - f[j].x;
+                        let numerator = - f[j].x;
+                        term = term * (numerator/denominator);
+                    }
+                }
+                result += term;
+                result = result.mod_euc(p)
+            }
+    */
+    /*
+        /// Make a DFA delta function into a circuit
+        /// Both [c] and [state] are in index
+        /// form in a [DomainRadix2] in [src/domain.rs]
+        pub fn cond_delta(&self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
+            /* println!(
+                "state {:#?}, c {:#?}, len {:#?}",
+                state.value().unwrap(),
+                c.value().unwrap(),
+                frth(self.ab.len() as u64)
+            ); */
+
+    //        let index = (state * frth(self.ab.len() as u64) + c)
+
+            // println!("index {:#?}", index.value().unwrap());
+
+            let mut bits = Vec::new();
+            for i in 0..num_bits(self.deltas().len() as u64) {
+                bits.push(index[i as usize].clone());
+            }
+            // println!("Bits {:#?}", bits.value().unwrap());
+
+            // Sort so indexing by (state, char) works correctly in the CondGadget
+            let mut ds: Vec<FpVar<Fr>> = self
+                .deltas()
+                .into_iter()
+                .sorted()
+    //            .map(|(_, _, c)| FpVar::constant(frth(c)))
+                .collect();
+
+            // println!("Deltas {:#?}", self.deltas().into_iter().sorted());
+
+            // pad ds
+            let dummy = FpVar::constant(Fr::zero());
+            while ds.len() < (1 << num_bits(self.deltas().len() as u64)) {
+                ds.push(dummy.clone());
+            }
+
+            CondSelectGadget::conditionally_select_power_of_two_vector(&bits, &ds).unwrap()
+
+            //let b = Boolean::new_witness(
+            //CondSelectGadget::conditionally_select(b, FpVar::constant(frth(1)), FpVar::constant(frth(2)));
+        }
+
+    */
 }

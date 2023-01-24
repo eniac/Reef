@@ -42,6 +42,8 @@ pub fn dfa_to_cs(self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
     ps[0].clone()
 }
 
+
+
       // For testing
 pub fn is_match(&self, doc: &String) -> bool {
           let mut s = self.init;

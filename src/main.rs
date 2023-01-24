@@ -3,9 +3,8 @@ use structopt::StructOpt;
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 use ::bellperson::{gadgets::num::AllocatedNum, SynthesisError};
-use ark_r1cs_std::alloc::AllocVar;
-use ark_r1cs_std::fields::fp::FpVar;
-use ark_relations::ns;
+use circ::cfg;
+use circ::cfg::CircOpt;
 use ff::PrimeField;
 use nova_snark::{
     traits::{
@@ -14,26 +13,18 @@ use nova_snark::{
     },
     CompressedSNARK, PublicParams, RecursiveSNARK,
 };
+
 pub mod deriv;
 pub mod dfa;
-pub mod domain;
 pub mod parser;
 
 use crate::deriv::mk_dfa;
 use crate::dfa::DFA;
-use crate::domain::frth;
 use crate::parser::regex_parser;
 
-use ark_r1cs_std::poly::evaluations::univariate::EvaluationsVar;
-use ark_r1cs_std::R1CSVar;
-
-use ark_ff::{FftField, Field, One, UniformRand};
-use ark_pallas::Fr;
-use ark_poly::polynomial::univariate::DensePolynomial;
-use ark_poly::{Polynomial, UVPolynomial};
-use ark_relations::r1cs::{ConstraintSystem, OptimizationGoal};
-use ark_std::test_rng;
-use ark_std::Zero;
+fn type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
@@ -146,12 +137,15 @@ where
 
         // check conditions hold:
         // x_i_plus_1 = x_i^2
+
         cs.enforce(
             || format!("x_i * x_i = x_i_plus_1"),
-            |lc| lc + x_i.get_variable(),
-            |lc| lc + x_i.get_variable(),
-            |lc| lc + x_i_plus_1.get_variable(),
+            |lc| lc + CS::one() + CS::one(),
+            |lc| lc + CS::one() + CS::one(),
+            |lc| lc + CS::one() + CS::one() + CS::one() + CS::one(),
         );
+
+        //println!("TESTING {:#?}", cs);
 
         // return hash(x_i_plus_1, ...TODO) since Nova circuits expect a single output
         z_out = Ok(vec![x_i_plus_1.clone()]); // # outputs??
@@ -171,7 +165,28 @@ where
         vec![self.wit.x_i_plus_1]
     }
 }
+/*
+pub fn ark_mat_to_nova<F>(mat: ark_relations::r1cs::Matrix<F>) {
+    println!("SCALAR {:#?}", type_of(&<G1 as Group>::Scalar::one()));
+    for cs in mat {
+        // rows = constraints
+        for col in cs {
+            let num = col.0;
+            let slot = col.1;
+        }
+    }
 
+    /*println!("mat len {:#?}", mat.len());
+    for row in mat {
+        println!("len row {:#?}", row.len());
+        for col in row {
+            println!("{:#?}", col.1);
+        }
+        println!("\n");
+    }
+    */
+}
+*/
 fn main() {
     let opt = Options::from_args();
     // Alphabet
@@ -183,141 +198,101 @@ fn main() {
     // Input document
     let doc = opt.input;
 
-    // make the (single) F circuit
-    let cs = ConstraintSystem::new_ref();
-    cs.set_optimization_goal(OptimizationGoal::None);
+    // set up CirC library
+    let mut circ: CircOpt = Default::default();
+    circ.field.custom_modulus = "7".to_owned(); //TODO
+    cfg::set(&circ);
 
     // Convert the Regex to a DFA
     let mut dfa = DFA::new(&ab[..]);
     mk_dfa(&r, &ab, &mut dfa);
     println!("dfa: {:#?}", dfa);
 
-    // allocate dummy witnesses
-    let dummy_c = FpVar::new_witness(ns!(cs, "dummy char"), || Ok(Fr::zero())).unwrap(); // todo
-    let dummy_state = FpVar::new_witness(ns!(cs, "dummy state"), || Ok(Fr::zero())).unwrap();
+    dfa.to_lookup_comp();
 
-    // make circuit for first step
-    let next_state = dfa.cond_delta(dummy_c, dummy_state);
-
-    assert!(cs.is_satisfied().unwrap());
-
-    println!("number of constraints per round: {}", cs.num_constraints());
-    // TODO: optimize, finalize
-    cs.finalize();
-    println!("number of constraints per round: {}", cs.num_constraints());
-
-    //println!("should construct ABC? {}", cs.should_construct_matrices());
-    let ark_matrices = cs.to_matrices().unwrap();
-    //println!("DUMMY {:#?}", ark_matrices);
+    // let next_state = dfa.cond_delta(dummy_c, dummy_state);
 
     // use dummy circuit to generate nova F (don't translate witnesses)
+    //ark_mat_to_nova(ark_matrices.a);
 
     // iterations
     let num_steps = doc.chars().count(); // len of document
     println!("Doc len is {}", num_steps);
     let mut chars = doc.chars();
 
-    let mut cs_i = ConstraintSystem::new_ref();
-    let mut curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(Fr::zero())).unwrap();
     for i in 0..num_steps {
         // allocate real witnesses for round i
-        let c_i = frth(dfa.ab_to_num(chars.next().unwrap()));
-        let civar = FpVar::new_witness(ns!(cs_i, "char i"), || Ok(c_i)).unwrap();
 
         // regenerate circuit (only needed for validation, not for nova)
-        let next_state = dfa.cond_delta(civar, curr_state.clone()).value().unwrap();
-        assert!(cs_i.is_satisfied().unwrap());
+        //let next_state = dfa.cond_delta(civar, curr_state.clone()).value().unwrap();
 
         // generate nova witness vector i
-        println!("# wit: {}", cs_i.num_witness_variables());
-        //println!("wit: {:#?}", cs_i.borrow().unwrap().witness_assignment);
-        //println!("inp: {:#?}", cs_i.borrow().unwrap().instance_assignment);
-
-        let wit = cs_i.borrow().unwrap().witness_assignment.clone();
-        let inp = cs_i.borrow().unwrap().instance_assignment.clone();
-        cs_i.finalize();
-        let ark_matrices = cs_i.to_matrices().unwrap();
-        //println!("DUMMY {:#?}", ark_matrices);
 
         // translate wit to nova, fold
 
         // for next i+1 round
-        cs_i = ConstraintSystem::new_ref();
-        cs_i.set_optimization_goal(OptimizationGoal::None);
-        println!("in state {:#?}", curr_state.value().unwrap());
-        println!("out state {:#?}", next_state);
-
-        curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(next_state)).unwrap();
     }
+
+    // TEST
+    /*
+    let circuit_primary = DFAStepCircuit {
+        wit: DFAStepWitness {
+            x_i: <G1 as Group>::Scalar::one(),
+            x_i_plus_1: <G1 as Group>::Scalar::zero(),
+        },
+    };
+
+    println!("TEST {:#?}", type_of(&circuit_primary.wit.x_i));
+
     // fold + compile nova
 
-    //    let init_state = FpVar::constant(pdfa.init); // starting state (folding wit carrying CS)
-    /*
-
-        let c = doc.chars().next().unwrap();
-        //for c in doc.chars() {
-        //let c_name = "character_".to_owned() + &i.to_string();
-        let c_i = FpVar::new_witness(ns!(ark_cs, "thing"), || Ok(nth(&domain, c as u64))).unwrap();
-
-
-        //let state = pdfa.clone().to_cs(c_i, init_state);
-
-        //println!("loop {}", i);
-        // TODO: convert state to circuit
-        //}
-
-        // check ark_cs looks good
-        assert!(ark_cs.is_satisfied().unwrap());
-        println!("number of ark constraints: {}", ark_cs.num_constraints());
-    */
     // TODO: check conversion is good
     // NOVA
-    /*
-        // main circuit F w/empty witness
-        let circuit_primary = DFAStepCircuit {
-            wit: DFAStepWitness {
-                x_i: <G1 as Group>::Scalar::zero(),
-                x_i_plus_1: <G1 as Group>::Scalar::zero(),
-            },
-        };
 
-        // trivial circuit
-        let circuit_secondary = TrivialTestCircuit::default();
+    // main circuit F w/empty witness
+    let circuit_primary = DFAStepCircuit {
+        wit: DFAStepWitness {
+            x_i: <G1 as Group>::Scalar::zero(),
+            x_i_plus_1: <G1 as Group>::Scalar::zero(),
+        },
+    };
 
-        // produce public parameters
-        println!("Producing public parameters...");
-        let pp = PublicParams::<
-            G1,
-            G2,
-            DFAStepCircuit<<G1 as Group>::Scalar>,
-            TrivialTestCircuit<<G2 as Group>::Scalar>,
-        >::setup(circuit_primary.clone(), circuit_secondary.clone());
-        println!(
-            "Number of constraints (primary circuit): {}",
-            pp.num_constraints().0
-        );
-        println!(
-            "Number of constraints (secondary circuit): {}",
-            pp.num_constraints().1
-        );
+    // trivial circuit
+    let circuit_secondary = TrivialTestCircuit::default();
 
-        println!(
-            "Number of variables (primary circuit): {}",
-            pp.num_variables().0
-        );
-        println!(
-            "Number of variables (secondary circuit): {}",
-            pp.num_variables().1
-        );
+    // produce public parameters
+    println!("Producing public parameters...");
+    let pp = PublicParams::<
+        G1,
+        G2,
+        DFAStepCircuit<<G1 as Group>::Scalar>,
+        TrivialTestCircuit<<G2 as Group>::Scalar>,
+    >::setup(circuit_primary.clone(), circuit_secondary.clone());
+    println!(
+        "Number of constraints (primary circuit): {}",
+        pp.num_constraints().0
+    );
+    println!(
+        "Number of constraints (secondary circuit): {}",
+        pp.num_constraints().1
+    );
 
-        println!("{:#?}", circuit_primary.clone());
-    */
-    /*
-        // circuit
-        let (z0_primary, circuits_primary) = DFAStepCircuit::new(
-            num_steps,
-            <G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one(),
-        );
+    println!(
+        "Number of variables (primary circuit): {}",
+        pp.num_variables().0
+    );
+    println!(
+        "Number of variables (secondary circuit): {}",
+        pp.num_variables().1
+    );
+
+    println!("{:#?}", circuit_primary.clone());
+
+    // circuit
+    let (z0_primary, circuits_primary) = DFAStepCircuit::new(
+        num_steps,
+        <G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one(),
+    );
 
         // trivial
         let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
