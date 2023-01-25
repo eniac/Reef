@@ -5,8 +5,7 @@ type G2 = pasta_curves::vesta::Point;
 use ::bellperson::{gadgets::num::AllocatedNum, LinearCombination, SynthesisError};
 use circ::cfg;
 use circ::cfg::CircOpt;
-use circ::target::r1cs::bellman::*;
-use circ::target::r1cs::R1cs;
+use circ::target::r1cs::{nova::*, R1cs};
 use ff::PrimeField;
 use nova_snark::{
     traits::{
@@ -72,12 +71,7 @@ impl<F: PrimeField> DFAStepWitness<F> {
     }
 }
 
-#[derive(Clone, Debug)]
-struct DFAStepCircuit<F: PrimeField> {
-    wit: DFAStepWitness<F>,
-    lcs: Vec<LinearCombination<F>>,
-}
-
+/*
 impl<F> DFAStepCircuit<F>
 where
     F: PrimeField,
@@ -109,67 +103,8 @@ where
 
     // helper methods here (?)
 }
+*/
 
-// sample F: x_{i+1} = x_i * x_i
-impl<F> StepCircuit<F> for DFAStepCircuit<F>
-where
-    F: PrimeField,
-{
-    // return # inputs or outputs of each step
-    // synthesize() and output() take as input and output a vec of len = arity()
-    fn arity(&self) -> usize {
-        1
-    }
-
-    // make circuit for a computation step
-    // return variable corresponding to output of step z_{i+1}
-    fn synthesize<CS: bellperson::ConstraintSystem<F>>(
-        &self,
-        cs: &mut CS,
-        z: &[AllocatedNum<F>],
-    ) -> Result<Vec<AllocatedNum<F>>, SynthesisError> {
-        let mut z_out: Result<Vec<AllocatedNum<F>>, SynthesisError> =
-            Err(SynthesisError::AssignmentMissing);
-
-        // let mut hash_i = hash_0;
-        // let mut x_i = z[0].clone();;
-
-        // non deterministic advice
-        let x_i = AllocatedNum::alloc(cs.namespace(|| format!("x_i")), || Ok(self.wit.x_i))?;
-        let x_i_plus_1 = AllocatedNum::alloc(cs.namespace(|| format!("x_i_plus_1")), || {
-            Ok(self.wit.x_i_plus_1)
-        })?;
-
-        // check conditions hold:
-        // x_i_plus_1 = x_i^2
-
-        cs.enforce(
-            || format!("x_i * x_i = x_i_plus_1"),
-            |lc| lc + CS::one() + CS::one(),
-            |lc| lc + CS::one() + CS::one(),
-            |lc| lc + CS::one() + CS::one() + CS::one() + CS::one(),
-        );
-
-        //println!("TESTING {:#?}", cs);
-
-        // return hash(x_i_plus_1, ...TODO) since Nova circuits expect a single output
-        z_out = Ok(vec![x_i_plus_1.clone()]); // # outputs??
-
-        // update x_i and hash_i for the next iteration
-        // x_i = x_i_plus_1;
-
-        z_out
-    }
-
-    // return output of step when provided with step's input
-    fn output(&self, z: &[F]) -> Vec<F> {
-        // sanity check
-        debug_assert_eq!(z[0], self.wit.x_i);
-
-        // compute output using advice
-        vec![self.wit.x_i_plus_1]
-    }
-}
 /*
 pub fn ark_mat_to_nova<F>(mat: ark_relations::r1cs::Matrix<F>) {
     println!("SCALAR {:#?}", type_of(&<G1 as Group>::Scalar::one()));
@@ -192,6 +127,7 @@ pub fn ark_mat_to_nova<F>(mat: ark_relations::r1cs::Matrix<F>) {
     */
 }
 */
+
 fn main() {
     let opt = Options::from_args();
     // Alphabet
@@ -205,7 +141,8 @@ fn main() {
 
     // set up CirC library
     let mut circ: CircOpt = Default::default();
-    circ.field.custom_modulus = "17".to_owned(); //TODO
+    circ.field.custom_modulus =
+        "28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); //TODO
     cfg::set(&circ);
 
     // Convert the Regex to a DFA
@@ -213,26 +150,36 @@ fn main() {
     mk_dfa(&r, &ab, &mut dfa);
     println!("dfa: {:#?}", dfa);
 
-    dfa.to_lookup_comp();
+    let (prover_data, verifier_data) = dfa.to_lookup_comp();
+    println!("r1cs: {:#?}", prover_data.r1cs);
 
     // use "empty" (witness-less) circuit to generate nova F
+    let circuit_primary = DFAStepCircuit::new(&prover_data.r1cs);
 
     // iterations
     let num_steps = doc.chars().count(); // len of document
     println!("Doc len is {}", num_steps);
     let mut chars = doc.chars();
 
+    let mut current_state = dfa.get_init_state();
     for i in 0..num_steps {
         // allocate real witnesses for round i
+        let (wits, next_state) = dfa.gen_wit_i(i, chars.next().unwrap(), current_state);
+        let precomp = prover_data.clone().precompute;
+        println!("prover_data {:#?}", prover_data.clone());
+        println!("wits {:#?}", wits.clone());
+        let extended_wit = precomp.eval(&wits);
+        println!("extended wit {:#?}", extended_wit);
 
-        // regenerate circuit (only needed for validation, not for nova)
-        //let next_state = dfa.cond_delta(civar, curr_state.clone()).value().unwrap();
+        prover_data.r1cs.check_all(&extended_wit);
 
         // generate nova witness vector i
+        // wits as F in z = vec![*xx, *xxx, *xx];
 
         // translate wit to nova, fold
 
         // for next i+1 round
+        current_state = next_state;
     }
 
     // TEST

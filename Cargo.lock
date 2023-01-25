@@ -1922,6 +1922,7 @@ dependencies = [
  "bellperson",
  "circ",
  "ff",
+ "fxhash",
  "hashconsing",
  "itertools 0.10.5",
  "nova-snark",

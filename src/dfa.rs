@@ -6,16 +6,16 @@ use std::io::{Error, ErrorKind, Result};
 use crate::deriv::nullable;
 use crate::parser::re::Regex;
 
-use circ::cfg::cfg;
+use circ::cfg::*;
 use circ::ir::opt::*;
 use circ::ir::proof::Constraints;
 use circ::ir::term::*;
-use circ::target::r1cs::opt::reduce_linearities;
-use circ::target::r1cs::trans::to_r1cs;
-
+use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
+use fxhash::FxHashMap;
 use rug::Integer;
 
 fn new_const<I>(i: I) -> Term
+// constants
 where
     Integer: From<I>,
 {
@@ -23,7 +23,16 @@ where
 }
 
 fn new_var(name: String) -> Term {
+    // empty holes
     leaf_term(Op::Var(name, Sort::Field(cfg().field().clone())))
+}
+
+fn new_wit<I>(i: I) -> Value
+// wit values
+where
+    Integer: From<I>,
+{
+    Value::Field(cfg().field().new_v(i))
 }
 
 #[derive(Debug)]
@@ -112,7 +121,7 @@ impl<'a> DFA<'a> {
             .collect()
     }
 
-    pub fn to_lookup_comp(&self) {
+    pub fn to_lookup_comp(&self) -> (ProverData, VerifierData) {
         let sorted_ab = self.ab.chars().sorted();
 
         let mut char_bottom = new_const(self.nstates()); //TODO
@@ -130,7 +139,7 @@ impl<'a> DFA<'a> {
                         vec![
                             term(
                                 Op::Eq,
-                                vec![new_var("current state".to_owned()), new_const(s)],
+                                vec![new_var("current_state".to_owned()), new_const(s)],
                             ), // if match on this state
                             new_const(t), // true (??)
                             state_bottom, // false
@@ -193,6 +202,26 @@ impl<'a> DFA<'a> {
         prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
 
         println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
+        return (prover_data, verifier_data);
+    }
+
+    pub fn gen_wit_i(
+        &self,
+        i: usize,
+        doc_i: char,
+        current_state: u64,
+    ) -> (FxHashMap<String, Value>, u64) {
+        let next_state = self.delta(current_state, doc_i).unwrap();
+
+        let values: FxHashMap<String, Value> = vec![
+            ("current_state".to_owned(), new_wit(current_state)),
+            ("char".to_owned(), new_wit(self.ab_to_num(doc_i))),
+            ("next_state".to_owned(), new_wit(next_state)),
+        ]
+        .into_iter()
+        .collect();
+
+        return (values, next_state);
     }
 }
 
