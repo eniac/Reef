@@ -42,92 +42,6 @@ struct Options {
     input: String,
 }
 
-#[derive(Clone, Debug)]
-struct DFAStepWitness<F: PrimeField> {
-    x_i: F,
-    x_i_plus_1: F,
-}
-
-impl<F: PrimeField> DFAStepWitness<F> {
-    // sample witness
-    fn new(x_0: &F) -> (Vec<F>, Self) {
-        //Vec<Self>) {
-        //let mut vars = Vec::new();
-
-        //let mut hash_i = *hash_0;
-        let mut x_i = *x_0;
-
-        // note in final version, we will likely do many iters per step
-        let x_i_plus_1 = x_i * x_i;
-
-        //vars.push(
-        let vars = Self { x_i, x_i_plus_1 };
-
-        //x_i = x_i_plus_1;
-
-        let z_0 = vec![*x_0];
-
-        (z_0, vars)
-    }
-}
-
-/*
-impl<F> DFAStepCircuit<F>
-where
-    F: PrimeField,
-{
-    fn new(num_steps: usize, x0: F, lc_list: Vec<LinearCombination<F>>) -> (Vec<F>, Vec<Self>) {
-        let z0 = vec![x0];
-        let mut circuits = Vec::new();
-        let (mut zi, mut dfa_witness) = DFAStepWitness::new(&x0);
-        let circuit = DFAStepCircuit {
-            wit: dfa_witness.clone(),
-            lcs: lc_list.clone(),
-        };
-        // println!("{:#?}", circuit);
-        circuits.push(circuit);
-
-        for i in 1..num_steps {
-            (zi, dfa_witness) = DFAStepWitness::new(&dfa_witness.x_i_plus_1);
-
-            let circuit = DFAStepCircuit {
-                wit: dfa_witness.clone(),
-                lcs: lc_list.clone(),
-            };
-            // println!("{:#?}", circuit);
-            circuits.push(circuit);
-        }
-
-        (z0, circuits)
-    }
-
-    // helper methods here (?)
-}
-*/
-
-/*
-pub fn ark_mat_to_nova<F>(mat: ark_relations::r1cs::Matrix<F>) {
-    println!("SCALAR {:#?}", type_of(&<G1 as Group>::Scalar::one()));
-    for cs in mat {
-        // rows = constraints
-        for col in cs {
-            let num = col.0;
-            let slot = col.1;
-        }
-    }
-
-    /*println!("mat len {:#?}", mat.len());
-    for row in mat {
-        println!("len row {:#?}", row.len());
-        for col in row {
-            println!("{:#?}", col.1);
-        }
-        println!("\n");
-    }
-    */
-}
-*/
-
 fn main() {
     let opt = Options::from_args();
     // Alphabet
@@ -142,7 +56,8 @@ fn main() {
     // set up CirC library
     let mut circ: CircOpt = Default::default();
     circ.field.custom_modulus =
-        "28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); //TODO
+        "28948022309329048855892746252171976963363056481941647379679742748393362948097".into(); // vesta (fuck???)
+                                                                                                //"28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); // pallas curve (i think?)
     cfg::set(&circ);
 
     // Convert the Regex to a DFA
@@ -182,29 +97,7 @@ fn main() {
         current_state = next_state;
     }
 
-    // TEST
-    /*
-    let circuit_primary = DFAStepCircuit {
-        wit: DFAStepWitness {
-            x_i: <G1 as Group>::Scalar::one(),
-            x_i_plus_1: <G1 as Group>::Scalar::zero(),
-        },
-    };
-
-    println!("TEST {:#?}", type_of(&circuit_primary.wit.x_i));
-
-    // fold + compile nova
-
     // TODO: check conversion is good
-    // NOVA
-
-    // main circuit F w/empty witness
-    let circuit_primary = DFAStepCircuit {
-        wit: DFAStepWitness {
-            x_i: <G1 as Group>::Scalar::zero(),
-            x_i_plus_1: <G1 as Group>::Scalar::zero(),
-        },
-    };
 
     // trivial circuit
     let circuit_secondary = TrivialTestCircuit::default();
@@ -235,20 +128,21 @@ fn main() {
         pp.num_variables().1
     );
 
-    println!("{:#?}", circuit_primary.clone());
+    //println!("{:#?}", circuit_primary.clone());
 
     // circuit
-    let (z0_primary, circuits_primary) = DFAStepCircuit::new(
+    /*let (z0_primary, circuits_primary) = DFAStepCircuit::new(
         num_steps,
         <G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one(),
     );
+    */
 
-        // trivial
-        let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
+    // trivial
+    let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
-        type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
-        type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
-
+    type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
+    type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
+    /*
         // recursive SNARK
         let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
 
