@@ -19,4 +19,5 @@ prettyprint = "0.8.1"
 rug = { version = "1.11", features = ["serde"] }
 fxhash = "0.2"
 
-
+[dev-dependencies]
+dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8" }
