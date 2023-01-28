@@ -1,16 +1,9 @@
 digraph example {
-    N0[label="a.*bb*a"];
-    N4[label="∅"];
-    N2[label="(.*bb*a | b*a)"];
-    N1[label=".*bb*a"];
-    N3[label="(ε | .*bb*a)"];
-    N3 -> N1[label="a"];
+    N0[label="a.*"];
+    N2[label="∅"];
+    N1[label=".*"];
     N0 -> N1[label="a"];
-    N1 -> N1[label="a"];
-    N4 -> N4[label="a, b"];
-    N1 -> N2[label="b"];
-    N2 -> N2[label="b"];
-    N3 -> N2[label="b"];
-    N2 -> N3[label="a"];
-    N0 -> N4[label="b"];
+    N1 -> N1[label="b, a"];
+    N2 -> N2[label="b, a"];
+    N0 -> N2[label="b"];
 }

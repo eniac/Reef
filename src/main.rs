@@ -1,12 +1,12 @@
 #![allow(missing_docs)]
 use structopt::StructOpt;
+
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 use ::bellperson::{gadgets::num::AllocatedNum, LinearCombination, SynthesisError};
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::target::r1cs::{nova::*, R1cs};
-use ff::PrimeField;
 use nova_snark::{
     traits::{
         circuit::{StepCircuit, TrivialTestCircuit},
@@ -14,13 +14,12 @@ use nova_snark::{
     },
     CompressedSNARK, PublicParams, RecursiveSNARK,
 };
-use std::collections::HashMap;
 
 pub mod deriv;
 pub mod dfa;
 pub mod parser;
 
-use crate::deriv::mk_dfa;
+use crate::deriv::*;
 use crate::dfa::DFA;
 use crate::parser::regex_parser;
 
@@ -40,6 +39,7 @@ struct Options {
 
     #[structopt(short = "i", long = "input", parse(from_str))]
     input: String,
+
 }
 
 fn main() {

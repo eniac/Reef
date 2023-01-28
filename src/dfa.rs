@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn dot_dfa() {
         let ab = String::from("ab");
-        let regex = regex_parser(&String::from("a.*b+a"), &ab);
+        let regex = regex_parser(&String::from("a.*(.|b)*"), &ab);
 
         let mut dfa = DFA::new(&ab[..]);
         mk_dfa(&regex, &ab, &mut dfa);
