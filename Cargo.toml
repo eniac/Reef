@@ -11,8 +11,8 @@ structopt = "0.3"
 circ = { path = "nova-circ", features = ["zok", "smt", "r1cs", "bellman"] }
 regex-syntax = "0.6"
 itertools = "0.10"
-nova-snark = "0.8.1" # backend
-bellperson = { version = "0.22", default-features = false }
+nova-snark = { path = "nova-circ/nova-fork" }
+bellperson = { version = "0.24", default-features = false }
 pasta_curves = { version = "0.4.0", features = ["repr-c"] }
 ff = "0.12.0"
 prettyprint = "0.8.1"

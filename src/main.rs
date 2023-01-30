@@ -7,6 +7,11 @@ use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::target::r1cs::{nova::*, R1cs};
 use ff::PrimeField;
+//use neptune::{
+//    circuit::poseidon_hash,
+//    poseidon::{HashMode, Poseidon, PoseidonConstants},
+//    Strength,
+//};
 use nova_snark::{
     traits::{
         circuit::{StepCircuit, TrivialTestCircuit},
