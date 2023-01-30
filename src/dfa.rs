@@ -285,9 +285,9 @@ mod tests {
         assert!(!re_match);
     }
 
-    use std::fs::File;
-    use std::fmt::{Display, Formatter, Error};
     use itertools::Itertools;
+    use std::fmt::{Display, Error, Formatter};
+    use std::fs::File;
 
     #[test]
     fn dot_dfa() {
@@ -318,7 +318,9 @@ mod tests {
     }
 
     impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
-        fn graph_id(&'a self) -> dot::Id<'a> { dot::Id::new("example").unwrap() }
+        fn graph_id(&'a self) -> dot::Id<'a> {
+            dot::Id::new("example").unwrap()
+        }
         fn node_id(&'a self, n: &Regex) -> dot::Id<'a> {
             dot::Id::new(format!("N{}", self.states[n])).unwrap()
         }
@@ -331,7 +333,9 @@ mod tests {
     }
 
     impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA<'a> {
-        fn nodes(&'a self) -> dot::Nodes<'a, Regex> { self.states.clone().into_keys().collect() }
+        fn nodes(&'a self) -> dot::Nodes<'a, Regex> {
+            self.states.clone().into_keys().collect()
+        }
         fn edges(&'a self) -> dot::Edges<'a, Ed> {
             self.trans
                 .clone()
@@ -339,11 +343,15 @@ mod tests {
                 .map(|(a, c, b)| ((a, b), c))
                 .into_group_map()
                 .into_iter()
-                .map(|((a,b), c)| (a, c, b))
+                .map(|((a, b), c)| (a, c, b))
                 .collect()
         }
 
-        fn source(&self, e: &Ed) -> Regex { e.0.clone() }
-        fn target(&self, e: &Ed) -> Regex { e.2.clone() }
+        fn source(&self, e: &Ed) -> Regex {
+            e.0.clone()
+        }
+        fn target(&self, e: &Ed) -> Regex {
+            e.2.clone()
+        }
     }
-  }
+}

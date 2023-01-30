@@ -74,35 +74,7 @@ fn main() {
     println!("r1cs: {:#?}", prover_data.r1cs);
 
     // use "empty" (witness-less) circuit to generate nova F
-    let circuit_primary = DFAStepCircuit::new(&prover_data.r1cs);
-
-    // iterations
-    let num_steps = doc.chars().count(); // len of document
-    println!("Doc len is {}", num_steps);
-    let mut chars = doc.chars();
-
-    let mut current_state = dfa.get_init_state();
-    for i in 0..num_steps {
-        // allocate real witnesses for round i
-        let (wits, next_state) = dfa.gen_wit_i(i, chars.next().unwrap(), current_state);
-        let precomp = prover_data.clone().precompute;
-        println!("prover_data {:#?}", prover_data.clone());
-        println!("wits {:#?}", wits.clone());
-        let extended_wit = precomp.eval(&wits);
-        println!("extended wit {:#?}", extended_wit);
-
-        prover_data.r1cs.check_all(&extended_wit);
-
-        // generate nova witness vector i
-        // wits as F in z = vec![*xx, *xxx, *xx];
-
-        // translate wit to nova, fold
-
-        // for next i+1 round
-        current_state = next_state;
-    }
-
-    // TODO: check conversion is good
+    let circuit_primary = DFAStepCircuit::new(&prover_data.r1cs, None);
 
     // trivial circuit
     let circuit_secondary = TrivialTestCircuit::default();
@@ -112,7 +84,7 @@ fn main() {
     let pp = PublicParams::<
         G1,
         G2,
-        DFAStepCircuit<<G1 as Group>::Scalar>,
+        DFAStepCircuit, //<<G1 as Group>::Scalar>,
         TrivialTestCircuit<<G2 as Group>::Scalar>,
     >::setup(circuit_primary.clone(), circuit_secondary.clone());
     println!(
@@ -133,6 +105,75 @@ fn main() {
         pp.num_variables().1
     );
 
+    // iterations
+    let num_steps = doc.chars().count(); // len of document
+    println!("Doc len is {}", num_steps);
+
+    // recursive SNARK
+    let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
+    let z0_primary = vec![]; // TODO!
+
+    // trivial
+    let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
+
+    type C1 = DFAStepCircuit; //<<G1 as Group>::Scalar>;
+    type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
+
+    let mut chars = doc.chars();
+
+    let mut current_state = dfa.get_init_state();
+    for i in 0..num_steps {
+        // allocate real witnesses for round i
+        let (wits, next_state) = dfa.gen_wit_i(i, chars.next().unwrap(), current_state);
+        let precomp = prover_data.clone().precompute;
+        println!("prover_data {:#?}", prover_data.clone());
+        println!("wits {:#?}", wits.clone());
+        let extended_wit = precomp.eval(&wits);
+        println!("extended wit {:#?}", extended_wit);
+
+        prover_data.r1cs.check_all(&extended_wit);
+
+        // generate nova witness vector i
+        let circuit_primary: DFAStepCircuit =
+            DFAStepCircuit::new(&prover_data.r1cs, Some(extended_wit));
+
+        let z0_primary = vec![]; // TODO!
+
+        // snark
+        let result = RecursiveSNARK::prove_step(
+            &pp,
+            recursive_snark,
+            circuit_primary.clone(),
+            circuit_secondary.clone(),
+            z0_primary.clone(),
+            z0_secondary.clone(),
+        );
+        assert!(result.is_ok());
+        println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
+        recursive_snark = Some(result.unwrap());
+
+        // for next i+1 round
+        current_state = next_state;
+    }
+
+    assert!(recursive_snark.is_some());
+    let recursive_snark = recursive_snark.unwrap();
+
+    // verify recursive
+    let res = recursive_snark.verify(&pp, num_steps, z0_primary.clone(), z0_secondary.clone());
+    assert!(res.is_ok());
+
+    // compressed SNARK
+    type S1 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G1>;
+    type S2 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G2>;
+    let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
+    assert!(res.is_ok());
+    let compressed_snark = res.unwrap();
+
+    // verify compressed
+    let res = compressed_snark.verify(&pp, num_steps, z0_primary, z0_secondary);
+    assert!(res.is_ok());
+
     //println!("{:#?}", circuit_primary.clone());
 
     // circuit
@@ -140,14 +181,7 @@ fn main() {
         num_steps,
         <G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one(),
     );
-    */
 
-    // trivial
-    let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
-
-    type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
-    type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
-    /*
         // recursive SNARK
         let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
 
