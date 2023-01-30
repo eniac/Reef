@@ -1,0 +1,9 @@
+digraph example {
+    N0[label="a.*"];
+    N2[label="∅"];
+    N1[label=".*"];
+    N0 -> N1[label="a"];
+    N1 -> N1[label="b, a"];
+    N2 -> N2[label="b, a"];
+    N0 -> N2[label="b"];
+}

@@ -6,6 +6,7 @@ use regex_syntax::hir::Literal::Unicode;
 use regex_syntax::hir::RepetitionKind::{OneOrMore, ZeroOrMore};
 use regex_syntax::Parser;
 
+
 pub mod re {
     use hashconsing::{consign, HConsed, HashConsign};
 
@@ -15,6 +16,7 @@ pub mod re {
     pub enum RegexF {
         Nil,
         Empty,
+        Dot,
         Char(char),
         Not(Regex),
         App(Regex, Regex),
@@ -27,6 +29,23 @@ pub mod re {
         let G = consign(10) for RegexF ;
     }
 
+    use core::fmt;
+    use core::fmt::Formatter;
+
+    impl fmt::Display for RegexF {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            match &self {
+                RegexF::Nil => write!(f, "ε"),
+                RegexF::Empty => write!(f, "∅"),
+                RegexF::Dot => write!(f, "."),
+                RegexF::Char(c) => write!(f, "{}", c),
+                RegexF::Not(c) => write!(f, "! {}", c),
+                RegexF::App(x, y) => write!(f, "{}{}", x, y),
+                RegexF::Alt(x, y) => write!(f, "({} | {})", x, y),
+                RegexF::Star(a) => write!(f, "{}*", a)
+            }
+        }
+    }
     // Smart constructors for regex simplification
     pub fn nil() -> Regex {
         G.mk(RegexF::Nil)
@@ -40,11 +59,16 @@ pub mod re {
         G.mk(RegexF::Char(c))
     }
 
+    pub fn dot() -> Regex {
+        G.mk(RegexF::Dot)
+    }
+
     pub fn app(a: Regex, b: Regex) -> Regex {
         match (&*a, &*b) {
             (RegexF::App(x, y), _) => app(x.clone(), app(y.clone(), b)),
             (_, RegexF::Nil) => a,
             (RegexF::Nil, _) => b,
+            (RegexF::Star(x), RegexF::Star(y)) if *x == *y => a,
             (_, RegexF::Empty) | (RegexF::Empty, _) => empty(),
             (_, _) => G.mk(RegexF::App(a, b)),
         }
@@ -56,6 +80,8 @@ pub mod re {
             (RegexF::Alt(x, y), _) => alt(x.clone(), alt(y.clone(), b)),
             (RegexF::Not(inner), _) if *inner == empty() => G.mk(RegexF::Not(empty())),
             (RegexF::Empty, _) => b,
+            (RegexF::Dot, RegexF::Char(_)) => a,
+            (RegexF::Char(_), RegexF::Dot) => b,
             (_, RegexF::Empty) => a,
             (x, y) if y < x => alt(b, a),
             (_, _) => G.mk(RegexF::Alt(a, b)),
@@ -102,14 +128,7 @@ fn to_regex<'a>(h: &'a Hir, ab: &'a str) -> Regex {
             }
         }
         Group(g) => to_regex(&g.hir, ab),
-        Class(_) =>
-        // this is dot
-        {
-            ab.chars()
-                .map(|a| re::character(a))
-                .reduce(|acc, a| re::alt(acc, a))
-                .unwrap()
-        }
+        Class(_) => re::dot(),
         Literal(Unicode(c)) => re::character(*c),
         _ => panic!("Unsupported regex {:?}", h),
     }

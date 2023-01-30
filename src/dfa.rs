@@ -230,12 +230,8 @@ mod tests {
 
     use crate::deriv::{mk_dfa, nullable};
     use crate::dfa::DFA;
-    use crate::domain::{frth, num_bits, DomainRadix2};
+    use crate::parser::re::Regex;
     use crate::parser::regex_parser;
-    use itertools::Itertools;
-    use std::collections::HashMap;
-    use std::collections::HashSet;
-    use std::io::{Error, ErrorKind, Result};
 
     fn set_up_delta_test(r: &str, alpha: &str, tocheck: &str) -> bool {
         let ab = String::from(alpha);
@@ -288,4 +284,66 @@ mod tests {
         let re_match = set_up_delta_test("a.*a", "ab", "abb");
         assert!(!re_match);
     }
-}
+
+    use std::fs::File;
+    use std::fmt::{Display, Formatter, Error};
+    use itertools::Itertools;
+
+    #[test]
+    fn dot_dfa() {
+        let ab = String::from("ab");
+        let regex = regex_parser(&String::from("a.*(.|b)*"), &ab);
+
+        let mut dfa = DFA::new(&ab[..]);
+        mk_dfa(&regex, &ab, &mut dfa);
+
+        // Output file
+        let mut buffer = File::create("graphs/dfa.dot").unwrap();
+
+        dot::render(&dfa, &mut buffer).unwrap()
+    }
+
+    type Ed = (Regex, Vec<char>, Regex);
+
+    fn ed_to_str(e: &Ed) -> String {
+        let mut comma_separated = String::new();
+
+        for num in &e.1[0..e.1.len() - 1] {
+            comma_separated.push_str(&num.to_string());
+            comma_separated.push_str(", ");
+        }
+
+        comma_separated.push_str(&e.1[e.1.len() - 1].to_string());
+        comma_separated
+    }
+
+    impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
+        fn graph_id(&'a self) -> dot::Id<'a> { dot::Id::new("example").unwrap() }
+        fn node_id(&'a self, n: &Regex) -> dot::Id<'a> {
+            dot::Id::new(format!("N{}", self.states[n])).unwrap()
+        }
+        fn node_label<'b>(&'b self, r: &Regex) -> dot::LabelText<'b> {
+            dot::LabelText::LabelStr(format!("{}", r).into())
+        }
+        fn edge_label<'b>(&'b self, c: &Ed) -> dot::LabelText<'b> {
+            dot::LabelText::LabelStr(format!("{}", ed_to_str(c)).into())
+        }
+    }
+
+    impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA<'a> {
+        fn nodes(&'a self) -> dot::Nodes<'a, Regex> { self.states.clone().into_keys().collect() }
+        fn edges(&'a self) -> dot::Edges<'a, Ed> {
+            self.trans
+                .clone()
+                .into_iter()
+                .map(|(a, c, b)| ((a, b), c))
+                .into_group_map()
+                .into_iter()
+                .map(|((a,b), c)| (a, c, b))
+                .collect()
+        }
+
+        fn source(&self, e: &Ed) -> Regex { e.0.clone() }
+        fn target(&self, e: &Ed) -> Regex { e.2.clone() }
+    }
+  }
