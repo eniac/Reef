@@ -24,10 +24,12 @@ use nova_snark::{
 pub mod deriv;
 pub mod dfa;
 pub mod parser;
+pub mod r1cs;
 
 use crate::deriv::*;
 use crate::dfa::DFA;
 use crate::parser::regex_parser;
+use crate::r1cs::*;
 
 fn type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
@@ -70,7 +72,7 @@ fn main() {
     mk_dfa(&r, &ab, &mut dfa);
     println!("dfa: {:#?}", dfa);
 
-    let (prover_data, verifier_data) = dfa.to_lookup_comp();
+    let (prover_data, verifier_data) = to_lookup_comp(&dfa);
     println!("r1cs: {:#?}", prover_data.r1cs);
 
     // use "empty" (witness-less) circuit to generate nova F
@@ -124,7 +126,7 @@ fn main() {
     let mut current_state = dfa.get_init_state();
     for i in 0..num_steps {
         // allocate real witnesses for round i
-        let (wits, next_state) = dfa.gen_wit_i(i, chars.next().unwrap(), current_state);
+        let (wits, next_state) = gen_wit_i(&dfa, i, chars.next().unwrap(), current_state);
         let precomp = prover_data.clone().precompute;
         println!("prover_data {:#?}", prover_data.clone());
         println!("wits {:#?}", wits.clone());
@@ -173,48 +175,4 @@ fn main() {
     // verify compressed
     let res = compressed_snark.verify(&pp, num_steps, z0_primary, z0_secondary);
     assert!(res.is_ok());
-
-    //println!("{:#?}", circuit_primary.clone());
-
-    // circuit
-    /*let (z0_primary, circuits_primary) = DFAStepCircuit::new(
-        num_steps,
-        <G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one(),
-    );
-
-        // recursive SNARK
-        let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
-
-        for (i, circuit_primary) in circuits_primary.iter().take(num_steps).enumerate() {
-            let result = RecursiveSNARK::prove_step(
-                &pp,
-                recursive_snark,
-                circuit_primary.clone(),
-                circuit_secondary.clone(),
-                z0_primary.clone(),
-                z0_secondary.clone(),
-            );
-            assert!(result.is_ok());
-            println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
-            recursive_snark = Some(result.unwrap());
-        }
-
-        assert!(recursive_snark.is_some());
-        let recursive_snark = recursive_snark.unwrap();
-
-        // verify recursive
-        let res = recursive_snark.verify(&pp, num_steps, z0_primary.clone(), z0_secondary.clone());
-        assert!(res.is_ok());
-
-        // compressed SNARK
-        type S1 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G1>;
-        type S2 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G2>;
-        let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
-        assert!(res.is_ok());
-        let compressed_snark = res.unwrap();
-
-        // verify compressed
-        let res = compressed_snark.verify(&pp, num_steps, z0_primary, z0_secondary);
-        assert!(res.is_ok());
-    */
 }
