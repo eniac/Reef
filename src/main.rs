@@ -148,12 +148,17 @@ fn main() {
         prover_data.r1cs.check_all(&extended_wit);
 
         // generate nova witness vector i
-        let next_char = chars.next().unwrap();
+
+        let mut next_char = '#'; // dummy char TODO
+        if i < num_steps - 1 {
+            next_char = chars.next().unwrap();
+        }
+
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
             Some(extended_wit),
             <G1 as Group>::Scalar::from(current_state),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)), // todo this function sucks,
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
             <G1 as Group>::Scalar::from(next_state),
             <G1 as Group>::Scalar::from(dfa.ab_to_num(next_char)),
         );

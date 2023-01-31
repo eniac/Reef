@@ -10,6 +10,8 @@ use crate::parser::re::Regex;
 pub struct DFA<'a> {
     /// Alphabet
     pub ab: &'a str,
+    /// map of alphabet -> u64
+    pub chars: HashMap<char, u64>,
     /// Set of states (and their index)
     pub states: HashMap<Regex, u64>,
     /// Transition relation from [state -> state], given [char]
@@ -18,17 +20,28 @@ pub struct DFA<'a> {
 
 impl<'a> DFA<'a> {
     pub fn new(ab: &'a str) -> Self {
+        let mut char_map = HashMap::new();
+        for (i, c) in ab.chars().sorted().enumerate() {
+            char_map.insert(c, i as u64);
+        }
+
         Self {
             ab,
+            chars: char_map,
             states: HashMap::new(),
             trans: HashSet::new(),
         }
     }
 
     pub fn ab_to_num(&self, c: char) -> u64 {
-        let sorted_ab = self.ab.chars().sorted().collect::<String>();
+        /*let sorted_ab = self.ab.chars().sorted().collect::<String>();
         let num = sorted_ab.chars().position(|x| x == c).unwrap();
         num as u64
+        */
+        match c {
+            '#' => self.chars.len() as u64, // TODO better solution
+            _ => self.chars[&c],
+        }
     }
 
     pub fn nstates(&self) -> usize {
