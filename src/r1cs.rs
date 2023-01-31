@@ -1,7 +1,4 @@
 use itertools::Itertools;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::io::{Error, ErrorKind, Result};
 
 use crate::dfa::DFA;
 
@@ -118,12 +115,7 @@ pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
     return (prover_data, verifier_data);
 }
 
-pub fn gen_wit_i(
-    dfa: &DFA,
-    i: usize,
-    doc_i: char,
-    current_state: u64,
-) -> (FxHashMap<String, Value>, u64) {
+pub fn gen_wit_i(dfa: &DFA, doc_i: char, current_state: u64) -> (FxHashMap<String, Value>, u64) {
     let next_state = dfa.delta(current_state, doc_i).unwrap();
 
     let values: FxHashMap<String, Value> = vec![

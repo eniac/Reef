@@ -3,21 +3,11 @@ use structopt::StructOpt;
 
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-use ::bellperson::{gadgets::num::AllocatedNum, LinearCombination, SynthesisError};
 use circ::cfg;
 use circ::cfg::CircOpt;
-use circ::target::r1cs::{nova::*, R1cs};
-use ff::PrimeField;
-//use neptune::{
-//    circuit::poseidon_hash,
-//    poseidon::{HashMode, Poseidon, PoseidonConstants},
-//    Strength,
-//};
+use circ::target::r1cs::nova::*;
 use nova_snark::{
-    traits::{
-        circuit::{StepCircuit, TrivialTestCircuit},
-        Group,
-    },
+    traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK,
 };
 
@@ -31,9 +21,11 @@ use crate::dfa::DFA;
 use crate::parser::regex_parser;
 use crate::r1cs::*;
 
+/*
 fn type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
+*/
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
@@ -72,7 +64,7 @@ fn main() {
     mk_dfa(&r, &ab, &mut dfa);
     println!("dfa: {:#?}", dfa);
 
-    let (prover_data, verifier_data) = to_lookup_comp(&dfa);
+    let (prover_data, _verifier_data) = to_lookup_comp(&dfa);
     println!("r1cs: {:#?}", prover_data.r1cs);
 
     // use "empty" (witness-less) circuit to generate nova F
@@ -138,7 +130,7 @@ fn main() {
 
     for i in 0..num_steps {
         // allocate real witnesses for round i
-        let (wits, next_state) = gen_wit_i(&dfa, i, current_char, current_state);
+        let (wits, next_state) = gen_wit_i(&dfa, current_char, current_state);
         let precomp = prover_data.clone().precompute;
         println!("prover_data {:#?}", prover_data.clone());
         println!("wits {:#?}", wits.clone());
