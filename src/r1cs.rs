@@ -70,9 +70,9 @@ pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
         i += 1;
     }
 
-    let ite = term(Op::Eq, vec![new_var("next_state".to_owned()), new_const(1)]); //char_bottom]);
+    let ite = term(Op::Eq, vec![new_var("next_state".to_owned()), char_bottom]);
 
-    //println!("ITE {:#?}", ite);
+    println!("ITE {:#?}", ite);
 
     let assertions = vec![ite];
 
