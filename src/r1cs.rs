@@ -70,12 +70,20 @@ pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
         i += 1;
     }
 
-    let ite = term(Op::Eq, vec![new_var("next_state".to_owned()), char_bottom]);
+    let ite = term(Op::Eq, vec![new_var("next_state".to_owned()), new_const(1)]); //char_bottom]);
 
     //println!("ITE {:#?}", ite);
 
     let assertions = vec![ite];
-    let pub_inputs = vec![];
+
+    // we must make intermediate private witnesses temporarily "public" as they serve as
+    // inputs/outputs to the nova F circuit. in the grand scheme of things (nova) they need to be
+    // changed back to private, but as far as circ is aware, they are public.
+    let pub_inputs = vec![
+        new_var("current_state".to_owned()),
+        new_var("char".to_owned()),
+        new_var("next_state".to_owned()),
+    ];
 
     let cs = Computation::from_constraint_system_parts(assertions, pub_inputs);
 
@@ -109,7 +117,11 @@ pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
         "Pre-opt R1cs size: {}",
         prover_data.r1cs.constraints().len()
     );
+
+    println!("Prover data {:#?}", prover_data);
     prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
+
+    println!("Prover data {:#?}", prover_data);
 
     println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
     return (prover_data, verifier_data);
