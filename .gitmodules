@@ -1,3 +1,0 @@
-[submodule "nova-circ"]
-	path = nova-circ
-	url = https://github.com/jkwoods/circ.git

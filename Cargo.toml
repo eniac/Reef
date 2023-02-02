@@ -8,10 +8,10 @@ edition = "2021"
 [dependencies]
 hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch = "phash"}
 structopt = "0.3"
-circ = { path = "nova-circ", features = ["zok", "smt", "r1cs", "bellman"] }
+circ = { git = "https://github.com/jkwoods/circ", branch = "nova2", features = ["zok", "smt", "r1cs", "bellman"] }
 regex-syntax = "0.6"
 itertools = "0.10"
-nova-snark = { path = "nova-circ/nova-fork" }
+nova-snark = { git = "https://github.com/jkwoods/Nova" }
 bellperson = { version = "0.24", default-features = false }
 pasta_curves = { version = "0.4.0", features = ["repr-c"] }
 ff = "0.12.0"
