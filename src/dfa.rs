@@ -166,14 +166,14 @@ mod tests {
         assert!(!re_match);
     }
 
+    use std::fs::File;
     use itertools::Itertools;
     use std::fmt::{Display, Error, Formatter};
-    use std::fs::File;
 
     #[test]
     fn dot_dfa() {
         let ab = String::from("ab");
-        let regex = regex_parser(&String::from("a.*(.|b)*"), &ab);
+        let regex = regex_parser(&String::from(".*ab"), &ab);
 
         let mut dfa = DFA::new(&ab[..]);
         mk_dfa(&regex, &ab, &mut dfa);
@@ -186,17 +186,6 @@ mod tests {
 
     type Ed = (Regex, Vec<char>, Regex);
 
-    fn ed_to_str(e: &Ed) -> String {
-        let mut comma_separated = String::new();
-
-        for num in &e.1[0..e.1.len() - 1] {
-            comma_separated.push_str(&num.to_string());
-            comma_separated.push_str(", ");
-        }
-
-        comma_separated.push_str(&e.1[e.1.len() - 1].to_string());
-        comma_separated
-    }
 
     impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
         fn graph_id(&'a self) -> dot::Id<'a> {
@@ -208,8 +197,17 @@ mod tests {
         fn node_label<'b>(&'b self, r: &Regex) -> dot::LabelText<'b> {
             dot::LabelText::LabelStr(format!("{}", r).into())
         }
-        fn edge_label<'b>(&'b self, c: &Ed) -> dot::LabelText<'b> {
-            dot::LabelText::LabelStr(format!("{}", ed_to_str(c)).into())
+        fn edge_label<'b>(&'b self, e: &Ed) -> dot::LabelText<'b> {
+            let mut comma_separated = String::new();
+
+            for num in &e.1[0..e.1.len() - 1] {
+                comma_separated.push_str(&num.to_string());
+                comma_separated.push_str(", ");
+            }
+
+            comma_separated.push_str(&e.1[e.1.len() - 1].to_string());
+
+            dot::LabelText::LabelStr(format!("{}", comma_separated).into())
         }
     }
 
