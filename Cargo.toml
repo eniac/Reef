@@ -8,12 +8,12 @@ edition = "2021"
 [dependencies]
 hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch = "phash"}
 structopt = "0.3"
-circ = { git = "https://github.com/jkwoods/circ", branch = "nova2", features = ["zok", "smt", "r1cs", "bellman"] }
+circ = { path = "nova-circ", features = ["zok", "smt", "r1cs", "bellman"] }
 regex-syntax = "0.6"
 itertools = "0.10"
-nova-snark = { git = "https://github.com/jkwoods/Nova" }
+nova-snark = { git = "https://github.com/sga001/Nova" }
 bellperson = { version = "0.24", default-features = false }
-pasta_curves = { version = "0.4.0", features = ["repr-c"] }
+pasta_curves = { version = "0.5.2", features = ["repr-c", "serde"], package = "fil_pasta_curves" }
 ff = "0.12.0"
 prettyprint = "0.8.1"
 rug = { version = "1.11", features = ["serde"] }

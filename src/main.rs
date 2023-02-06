@@ -8,7 +8,7 @@ use circ::cfg::CircOpt;
 use circ::target::r1cs::nova::*;
 use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
-    CompressedSNARK, PublicParams, RecursiveSNARK,
+    CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 
 pub mod deriv;
@@ -78,7 +78,7 @@ fn main() {
     );
 
     // trivial circuit
-    let circuit_secondary = TrivialTestCircuit::default();
+    let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
 
     // produce public parameters
     println!("Producing public parameters...");
@@ -87,7 +87,8 @@ fn main() {
         G2,
         DFAStepCircuit<<G1 as Group>::Scalar>,
         TrivialTestCircuit<<G2 as Group>::Scalar>,
-    >::setup(circuit_primary.clone(), circuit_secondary.clone());
+    >::setup(circuit_primary.clone(), circuit_secondary.clone())
+    .unwrap();
     println!(
         "Number of constraints (primary circuit): {}",
         pp.num_constraints().0
@@ -110,14 +111,13 @@ fn main() {
     let num_steps = doc.chars().count(); // len of document
     println!("Doc len is {}", num_steps);
 
-    // recursive SNARK
-    let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
-
     // trivial
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
     type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
     type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
+    // recursive SNARK
+    let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
 
     let mut chars = doc.chars();
 
@@ -177,17 +177,24 @@ fn main() {
     let recursive_snark = recursive_snark.unwrap();
 
     // verify recursive
-    let res = recursive_snark.verify(&pp, num_steps, z0_primary.clone(), z0_secondary.clone());
+    let res = recursive_snark.verify(
+        &pp,
+        FINAL_EXTERNAL_COUNTER,
+        z0_primary.clone(),
+        z0_secondary.clone(),
+    );
     assert!(res.is_ok());
 
     // compressed SNARK
-    type S1 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G1>;
-    type S2 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G2>;
+    type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+    type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
+    type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
+    type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
 
     // verify compressed
-    let res = compressed_snark.verify(&pp, num_steps, z0_primary, z0_secondary);
+    let res = compressed_snark.verify(&pp, FINAL_EXTERNAL_COUNTER, z0_primary, z0_secondary);
     assert!(res.is_ok());
 }

@@ -34,7 +34,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
 dependencies = [
- "getrandom 0.2.8",
+ "getrandom",
  "once_cell",
  "version_check",
 ]
@@ -138,7 +138,7 @@ dependencies = [
  "group",
  "lazy_static",
  "log",
- "merlin 3.0.0",
+ "merlin",
  "num_cpus",
  "pairing",
  "rand_chacha",
@@ -348,7 +348,6 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "circ"
 version = "0.1.0"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#94d7352b38af5afd739c5a5534a670eb65813db9"
 dependencies = [
  "bellman",
  "bellperson",
@@ -357,6 +356,7 @@ dependencies = [
  "circ_hc",
  "circ_opt",
  "ff",
+ "fil_pasta_curves",
  "fxhash",
  "generic-array 0.14.6",
  "gmp-mpfr-sys",
@@ -370,7 +370,6 @@ dependencies = [
  "nova-snark",
  "once_cell",
  "pairing",
- "pasta_curves",
  "paste",
  "petgraph",
  "rand",
@@ -388,7 +387,6 @@ dependencies = [
 [[package]]
 name = "circ_fields"
 version = "0.1.0"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#94d7352b38af5afd739c5a5534a670eb65813db9"
 dependencies = [
  "ff",
  "ff-derive-num",
@@ -404,7 +402,6 @@ dependencies = [
 [[package]]
 name = "circ_hc"
 version = "0.1.0"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#94d7352b38af5afd739c5a5534a670eb65813db9"
 dependencies = [
  "fxhash",
  "lru",
@@ -413,7 +410,6 @@ dependencies = [
 [[package]]
 name = "circ_opt"
 version = "0.1.0"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#94d7352b38af5afd739c5a5534a670eb65813db9"
 dependencies = [
  "clap 4.1.4",
 ]
@@ -1019,24 +1015,13 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.1.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fc3cb4d91f53b50155bdcfd23f6a4c39ae1969c2ae85982b135750cccaf5fce"
-dependencies = [
- "cfg-if 1.0.0",
- "libc",
- "wasi 0.9.0+wasi-snapshot-preview1",
-]
-
-[[package]]
-name = "getrandom"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c05aeb6a22b8f62540c194aac980f2115af067bfe15a0734d7277a768d396b31"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "wasi 0.11.0+wasi-snapshot-preview1",
+ "wasi",
 ]
 
 [[package]]
@@ -1329,6 +1314,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lurk-pasta-msm"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12992280292a2a4ff84591308c426029245d49094c75df079b286f1bb8496e6c"
+dependencies = [
+ "cc",
+ "fil_pasta_curves",
+ "semolina",
+ "sppark",
+ "which",
+]
+
+[[package]]
 name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1350,18 +1348,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "merlin"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e261cf0f8b3c42ded9f7d2bb59dea03aa52bc8a1cbc7482f9fc3fd1229d3b42"
-dependencies = [
- "byteorder",
- "keccak",
- "rand_core 0.5.1",
- "zeroize",
 ]
 
 [[package]]
@@ -1407,8 +1393,8 @@ dependencies = [
 
 [[package]]
 name = "nova-snark"
-version = "0.10.0"
-source = "git+https://github.com/jkwoods/Nova#3ef2a3b36a9a841f0ef8c8e2f1af8ee937bfbf4f"
+version = "0.13.0"
+source = "git+https://github.com/sga001/Nova#105a249cdf53787bad803323a6dbc0e0565efcca"
 dependencies = [
  "bellperson",
  "bincode",
@@ -1416,23 +1402,23 @@ dependencies = [
  "byteorder",
  "digest 0.8.1",
  "ff",
+ "fil_pasta_curves",
  "flate2",
  "generic-array 0.14.6",
  "itertools 0.9.0",
- "merlin 2.0.1",
+ "lurk-pasta-msm",
+ "merlin",
  "neptune",
  "num-bigint 0.4.3",
  "num-integer",
  "num-traits",
- "pasta-msm",
- "pasta_curves",
- "rand",
  "rand_chacha",
  "rand_core 0.5.1",
  "rayon",
  "serde",
  "sha3",
  "subtle",
+ "thiserror",
 ]
 
 [[package]]
@@ -1544,34 +1530,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "135590d8bdba2b31346f9cd1fb2a912329f5135e832a4f422942eb6ead8b6b3b"
 dependencies = [
  "group",
-]
-
-[[package]]
-name = "pasta-msm"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a40dc8bdddb15a18fdf7c398f341a5ef2632a287419bbeeb64c61dec25091627"
-dependencies = [
- "cc",
- "pasta_curves",
- "semolina",
- "sppark",
- "which",
-]
-
-[[package]]
-name = "pasta_curves"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cc65faf8e7313b4b1fbaa9f7ca917a0eed499a9663be71477f87993604341d8"
-dependencies = [
- "blake2b_simd",
- "ff",
- "group",
- "lazy_static",
- "rand",
- "static_assertions",
- "subtle",
 ]
 
 [[package]]
@@ -1795,9 +1753,6 @@ name = "rand_core"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90bde5296fc891b0cef12a6d03ddccc162ce7b2aff54160af9338f8d40df6d19"
-dependencies = [
- "getrandom 0.1.16",
-]
 
 [[package]]
 name = "rand_core"
@@ -1805,7 +1760,7 @@ version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
- "getrandom 0.2.8",
+ "getrandom",
 ]
 
 [[package]]
@@ -1863,7 +1818,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b033d837a7cf162d7993aded9304e30a83213c648b6e389db233191f891e5c2b"
 dependencies = [
- "getrandom 0.2.8",
+ "getrandom",
  "redox_syscall",
  "thiserror",
 ]
@@ -1891,11 +1846,11 @@ dependencies = [
  "circ",
  "dot",
  "ff",
+ "fil_pasta_curves",
  "fxhash",
  "hashconsing",
  "itertools 0.10.5",
  "nova-snark",
- "pasta_curves",
  "prettyprint",
  "regex-syntax",
  "rug",
@@ -2401,12 +2356,6 @@ dependencies = [
 
 [[package]]
 name = "wasi"
-version = "0.9.0+wasi-snapshot-preview1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
-
-[[package]]
-name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
@@ -2553,7 +2502,6 @@ dependencies = [
 [[package]]
 name = "zokrates_parser"
 version = "0.2.4"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#94d7352b38af5afd739c5a5534a670eb65813db9"
 dependencies = [
  "pest",
  "pest_derive",
@@ -2562,7 +2510,6 @@ dependencies = [
 [[package]]
 name = "zokrates_pest_ast"
 version = "0.2.3"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#94d7352b38af5afd739c5a5534a670eb65813db9"
 dependencies = [
  "from-pest",
  "lazy_static",
