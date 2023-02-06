@@ -80,8 +80,8 @@ pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
     // inputs/outputs to the nova F circuit. in the grand scheme of things (nova) they need to be
     // changed back to private, but as far as circ is aware, they are public.
     let pub_inputs = vec![
-        new_var("current_state".to_owned()),
-        new_var("char".to_owned()),
+        //new_var("current_state".to_owned()),
+        //new_var("char".to_owned()),
         new_var("next_state".to_owned()),
     ];
 

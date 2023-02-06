@@ -365,6 +365,7 @@ dependencies = [
  "itertools 0.10.5",
  "log",
  "logos",
+ "neptune",
  "nova-snark",
  "once_cell",
  "pairing",
@@ -1403,6 +1404,7 @@ dependencies = [
 [[package]]
 name = "nova-snark"
 version = "0.10.0"
+source = "git+https://github.com/jkwoods/Nova#3ef2a3b36a9a841f0ef8c8e2f1af8ee937bfbf4f"
 dependencies = [
  "bellperson",
  "bincode",

@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch = "phash"}
 structopt = "0.3"
-circ = { git = "https://github.com/jkwoods/circ", branch = "nova2", features = ["zok", "smt", "r1cs", "bellman"] }
+circ = { path = "nova-circ", features = ["zok", "smt", "r1cs", "bellman"] }
 regex-syntax = "0.6"
 itertools = "0.10"
 nova-snark = { git = "https://github.com/jkwoods/Nova" }
