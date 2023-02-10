@@ -113,6 +113,109 @@ pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
     return coeffs;
 }
 
+fn r1cs_conv(assertions: Vec<Term>, pub_inputs: Vec<Term>) -> (ProverData, VerifierData) {
+    let cs = Computation::from_constraint_system_parts(assertions, pub_inputs);
+
+    let mut css = Computations::new();
+    css.comps.insert("main".to_string(), cs);
+    let css = opt(
+        css,
+        vec![
+            Opt::ScalarizeVars,
+            Opt::Flatten,
+            Opt::Sha,
+            Opt::ConstantFold(Box::new([])),
+            // Tuples must be eliminated before oblivious array elim
+            Opt::Tuple,
+            Opt::ConstantFold(Box::new([])),
+            Opt::Obliv,
+            // The obliv elim pass produces more tuples, that must be eliminated
+            Opt::Tuple,
+            Opt::LinearScan,
+            // The linear scan pass produces more tuples, that must be eliminated
+            Opt::Tuple,
+            Opt::Flatten,
+            Opt::ConstantFold(Box::new([])),
+        ],
+    );
+    let (mut prover_data, verifier_data) = to_r1cs(css.get("main").clone(), cfg());
+
+    println!(
+        "Pre-opt R1cs size: {}",
+        prover_data.r1cs.constraints().len()
+    );
+    //println!("Prover data {:#?}", prover_data);
+    //prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
+
+    //println!("Prover data {:#?}", prover_data);
+
+    println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
+
+    return (prover_data, verifier_data);
+}
+
+pub fn to_polys(dfa: &DFA) -> (ProverData, VerifierData) {
+    let coeffs = lagrange_from_dfa(dfa);
+
+    // hash the in state and char -> Integer::from(si * (dfa.chars.len() as u64) + dfa.ab_to_num(c))
+
+    let x_lookup = term(
+        Op::PfNaryOp(PfNaryOp::Add),
+        vec![
+            term(
+                Op::PfNaryOp(PfNaryOp::Mul),
+                vec![
+                    new_var("next_state".to_owned()),
+                    new_const(dfa.chars.len() as u64),
+                ],
+            ),
+            new_var("char".to_owned()),
+        ],
+    );
+    let input_lookup = term(Op::Eq, vec![new_var("x_lookup".to_owned()), x_lookup]);
+
+    // horners eval
+    let num_c = coeffs.len();
+    let mut horners = term(
+        Op::PfNaryOp(PfNaryOp::Mul),
+        vec![
+            new_const(coeffs[num_c - 1].clone()),
+            new_var("x_lookup".to_owned()),
+        ],
+    );
+    for i in (1..(num_c - 2)).rev() {
+        horners = term(
+            Op::PfNaryOp(PfNaryOp::Mul),
+            vec![
+                new_var("x_lookup".to_owned()),
+                term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![horners, new_const(coeffs[i].clone())],
+                ),
+            ],
+        );
+    }
+
+    // constant
+    horners = term(
+        Op::PfNaryOp(PfNaryOp::Add),
+        vec![horners, new_const(coeffs[0].clone())],
+    );
+
+    // next_state
+    let eq = term(Op::Eq, vec![new_var("next_state".to_owned()), horners]);
+
+    let assertions = vec![input_lookup, eq];
+
+    let pub_inputs = vec![
+        //new_var("current_state".to_owned()),
+        //new_var("char".to_owned()),
+        new_var("next_state".to_owned()),
+    ];
+
+    r1cs_conv(assertions, pub_inputs)
+}
+
 pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
     let sorted_ab = dfa.ab.chars().sorted();
 
@@ -167,45 +270,7 @@ pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
         new_var("next_state".to_owned()),
     ];
 
-    let cs = Computation::from_constraint_system_parts(assertions, pub_inputs);
-
-    let mut css = Computations::new();
-    css.comps.insert("main".to_string(), cs);
-    /*
-        let css = opt(
-            css,
-            vec![
-                Opt::ScalarizeVars,
-                Opt::Flatten,
-                Opt::Sha,
-                Opt::ConstantFold(Box::new([])),
-                // Tuples must be eliminated before oblivious array elim
-                Opt::Tuple,
-                Opt::ConstantFold(Box::new([])),
-                Opt::Obliv,
-                // The obliv elim pass produces more tuples, that must be eliminated
-                Opt::Tuple,
-                Opt::LinearScan,
-                // The linear scan pass produces more tuples, that must be eliminated
-                Opt::Tuple,
-                Opt::Flatten,
-                Opt::ConstantFold(Box::new([])),
-            ],
-        );
-    */
-    let (mut prover_data, verifier_data) = to_r1cs(css.get("main").clone(), cfg());
-
-    println!(
-        "Pre-opt R1cs size: {}",
-        prover_data.r1cs.constraints().len()
-    );
-    //println!("Prover data {:#?}", prover_data);
-    //prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
-
-    //println!("Prover data {:#?}", prover_data);
-
-    println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
-    return (prover_data, verifier_data);
+    r1cs_conv(assertions, pub_inputs)
 }
 
 pub fn gen_wit_i(dfa: &DFA, doc_i: char, current_state: u64) -> (FxHashMap<String, Value>, u64) {
