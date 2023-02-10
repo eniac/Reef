@@ -78,7 +78,7 @@ pub fn lagrange_from_dfa(dfa: &DFA) -> Vec<Integer> {
 
 pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
     let num_pts = evals.len();
-    println!("evals = {:#?}", evals);
+    //println!("evals = {:#?}", evals);
 
     let mut coeffs = vec![Integer::from(0); num_pts];
     for i in 0..num_pts {
@@ -97,13 +97,13 @@ pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
                 for j in range {
                     new_l_i[j + 1] = add(&new_l_i[j + 1], &l_i[j]);
                     new_l_i[j] = sub(&new_l_i[j], &mul(&evals[k].0, &l_i[j]));
-                    println!("new_li j, j+1 = {:#?}, {:#?}", new_l_i[j], new_l_i[j + 1]);
+                    //println!("new_li j, j+1 = {:#?}, {:#?}", new_l_i[j], new_l_i[j + 1]);
                 }
                 l_i = new_l_i;
             }
         }
 
-        println!("li = {:#?}", l_i);
+        //println!("li = {:#?}", l_i);
         // mult y's
         for k in 0..num_pts {
             coeffs[k] = add(&coeffs[k], &mul(&evals[i].1, &l_i[k]));
@@ -156,38 +156,34 @@ fn r1cs_conv(assertions: Vec<Term>, pub_inputs: Vec<Term>) -> (ProverData, Verif
 
 pub fn to_polys(dfa: &DFA) -> (ProverData, VerifierData) {
     let coeffs = lagrange_from_dfa(dfa);
+    println!("lagrange coeffs {:#?}", coeffs);
 
     // hash the in state and char -> Integer::from(si * (dfa.chars.len() as u64) + dfa.ab_to_num(c))
-
     let x_lookup = term(
         Op::PfNaryOp(PfNaryOp::Add),
         vec![
             term(
                 Op::PfNaryOp(PfNaryOp::Mul),
                 vec![
-                    new_var("next_state".to_owned()),
+                    new_var("current_state".to_owned()),
                     new_const(dfa.chars.len() as u64),
                 ],
             ),
             new_var("char".to_owned()),
         ],
     );
-    let input_lookup = term(Op::Eq, vec![new_var("x_lookup".to_owned()), x_lookup]);
 
     // horners eval
     let num_c = coeffs.len();
     let mut horners = term(
         Op::PfNaryOp(PfNaryOp::Mul),
-        vec![
-            new_const(coeffs[num_c - 1].clone()),
-            new_var("x_lookup".to_owned()),
-        ],
+        vec![new_const(coeffs[num_c - 1].clone()), x_lookup.clone()],
     );
-    for i in (1..(num_c - 2)).rev() {
+    for i in (1..(num_c - 1)).rev() {
         horners = term(
             Op::PfNaryOp(PfNaryOp::Mul),
             vec![
-                new_var("x_lookup".to_owned()),
+                x_lookup.clone(),
                 term(
                     Op::PfNaryOp(PfNaryOp::Add),
                     vec![horners, new_const(coeffs[i].clone())],
@@ -205,17 +201,22 @@ pub fn to_polys(dfa: &DFA) -> (ProverData, VerifierData) {
     // next_state
     let eq = term(Op::Eq, vec![new_var("next_state".to_owned()), horners]);
 
-    let assertions = vec![input_lookup, eq];
+    // final state (non) match check
+
+    println!("computation {:#?}", eq);
+
+    let assertions = vec![eq];
 
     let pub_inputs = vec![
-        //new_var("current_state".to_owned()),
-        //new_var("char".to_owned()),
+        new_var("current_state".to_owned()),
+        new_var("char".to_owned()),
         new_var("next_state".to_owned()),
     ];
 
     r1cs_conv(assertions, pub_inputs)
 }
 
+// outdated - do not use
 pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
     let sorted_ab = dfa.ab.chars().sorted();
 
@@ -290,7 +291,9 @@ pub fn gen_wit_i(dfa: &DFA, doc_i: char, current_state: u64) -> (FxHashMap<Strin
 #[cfg(test)]
 mod tests {
 
+    use crate::deriv::*;
     use crate::dfa::DFA;
+    use crate::parser::regex_parser;
     use crate::r1cs::*;
     use circ::cfg;
     use circ::cfg::CircOpt;
@@ -304,7 +307,8 @@ mod tests {
 
     #[test]
     fn basic_lg() {
-        set_up_cfg("79".to_owned());
+        set_up_cfg("1019".to_owned());
+        //set_up_cfg("79".to_owned());
 
         let points = vec![
             (Integer::from(1), Integer::from(1)),
@@ -324,8 +328,9 @@ mod tests {
         assert_eq!(coeffs, expected);
     }
 
+    #[test]
     fn lg_1() {
-        set_up_cfg("1019".to_owned());
+        //set_up_cfg("1019".to_owned());
 
         let points = vec![
             (Integer::from(1), Integer::from(2)),
@@ -337,17 +342,80 @@ mod tests {
 
         let expected = vec![
             Integer::from(124),
-            Integer::from(277),
+            Integer::from(742),
             Integer::from(929),
-            Integer::from(774),
+            Integer::from(245),
         ];
 
         assert_eq!(coeffs, expected);
     }
 
-    /*
-        fn dfa_lg() {
+    fn dfa_test(ab: String, regex: String, doc: String) {
+        //set_up_cfg("1019".to_owned());
 
+        let r = regex_parser(&regex, &ab);
+        let mut dfa = DFA::new(&ab[..]);
+        mk_dfa(&r, &ab, &mut dfa);
+        println!("{:#?}", dfa);
+
+        let mut chars = doc.chars();
+        let num_steps = doc.chars().count();
+
+        let (prover_data, _) = to_polys(&dfa);
+        let precomp = prover_data.clone().precompute;
+        //println!("{:#?}", prover_data);
+
+        let mut current_state = dfa.get_init_state();
+        let mut current_char = chars.next().unwrap();
+
+        for i in 0..num_steps {
+            let (values, next_state) = gen_wit_i(&dfa, current_char, dfa.get_init_state());
+            let extd_val = precomp.eval(&values);
+
+            prover_data.r1cs.check_all(&extd_val);
+
+            let mut next_char = '#'; // dummy char TODO
+            if i < num_steps - 1 {
+                next_char = chars.next().unwrap();
+            }
+
+            // for next i+1 round
+            current_state = next_state;
+            current_char = next_char;
         }
+    }
+
+    #[test]
+    fn dfa_1() {
+        dfa_test("a".to_string(), "a".to_string(), "a".to_string());
+    }
+
+    #[test]
+    fn dfa_2() {
+        dfa_test("ab".to_string(), "ab".to_string(), "ab".to_string());
+        dfa_test("abc".to_string(), "ab".to_string(), "ab".to_string());
+    }
+
+    #[test]
+    fn dfa_star() {
+        dfa_test("ab".to_string(), "a*b*".to_string(), "ab".to_string());
+        dfa_test(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaaabbbbbbbbbbbbbb".to_string(),
+        );
+        dfa_test(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaaaaaaaaaab".to_string(),
+        );
+    }
+
+    /*
+    #[test]
+    #[should_panic]
+    fn dfa_bad() {
+        dfa_test("ab".to_string(), "a".to_string(), "b".to_string());
+    }
     */
 }
