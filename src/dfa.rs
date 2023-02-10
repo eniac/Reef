@@ -166,9 +166,9 @@ mod tests {
         assert!(!re_match);
     }
 
-    use std::fs::File;
     use itertools::Itertools;
     use std::fmt::{Display, Error, Formatter};
+    use std::fs::File;
 
     #[test]
     fn dot_dfa() {
@@ -185,7 +185,6 @@ mod tests {
     }
 
     type Ed = (Regex, Vec<char>, Regex);
-
 
     impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
         fn graph_id(&'a self) -> dot::Id<'a> {

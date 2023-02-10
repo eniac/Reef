@@ -65,8 +65,15 @@ fn main() {
     println!("dfa: {:#?}", dfa);
 
     let (prover_data, _verifier_data) = to_lookup_comp(&dfa);
-    println!("r1cs: {:#?}", prover_data.r1cs);
+    //println!("r1cs: {:#?}", prover_data.r1cs);
 
+    //print_r1cs(&prover_data);
+    println!(
+        "unopt #r1cs: {:#?}, nstates * nchars = {:#?}",
+        prover_data.r1cs.constraints().len(),
+        dfa.nstates() * dfa.chars.len()
+    );
+    /*
     // use "empty" (witness-less) circuit to generate nova F
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
         &prover_data.r1cs,
@@ -197,4 +204,6 @@ fn main() {
     // verify compressed
     let res = compressed_snark.verify(&pp, FINAL_EXTERNAL_COUNTER, z0_primary, z0_secondary);
     assert!(res.is_ok());
+
+    */
 }

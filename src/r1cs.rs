@@ -6,7 +6,9 @@ use circ::cfg::*;
 use circ::ir::opt::*;
 use circ::ir::proof::Constraints;
 use circ::ir::term::*;
-use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
+use circ::target::r1cs::{
+    opt::reduce_linearities, trans::to_r1cs, Lc, ProverData, R1cs, VerifierData,
+};
 use fxhash::FxHashMap;
 use rug::Integer;
 
@@ -29,6 +31,86 @@ where
     Integer: From<I>,
 {
     Value::Field(cfg().field().new_v(i))
+}
+
+fn add(a: &Integer, b: &Integer) -> Integer {
+    let (_, rem) = (a.clone() + b.clone()).div_rem_euc(cfg().field().modulus().clone());
+    rem
+}
+
+fn sub(a: &Integer, b: &Integer) -> Integer {
+    let (_, rem) = (a.clone() - b.clone()).div_rem_euc(cfg().field().modulus().clone());
+    rem
+}
+
+fn mul(a: &Integer, b: &Integer) -> Integer {
+    let (_, rem) = (a.clone() * b.clone()).div_rem_euc(cfg().field().modulus().clone());
+    rem
+}
+
+//fn horner_testing(coeffs: &Vec<Integer>,
+
+fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
+    let mut res = Integer::from(1);
+    for j in (0..evals.len()).rev() {
+        if i != j {
+            res = mul(&res, &sub(&evals[i].0, &evals[j].0));
+        }
+    }
+
+    // find inv in feild
+    let inv = res.invert(cfg().field().modulus()).unwrap();
+
+    return inv;
+}
+
+pub fn lagrange_from_dfa(dfa: &DFA) -> Vec<Integer> {
+    let mut evals = vec![];
+    for (si, c, so) in dfa.deltas() {
+        evals.push((
+            Integer::from(si * (dfa.chars.len() as u64) + dfa.ab_to_num(c)),
+            Integer::from(so),
+        ));
+    }
+
+    lagrange_field(evals)
+}
+
+pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
+    let num_pts = evals.len();
+    println!("evals = {:#?}", evals);
+
+    let mut coeffs = vec![Integer::from(0); num_pts];
+    for i in 0..num_pts {
+        // make l_i
+        let mut l_i = vec![Integer::from(0); num_pts];
+        l_i[0] = denom(i, &evals);
+
+        let mut new_l_i = vec![Integer::from(0); num_pts];
+        for k in 0..num_pts {
+            if k != i {
+                new_l_i = vec![Integer::from(0); num_pts];
+                let mut range = (0..k).rev();
+                if k < i {
+                    range = (0..(k + 1)).rev();
+                }
+                for j in range {
+                    new_l_i[j + 1] = add(&new_l_i[j + 1], &l_i[j]);
+                    new_l_i[j] = sub(&new_l_i[j], &mul(&evals[k].0, &l_i[j]));
+                    println!("new_li j, j+1 = {:#?}, {:#?}", new_l_i[j], new_l_i[j + 1]);
+                }
+                l_i = new_l_i;
+            }
+        }
+
+        println!("li = {:#?}", l_i);
+        // mult y's
+        for k in 0..num_pts {
+            coeffs[k] = add(&coeffs[k], &mul(&evals[i].1, &l_i[k]));
+        }
+    }
+
+    return coeffs;
 }
 
 pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
@@ -89,39 +171,38 @@ pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
 
     let mut css = Computations::new();
     css.comps.insert("main".to_string(), cs);
-
-    let opt_css = opt(
-        css,
-        vec![
-            Opt::ScalarizeVars,
-            Opt::Flatten,
-            Opt::Sha,
-            Opt::ConstantFold(Box::new([])),
-            // Tuples must be eliminated before oblivious array elim
-            Opt::Tuple,
-            Opt::ConstantFold(Box::new([])),
-            Opt::Obliv,
-            // The obliv elim pass produces more tuples, that must be eliminated
-            Opt::Tuple,
-            Opt::LinearScan,
-            // The linear scan pass produces more tuples, that must be eliminated
-            Opt::Tuple,
-            Opt::Flatten,
-            Opt::ConstantFold(Box::new([])),
-        ],
-    );
-
-    let (mut prover_data, verifier_data) = to_r1cs(opt_css.get("main").clone(), cfg());
+    /*
+        let css = opt(
+            css,
+            vec![
+                Opt::ScalarizeVars,
+                Opt::Flatten,
+                Opt::Sha,
+                Opt::ConstantFold(Box::new([])),
+                // Tuples must be eliminated before oblivious array elim
+                Opt::Tuple,
+                Opt::ConstantFold(Box::new([])),
+                Opt::Obliv,
+                // The obliv elim pass produces more tuples, that must be eliminated
+                Opt::Tuple,
+                Opt::LinearScan,
+                // The linear scan pass produces more tuples, that must be eliminated
+                Opt::Tuple,
+                Opt::Flatten,
+                Opt::ConstantFold(Box::new([])),
+            ],
+        );
+    */
+    let (mut prover_data, verifier_data) = to_r1cs(css.get("main").clone(), cfg());
 
     println!(
         "Pre-opt R1cs size: {}",
         prover_data.r1cs.constraints().len()
     );
+    //println!("Prover data {:#?}", prover_data);
+    //prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
 
-    println!("Prover data {:#?}", prover_data);
-    prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
-
-    println!("Prover data {:#?}", prover_data);
+    //println!("Prover data {:#?}", prover_data);
 
     println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
     return (prover_data, verifier_data);
@@ -139,4 +220,69 @@ pub fn gen_wit_i(dfa: &DFA, doc_i: char, current_state: u64) -> (FxHashMap<Strin
     .collect();
 
     return (values, next_state);
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::dfa::DFA;
+    use crate::r1cs::*;
+    use circ::cfg;
+    use circ::cfg::CircOpt;
+
+    fn set_up_cfg(m: String) {
+        let mut circ: CircOpt = Default::default();
+        circ.field.custom_modulus = m.into();
+
+        cfg::set(&circ);
+    }
+
+    #[test]
+    fn basic_lg() {
+        set_up_cfg("79".to_owned());
+
+        let points = vec![
+            (Integer::from(1), Integer::from(1)),
+            (Integer::from(10), Integer::from(10)),
+            (Integer::from(3), Integer::from(3)),
+            (Integer::from(4), Integer::from(4)),
+        ];
+        let coeffs = lagrange_field(points);
+
+        let expected = vec![
+            Integer::from(0),
+            Integer::from(1),
+            Integer::from(0),
+            Integer::from(0),
+        ];
+
+        assert_eq!(coeffs, expected);
+    }
+
+    fn lg_1() {
+        set_up_cfg("1019".to_owned());
+
+        let points = vec![
+            (Integer::from(1), Integer::from(2)),
+            (Integer::from(10), Integer::from(3)),
+            (Integer::from(3), Integer::from(3)),
+            (Integer::from(4), Integer::from(9)),
+        ];
+        let coeffs = lagrange_field(points);
+
+        let expected = vec![
+            Integer::from(124),
+            Integer::from(277),
+            Integer::from(929),
+            Integer::from(774),
+        ];
+
+        assert_eq!(coeffs, expected);
+    }
+
+    /*
+        fn dfa_lg() {
+
+        }
+    */
 }
