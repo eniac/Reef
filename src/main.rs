@@ -64,7 +64,7 @@ fn main() {
     mk_dfa(&r, &ab, &mut dfa);
     println!("dfa: {:#?}", dfa);
 
-    let (prover_data, _verifier_data) = to_lookup_comp(&dfa);
+    /*    let (prover_data, _verifier_data) = to_lookup_comp(&dfa);
     //println!("r1cs: {:#?}", prover_data.r1cs);
 
     //print_r1cs(&prover_data);
@@ -73,7 +73,7 @@ fn main() {
         prover_data.r1cs.constraints().len(),
         dfa.nstates() * dfa.chars.len()
     );
-    /*
+
     // use "empty" (witness-less) circuit to generate nova F
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
         &prover_data.r1cs,

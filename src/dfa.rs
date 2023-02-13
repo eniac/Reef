@@ -104,6 +104,15 @@ impl<'a> DFA<'a> {
             .map(|(a, b, c)| (self.get_state_num(&a), b, self.get_state_num(&c)))
             .collect()
     }
+
+    pub fn is_match(&self, doc: &String) -> bool {
+        let mut s = self.get_init_state();
+        for c in doc.chars() {
+            s = self.delta(s, c).unwrap();
+        }
+        // If it is in the final states, then success
+        self.get_final_states().contains(&s)
+    }
 }
 
 #[cfg(test)]
