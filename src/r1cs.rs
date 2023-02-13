@@ -9,6 +9,7 @@ use circ::target::r1cs::{
 };
 use fxhash::FxHashMap;
 use itertools::Itertools;
+use rug::rand::RandState;
 use rug::Integer;
 
 fn new_const<I>(i: I) -> Term
@@ -82,6 +83,12 @@ fn vanishing(xs: Vec<u64>) -> Vec<Integer> {
     for xi in xs {
         evals.push((Integer::from(xi), Integer::from(0)));
     }
+    // note we don't just want y = 0
+    let mut rand = RandState::new();
+    evals.push((
+        cfg().field().modulus().clone().random_below(&mut rand),
+        cfg().field().modulus().clone().random_below(&mut rand),
+    )); // todo different? - check not in domain
 
     lagrange_field(evals)
 }
@@ -100,7 +107,7 @@ pub fn lagrange_from_dfa(dfa: &DFA) -> Vec<Integer> {
 
 pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
     let num_pts = evals.len();
-    //println!("evals = {:#?}", evals);
+    println!("evals = {:#?}", evals);
 
     let mut coeffs = vec![Integer::from(0); num_pts];
     for i in 0..num_pts {
@@ -137,6 +144,7 @@ pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
 
 fn horners_circuit(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
     let num_c = coeffs.len();
+    println!("coeffs = {:#?}", coeffs);
 
     let mut horners = term(
         Op::PfNaryOp(PfNaryOp::Mul),
@@ -195,7 +203,7 @@ fn r1cs_conv(assertions: Vec<Term>, pub_inputs: Vec<Term>) -> (ProverData, Verif
         "Pre-opt R1cs size: {}",
         prover_data.r1cs.constraints().len()
     );
-    //println!("Prover data {:#?}", prover_data);
+    // println!("Prover data {:#?}", prover_data);
     //prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
 
     //println!("Prover data {:#?}", prover_data);
@@ -207,7 +215,7 @@ fn r1cs_conv(assertions: Vec<Term>, pub_inputs: Vec<Term>) -> (ProverData, Verif
 
 pub fn to_polys(dfa: &DFA, is_match: bool, doc_length: usize) -> (ProverData, VerifierData) {
     let coeffs = lagrange_from_dfa(dfa);
-    println!("lagrange coeffs {:#?}", coeffs);
+    //println!("lagrange coeffs {:#?}", coeffs);
 
     // hash the in state and char -> Integer::from(si * (dfa.chars.len() as u64) + dfa.ab_to_num(c))
     let x_lookup = term(
@@ -246,9 +254,13 @@ pub fn to_polys(dfa: &DFA, is_match: bool, doc_length: usize) -> (ProverData, Ve
     }
 
     if is_match {
+        println!("MEMBERSHIP");
+        println!("in states: {:#?}", final_states);
         // proof of membership
         vanishing_poly = horners_circuit(vanishing(final_states), new_var("next_state".to_owned()));
     } else {
+        println!("NONMEMBERSHIP");
+        println!("in states: {:#?}", non_final_states);
         vanishing_poly = horners_circuit(
             vanishing(non_final_states),
             new_var("next_state".to_owned()),
@@ -260,7 +272,7 @@ pub fn to_polys(dfa: &DFA, is_match: bool, doc_length: usize) -> (ProverData, Ve
         vec![
             term(
                 Op::Eq,
-                vec![new_var("round_num".to_owned()), new_const(doc_length)],
+                vec![new_var("round_num".to_owned()), new_const(doc_length - 1)],
             ), // if in final round
             term(Op::Eq, vec![vanishing_poly, new_const(0)]), // true -> check next_state (not) in final_states
             new_bool_const(false),                            // not in correct round
@@ -272,7 +284,9 @@ pub fn to_polys(dfa: &DFA, is_match: bool, doc_length: usize) -> (ProverData, Ve
         vec![new_bool_var("bool_out".to_owned()), match_term],
     );
 
-    let assertions = vec![eq, bool_out];
+    println!("bool out term {:#?}", bool_out);
+
+    let assertions = vec![bool_out]; //eq
 
     let pub_inputs = vec![
         new_var("round_num".to_owned()),
@@ -350,18 +364,11 @@ pub fn gen_wit_i(
     round_num: usize,
     current_state: u64,
     doc: &String,
-    is_match_claim: bool,
 ) -> (FxHashMap<String, Value>, u64) {
     let doc_i = doc.chars().nth(round_num).unwrap();
     let next_state = dfa.delta(current_state, doc_i).unwrap();
 
-    let bool_out = if (round_num == doc.chars().count())
-        && ((is_match_claim && dfa.is_match(doc)) || (!is_match_claim && !dfa.is_match(doc)))
-    {
-        true
-    } else {
-        false
-    };
+    let bool_out = (round_num == doc.chars().count() - 1); // && (is_match_claim == dfa.is_match(doc)); //((is_match_claim && dfa.is_match(doc)) || (!is_match_claim && !dfa.is_match(doc)));
 
     let values: FxHashMap<String, Value> = vec![
         ("round_num".to_owned(), new_wit(round_num)),
@@ -438,7 +445,7 @@ mod tests {
         assert_eq!(coeffs, expected);
     }
 
-    fn dfa_test(ab: String, regex: String, doc: String, is_match: bool) {
+    fn dfa_test(ab: String, regex: String, doc: String) {
         //set_up_cfg("1019".to_owned());
 
         let r = regex_parser(&regex, &ab);
@@ -449,7 +456,7 @@ mod tests {
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
 
-        let (prover_data, _) = to_polys(&dfa, is_match, num_steps);
+        let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
         let precomp = prover_data.clone().precompute;
         //println!("{:#?}", prover_data);
 
@@ -457,7 +464,8 @@ mod tests {
         let mut current_char = chars.next().unwrap();
 
         for i in 0..num_steps {
-            let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc, is_match);
+            let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
+            println!("VALUES ROUND {:#?}: {:#?}", i, values);
             let extd_val = precomp.eval(&values);
 
             prover_data.r1cs.check_all(&extd_val);
@@ -475,37 +483,43 @@ mod tests {
 
     #[test]
     fn dfa_1() {
-        dfa_test("a".to_string(), "a".to_string(), "a".to_string(), true);
+        dfa_test("a".to_string(), "a".to_string(), "a".to_string());
     }
 
     #[test]
     fn dfa_2() {
-        dfa_test("ab".to_string(), "ab".to_string(), "ab".to_string(), true);
-        dfa_test("abc".to_string(), "ab".to_string(), "ab".to_string(), true);
+        dfa_test("ab".to_string(), "ab".to_string(), "ab".to_string());
+        dfa_test("abc".to_string(), "ab".to_string(), "ab".to_string());
     }
 
     #[test]
     fn dfa_star() {
-        dfa_test("ab".to_string(), "a*b*".to_string(), "ab".to_string(), true);
+        dfa_test("ab".to_string(), "a*b*".to_string(), "ab".to_string());
         dfa_test(
             "ab".to_string(),
             "a*b*".to_string(),
             "aaaabbbbbbbbbbbbbb".to_string(),
-            true,
         );
         dfa_test(
             "ab".to_string(),
             "a*b*".to_string(),
             "aaaaaaaaaaab".to_string(),
-            true,
         );
     }
 
-    /*
+    #[test]
+    fn dfa_non_match() {
+        dfa_test("ab".to_string(), "a".to_string(), "b".to_string());
+        dfa_test(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaabaaaaaaaab".to_string(),
+        );
+    }
+
     #[test]
     #[should_panic]
-    fn dfa_bad() {
-        dfa_test("ab".to_string(), "a".to_string(), "b".to_string());
+    fn dfa_bad_1() {
+        dfa_test("ab".to_string(), "a".to_string(), "c".to_string());
     }
-    */
 }
