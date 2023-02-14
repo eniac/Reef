@@ -107,7 +107,7 @@ pub fn lagrange_from_dfa(dfa: &DFA) -> Vec<Integer> {
 
 pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
     let num_pts = evals.len();
-    println!("evals = {:#?}", evals);
+    //println!("evals = {:#?}", evals);
 
     let mut coeffs = vec![Integer::from(0); num_pts];
     for i in 0..num_pts {
@@ -204,7 +204,7 @@ fn r1cs_conv(assertions: Vec<Term>, pub_inputs: Vec<Term>) -> (ProverData, Verif
         prover_data.r1cs.constraints().len()
     );
     // println!("Prover data {:#?}", prover_data);
-    //prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
+    prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
 
     //println!("Prover data {:#?}", prover_data);
 
@@ -284,9 +284,7 @@ pub fn to_polys(dfa: &DFA, is_match: bool, doc_length: usize) -> (ProverData, Ve
         vec![new_bool_var("bool_out".to_owned()), match_term],
     );
 
-    println!("bool out term {:#?}", bool_out);
-
-    let assertions = vec![bool_out]; //eq
+    let assertions = vec![eq, bool_out];
 
     let pub_inputs = vec![
         new_var("round_num".to_owned()),
@@ -368,7 +366,7 @@ pub fn gen_wit_i(
     let doc_i = doc.chars().nth(round_num).unwrap();
     let next_state = dfa.delta(current_state, doc_i).unwrap();
 
-    let bool_out = (round_num == doc.chars().count() - 1); // && (is_match_claim == dfa.is_match(doc)); //((is_match_claim && dfa.is_match(doc)) || (!is_match_claim && !dfa.is_match(doc)));
+    let bool_out = round_num == doc.chars().count() - 1;
 
     let values: FxHashMap<String, Value> = vec![
         ("round_num".to_owned(), new_wit(round_num)),
@@ -381,6 +379,24 @@ pub fn gen_wit_i(
     .collect();
 
     return (values, next_state);
+}
+
+pub fn polys_cost_model(dfa: &DFA, is_match: bool) -> usize {
+    // horners selection - poly of degree m * n - 1, +1 for x_lookup
+    let mut cost = dfa.nstates() * dfa.chars.len();
+
+    // vanishing selection for final check
+    // poly of degree (# final states - 1)
+    // (alt, # non final states - 1)
+    // + 2 for round_num selection
+    // + 1 to set bool_out
+    if is_match {
+        cost += dfa.get_final_states().len() + 2;
+    } else {
+        cost += (dfa.nstates() - dfa.get_final_states().len()) + 2;
+    }
+
+    cost
 }
 
 #[cfg(test)]
@@ -451,34 +467,33 @@ mod tests {
         let r = regex_parser(&regex, &ab);
         let mut dfa = DFA::new(&ab[..]);
         mk_dfa(&r, &ab, &mut dfa);
-        println!("{:#?}", dfa);
+        //println!("{:#?}", dfa);
 
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
 
         let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
         let precomp = prover_data.clone().precompute;
-        //println!("{:#?}", prover_data);
+        println!("{:#?}", prover_data);
 
         let mut current_state = dfa.get_init_state();
-        let mut current_char = chars.next().unwrap();
 
         for i in 0..num_steps {
             let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
-            println!("VALUES ROUND {:#?}: {:#?}", i, values);
+            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
             let extd_val = precomp.eval(&values);
 
             prover_data.r1cs.check_all(&extd_val);
 
-            let mut next_char = '#'; // dummy char TODO
-            if i < num_steps - 1 {
-                next_char = chars.next().unwrap();
-            }
-
             // for next i+1 round
             current_state = next_state;
-            current_char = next_char;
         }
+
+        println!(
+            "cost model: {:#?}",
+            polys_cost_model(&dfa, dfa.is_match(&doc))
+        );
+        assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
     }
 
     #[test]

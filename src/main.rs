@@ -64,15 +64,18 @@ fn main() {
     mk_dfa(&r, &ab, &mut dfa);
     println!("dfa: {:#?}", dfa);
 
-    /*    let (prover_data, _verifier_data) = to_lookup_comp(&dfa);
+    let num_steps = doc.chars().count(); // len of document
+    println!("Doc len is {}", num_steps);
+
+    let (prover_data, _verifier_data) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
     //println!("r1cs: {:#?}", prover_data.r1cs);
 
     //print_r1cs(&prover_data);
-    println!(
+    /*println!(
         "unopt #r1cs: {:#?}, nstates * nchars = {:#?}",
         prover_data.r1cs.constraints().len(),
         dfa.nstates() * dfa.chars.len()
-    );
+    );*/
 
     // use "empty" (witness-less) circuit to generate nova F
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
@@ -114,10 +117,6 @@ fn main() {
         pp.num_variables().1
     );
 
-    // iterations
-    let num_steps = doc.chars().count(); // len of document
-    println!("Doc len is {}", num_steps);
-
     // trivial
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
@@ -126,33 +125,28 @@ fn main() {
     // recursive SNARK
     let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
 
-    let mut chars = doc.chars();
-
     let mut current_state = dfa.get_init_state();
-    let mut current_char = chars.next().unwrap();
     let z0_primary = vec![
         <G1 as Group>::Scalar::from(current_state),
-        <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
+        <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
     ];
 
+    let precomp = prover_data.clone().precompute;
     for i in 0..num_steps {
         // allocate real witnesses for round i
-        let (wits, next_state) = gen_wit_i(&dfa, current_char, current_state);
-        let precomp = prover_data.clone().precompute;
-        println!("prover_data {:#?}", prover_data.clone());
-        println!("wits {:#?}", wits.clone());
+        let (wits, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
+        //println!("prover_data {:#?}", prover_data.clone());
+        //println!("wits {:#?}", wits.clone());
         let extended_wit = precomp.eval(&wits);
-        println!("extended wit {:#?}", extended_wit);
+        //println!("extended wit {:#?}", extended_wit);
 
         prover_data.r1cs.check_all(&extended_wit);
 
-        // generate nova witness vector i
-
-        let mut next_char = '#'; // dummy char TODO
-        if i < num_steps - 1 {
-            next_char = chars.next().unwrap();
-        }
-
+        let current_char = doc.chars().nth(i).unwrap();
+        let next_char = match i + 1 {
+            num_steps => '#', // dummy
+            _ => doc.chars().nth(i + 1).unwrap(),
+        };
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
             Some(extended_wit),
@@ -177,7 +171,6 @@ fn main() {
 
         // for next i+1 round
         current_state = next_state;
-        current_char = next_char;
     }
 
     assert!(recursive_snark.is_some());
@@ -204,6 +197,4 @@ fn main() {
     // verify compressed
     let res = compressed_snark.verify(&pp, FINAL_EXTERNAL_COUNTER, z0_primary, z0_secondary);
     assert!(res.is_ok());
-
-    */
 }
