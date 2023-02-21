@@ -78,6 +78,14 @@ impl<'a> DFA<'a> {
             .collect()
     }
 
+    /// All states
+    pub fn get_states(&self) -> HashSet<u64> {
+        self.states
+            .clone()
+            .into_values()
+            .collect()
+    }
+
     /// DFA step function [delta(s, c) = s'] function
     pub fn delta(&self, state: u64, ch: char) -> Result<u64> {
         let res: Vec<u64> = self
@@ -92,7 +100,7 @@ impl<'a> DFA<'a> {
         } else {
             Err(Error::new(
                 ErrorKind::InvalidInput,
-                "Invalidated DFA invariant",
+                "Invalidated DFA invariant (determinism)",
             ))
         }
     }
@@ -113,6 +121,36 @@ impl<'a> DFA<'a> {
         // If it is in the final states, then success
         self.get_final_states().contains(&s)
     }
+
+    pub fn equiv_classes(&self) -> HashMap<char, HashSet<char>> {
+        let mut char_classes: HashMap<char, HashSet<char>> = HashMap::new();
+
+        for a in self.ab.chars() {
+            for b in self.ab.chars() {
+                if !char_classes.contains_key(&a) {
+                    char_classes.insert(a, HashSet::from([a]));
+                }
+                if !char_classes.contains_key(&b) {
+                    char_classes.insert(b, HashSet::from([b]));
+                }
+                let mut equivalent = true;
+                for s in self.get_states() {
+                    if self.delta(s, a).unwrap() != self.delta(s, b).unwrap() {
+                        equivalent = false;
+                    }
+                }
+                // Merge equivalence classes
+                if equivalent {
+                    let union: HashSet<char> = char_classes[&a].union(&char_classes[&b]).cloned().collect();
+                    char_classes.insert(a, union.clone());
+                    char_classes.insert(b, union);
+                }
+            }
+        }
+
+        char_classes
+    }
+
 }
 
 #[cfg(test)]
