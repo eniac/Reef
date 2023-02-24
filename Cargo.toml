@@ -9,6 +9,7 @@ edition = "2021"
 hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch = "phash"}
 structopt = "0.3"
 circ = { git = "https://github.com/jkwoods/circ", branch = "nova2", features = ["zok", "smt", "r1cs", "bellman"] }
+#circ = { path = "nova-circ", features = ["zok", "smt", "r1cs", "bellman"] }
 regex-syntax = "0.6"
 itertools = "0.10"
 nova-snark = { git = "https://github.com/sga001/Nova" }
@@ -18,6 +19,8 @@ ff = "0.12.0"
 prettyprint = "0.8.1"
 rug = { version = "1.11", features = ["serde"] }
 fxhash = "0.2"
+neptune = "8.1.0"
+generic-array = "0.14.4"
 
 [dev-dependencies]
 dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8" }

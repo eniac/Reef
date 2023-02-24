@@ -6,6 +6,11 @@ type G2 = pasta_curves::vesta::Point;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::target::r1cs::nova::*;
+use generic_array::typenum;
+use neptune::{
+    poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
+    Strength,
+};
 use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
@@ -77,6 +82,9 @@ fn main() {
         dfa.nstates() * dfa.chars.len()
     );*/
 
+    let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
+        Strength::Standard,
+    );
     // use "empty" (witness-less) circuit to generate nova F
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
         &prover_data.r1cs,
@@ -85,6 +93,9 @@ fn main() {
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        pc.clone(),
     );
 
     // trivial circuit
@@ -131,6 +142,7 @@ fn main() {
         <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
     ];
 
+    let mut prev_hash = <G1 as Group>::Scalar::from(0);
     let precomp = prover_data.clone().precompute;
     for i in 0..num_steps {
         // allocate real witnesses for round i
@@ -147,6 +159,15 @@ fn main() {
             num_steps => '#', // dummy
             _ => doc.chars().nth(i + 1).unwrap(),
         };
+
+        // expected poseidon
+        let mut data = vec![
+            prev_hash,
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
+        ];
+        let mut p = Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
+        let expected_next_hash: <G1 as Group>::Scalar = p.hash();
+
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
             Some(extended_wit),
@@ -154,6 +175,9 @@ fn main() {
             <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
             <G1 as Group>::Scalar::from(next_state),
             <G1 as Group>::Scalar::from(dfa.ab_to_num(next_char)),
+            <G1 as Group>::Scalar::from(prev_hash),
+            <G1 as Group>::Scalar::from(expected_next_hash),
+            pc.clone(),
         );
 
         // snark
@@ -171,6 +195,7 @@ fn main() {
 
         // for next i+1 round
         current_state = next_state;
+        prev_hash = expected_next_hash;
     }
 
     assert!(recursive_snark.is_some());

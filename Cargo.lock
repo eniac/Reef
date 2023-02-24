@@ -348,7 +348,6 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "circ"
 version = "0.1.0"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#8d2982703f6579536af508a85fb25f1598e0969c"
 dependencies = [
  "bellman",
  "bellperson",
@@ -388,7 +387,6 @@ dependencies = [
 [[package]]
 name = "circ_fields"
 version = "0.1.0"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#8d2982703f6579536af508a85fb25f1598e0969c"
 dependencies = [
  "ff",
  "ff-derive-num",
@@ -404,7 +402,6 @@ dependencies = [
 [[package]]
 name = "circ_hc"
 version = "0.1.0"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#8d2982703f6579536af508a85fb25f1598e0969c"
 dependencies = [
  "fxhash",
  "lru",
@@ -413,7 +410,6 @@ dependencies = [
 [[package]]
 name = "circ_opt"
 version = "0.1.0"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#8d2982703f6579536af508a85fb25f1598e0969c"
 dependencies = [
  "clap 4.1.6",
 ]
@@ -1858,8 +1854,10 @@ dependencies = [
  "ff",
  "fil_pasta_curves",
  "fxhash",
+ "generic-array 0.14.6",
  "hashconsing",
  "itertools 0.10.5",
+ "neptune",
  "nova-snark",
  "prettyprint",
  "regex-syntax",
@@ -2536,7 +2534,6 @@ dependencies = [
 [[package]]
 name = "zokrates_parser"
 version = "0.2.4"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#8d2982703f6579536af508a85fb25f1598e0969c"
 dependencies = [
  "pest",
  "pest_derive",
@@ -2545,7 +2542,6 @@ dependencies = [
 [[package]]
 name = "zokrates_pest_ast"
 version = "0.2.3"
-source = "git+https://github.com/jkwoods/circ?branch=nova2#8d2982703f6579536af508a85fb25f1598e0969c"
 dependencies = [
  "from-pest",
  "lazy_static",

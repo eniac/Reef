@@ -213,6 +213,28 @@ fn r1cs_conv(assertions: Vec<Term>, pub_inputs: Vec<Term>) -> (ProverData, Verif
     return (prover_data, verifier_data);
 }
 
+// plookup
+pub fn batch_polys(
+    dfa: &DFA,
+    is_match: bool,
+    doc_length: usize,
+    batch_size: usize,
+) -> (ProverData, VerifierData) {
+    let mut x_lookup_set: Vec<Term>;
+
+    let assertions = vec![]; // TODO
+
+    let pub_inputs = vec![
+        //new_var("round_num".to_owned()),
+        //new_var("current_state".to_owned()),
+        //new_var("char".to_owned()),
+        //new_var("next_state".to_owned()),
+        new_bool_var("bool_out".to_owned()),
+    ];
+
+    r1cs_conv(assertions, pub_inputs)
+}
+
 pub fn to_polys(dfa: &DFA, is_match: bool, doc_length: usize) -> (ProverData, VerifierData) {
     let coeffs = lagrange_from_dfa(dfa);
     //println!("lagrange coeffs {:#?}", coeffs);
