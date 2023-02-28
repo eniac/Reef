@@ -401,7 +401,69 @@ fn bit_eq_circuit(m: u64, eq_name: String) -> Term {
     eq
 }
 
-fn sum_check_circuit() {}
+// C_1 = LHS/"claim"
+fn sum_check_circuit(C_1: Term, num_rounds: u64) -> (Vec<Term>, Vec<Term>) {
+    let mut assertions = vec![];
+    let mut pub_inputs = vec![];
+
+    // first round claim
+    let mut claim = C_1.clone();
+
+    for j in 0..num_rounds {
+        // P makes a claim g_j(X_j) about a univariate slice of its large multilinear polynomial
+        // g_j is degree 1 in our case (woo constant time evaluation)
+
+        // V checks g_{j-1}(r_{j-1}) = g_j(0) + g_j(1)
+        let g_j = term(
+            Op::PfNaryOp(PfNaryOp::Add),
+            vec![
+                new_var(format!("sc_g_{}_coeff", j)),
+                term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        new_var(format!("sc_g_{}_const", j)),
+                        new_var(format!("sc_g_{}_const", j)),
+                    ],
+                ),
+            ],
+        );
+
+        let claim_check = term(Op::Eq, vec![claim.clone(), g_j]);
+
+        assertions.push(claim_check);
+        pub_inputs.push(new_var(format!("sc_g_{}_coeff", j)));
+        pub_inputs.push(new_var(format!("sc_g_{}_const", j)));
+        pub_inputs.push(new_var(format!("sc_r_{}", j)));
+
+        // "V" chooses rand r_{j} (P chooses this with hash)
+        let r_j = new_var(format!("sc_r_{}", j));
+
+        // update claim for the next round g_j(r_j)
+        claim = term(
+            Op::PfNaryOp(PfNaryOp::Add),
+            vec![
+                new_var(format!("sc_g_{}_const", j)),
+                term(
+                    Op::PfNaryOp(PfNaryOp::Mul),
+                    vec![new_var(format!("sc_g_{}_coeff", j)), r_j],
+                ),
+            ],
+        );
+
+        if j == num_rounds - 1 {
+            // output last g_v(r_v) claim
+
+            let last_claim = term(
+                Op::Eq,
+                vec![claim.clone(), new_var(format!("sc_last_claim"))],
+            );
+            assertions.push(last_claim);
+            pub_inputs.push(new_var(format!("sc_last_claim")));
+        }
+    }
+
+    (assertions, pub_inputs)
+}
 
 pub fn gen_wit_i(
     dfa: &DFA,
