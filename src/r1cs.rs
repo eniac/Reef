@@ -142,6 +142,34 @@ pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
     return coeffs;
 }
 
+// calculate multilinear extension from evals of univariate
+fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
+    let num_pts = pts.len();
+    if num_pts == 1 {
+        return vec![pts[0].clone()];
+    }
+
+    let h = num_pts / 2;
+    let mut l = mle_from_pts(pts[..h].to_vec());
+    let r = mle_from_pts(pts[h..].to_vec());
+
+    for i in 0..r.len() {
+        l.push(sub(&r[i], &l[i]));
+    }
+
+    l
+}
+
+fn horners_eval(coeffs: Vec<Integer>, x_lookup: Integer) -> Integer {
+    let num_c = coeffs.len();
+    let mut horners = mul(&coeffs[num_c - 1], &x_lookup);
+    for i in (1..(num_c - 1)).rev() {
+        horners = mul(&x_lookup, &add(&horners, &coeffs[i]));
+    }
+    horners = add(&horners, &coeffs[0]);
+    horners
+}
+
 fn horners_circuit(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
     let num_c = coeffs.len();
     println!("coeffs = {:#?}", coeffs);
@@ -318,66 +346,6 @@ pub fn to_polys(dfa: &DFA, is_match: bool, doc_length: usize) -> (ProverData, Ve
 
     r1cs_conv(assertions, pub_inputs)
 }
-
-// outdated - do not use
-/*
-pub fn to_lookup_comp(dfa: &DFA) -> (ProverData, VerifierData) {
-    let sorted_ab = dfa.ab.chars().sorted();
-
-    let mut char_bottom = new_const(dfa.nstates()); //TODO
-    let mut i = 0; // position of char
-    for c in sorted_ab {
-        // for each char
-        let mut state_bottom = new_const(dfa.nstates()); //TODO dummy state that is returned in case of no match
-                                                         // perhaps better way todo
-                                                         // make each state ite
-        for (s, ch, t) in dfa.deltas() {
-            if ch == c {
-                // if this char is transition
-                state_bottom = term(
-                    Op::Ite,
-                    vec![
-                        term(
-                            Op::Eq,
-                            vec![new_var("current_state".to_owned()), new_const(s)],
-                        ), // if match on this state
-                        new_const(t), // true (??)
-                        state_bottom, // false
-                    ],
-                );
-            }
-        }
-
-        // add to char ite (outer)
-        char_bottom = term(
-            Op::Ite,
-            vec![
-                term(Op::Eq, vec![new_var("char".to_owned()), new_const(i)]),
-                state_bottom,
-                char_bottom,
-            ],
-        );
-        i += 1;
-    }
-
-    let ite = term(Op::Eq, vec![new_var("next_state".to_owned()), char_bottom]);
-
-    println!("ITE {:#?}", ite);
-
-    let assertions = vec![ite];
-
-    // we must make intermediate private witnesses temporarily "public" as they serve as
-    // inputs/outputs to the nova F circuit. in the grand scheme of things (nova) they need to be
-    // changed back to private, but as far as circ is aware, they are public.
-    let pub_inputs = vec![
-        //new_var("current_state".to_owned()),
-        //new_var("char".to_owned()),
-        new_var("next_state".to_owned()),
-    ];
-
-    r1cs_conv(assertions, pub_inputs)
-}
-*/
 
 pub fn gen_wit_i(
     dfa: &DFA,
@@ -558,5 +526,57 @@ mod tests {
     #[should_panic]
     fn dfa_bad_1() {
         dfa_test("ab".to_string(), "a".to_string(), "c".to_string());
+    }
+
+    #[test]
+    fn mle_1() {
+        let mut rand = RandState::new();
+
+        let mut points: Vec<(Integer, Integer)> = vec![];
+        for x in 0..8 {
+            let mut lim = Integer::from(1019);
+            lim.random_below_mut(&mut rand);
+            points.push((Integer::from(x), lim));
+        }
+        println!("points: {:#?}", points);
+        let uni = points.clone().into_iter().map(|(_, y)| y).collect();
+
+        let coeffs = lagrange_field(points);
+        println!("coeffs: {:#?}", coeffs);
+
+        let mle = mle_from_pts(uni);
+        println!("mle coeffs: {:#?}", mle);
+
+        for x in vec![Integer::from(0), Integer::from(1)] {
+            for y in vec![Integer::from(0), Integer::from(1)] {
+                for z in vec![Integer::from(0), Integer::from(1)] {
+                    let f = add(
+                        &z,
+                        &add(&mul(&Integer::from(2), &y), &mul(&Integer::from(4), &x)),
+                    );
+
+                    let uni_out = horners_eval(coeffs.clone(), f);
+
+                    let mle_out = add(
+                        &add(
+                            &add(
+                                &add(
+                                    &add(
+                                        &add(&add(&mle[0], &mul(&mle[1], &z)), &mul(&mle[2], &y)),
+                                        &mul(&mul(&mle[3], &y), &z),
+                                    ),
+                                    &mul(&mle[4], &x),
+                                ),
+                                &mul(&mul(&mle[5], &x), &z),
+                            ),
+                            &mul(&mul(&mle[6], &x), &y),
+                        ),
+                        &mul(&mul(&mul(&mle[7], &x), &y), &z),
+                    );
+
+                    assert_eq!(mle_out, uni_out);
+                }
+            }
+        }
     }
 }
