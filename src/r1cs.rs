@@ -347,6 +347,62 @@ pub fn to_polys(dfa: &DFA, is_match: bool, doc_length: usize) -> (ProverData, Ve
     r1cs_conv(assertions, pub_inputs)
 }
 
+// for use in sum check
+// eq([x0,x1,x2...],[e0,e1,e2...])
+// m = dim of bool hypercube
+fn bit_eq_circuit(m: u64, eq_name: String) -> Term {
+    let mut eq = new_const(1); // dummy
+
+    for i in 0..m {
+        let next = term(
+            Op::PfNaryOp(PfNaryOp::Add),
+            vec![
+                term(
+                    Op::PfNaryOp(PfNaryOp::Mul),
+                    vec![
+                        new_var(format!("{}_x_{}", eq_name, i)),
+                        new_var(format!("{}_e_{}", eq_name, i)),
+                    ],
+                ),
+                term(
+                    Op::PfNaryOp(PfNaryOp::Mul),
+                    vec![
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Add),
+                            vec![
+                                new_const(1),
+                                term(
+                                    Op::PfUnOp(PfUnOp::Neg),
+                                    vec![new_var(format!("{}_x_{}", eq_name, i))],
+                                ),
+                            ],
+                        ),
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Add),
+                            vec![
+                                new_const(1),
+                                term(
+                                    Op::PfUnOp(PfUnOp::Neg),
+                                    vec![new_var(format!("{}_e_{}", eq_name, i))],
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        );
+        if i == 0 {
+            eq = next;
+        } else {
+            eq = term(Op::PfNaryOp(PfNaryOp::Mul), vec![eq, next]);
+        }
+    }
+
+    eq
+}
+
+fn sum_check_circuit() {}
+
 pub fn gen_wit_i(
     dfa: &DFA,
     round_num: usize,
