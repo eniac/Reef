@@ -644,10 +644,10 @@ impl<'a> R1CS<'a> {
         cost = cost *2;
 
         //Batchsize creating v_i
-        cost += (3*batch_size);
+        cost += 3*batch_size;
 
         //Schwarz Zippel evals of sequence
-        cost += (2*((self.dfa.nstates() * self.dfa.chars.len())+batch_size));
+        cost += 2*((self.dfa.nstates() * self.dfa.chars.len())+batch_size);
         
         cost
 
@@ -657,7 +657,7 @@ impl<'a> R1CS<'a> {
         let mut cost: usize = self.plookup_cost_model_nohash(batch_size);
 
         //Randomized difference
-        cost += (2*POSEIDON_NUM);
+        cost += 2*POSEIDON_NUM;
 
         //Poseidon hash in Schwarz Zippel
         cost += POSEIDON_NUM;
@@ -667,37 +667,37 @@ impl<'a> R1CS<'a> {
 
     pub fn nlookup_cost_model_nohash(&self, batch_size: usize) -> usize {
         let mn: usize = self.dfa.nstates() * self.dfa.chars.len();
-        let log_mn: usize = ((mn as f32).log2().ceil() as usize);
+        let log_mn: usize = (mn as f32).log2().ceil() as usize;
         let mut cost: usize = 0;
 
         //Multiplications
-        cost += (batch_size+1);
+        cost += batch_size+1;
 
         //Sum-check additions
-        cost += (log_mn*3);
+        cost += log_mn*3;
 
         //eq calc
-        cost += ((batch_size+1)*log_mn);
+        cost += (batch_size+1)*log_mn;
 
         //horners
-        cost += batch_size;
+        cost += batch_size*2;
 
         //v_i creation
-        cost += (batch_size*3);
+        cost += batch_size*3;
 
         cost
     }
 
     pub fn nlookup_cost_model_hash(&self, batch_size: usize) -> usize {
         let mn: usize = self.dfa.nstates() * self.dfa.chars.len();
-        let log_mn: usize = ((mn as f32).log2().ceil() as usize);
+        let log_mn: usize = (mn as f32).log2().ceil() as usize;
         let mut cost = self.nlookup_cost_model_nohash(batch_size);
 
         //R generation hashes 
-        cost += ((batch_size+1)*POSEIDON_NUM);
+        cost += POSEIDON_NUM;
 
         //Sum check poseidon hashes
-        cost += (log_mn*POSEIDON_NUM);
+        cost += log_mn*POSEIDON_NUM;
 
         cost
     }
@@ -708,7 +708,7 @@ impl<'a> R1CS<'a> {
             JBatching::Nlookup => self.nlookup_cost_model_hash(batch_size),
             JBatching::Plookup => self.plookup_cost_model_hash(batch_size),
         };
-        cost += (POSEIDON_NUM*batch_size);
+        cost += POSEIDON_NUM*batch_size;
         cost
     }
 
