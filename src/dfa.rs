@@ -80,10 +80,7 @@ impl<'a> DFA<'a> {
 
     /// All states
     pub fn get_states(&self) -> HashSet<u64> {
-        self.states
-            .clone()
-            .into_values()
-            .collect()
+        self.states.clone().into_values().collect()
     }
 
     /// DFA step function [delta(s, c) = s'] function
@@ -141,7 +138,8 @@ impl<'a> DFA<'a> {
                 }
                 // Merge equivalence classes
                 if equivalent {
-                    let union: HashSet<char> = char_classes[&a].union(&char_classes[&b]).cloned().collect();
+                    let union: HashSet<char> =
+                        char_classes[&a].union(&char_classes[&b]).cloned().collect();
                     char_classes.insert(a, union.clone());
                     char_classes.insert(b, union);
                 }
@@ -150,7 +148,6 @@ impl<'a> DFA<'a> {
 
         char_classes
     }
-
 }
 
 #[cfg(test)]

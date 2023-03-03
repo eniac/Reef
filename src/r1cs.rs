@@ -12,6 +12,13 @@ use itertools::Itertools;
 use rug::rand::RandState;
 use rug::Integer;
 
+enum JBatching {
+    NaivePolys,
+    Plookup,
+    Nlookup,
+}
+
+// circuit values
 fn new_const<I>(i: I) -> Term
 // constants
 where
@@ -49,6 +56,7 @@ fn new_bool_wit(b: bool) -> Value
     Value::Bool(b)
 }
 
+// feild ops
 fn add(a: &Integer, b: &Integer) -> Integer {
     let (_, rem) = (a.clone() + b.clone()).div_rem_euc(cfg().field().modulus().clone());
     rem
@@ -93,19 +101,7 @@ fn vanishing(xs: Vec<u64>) -> Vec<Integer> {
     lagrange_field(evals)
 }
 
-pub fn lagrange_from_dfa(dfa: &DFA) -> Vec<Integer> {
-    let mut evals = vec![];
-    for (si, c, so) in dfa.deltas() {
-        evals.push((
-            Integer::from(si * (dfa.chars.len() as u64) + dfa.ab_to_num(c)),
-            Integer::from(so),
-        ));
-    }
-
-    lagrange_field(evals)
-}
-
-pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
+fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
     let num_pts = evals.len();
     //println!("evals = {:#?}", evals);
 
@@ -141,7 +137,6 @@ pub fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
 
     return coeffs;
 }
-
 // calculate multilinear extension from evals of univariate
 fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
     let num_pts = pts.len();
@@ -200,311 +195,378 @@ fn horners_circuit(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
     horners
 }
 
-fn r1cs_conv(assertions: Vec<Term>, pub_inputs: Vec<Term>) -> (ProverData, VerifierData) {
-    let cs = Computation::from_constraint_system_parts(assertions, pub_inputs);
-
-    let mut css = Computations::new();
-    css.comps.insert("main".to_string(), cs);
-    let css = opt(
-        css,
-        vec![
-            Opt::ScalarizeVars,
-            Opt::Flatten,
-            Opt::Sha,
-            Opt::ConstantFold(Box::new([])),
-            // Tuples must be eliminated before oblivious array elim
-            Opt::Tuple,
-            Opt::ConstantFold(Box::new([])),
-            Opt::Obliv,
-            // The obliv elim pass produces more tuples, that must be eliminated
-            Opt::Tuple,
-            Opt::LinearScan,
-            // The linear scan pass produces more tuples, that must be eliminated
-            Opt::Tuple,
-            Opt::Flatten,
-            Opt::ConstantFold(Box::new([])),
-        ],
-    );
-    let (mut prover_data, verifier_data) = to_r1cs(css.get("main").clone(), cfg());
-
-    println!(
-        "Pre-opt R1cs size: {}",
-        prover_data.r1cs.constraints().len()
-    );
-    // println!("Prover data {:#?}", prover_data);
-    prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
-
-    //println!("Prover data {:#?}", prover_data);
-
-    println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
-
-    return (prover_data, verifier_data);
+pub struct R1CS<'a> {
+    dfa: &'a DFA<'a>,
+    batching: JBatching,
+    assertions: Vec<Term>,
+    pub_inputs: Vec<Term>,
+    wits: Vec<FxHashMap<String, Value>>,
 }
 
-// plookup
-pub fn batch_polys(
-    dfa: &DFA,
-    is_match: bool,
-    doc_length: usize,
-    batch_size: usize,
-) -> (ProverData, VerifierData) {
-    let mut x_lookup_set: Vec<Term>;
+impl<'a> R1CS<'a> {
+    pub fn new(dfa: &'a DFA<'a>) -> Self {
+        // run cost model (with Poseidon) to decide batching
 
-    let assertions = vec![]; // TODO
-
-    let pub_inputs = vec![
-        //new_var("round_num".to_owned()),
-        //new_var("current_state".to_owned()),
-        //new_var("char".to_owned()),
-        //new_var("next_state".to_owned()),
-        new_bool_var("bool_out".to_owned()),
-    ];
-
-    r1cs_conv(assertions, pub_inputs)
-}
-
-pub fn to_polys(dfa: &DFA, is_match: bool, doc_length: usize) -> (ProverData, VerifierData) {
-    let coeffs = lagrange_from_dfa(dfa);
-    //println!("lagrange coeffs {:#?}", coeffs);
-
-    // hash the in state and char -> Integer::from(si * (dfa.chars.len() as u64) + dfa.ab_to_num(c))
-    let x_lookup = term(
-        Op::PfNaryOp(PfNaryOp::Add),
-        vec![
-            term(
-                Op::PfNaryOp(PfNaryOp::Mul),
-                vec![
-                    new_var("current_state".to_owned()),
-                    new_const(dfa.chars.len() as u64),
-                ],
-            ),
-            new_var("char".to_owned()),
-        ],
-    );
-
-    // next_state
-    let eq = term(
-        Op::Eq,
-        vec![
-            new_var("next_state".to_owned()),
-            horners_circuit(coeffs, x_lookup),
-        ],
-    );
-
-    // final state (non) match check
-    let mut vanishing_poly;
-    let mut final_states = vec![];
-    let mut non_final_states = vec![];
-    for (k, v) in dfa.states.clone() {
-        if nullable(&k) {
-            final_states.push(v);
-        } else {
-            non_final_states.push(v);
+        Self {
+            dfa,
+            batching: JBatching::Plookup,
+            assertions: Vec::new(),
+            pub_inputs: Vec::new(),
+            wits: Vec::new(),
         }
     }
 
-    if is_match {
-        println!("MEMBERSHIP");
-        println!("in states: {:#?}", final_states);
-        // proof of membership
-        vanishing_poly = horners_circuit(vanishing(final_states), new_var("next_state".to_owned()));
-    } else {
-        println!("NONMEMBERSHIP");
-        println!("in states: {:#?}", non_final_states);
-        vanishing_poly = horners_circuit(
-            vanishing(non_final_states),
-            new_var("next_state".to_owned()),
-        );
-    }
-
-    let match_term = term(
-        Op::Ite,
-        vec![
-            term(
-                Op::Eq,
-                vec![new_var("round_num".to_owned()), new_const(doc_length - 1)],
-            ), // if in final round
-            term(Op::Eq, vec![vanishing_poly, new_const(0)]), // true -> check next_state (not) in final_states
-            new_bool_const(false),                            // not in correct round
-        ],
-    );
-
-    let bool_out = term(
-        Op::Eq,
-        vec![new_bool_var("bool_out".to_owned()), match_term],
-    );
-
-    let assertions = vec![eq, bool_out];
-
-    let pub_inputs = vec![
-        new_var("round_num".to_owned()),
-        new_var("current_state".to_owned()),
-        new_var("char".to_owned()),
-        new_var("next_state".to_owned()),
-        new_bool_var("bool_out".to_owned()),
-    ];
-
-    r1cs_conv(assertions, pub_inputs)
-}
-
-// for use in sum check
-// eq([x0,x1,x2...],[e0,e1,e2...])
-// m = dim of bool hypercube
-fn bit_eq_circuit(m: u64, eq_name: String) -> Term {
-    let mut eq = new_const(1); // dummy
-
-    for i in 0..m {
-        let next = term(
-            Op::PfNaryOp(PfNaryOp::Add),
-            vec![
-                term(
-                    Op::PfNaryOp(PfNaryOp::Mul),
-                    vec![
-                        new_var(format!("{}_x_{}", eq_name, i)),
-                        new_var(format!("{}_e_{}", eq_name, i)),
-                    ],
-                ),
-                term(
-                    Op::PfNaryOp(PfNaryOp::Mul),
-                    vec![
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Add),
-                            vec![
-                                new_const(1),
-                                term(
-                                    Op::PfUnOp(PfUnOp::Neg),
-                                    vec![new_var(format!("{}_x_{}", eq_name, i))],
-                                ),
-                            ],
-                        ),
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Add),
-                            vec![
-                                new_const(1),
-                                term(
-                                    Op::PfUnOp(PfUnOp::Neg),
-                                    vec![new_var(format!("{}_e_{}", eq_name, i))],
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
-            ],
-        );
-        if i == 0 {
-            eq = next;
-        } else {
-            eq = term(Op::PfNaryOp(PfNaryOp::Mul), vec![eq, next]);
+    fn lagrange_from_dfa(&self) -> Vec<Integer> {
+        let mut evals = vec![];
+        for (si, c, so) in self.dfa.deltas() {
+            evals.push((
+                Integer::from(si * (self.dfa.chars.len() as u64) + self.dfa.ab_to_num(c)),
+                Integer::from(so),
+            ));
         }
+
+        lagrange_field(evals)
     }
 
-    eq
-}
-
-// C_1 = LHS/"claim"
-fn sum_check_circuit(C_1: Term, num_rounds: u64) -> (Vec<Term>, Vec<Term>) {
-    let mut assertions = vec![];
-    let mut pub_inputs = vec![];
-
-    // first round claim
-    let mut claim = C_1.clone();
-
-    for j in 0..num_rounds {
-        // P makes a claim g_j(X_j) about a univariate slice of its large multilinear polynomial
-        // g_j is degree 1 in our case (woo constant time evaluation)
-
-        // V checks g_{j-1}(r_{j-1}) = g_j(0) + g_j(1)
-        let g_j = term(
-            Op::PfNaryOp(PfNaryOp::Add),
-            vec![
-                new_var(format!("sc_g_{}_coeff", j)),
-                term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![
-                        new_var(format!("sc_g_{}_const", j)),
-                        new_var(format!("sc_g_{}_const", j)),
-                    ],
-                ),
-            ],
+    fn r1cs_conv(&self) -> (ProverData, VerifierData) {
+        let cs = Computation::from_constraint_system_parts(
+            self.assertions.clone(),
+            self.pub_inputs.clone(),
         );
 
-        let claim_check = term(Op::Eq, vec![claim.clone(), g_j]);
+        let mut css = Computations::new();
+        css.comps.insert("main".to_string(), cs);
+        let css = opt(
+            css,
+            vec![
+                Opt::ScalarizeVars,
+                Opt::Flatten,
+                Opt::Sha,
+                Opt::ConstantFold(Box::new([])),
+                // Tuples must be eliminated before oblivious array elim
+                Opt::Tuple,
+                Opt::ConstantFold(Box::new([])),
+                Opt::Obliv,
+                // The obliv elim pass produces more tuples, that must be eliminated
+                Opt::Tuple,
+                Opt::LinearScan,
+                // The linear scan pass produces more tuples, that must be eliminated
+                Opt::Tuple,
+                Opt::Flatten,
+                Opt::ConstantFold(Box::new([])),
+            ],
+        );
+        let (mut prover_data, verifier_data) = to_r1cs(css.get("main").clone(), cfg());
 
-        assertions.push(claim_check);
-        pub_inputs.push(new_var(format!("sc_g_{}_coeff", j)));
-        pub_inputs.push(new_var(format!("sc_g_{}_const", j)));
-        pub_inputs.push(new_var(format!("sc_r_{}", j)));
+        println!(
+            "Pre-opt R1cs size: {}",
+            prover_data.r1cs.constraints().len()
+        );
+        // println!("Prover data {:#?}", prover_data);
+        prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
 
-        // "V" chooses rand r_{j} (P chooses this with hash)
-        let r_j = new_var(format!("sc_r_{}", j));
+        //println!("Prover data {:#?}", prover_data);
 
-        // update claim for the next round g_j(r_j)
-        claim = term(
+        println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
+
+        return (prover_data, verifier_data);
+    }
+
+    pub fn to_polys(&mut self, is_match: bool, doc_length: usize) -> (ProverData, VerifierData) {
+        let coeffs = self.lagrange_from_dfa();
+        //println!("lagrange coeffs {:#?}", coeffs);
+
+        // hash the in state and char -> Integer::from(si * (dfa.chars.len() as u64) + dfa.ab_to_num(c))
+        let x_lookup = term(
             Op::PfNaryOp(PfNaryOp::Add),
             vec![
-                new_var(format!("sc_g_{}_const", j)),
                 term(
                     Op::PfNaryOp(PfNaryOp::Mul),
-                    vec![new_var(format!("sc_g_{}_coeff", j)), r_j],
+                    vec![
+                        new_var("current_state".to_owned()),
+                        new_const(self.dfa.chars.len() as u64),
+                    ],
                 ),
+                new_var("char".to_owned()),
             ],
         );
 
-        if j == num_rounds - 1 {
-            // output last g_v(r_v) claim
+        // next_state
+        let eq = term(
+            Op::Eq,
+            vec![
+                new_var("next_state".to_owned()),
+                horners_circuit(coeffs, x_lookup),
+            ],
+        );
 
-            let last_claim = term(
-                Op::Eq,
-                vec![claim.clone(), new_var(format!("sc_last_claim"))],
+        // final state (non) match check
+        let mut vanishing_poly;
+        let mut final_states = vec![];
+        let mut non_final_states = vec![];
+        for (k, v) in self.dfa.states.clone() {
+            if nullable(&k) {
+                final_states.push(v);
+            } else {
+                non_final_states.push(v);
+            }
+        }
+
+        if is_match {
+            println!("MEMBERSHIP");
+            println!("in states: {:#?}", final_states);
+            // proof of membership
+            vanishing_poly =
+                horners_circuit(vanishing(final_states), new_var("next_state".to_owned()));
+        } else {
+            println!("NONMEMBERSHIP");
+            println!("in states: {:#?}", non_final_states);
+            vanishing_poly = horners_circuit(
+                vanishing(non_final_states),
+                new_var("next_state".to_owned()),
             );
-            assertions.push(last_claim);
-            pub_inputs.push(new_var(format!("sc_last_claim")));
+        }
+
+        let match_term = term(
+            Op::Ite,
+            vec![
+                term(
+                    Op::Eq,
+                    vec![new_var("round_num".to_owned()), new_const(doc_length - 1)],
+                ), // if in final round
+                term(Op::Eq, vec![vanishing_poly, new_const(0)]), // true -> check next_state (not) in final_states
+                new_bool_const(false),                            // not in correct round
+            ],
+        );
+
+        let bool_out = term(
+            Op::Eq,
+            vec![new_bool_var("bool_out".to_owned()), match_term],
+        );
+
+        self.assertions.push(eq);
+        self.assertions.push(bool_out);
+
+        self.pub_inputs.push(new_var("round_num".to_owned()));
+        self.pub_inputs.push(new_var("current_state".to_owned()));
+        self.pub_inputs.push(new_var("char".to_owned()));
+        self.pub_inputs.push(new_var("next_state".to_owned()));
+        self.pub_inputs.push(new_bool_var("bool_out".to_owned()));
+
+        self.r1cs_conv()
+    }
+
+    // for use in sum check
+    // eq([x0,x1,x2...],[e0,e1,e2...])
+    // m = dim of bool hypercube
+    fn bit_eq_circuit(&self, m: u64, eq_name: String) -> Term {
+        let mut eq = new_const(1); // dummy
+
+        for i in 0..m {
+            let next = term(
+                Op::PfNaryOp(PfNaryOp::Add),
+                vec![
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Mul),
+                        vec![
+                            new_var(format!("{}_x_{}", eq_name, i)),
+                            new_var(format!("{}_e_{}", eq_name, i)),
+                        ],
+                    ),
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Mul),
+                        vec![
+                            term(
+                                Op::PfNaryOp(PfNaryOp::Add),
+                                vec![
+                                    new_const(1),
+                                    term(
+                                        Op::PfUnOp(PfUnOp::Neg),
+                                        vec![new_var(format!("{}_x_{}", eq_name, i))],
+                                    ),
+                                ],
+                            ),
+                            term(
+                                Op::PfNaryOp(PfNaryOp::Add),
+                                vec![
+                                    new_const(1),
+                                    term(
+                                        Op::PfUnOp(PfUnOp::Neg),
+                                        vec![new_var(format!("{}_e_{}", eq_name, i))],
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ],
+            );
+            if i == 0 {
+                eq = next;
+            } else {
+                eq = term(Op::PfNaryOp(PfNaryOp::Mul), vec![eq, next]);
+            }
+        }
+
+        eq
+    }
+
+    // C_1 = LHS/"claim"
+    fn sum_check_circuit(&mut self, C_1: Term, num_rounds: u64) {
+        // first round claim
+        let mut claim = C_1.clone();
+
+        for j in 0..num_rounds {
+            // P makes a claim g_j(X_j) about a univariate slice of its large multilinear polynomial
+            // g_j is degree 1 in our case (woo constant time evaluation)
+
+            // V checks g_{j-1}(r_{j-1}) = g_j(0) + g_j(1)
+            let g_j = term(
+                Op::PfNaryOp(PfNaryOp::Add),
+                vec![
+                    new_var(format!("sc_g_{}_coeff", j)),
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Add),
+                        vec![
+                            new_var(format!("sc_g_{}_const", j)),
+                            new_var(format!("sc_g_{}_const", j)),
+                        ],
+                    ),
+                ],
+            );
+
+            let claim_check = term(Op::Eq, vec![claim.clone(), g_j]);
+
+            self.assertions.push(claim_check);
+            self.pub_inputs.push(new_var(format!("sc_g_{}_coeff", j)));
+            self.pub_inputs.push(new_var(format!("sc_g_{}_const", j)));
+            self.pub_inputs.push(new_var(format!("sc_r_{}", j)));
+
+            // "V" chooses rand r_{j} (P chooses this with hash)
+            let r_j = new_var(format!("sc_r_{}", j));
+
+            // update claim for the next round g_j(r_j)
+            claim = term(
+                Op::PfNaryOp(PfNaryOp::Add),
+                vec![
+                    new_var(format!("sc_g_{}_const", j)),
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Mul),
+                        vec![new_var(format!("sc_g_{}_coeff", j)), r_j],
+                    ),
+                ],
+            );
+
+            if j == num_rounds - 1 {
+                // output last g_v(r_v) claim
+
+                let last_claim = term(
+                    Op::Eq,
+                    vec![claim.clone(), new_var(format!("sc_last_claim"))],
+                );
+                self.assertions.push(last_claim);
+                self.pub_inputs.push(new_var(format!("sc_last_claim")));
+            }
         }
     }
 
-    (assertions, pub_inputs)
-}
+    pub fn to_nlookup(
+        &mut self,
+        is_match: bool,
+        doc_length: usize,
+        batch_size: usize,
+    ) -> (ProverData, VerifierData) {
+        // generate v's
+        let v: Vec<Term> = vec![];
 
-pub fn gen_wit_i(
-    dfa: &DFA,
-    round_num: usize,
-    current_state: u64,
-    doc: &String,
-) -> (FxHashMap<String, Value>, u64) {
-    let doc_i = doc.chars().nth(round_num).unwrap();
-    let next_state = dfa.delta(current_state, doc_i).unwrap();
+        // generate claim on lhs
+        let mut lhs = term(
+            Op::PfNaryOp(PfNaryOp::Mul),
+            vec![new_var(format!("claim_r_0")), new_var(format!("v_0"))],
+        );
 
-    let bool_out = round_num == doc.chars().count() - 1;
+        for i in 1..v.len() {
+            lhs = term(
+                Op::PfNaryOp(PfNaryOp::Add),
+                vec![
+                    lhs,
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Mul),
+                        vec![
+                            new_var(format!("claim_r_{}", i)),
+                            new_var(format!("v_{}", i)),
+                        ],
+                    ),
+                ],
+            );
+        }
 
-    let values: FxHashMap<String, Value> = vec![
-        ("round_num".to_owned(), new_wit(round_num)),
-        ("current_state".to_owned(), new_wit(current_state)),
-        ("char".to_owned(), new_wit(dfa.ab_to_num(doc_i))),
-        ("next_state".to_owned(), new_wit(next_state)),
-        ("bool_out".to_owned(), new_bool_wit(bool_out)),
-    ]
-    .into_iter()
-    .collect();
+        for i in 0..v.len() {
+            self.pub_inputs.push(new_var(format!("claim_r_{}", i)));
+            self.pub_inputs.push(new_var(format!("v_{}", i)));
+        }
 
-    return (values, next_state);
-}
+        self.sum_check_circuit(lhs, 1); // NUM ROUNDS TODO
 
-pub fn polys_cost_model(dfa: &DFA, is_match: bool) -> usize {
-    // horners selection - poly of degree m * n - 1, +1 for x_lookup
-    let mut cost = dfa.nstates() * dfa.chars.len();
+        // calculate eq's
 
-    // vanishing selection for final check
-    // poly of degree (# final states - 1)
-    // (alt, # non final states - 1)
-    // + 2 for round_num selection
-    // + 1 to set bool_out
-    if is_match {
-        cost += dfa.get_final_states().len() + 2;
-    } else {
-        cost += (dfa.nstates() - dfa.get_final_states().len()) + 2;
+        // add last v_m+1 check (for T(j) optimization) - TODO
+
+        self.r1cs_conv()
     }
 
-    cost
+    //pub fn gen_wit_i(dfa: &DFA, round_num: usize, current_state: u64, doc: &String) -> (FxHashMap<String, Value>, u64) {
+
+    // generate claim r's
+
+    // generate claim v's
+
+    // generate polynomial g's for sum check
+
+    // generate sum check r's
+
+    //}
+
+    pub fn gen_wit_i(
+        &self,
+        round_num: usize,
+        current_state: u64,
+        doc: &String,
+    ) -> (FxHashMap<String, Value>, u64) {
+        let doc_i = doc.chars().nth(round_num).unwrap();
+        let next_state = self.dfa.delta(current_state, doc_i).unwrap();
+
+        let bool_out = round_num == doc.chars().count() - 1;
+
+        let values: FxHashMap<String, Value> = vec![
+            ("round_num".to_owned(), new_wit(round_num)),
+            ("current_state".to_owned(), new_wit(current_state)),
+            ("char".to_owned(), new_wit(self.dfa.ab_to_num(doc_i))),
+            ("next_state".to_owned(), new_wit(next_state)),
+            ("bool_out".to_owned(), new_bool_wit(bool_out)),
+        ]
+        .into_iter()
+        .collect();
+
+        return (values, next_state);
+    }
+
+    pub fn polys_cost_model(&self, is_match: bool) -> usize {
+        // horners selection - poly of degree m * n - 1, +1 for x_lookup
+        let mut cost = self.dfa.nstates() * self.dfa.chars.len();
+
+        // vanishing selection for final check
+        // poly of degree (# final states - 1)
+        // (alt, # non final states - 1)
+        // + 2 for round_num selection
+        // + 1 to set bool_out
+        if is_match {
+            cost += self.dfa.get_final_states().len() + 2;
+        } else {
+            cost += (self.dfa.nstates() - self.dfa.get_final_states().len()) + 2;
+        }
+
+        cost
+    }
 }
 
 #[cfg(test)]
