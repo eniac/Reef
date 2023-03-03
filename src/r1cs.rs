@@ -226,7 +226,6 @@ pub struct R1CS<'a> {
     batching: JBatching,
     assertions: Vec<Term>,
     pub_inputs: Vec<Term>,
-    wits: Option<FxHashMap<String, Value>>,
 }
 
 impl<'a> R1CS<'a> {
@@ -238,7 +237,6 @@ impl<'a> R1CS<'a> {
             batching: JBatching::Plookup,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
-            wits: None,
         }
     }
 
@@ -570,29 +568,52 @@ impl<'a> R1CS<'a> {
         self.r1cs_conv()
     }
 
-    pub fn gen_wit_i_nlookup(&mut self, round_num: usize, doc_batch: &String) {
+    pub fn gen_wit_i_nlookup(
+        &mut self,
+        batch_num: usize,
+        current_state: u64,
+        doc: &String,
+        batch_size: usize,
+    ) -> (FxHashMap<String, Value>, u64) {
+        let mut wits = FxHashMap::default();
+
         // TODO - what needs to be public?
 
-        let num_vals = doc_batch.len() + 1;
+        // generate claim r
+        let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
+            Strength::Standard,
+        );
+        let mut data = vec![<G1 as Group>::Scalar::zero(), <G1 as Group>::Scalar::zero()];
 
-        // generate claim r's
-        for i in 0..num_vals {
-            let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
-                Strength::Standard,
-            );
-            let mut data = vec![<G1 as Group>::Scalar::zero(), <G1 as Group>::Scalar::zero()];
+        let mut p = Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
+        let claim_r: <G1 as Group>::Scalar = p.hash();
 
-            let mut p =
-                Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
-            let claim_r: <G1 as Group>::Scalar = p.hash();
-            //self.wits.insert(format!("claim_r_{}", i), new_wit(claim_r));
+        // TODO GET INT wits.insert(format!("claim_r"), new_wit(claim_r));
+
+        // generate claim v's (well, v isn't a real named var, generate the states/chars)
+        let mut state_i = current_state;
+        let mut next_state = 0;
+        for i in 0..batch_size {
+            let c = doc.chars().nth(batch_num * batch_size + i).unwrap();
+            next_state = self.dfa.delta(state_i, c).unwrap();
+
+            wits.insert(format!("state_{}", i), new_wit(state_i));
+            wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(c)));
+
+            state_i = next_state;
         }
-
-        // generate claim v's
+        // todo last state (?)
 
         // generate polynomial g's for sum check
 
         // generate sum check r's
+
+        // other
+        let bool_out = batch_num == doc.chars().count() / batch_size - 1; // right??
+        wits.insert(format!("bool_out"), new_bool_wit(bool_out));
+        wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
+
+        (wits, next_state)
     }
 
     pub fn gen_wit_i(
@@ -642,23 +663,22 @@ impl<'a> R1CS<'a> {
         // 2 prove sequence constructions
         cost = self.dfa.nstates() * self.dfa.chars.len();
         cost += batch_size;
-        cost = cost *2;
+        cost = cost * 2;
 
         //Batchsize creating v_i
-        cost += 3*batch_size;
+        cost += 3 * batch_size;
 
         //Schwarz Zippel evals of sequence
-        cost += 2*((self.dfa.nstates() * self.dfa.chars.len())+batch_size);
-        
-        cost
+        cost += 2 * ((self.dfa.nstates() * self.dfa.chars.len()) + batch_size);
 
+        cost
     }
 
     pub fn plookup_cost_model_hash(&self, batch_size: usize) -> usize {
         let mut cost: usize = self.plookup_cost_model_nohash(batch_size);
 
         //Randomized difference
-        cost += 2*POSEIDON_NUM;
+        cost += 2 * POSEIDON_NUM;
 
         //Poseidon hash in Schwarz Zippel
         cost += POSEIDON_NUM;
@@ -672,19 +692,19 @@ impl<'a> R1CS<'a> {
         let mut cost: usize = 0;
 
         //Multiplications
-        cost += batch_size+1;
+        cost += batch_size + 1;
 
         //Sum-check additions
-        cost += log_mn*3;
+        cost += log_mn * 3;
 
         //eq calc
-        cost += (batch_size+1)*log_mn;
+        cost += (batch_size + 1) * log_mn;
 
         //horners
-        cost += batch_size*2;
+        cost += batch_size * 2;
 
         //v_i creation
-        cost += batch_size*3;
+        cost += batch_size * 3;
 
         cost
     }
@@ -694,26 +714,29 @@ impl<'a> R1CS<'a> {
         let log_mn: usize = (mn as f32).log2().ceil() as usize;
         let mut cost = self.nlookup_cost_model_nohash(batch_size);
 
-        //R generation hashes 
+        //R generation hashes
         cost += POSEIDON_NUM;
 
         //Sum check poseidon hashes
-        cost += log_mn*POSEIDON_NUM;
+        cost += log_mn * POSEIDON_NUM;
 
         cost
     }
 
-    pub fn full_round_cost_model(&self, batch_size: usize, lookup_type: JBatching, is_match: bool) -> usize {
+    pub fn full_round_cost_model(
+        &self,
+        batch_size: usize,
+        lookup_type: JBatching,
+        is_match: bool,
+    ) -> usize {
         let mut cost: usize = match lookup_type {
             JBatching::NaivePolys => self.naive_cost_model_nohash(is_match) * batch_size,
             JBatching::Nlookup => self.nlookup_cost_model_hash(batch_size),
             JBatching::Plookup => self.plookup_cost_model_hash(batch_size),
         };
-        cost += POSEIDON_NUM*batch_size;
+        cost += POSEIDON_NUM * batch_size;
         cost
     }
-
-
 }
 
 #[cfg(test)]
@@ -788,30 +811,30 @@ mod tests {
 
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
-/*
-        let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
-        let precomp = prover_data.clone().precompute;
-        println!("{:#?}", prover_data);
+        /*
+                let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
+                let precomp = prover_data.clone().precompute;
+                println!("{:#?}", prover_data);
 
-        let mut current_state = dfa.get_init_state();
+                let mut current_state = dfa.get_init_state();
 
-        for i in 0..num_steps {
-            let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
-            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-            let extd_val = precomp.eval(&values);
+                for i in 0..num_steps {
+                    let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
+                    //println!("VALUES ROUND {:#?}: {:#?}", i, values);
+                    let extd_val = precomp.eval(&values);
 
-            prover_data.r1cs.check_all(&extd_val);
+                    prover_data.r1cs.check_all(&extd_val);
 
-            // for next i+1 round
-            current_state = next_state;
-        }
+                    // for next i+1 round
+                    current_state = next_state;
+                }
 
-        println!(
-            "cost model: {:#?}",
-            polys_cost_model(&dfa, dfa.is_match(&doc))
-        );
-        assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
-*/
+                println!(
+                    "cost model: {:#?}",
+                    polys_cost_model(&dfa, dfa.is_match(&doc))
+                );
+                assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
+        */
     }
 
     fn plookup_test_func(ab: String, regex: String, doc: String) {
@@ -824,32 +847,32 @@ mod tests {
 
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
-/*
-        let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
-        let precomp = prover_data.clone().precompute;
-        println!("{:#?}", prover_data);
+        /*
+                let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
+                let precomp = prover_data.clone().precompute;
+                println!("{:#?}", prover_data);
 
-        let mut current_state = dfa.get_init_state();
+                let mut current_state = dfa.get_init_state();
 
-        for i in 0..num_steps {
-            let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
-            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-            let extd_val = precomp.eval(&values);
+                for i in 0..num_steps {
+                    let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
+                    //println!("VALUES ROUND {:#?}: {:#?}", i, values);
+                    let extd_val = precomp.eval(&values);
 
-            prover_data.r1cs.check_all(&extd_val);
+                    prover_data.r1cs.check_all(&extd_val);
 
-            // for next i+1 round
-            current_state = next_state;
-        }
+                    // for next i+1 round
+                    current_state = next_state;
+                }
 
-        println!(
-            "cost model: {:#?}",
-            polys_cost_model(&dfa, dfa.is_match(&doc))
-        );
-        assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
-*/
+                println!(
+                    "cost model: {:#?}",
+                    polys_cost_model(&dfa, dfa.is_match(&doc))
+                );
+                assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
+        */
     }
-    
+
     fn nlookup_test_func(ab: String, regex: String, doc: String) {
         //set_up_cfg("1019".to_owned());
 
