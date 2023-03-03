@@ -180,13 +180,14 @@ fn horners_eval(coeffs: Vec<Integer>, x_lookup: Integer) -> Integer {
     horners
 }
 
-fn horners_circuit(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
+// coeffs = [constant, x, x^2 ...]
+fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
     let num_c = coeffs.len();
     println!("coeffs = {:#?}", coeffs);
 
     let mut horners = term(
         Op::PfNaryOp(PfNaryOp::Mul),
-        vec![new_const(coeffs[num_c - 1].clone()), x_lookup.clone()],
+        vec![coeffs[num_c - 1].clone(), x_lookup.clone()],
     );
     for i in (1..(num_c - 1)).rev() {
         horners = term(
@@ -195,7 +196,7 @@ fn horners_circuit(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
                 x_lookup.clone(),
                 term(
                     Op::PfNaryOp(PfNaryOp::Add),
-                    vec![horners, new_const(coeffs[i].clone())],
+                    vec![horners, coeffs[i].clone()],
                 ),
             ],
         );
@@ -204,10 +205,20 @@ fn horners_circuit(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
     // constant
     horners = term(
         Op::PfNaryOp(PfNaryOp::Add),
-        vec![horners, new_const(coeffs[0].clone())],
+        vec![horners, coeffs[0].clone()],
     );
 
     horners
+}
+
+// if your mult terms are not yet CirC Terms
+fn horners_circuit_const(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
+    let mut vars = vec![];
+    for c in coeffs {
+        vars.push(new_const(c));
+    }
+
+    horners_circuit_vars(&vars, x_lookup)
 }
 
 pub struct R1CS<'a> {
@@ -311,7 +322,7 @@ impl<'a> R1CS<'a> {
             Op::Eq,
             vec![
                 new_var("next_state".to_owned()),
-                horners_circuit(coeffs, x_lookup),
+                horners_circuit_const(coeffs, x_lookup),
             ],
         );
 
@@ -332,11 +343,11 @@ impl<'a> R1CS<'a> {
             println!("in states: {:#?}", final_states);
             // proof of membership
             vanishing_poly =
-                horners_circuit(vanishing(final_states), new_var("next_state".to_owned()));
+                horners_circuit_const(vanishing(final_states), new_var("next_state".to_owned()));
         } else {
             println!("NONMEMBERSHIP");
             println!("in states: {:#?}", non_final_states);
-            vanishing_poly = horners_circuit(
+            vanishing_poly = horners_circuit_const(
                 vanishing(non_final_states),
                 new_var("next_state".to_owned()),
             );
@@ -371,11 +382,11 @@ impl<'a> R1CS<'a> {
         self.r1cs_conv()
     }
 
-    // for use in sum check
+    // for use at the end of sum check
     // eq([x0,x1,x2...],[e0,e1,e2...])
     // m = dim of bool hypercube
-    fn bit_eq_circuit(&self, m: u64, eq_name: String) -> Term {
-        let mut eq = new_const(1); // dummy
+    fn bit_eq_circuit(&self, m: u64, q_name: String) -> Term {
+        let mut eq = new_const(1); // dummy, not used
 
         for i in 0..m {
             let next = term(
@@ -384,8 +395,8 @@ impl<'a> R1CS<'a> {
                     term(
                         Op::PfNaryOp(PfNaryOp::Mul),
                         vec![
-                            new_var(format!("{}_x_{}", eq_name, i)),
-                            new_var(format!("{}_e_{}", eq_name, i)),
+                            new_var(format!("{}_q_{}", q_name, i)),
+                            new_var(format!("eq_j_{}", i)),
                         ],
                     ),
                     term(
@@ -397,7 +408,7 @@ impl<'a> R1CS<'a> {
                                     new_const(1),
                                     term(
                                         Op::PfUnOp(PfUnOp::Neg),
-                                        vec![new_var(format!("{}_x_{}", eq_name, i))],
+                                        vec![new_var(format!("{}_q_{}", q_name, i))],
                                     ),
                                 ],
                             ),
@@ -407,7 +418,7 @@ impl<'a> R1CS<'a> {
                                     new_const(1),
                                     term(
                                         Op::PfUnOp(PfUnOp::Neg),
-                                        vec![new_var(format!("{}_e_{}", eq_name, i))],
+                                        vec![new_var(format!("eq_j_{}", i))],
                                     ),
                                 ],
                             ),
@@ -536,33 +547,23 @@ impl<'a> R1CS<'a> {
         }
 
         // generate claim on lhs
-        let mut lhs = term(
-            Op::PfNaryOp(PfNaryOp::Mul),
-            vec![new_var(format!("claim_r_0")), v[0].clone()],
-        );
+        let mut lhs = horners_circuit_vars(&v, new_var(format!("claim_r")));
+        self.pub_inputs.push(new_var(format!("claim_r")));
 
-        for i in 1..v.len() {
-            lhs = term(
-                Op::PfNaryOp(PfNaryOp::Add),
-                vec![
-                    lhs,
-                    term(
-                        Op::PfNaryOp(PfNaryOp::Mul),
-                        vec![new_var(format!("claim_r_{}", i)), v[i].clone()],
-                    ),
-                ],
-            );
-        }
+        // size of table (T -> mle)
+        let sc_l = (self.dfa.trans.len() as f64).log2().ceil() as u64;
+        println!("sum check rounds: {}", sc_l);
 
-        for i in 0..v.len() {
-            self.pub_inputs.push(new_var(format!("claim_r_{}", i)));
-        }
-
-        // what's the size of the table?
-
-        self.sum_check_circuit(lhs, 1); // NUM ROUNDS TODO
+        self.sum_check_circuit(lhs, sc_l);
 
         // calculate eq's
+        // TODO check ordering correct
+        // TODO pub wits for eq circ
+        let mut eq_evals = vec![];
+        for i in 0..v.len() {
+            eq_evals.push(self.bit_eq_circuit(sc_l, format!("eq{}", i)));
+        }
+        horners_circuit_vars(&eq_evals, new_var(format!("claim_r")));
 
         // add last v_m+1 check (for T(j) optimization) - TODO
 
@@ -859,30 +860,30 @@ mod tests {
 
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
-/*
-        let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
-        let precomp = prover_data.clone().precompute;
-        println!("{:#?}", prover_data);
+        /*
+                let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
+                let precomp = prover_data.clone().precompute;
+                println!("{:#?}", prover_data);
 
-        let mut current_state = dfa.get_init_state();
+                let mut current_state = dfa.get_init_state();
 
-        for i in 0..num_steps {
-            let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
-            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-            let extd_val = precomp.eval(&values);
+                for i in 0..num_steps {
+                    let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
+                    //println!("VALUES ROUND {:#?}: {:#?}", i, values);
+                    let extd_val = precomp.eval(&values);
 
-            prover_data.r1cs.check_all(&extd_val);
+                    prover_data.r1cs.check_all(&extd_val);
 
-            // for next i+1 round
-            current_state = next_state;
-        }
+                    // for next i+1 round
+                    current_state = next_state;
+                }
 
-        println!(
-            "cost model: {:#?}",
-            polys_cost_model(&dfa, dfa.is_match(&doc))
-        );
-        assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
-*/
+                println!(
+                    "cost model: {:#?}",
+                    polys_cost_model(&dfa, dfa.is_match(&doc))
+                );
+                assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
+        */
     }
 
     #[test]
