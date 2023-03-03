@@ -489,12 +489,54 @@ impl<'a> R1CS<'a> {
         batch_size: usize,
     ) -> (ProverData, VerifierData) {
         // generate v's
-        let v: Vec<Term> = vec![];
+        let mut v = vec![];
+
+        // TODO pub inputs
+        for i in 0..batch_size {
+            self.pub_inputs.push(new_var(format!("state_{}", i)));
+            self.pub_inputs.push(new_var(format!("char_{}", i)));
+        }
+
+        // last state_batch is final "next_state" output
+        // v_{batch-1} = (state_{batch-1}, c, state_batch)
+        // v_batch = T eval check (optimization)
+        self.pub_inputs
+            .push(new_var(format!("state_{}", batch_size)));
+
+        for i in 1..batch_size {
+            // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
+            let v_i = term(
+                Op::PfNaryOp(PfNaryOp::Add),
+                vec![
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Add),
+                        vec![
+                            term(
+                                Op::PfNaryOp(PfNaryOp::Mul),
+                                vec![
+                                    new_var(format!("state_{}", i - 1)),
+                                    new_const(self.dfa.nstates() * self.dfa.chars.len()),
+                                ],
+                            ),
+                            term(
+                                Op::PfNaryOp(PfNaryOp::Mul),
+                                vec![
+                                    new_var(format!("state_{}", i)),
+                                    new_const(self.dfa.chars.len() as u64),
+                                ],
+                            ),
+                        ],
+                    ),
+                    new_var(format!("char_{}", i)),
+                ],
+            );
+            v.push(v_i);
+        }
 
         // generate claim on lhs
         let mut lhs = term(
             Op::PfNaryOp(PfNaryOp::Mul),
-            vec![new_var(format!("claim_r_0")), new_var(format!("v_0"))],
+            vec![new_var(format!("claim_r_0")), v[0].clone()],
         );
 
         for i in 1..v.len() {
@@ -504,10 +546,7 @@ impl<'a> R1CS<'a> {
                     lhs,
                     term(
                         Op::PfNaryOp(PfNaryOp::Mul),
-                        vec![
-                            new_var(format!("claim_r_{}", i)),
-                            new_var(format!("v_{}", i)),
-                        ],
+                        vec![new_var(format!("claim_r_{}", i)), v[i].clone()],
                     ),
                 ],
             );
@@ -515,8 +554,9 @@ impl<'a> R1CS<'a> {
 
         for i in 0..v.len() {
             self.pub_inputs.push(new_var(format!("claim_r_{}", i)));
-            self.pub_inputs.push(new_var(format!("v_{}", i)));
         }
+
+        // what's the size of the table?
 
         self.sum_check_circuit(lhs, 1); // NUM ROUNDS TODO
 
@@ -541,9 +581,8 @@ impl<'a> R1CS<'a> {
 
             let mut p =
                 Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
-            let expected_next_hash: <G1 as Group>::Scalar = p.hash();
-            //let claim_r =
-            //self.wits.push(format("claim_r_{}",i), new_wit());
+            let claim_r: <G1 as Group>::Scalar = p.hash();
+            //self.wits.insert(format!("claim_r_{}", i), new_wit(claim_r));
         }
 
         // generate claim v's
