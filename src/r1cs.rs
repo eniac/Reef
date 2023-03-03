@@ -25,9 +25,7 @@ use rug::Integer;
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
-static POSEIDON_NUM: usize = 237;
-
-pub enum JBatching {
+enum JBatching {
     NaivePolys,
     Plookup,
     Nlookup,
@@ -619,7 +617,7 @@ impl<'a> R1CS<'a> {
         return (values, next_state);
     }
 
-    pub fn naive_cost_model_nohash(&self, is_match: bool) -> usize {
+    pub fn polys_cost_model(&self, is_match: bool) -> usize {
         // horners selection - poly of degree m * n - 1, +1 for x_lookup
         let mut cost = self.dfa.nstates() * self.dfa.chars.len();
 
@@ -636,84 +634,6 @@ impl<'a> R1CS<'a> {
 
         cost
     }
-
-    pub fn plookup_cost_model_nohash(&self, batch_size: usize) -> usize {
-        let mut cost = 0;
-        // 2 prove sequence constructions
-        cost = self.dfa.nstates() * self.dfa.chars.len();
-        cost += batch_size;
-        cost = cost *2;
-
-        //Batchsize creating v_i
-        cost += 3*batch_size;
-
-        //Schwarz Zippel evals of sequence
-        cost += 2*((self.dfa.nstates() * self.dfa.chars.len())+batch_size);
-        
-        cost
-
-    }
-
-    pub fn plookup_cost_model_hash(&self, batch_size: usize) -> usize {
-        let mut cost: usize = self.plookup_cost_model_nohash(batch_size);
-
-        //Randomized difference
-        cost += 2*POSEIDON_NUM;
-
-        //Poseidon hash in Schwarz Zippel
-        cost += POSEIDON_NUM;
-
-        cost
-    }
-
-    pub fn nlookup_cost_model_nohash(&self, batch_size: usize) -> usize {
-        let mn: usize = self.dfa.nstates() * self.dfa.chars.len();
-        let log_mn: usize = (mn as f32).log2().ceil() as usize;
-        let mut cost: usize = 0;
-
-        //Multiplications
-        cost += batch_size+1;
-
-        //Sum-check additions
-        cost += log_mn*3;
-
-        //eq calc
-        cost += (batch_size+1)*log_mn;
-
-        //horners
-        cost += batch_size*2;
-
-        //v_i creation
-        cost += batch_size*3;
-
-        cost
-    }
-
-    pub fn nlookup_cost_model_hash(&self, batch_size: usize) -> usize {
-        let mn: usize = self.dfa.nstates() * self.dfa.chars.len();
-        let log_mn: usize = (mn as f32).log2().ceil() as usize;
-        let mut cost = self.nlookup_cost_model_nohash(batch_size);
-
-        //R generation hashes 
-        cost += POSEIDON_NUM;
-
-        //Sum check poseidon hashes
-        cost += log_mn*POSEIDON_NUM;
-
-        cost
-    }
-
-    pub fn full_round_cost_model(&self, batch_size: usize, lookup_type: JBatching, is_match: bool) -> usize {
-        let mut cost: usize = match lookup_type {
-            JBatching::NaivePolys => self.naive_cost_model_nohash(is_match) * batch_size,
-            JBatching::Nlookup => self.nlookup_cost_model_hash(batch_size),
-            JBatching::Plookup => self.plookup_cost_model_hash(batch_size),
-        };
-        cost += POSEIDON_NUM*batch_size;
-        cost
-    }
-
-
 }
 
 #[cfg(test)]
@@ -778,79 +698,7 @@ mod tests {
         assert_eq!(coeffs, expected);
     }
 
-    fn naive_test_func(ab: String, regex: String, doc: String) {
-        //set_up_cfg("1019".to_owned());
-
-        let r = regex_parser(&regex, &ab);
-        let mut dfa = DFA::new(&ab[..]);
-        mk_dfa(&r, &ab, &mut dfa);
-        //println!("{:#?}", dfa);
-
-        let mut chars = doc.chars();
-        let num_steps = doc.chars().count();
-/*
-        let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
-        let precomp = prover_data.clone().precompute;
-        println!("{:#?}", prover_data);
-
-        let mut current_state = dfa.get_init_state();
-
-        for i in 0..num_steps {
-            let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
-            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-            let extd_val = precomp.eval(&values);
-
-            prover_data.r1cs.check_all(&extd_val);
-
-            // for next i+1 round
-            current_state = next_state;
-        }
-
-        println!(
-            "cost model: {:#?}",
-            polys_cost_model(&dfa, dfa.is_match(&doc))
-        );
-        assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
-*/
-    }
-
-    fn plookup_test_func(ab: String, regex: String, doc: String) {
-        //set_up_cfg("1019".to_owned());
-
-        let r = regex_parser(&regex, &ab);
-        let mut dfa = DFA::new(&ab[..]);
-        mk_dfa(&r, &ab, &mut dfa);
-        //println!("{:#?}", dfa);
-
-        let mut chars = doc.chars();
-        let num_steps = doc.chars().count();
-/*
-        let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
-        let precomp = prover_data.clone().precompute;
-        println!("{:#?}", prover_data);
-
-        let mut current_state = dfa.get_init_state();
-
-        for i in 0..num_steps {
-            let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
-            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-            let extd_val = precomp.eval(&values);
-
-            prover_data.r1cs.check_all(&extd_val);
-
-            // for next i+1 round
-            current_state = next_state;
-        }
-
-        println!(
-            "cost model: {:#?}",
-            polys_cost_model(&dfa, dfa.is_match(&doc))
-        );
-        assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
-*/
-    }
-    
-    fn nlookup_test_func(ab: String, regex: String, doc: String) {
+    fn dfa_test(ab: String, regex: String, doc: String) {
         //set_up_cfg("1019".to_owned());
 
         let r = regex_parser(&regex, &ab);
@@ -887,25 +735,25 @@ mod tests {
     }
 
     #[test]
-    fn naive_test() {
-        naive_test_func("a".to_string(), "a".to_string(), "a".to_string());
+    fn dfa_1() {
+        dfa_test("a".to_string(), "a".to_string(), "a".to_string());
     }
 
     #[test]
     fn dfa_2() {
-        naive_test_func("ab".to_string(), "ab".to_string(), "ab".to_string());
-        naive_test_func("abc".to_string(), "ab".to_string(), "ab".to_string());
+        dfa_test("ab".to_string(), "ab".to_string(), "ab".to_string());
+        dfa_test("abc".to_string(), "ab".to_string(), "ab".to_string());
     }
 
     #[test]
     fn dfa_star() {
-        naive_test_func("ab".to_string(), "a*b*".to_string(), "ab".to_string());
-        naive_test_func(
+        dfa_test("ab".to_string(), "a*b*".to_string(), "ab".to_string());
+        dfa_test(
             "ab".to_string(),
             "a*b*".to_string(),
             "aaaabbbbbbbbbbbbbb".to_string(),
         );
-        naive_test_func(
+        dfa_test(
             "ab".to_string(),
             "a*b*".to_string(),
             "aaaaaaaaaaab".to_string(),
@@ -914,8 +762,8 @@ mod tests {
 
     #[test]
     fn dfa_non_match() {
-        naive_test_func("ab".to_string(), "a".to_string(), "b".to_string());
-        naive_test_func(
+        dfa_test("ab".to_string(), "a".to_string(), "b".to_string());
+        dfa_test(
             "ab".to_string(),
             "a*b*".to_string(),
             "aaabaaaaaaaab".to_string(),
@@ -925,7 +773,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn dfa_bad_1() {
-        naive_test_func("ab".to_string(), "a".to_string(), "c".to_string());
+        dfa_test("ab".to_string(), "a".to_string(), "c".to_string());
     }
 
     #[test]
