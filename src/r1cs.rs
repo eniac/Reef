@@ -7,10 +7,23 @@ use circ::ir::term::*;
 use circ::target::r1cs::{
     opt::reduce_linearities, trans::to_r1cs, Lc, ProverData, R1cs, VerifierData,
 };
+use ff::PrimeField;
 use fxhash::FxHashMap;
+use generic_array::typenum;
 use itertools::Itertools;
+use neptune::{
+    poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
+    Strength,
+};
+use nova_snark::{
+    traits::{circuit::TrivialTestCircuit, Group},
+    CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+};
 use rug::rand::RandState;
 use rug::Integer;
+
+type G1 = pasta_curves::pallas::Point;
+type G2 = pasta_curves::vesta::Point;
 
 enum JBatching {
     NaivePolys,
@@ -200,7 +213,7 @@ pub struct R1CS<'a> {
     batching: JBatching,
     assertions: Vec<Term>,
     pub_inputs: Vec<Term>,
-    wits: Vec<FxHashMap<String, Value>>,
+    wits: Option<FxHashMap<String, Value>>,
 }
 
 impl<'a> R1CS<'a> {
@@ -212,7 +225,7 @@ impl<'a> R1CS<'a> {
             batching: JBatching::Plookup,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
-            wits: Vec::new(),
+            wits: None,
         }
     }
 
@@ -514,17 +527,31 @@ impl<'a> R1CS<'a> {
         self.r1cs_conv()
     }
 
-    //pub fn gen_wit_i(dfa: &DFA, round_num: usize, current_state: u64, doc: &String) -> (FxHashMap<String, Value>, u64) {
+    pub fn gen_wit_i_nlookup(&mut self, round_num: usize, doc_batch: &String) {
+        // TODO - what needs to be public?
 
-    // generate claim r's
+        let num_vals = doc_batch.len() + 1;
 
-    // generate claim v's
+        // generate claim r's
+        for i in 0..num_vals {
+            let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
+                Strength::Standard,
+            );
+            let mut data = vec![<G1 as Group>::Scalar::zero(), <G1 as Group>::Scalar::zero()];
 
-    // generate polynomial g's for sum check
+            let mut p =
+                Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
+            let expected_next_hash: <G1 as Group>::Scalar = p.hash();
+            //let claim_r =
+            //self.wits.push(format("claim_r_{}",i), new_wit());
+        }
 
-    // generate sum check r's
+        // generate claim v's
 
-    //}
+        // generate polynomial g's for sum check
+
+        // generate sum check r's
+    }
 
     pub fn gen_wit_i(
         &self,
