@@ -1,11 +1,11 @@
 digraph example {
-    N0[label=".*ab"];
     N2[label="(ε | .*ab)"];
+    N0[label=".*ab"];
     N1[label="(b | .*ab)"];
-    N0 -> N0[label="b"];
     N1 -> N1[label="a"];
-    N2 -> N0[label="b"];
-    N1 -> N2[label="b"];
-    N0 -> N1[label="a"];
+    N0 -> N0[label="b"];
     N2 -> N1[label="a"];
+    N0 -> N1[label="a"];
+    N1 -> N2[label="b"];
+    N2 -> N0[label="b"];
 }
