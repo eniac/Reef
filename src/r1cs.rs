@@ -233,7 +233,7 @@ pub struct R1CS<'a> {
 
 impl<'a> R1CS<'a> {
     pub fn new(dfa: &'a DFA<'a>, doc: String, batch_size: usize) -> Self {
-        let mut batching: JBatching = Self::opt_cost_model_select(&dfa,batch_size, dfa.is_match(&doc));
+        let batching: JBatching = Self::opt_cost_model_select(&dfa,batch_size, dfa.is_match(&doc));
         let is_match = dfa.is_match(&doc);
         // run cost model (with Poseidon) to decide batching
 
@@ -310,8 +310,8 @@ impl<'a> R1CS<'a> {
     ) -> (ProverData, VerifierData) {
         match self.batching {
             JBatching::NaivePolys => self.to_polys(doc_length),
-            JBatching::Plookup => self.to_nlookup(doc_length),
-            JBatching::Nlookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
+            JBatching::Nlookup => self.to_nlookup(doc_length),
+            JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
@@ -883,6 +883,10 @@ mod tests {
         println!(
             "cost model: {:#?}",
             R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
+        );
+        println!(
+            "actual cost: {:#?}",
+            prover_data.r1cs.constraints().len()
         );
         assert!(
             prover_data.r1cs.constraints().len()
