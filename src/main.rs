@@ -72,9 +72,9 @@ fn main() {
     let num_steps = doc.chars().count(); // len of document
     println!("Doc len is {}", num_steps);
 
-    let mut r1cs_converter = R1CS::new(&dfa);
+    let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1);
 
-    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs(dfa.is_match(&doc), num_steps, 1);
+    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs(num_steps);
     //println!("r1cs: {:#?}", prover_data.r1cs);
 
     //print_r1cs(&prover_data);
@@ -148,7 +148,7 @@ fn main() {
     let precomp = prover_data.clone().precompute;
     for i in 0..num_steps {
         // allocate real witnesses for round i
-        let (wits, next_state) = r1cs_converter.gen_wit_i(i, current_state, &doc, 1);
+        let (wits, next_state) = r1cs_converter.gen_wit_i(i, current_state);
         //println!("prover_data {:#?}", prover_data.clone());
         //println!("wits {:#?}", wits.clone());
         let extended_wit = precomp.eval(&wits);
