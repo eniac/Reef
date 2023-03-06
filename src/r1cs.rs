@@ -776,6 +776,10 @@ impl<'a> R1CS<'a> {
         let mut opt_batching:JBatching = JBatching::NaivePolys;
         let mut cost: usize = Self::full_round_cost_model(dfa, batch_size, JBatching::NaivePolys, is_match);
 
+        if cost < 10000 {
+            cost = 10000
+        }
+
         if Self::full_round_cost_model(dfa, batch_size, JBatching::Nlookup, is_match) < cost {
                 cost = Self::full_round_cost_model(dfa, batch_size, JBatching::Nlookup, is_match);
                 opt_batching = JBatching::Nlookup;
