@@ -234,7 +234,7 @@ impl<'a> R1CS<'a> {
 
         Self {
             dfa,
-            batching: JBatching::Plookup,
+            batching: JBatching::NaivePolys, //Plookup,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
         }
@@ -296,7 +296,26 @@ impl<'a> R1CS<'a> {
         return (prover_data, verifier_data);
     }
 
-    pub fn to_polys(&mut self, is_match: bool, doc_length: usize) -> (ProverData, VerifierData) {
+    pub fn to_r1cs(
+        &mut self,
+        is_match: bool,
+        doc_length: usize,
+        batch_size: usize,
+    ) -> (ProverData, VerifierData) {
+        match self.batching {
+            JBatching::NaivePolys => self.to_polys(is_match, doc_length, batch_size),
+            JBatching::Plookup => self.to_nlookup(is_match, doc_length, batch_size),
+            JBatching::Nlookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
+        }
+    }
+
+    // TODO batch size (1 currently)
+    fn to_polys(
+        &mut self,
+        is_match: bool,
+        doc_length: usize,
+        batch_size: usize,
+    ) -> (ProverData, VerifierData) {
         let coeffs = self.lagrange_from_dfa();
         //println!("lagrange coeffs {:#?}", coeffs);
 
@@ -337,14 +356,14 @@ impl<'a> R1CS<'a> {
         }
 
         if is_match {
-            println!("MEMBERSHIP");
-            println!("in states: {:#?}", final_states);
+            //println!("MEMBERSHIP");
+            //println!("in states: {:#?}", final_states);
             // proof of membership
             vanishing_poly =
                 horners_circuit_const(vanishing(final_states), new_var("next_state".to_owned()));
         } else {
-            println!("NONMEMBERSHIP");
-            println!("in states: {:#?}", non_final_states);
+            //println!("NONMEMBERSHIP");
+            //println!("in states: {:#?}", non_final_states);
             vanishing_poly = horners_circuit_const(
                 vanishing(non_final_states),
                 new_var("next_state".to_owned()),
@@ -568,8 +587,24 @@ impl<'a> R1CS<'a> {
         self.r1cs_conv()
     }
 
-    pub fn gen_wit_i_nlookup(
-        &mut self,
+    pub fn gen_wit_i(
+        &self,
+        round_num: usize,
+        current_state: u64,
+        doc: &String,
+        batch_size: usize,
+    ) -> (FxHashMap<String, Value>, u64) {
+        match self.batching {
+            JBatching::NaivePolys => {
+                self.gen_wit_i_polys(round_num, current_state, doc, batch_size)
+            }
+            JBatching::Plookup => self.gen_wit_i_nlookup(round_num, current_state, doc, batch_size),
+            JBatching::Nlookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
+        }
+    }
+
+    fn gen_wit_i_nlookup(
+        &self,
         batch_num: usize,
         current_state: u64,
         doc: &String,
@@ -616,11 +651,13 @@ impl<'a> R1CS<'a> {
         (wits, next_state)
     }
 
-    pub fn gen_wit_i(
+    // TODO BATCH SIZE (rn = 1)
+    fn gen_wit_i_polys(
         &self,
         round_num: usize,
         current_state: u64,
         doc: &String,
+        batch_size: usize,
     ) -> (FxHashMap<String, Value>, u64) {
         let doc_i = doc.chars().nth(round_num).unwrap();
         let next_state = self.dfa.delta(current_state, doc_i).unwrap();
@@ -811,30 +848,33 @@ mod tests {
 
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
-        /*
-                let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
-                let precomp = prover_data.clone().precompute;
-                println!("{:#?}", prover_data);
 
-                let mut current_state = dfa.get_init_state();
+        let mut r1cs_converter = R1CS::new(&dfa);
+        let (prover_data, _) = r1cs_converter.to_r1cs(dfa.is_match(&doc), num_steps, 1);
+        let precomp = prover_data.clone().precompute;
+        println!("{:#?}", prover_data);
 
-                for i in 0..num_steps {
-                    let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
-                    //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-                    let extd_val = precomp.eval(&values);
+        let mut current_state = dfa.get_init_state();
 
-                    prover_data.r1cs.check_all(&extd_val);
+        for i in 0..num_steps {
+            let (values, next_state) = r1cs_converter.gen_wit_i(i, current_state, &doc, 1);
+            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
+            let extd_val = precomp.eval(&values);
 
-                    // for next i+1 round
-                    current_state = next_state;
-                }
+            prover_data.r1cs.check_all(&extd_val);
 
-                println!(
-                    "cost model: {:#?}",
-                    polys_cost_model(&dfa, dfa.is_match(&doc))
-                );
-                assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
-        */
+            // for next i+1 round
+            current_state = next_state;
+        }
+
+        println!(
+            "cost model: {:#?}",
+            r1cs_converter.naive_cost_model_nohash(dfa.is_match(&doc))
+        );
+        assert!(
+            prover_data.r1cs.constraints().len()
+                <= r1cs_converter.naive_cost_model_nohash(dfa.is_match(&doc))
+        );
     }
 
     fn plookup_test_func(ab: String, regex: String, doc: String) {
