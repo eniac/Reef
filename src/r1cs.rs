@@ -241,6 +241,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         pcs: PoseidonConstants<F, typenum::U2>,
     ) -> Self {
         let is_match = dfa.is_match(&doc);
+        println!("Match? {:#?}", is_match);
+
         // run cost model (with Poseidon) to decide batching
         let batching: JBatching = Self::opt_cost_model_select(&dfa, batch_size, dfa.is_match(&doc));
 
