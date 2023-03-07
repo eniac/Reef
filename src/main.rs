@@ -72,27 +72,18 @@ fn main() {
     let num_steps = doc.chars().count(); // len of document
     println!("Doc len is {}", num_steps);
 
-    let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1);
-
-    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs(num_steps);
-    //println!("r1cs: {:#?}", prover_data.r1cs);
-
-    //print_r1cs(&prover_data);
-    /*println!(
-        "unopt #r1cs: {:#?}, nstates * nchars = {:#?}",
-        prover_data.r1cs.constraints().len(),
-        dfa.nstates() * dfa.chars.len()
-    );*/
-
     let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
         Strength::Standard,
     );
+    let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, pc.clone());
+    println!("generate commitment");
+    r1cs_converter.gen_commitment();
+    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs(num_steps);
+
     // use "empty" (witness-less) circuit to generate nova F
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
         &prover_data.r1cs,
         None,
-        <G1 as Group>::Scalar::zero(),
-        <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
@@ -144,12 +135,11 @@ fn main() {
     let mut current_state = dfa.get_init_state();
     let z0_primary = vec![
         <G1 as Group>::Scalar::from(current_state),
-        //<G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
-        //        <G1 as Group>::Scalar::from(0),
-        //        <G1 as Group>::Scalar::from(0),
-        //        <G1 as Group>::Scalar::from((num_steps == 1) as u64),
+        <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
+        <G1 as Group>::Scalar::from(0),
+        <G1 as Group>::Scalar::from(0),
     ];
-
+    // TODO check "ingrained" bool out
     let mut prev_hash = <G1 as Group>::Scalar::from(0);
     let precomp = prover_data.clone().precompute;
     for i in 0..num_steps {
@@ -165,10 +155,11 @@ fn main() {
         prover_data.r1cs.check_all(&extended_wit);
 
         let current_char = doc.chars().nth(i).unwrap();
-        let next_char = match i + 1 {
-            num_steps => '#', // dummy
-            _ => doc.chars().nth(i + 1).unwrap(),
+        let mut next_char = '#';
+        if i + 1 < num_steps {
+            next_char = doc.chars().nth(i + 1).unwrap();
         };
+        //println!("next char = {}", next_char);
 
         // expected poseidon
         let mut data = vec![
@@ -180,12 +171,6 @@ fn main() {
 
         println!("expected next hash in main {:#?}", expected_next_hash);
 
-        let mut bool_out = false;
-        let bool_out_next = false;
-        if i == num_steps - 1 {
-            bool_out = true;
-        }
-
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
             Some(extended_wit),
@@ -196,11 +181,10 @@ fn main() {
             <G1 as Group>::Scalar::from(prev_hash),
             <G1 as Group>::Scalar::from(expected_next_hash),
             <G1 as Group>::Scalar::from(i as u64),
-            <G1 as Group>::Scalar::from(bool_out as u64),
-            <G1 as Group>::Scalar::from(bool_out_next as u64),
             pc.clone(),
         );
 
+        //println!("STEP CIRC WIT for i={}: {:#?}", i, circuit_primary);
         // snark
         let result = RecursiveSNARK::prove_step(
             &pp,
@@ -227,11 +211,11 @@ fn main() {
     // verify recursive
     let res = recursive_snark.verify(
         &pp,
-        num_steps, //FINAL_EXTERNAL_COUNTER,
+        FINAL_EXTERNAL_COUNTER,
         z0_primary.clone(),
         z0_secondary.clone(),
     );
-    //println!("Recursive res: {:#?}", recursive_snark);
+    //println!("Recursive res: {:#?}", res);
 
     assert!(res.is_ok());
 

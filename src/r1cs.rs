@@ -221,7 +221,7 @@ fn horners_circuit_const(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
     horners_circuit_vars(&vars, x_lookup)
 }
 
-pub struct R1CS<'a> {
+pub struct R1CS<'a, F: PrimeField> {
     dfa: &'a DFA<'a>,
     batching: JBatching,
     assertions: Vec<Term>,
@@ -229,10 +229,17 @@ pub struct R1CS<'a> {
     batch_size: usize,
     doc: String,
     is_match: bool,
+    pc: PoseidonConstants<F, typenum::U2>,
+    commitment: Option<F>,
 }
 
-impl<'a> R1CS<'a> {
-    pub fn new(dfa: &'a DFA<'a>, doc: String, batch_size: usize) -> Self {
+impl<'a, F: PrimeField> R1CS<'a, F> {
+    pub fn new(
+        dfa: &'a DFA<'a>,
+        doc: String,
+        batch_size: usize,
+        pcs: PoseidonConstants<F, typenum::U2>,
+    ) -> Self {
         let is_match = dfa.is_match(&doc);
         // run cost model (with Poseidon) to decide batching
         let batching: JBatching = Self::opt_cost_model_select(&dfa, batch_size, dfa.is_match(&doc));
@@ -245,7 +252,20 @@ impl<'a> R1CS<'a> {
             batch_size: batch_size,
             doc: doc,
             is_match: is_match,
+            pc: pcs,
+            commitment: None,
         }
+    }
+
+    pub fn gen_commitment(&mut self) {
+        let mut hash = F::from(0);
+        for c in self.doc.chars() {
+            let mut data = vec![hash, F::from(self.dfa.ab_to_num(c))];
+            let mut p = Poseidon::<F, typenum::U2>::new_with_preimage(&data, &self.pc);
+            hash = p.hash();
+        }
+        println!("commitment = {:#?}", hash.clone());
+        self.commitment = Some(hash);
     }
 
     fn lagrange_from_dfa(&self) -> Vec<Integer> {
@@ -291,7 +311,7 @@ impl<'a> R1CS<'a> {
         let (mut prover_data, verifier_data) = to_r1cs(css.get("main").clone(), cfg());
 
         println!(
-            "Pre-opt R1cs size: {}",
+            "Pre-opt R1cs size (no hashes): {}",
             prover_data.r1cs.constraints().len()
         );
         // println!("Prover data {:#?}", prover_data);
@@ -299,7 +319,10 @@ impl<'a> R1CS<'a> {
 
         //println!("Prover data {:#?}", prover_data);
 
-        println!("Final R1cs size: {}", prover_data.r1cs.constraints().len());
+        println!(
+            "Final R1cs size (no hashes): {}",
+            prover_data.r1cs.constraints().len()
+        );
 
         return (prover_data, verifier_data);
     }
@@ -376,23 +399,30 @@ impl<'a> R1CS<'a> {
                     vec![new_var("round_num".to_owned()), new_const(doc_length - 1)],
                 ), // if in final round
                 term(Op::Eq, vec![vanishing_poly, new_const(0)]), // true -> check next_state (not) in final_states
-                new_bool_const(false),                            // not in correct round
+                new_bool_const(true),                             // not in correct round
             ],
         );
 
-        let bool_out = term(
+        let round_term = term(
             Op::Eq,
-            vec![new_bool_var("bool_out".to_owned()), match_term],
+            vec![
+                new_var("next_round_num".to_owned()),
+                term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![new_var("round_num".to_owned()), new_const(1)],
+                ),
+            ],
         );
 
         self.assertions.push(eq);
-        self.assertions.push(bool_out);
+        self.assertions.push(match_term);
+        self.assertions.push(round_term);
 
         self.pub_inputs.push(new_var("round_num".to_owned()));
+        self.pub_inputs.push(new_var("next_round_num".to_owned()));
         self.pub_inputs.push(new_var("current_state".to_owned()));
         self.pub_inputs.push(new_var("char".to_owned()));
         self.pub_inputs.push(new_var("next_state".to_owned()));
-        self.pub_inputs.push(new_bool_var("bool_out".to_owned()));
 
         self.r1cs_conv()
     }
@@ -635,8 +665,6 @@ impl<'a> R1CS<'a> {
         // generate sum check r's
 
         // other
-        let bool_out = batch_num == self.doc.chars().count() / self.batch_size - 1; // right??
-        wits.insert(format!("bool_out"), new_bool_wit(bool_out));
         wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
 
         (wits, next_state)
@@ -651,14 +679,12 @@ impl<'a> R1CS<'a> {
         let doc_i = self.doc.chars().nth(round_num).unwrap();
         let next_state = self.dfa.delta(current_state, doc_i).unwrap();
 
-        let bool_out = round_num == self.doc.chars().count() - 1;
-
         let values: FxHashMap<String, Value> = vec![
             ("round_num".to_owned(), new_wit(round_num)),
+            ("next_round_num".to_owned(), new_wit(round_num + 1)),
             ("current_state".to_owned(), new_wit(current_state)),
             ("char".to_owned(), new_wit(self.dfa.ab_to_num(doc_i))),
             ("next_state".to_owned(), new_wit(next_state)),
-            ("bool_out".to_owned(), new_bool_wit(bool_out)),
         ]
         .into_iter()
         .collect();
@@ -673,12 +699,11 @@ impl<'a> R1CS<'a> {
         // vanishing selection for final check
         // poly of degree (# final states - 1)
         // (alt, # non final states - 1)
-        // + 2 for round_num selection
-        // + 1 to set bool_out
+        // + 3 for round_num selection + 1 for next_round_num
         if is_match {
-            cost += dfa.get_final_states().len() + 2;
+            cost += dfa.get_final_states().len() + 3;
         } else {
-            cost += (dfa.nstates() - dfa.get_final_states().len()) + 2;
+            cost += (dfa.nstates() - dfa.get_final_states().len()) + 3;
         }
 
         cost
