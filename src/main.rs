@@ -169,7 +169,7 @@ fn main() {
         let mut p = Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
         let expected_next_hash: <G1 as Group>::Scalar = p.hash();
 
-        println!("expected next hash in main {:#?}", expected_next_hash);
+        //println!("expected next hash in main {:#?}", expected_next_hash);
 
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
