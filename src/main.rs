@@ -1,40 +1,36 @@
 #![allow(missing_docs)]
 use structopt::StructOpt;
+
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-use ::bellperson::{gadgets::num::AllocatedNum, SynthesisError};
-//use ark_bls12_381::Fr;
-use ark_r1cs_std::alloc::AllocVar;
-use ark_r1cs_std::fields::{fp::FpVar};
-use ark_relations::ns;
-use ff::PrimeField;
-use nova_snark::{
-    traits::{
-        circuit::{StepCircuit, TrivialTestCircuit},
-        Group,
-    },
-    CompressedSNARK, PublicParams, RecursiveSNARK,
+use circ::cfg;
+use circ::cfg::CircOpt;
+use circ::target::r1cs::nova::*;
+use generic_array::typenum;
+use neptune::{
+    poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
+    Strength,
 };
+use nova_snark::{
+    traits::{circuit::TrivialTestCircuit, Group},
+    CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+};
+
 pub mod deriv;
-pub mod parser;
 pub mod dfa;
-pub mod domain;
+pub mod parser;
+pub mod r1cs;
 
-use crate::parser::regex_parser;
-use crate::domain::DomainRadix2;
+use crate::deriv::*;
 use crate::dfa::DFA;
-use crate::deriv::mk_dfa;
+use crate::parser::regex_parser;
+use crate::r1cs::*;
 
-use ark_r1cs_std::poly::domain::Radix2DomainVar;
-use ark_r1cs_std::poly::evaluations::univariate::EvaluationsVar;
-use ark_r1cs_std::R1CSVar;
-
-use ark_ff::{FftField, Field, One, UniformRand};
-use ark_poly::polynomial::univariate::DensePolynomial;
-use ark_poly::{Polynomial, UVPolynomial};
-use ark_relations::r1cs::{ConstraintSystem, OptimizationGoal};
-use ark_std::test_rng;
-use ark_std::Zero;
+/*
+fn type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
+*/
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
@@ -50,319 +46,189 @@ struct Options {
     input: String,
 }
 
-#[derive(Clone, Debug)]
-struct DFAStepWitness<F: PrimeField> {
-    x_i: F,
-    x_i_plus_1: F,
-}
-
-impl<F: PrimeField> DFAStepWitness<F> {
-    // sample witness
-    fn new(x_0: &F) -> (Vec<F>, Self) {
-        //Vec<Self>) {
-        //let mut vars = Vec::new();
-
-        //let mut hash_i = *hash_0;
-        let mut x_i = *x_0;
-
-        // note in final version, we will likely do many iters per step
-        let x_i_plus_1 = x_i * x_i;
-
-        //vars.push(
-        let vars = Self { x_i, x_i_plus_1 };
-
-        //x_i = x_i_plus_1;
-
-        let z_0 = vec![*x_0];
-
-        (z_0, vars)
-    }
-}
-
-#[derive(Clone, Debug)]
-struct DFAStepCircuit<F: PrimeField> {
-    wit: DFAStepWitness<F>,
-    //arkcs:
-}
-
-impl<F> DFAStepCircuit<F>
-where
-    F: PrimeField,
-{
-    fn new(num_steps: usize, x0: F) -> (Vec<F>, Vec<Self>) {
-        let z0 = vec![x0];
-        let mut circuits = Vec::new();
-        let (mut zi, mut dfa_witness) = DFAStepWitness::new(&x0);
-        let circuit = DFAStepCircuit {
-            wit: dfa_witness.clone(),
-        };
-        // println!("{:#?}", circuit);
-        circuits.push(circuit);
-
-        for i in 1..num_steps {
-            (zi, dfa_witness) = DFAStepWitness::new(&dfa_witness.x_i_plus_1);
-
-            let circuit = DFAStepCircuit {
-                wit: dfa_witness.clone(),
-            };
-            // println!("{:#?}", circuit);
-            circuits.push(circuit);
-        }
-
-        (z0, circuits)
-    }
-
-    // helper methods here (?)
-}
-
-// sample F: x_{i+1} = x_i * x_i
-impl<F> StepCircuit<F> for DFAStepCircuit<F>
-where
-    F: PrimeField,
-{
-    // return # inputs or outputs of each step
-    // synthesize() and output() take as input and output a vec of len = arity()
-    fn arity(&self) -> usize {
-        1
-    }
-
-    // make circuit for a computation step
-    // return variable corresponding to output of step z_{i+1}
-    fn synthesize<CS: bellperson::ConstraintSystem<F>>(
-        &self,
-        cs: &mut CS,
-        z: &[AllocatedNum<F>],
-    ) -> Result<Vec<AllocatedNum<F>>, SynthesisError> {
-        let mut z_out: Result<Vec<AllocatedNum<F>>, SynthesisError> =
-            Err(SynthesisError::AssignmentMissing);
-
-        // let mut hash_i = hash_0;
-        // let mut x_i = z[0].clone();;
-
-        // non deterministic advice
-        let x_i = AllocatedNum::alloc(cs.namespace(|| format!("x_i")), || Ok(self.wit.x_i))?;
-        let x_i_plus_1 = AllocatedNum::alloc(cs.namespace(|| format!("x_i_plus_1")), || {
-            Ok(self.wit.x_i_plus_1)
-        })?;
-
-        // check conditions hold:
-        // x_i_plus_1 = x_i^2
-        cs.enforce(
-            || format!("x_i * x_i = x_i_plus_1"),
-            |lc| lc + x_i.get_variable(),
-            |lc| lc + x_i.get_variable(),
-            |lc| lc + x_i_plus_1.get_variable(),
-        );
-
-        // return hash(x_i_plus_1, ...TODO) since Nova circuits expect a single output
-        z_out = Ok(vec![x_i_plus_1.clone()]); // # outputs??
-
-        // update x_i and hash_i for the next iteration
-        // x_i = x_i_plus_1;
-
-        z_out
-    }
-
-    // return output of step when provided with step's input
-    fn output(&self, z: &[F]) -> Vec<F> {
-        // sanity check
-        debug_assert_eq!(z[0], self.wit.x_i);
-
-        // compute output using advice
-        vec![self.wit.x_i_plus_1]
-    }
-}
-
 fn main() {
     let opt = Options::from_args();
     // Alphabet
     let ab = opt.alphabet;
 
-      // Regular expresion
+    // Regular expresion
     let r = regex_parser(&opt.regex, &ab);
 
     // Input document
     let doc = opt.input;
 
-    // make the (single) F circuit
-    let cs = ConstraintSystem::new_ref();
-    cs.set_optimization_goal(OptimizationGoal::None);
+    // set up CirC library
+    let mut circ: CircOpt = Default::default();
+    circ.field.custom_modulus =
+        "28948022309329048855892746252171976963363056481941647379679742748393362948097".into(); // vesta (fuck???)
+                                                                                                //"28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); // pallas curve (i think?)
+    cfg::set(&circ);
 
     // Convert the Regex to a DFA
     let mut dfa = DFA::new(&ab[..]);
     mk_dfa(&r, &ab, &mut dfa);
+    println!("dfa: {:#?}", dfa);
 
-    // Domain of characters
-    let domain_ab = DomainRadix2::new(dfa.nab());
-    // Domain of states
-    let domain_states = DomainRadix2::new(dfa.nstates());
-
-    // allocate dummy witnesses
-    let c_i = FpVar::new_witness(ns!(cs, "dummy char"), || Ok(domain_ab.get_offset())).unwrap(); // todo
-    let init_state = FpVar::new_witness(ns!(cs, "dummy state"), || Ok(domain_states.get_offset())).unwrap();
-
-    // make circuit for first step
-    let next_state = dfa.cond_delta(c_i, init_state, &domain_states);
-
-    assert!(cs.is_satisfied().unwrap());
-
-    println!("number of constraints per round: {}", cs.num_constraints());
-    // TODO: optimize, finalize
-    cs.finalize();
-    println!("number of constraints per round: {}", cs.num_constraints());
-
-    //println!("should construct ABC? {}", cs.should_construct_matrices());
-    let ark_matrices = cs.to_matrices().unwrap();
-    //println!("DUMMY {:#?}", ark_matrices);
-
-    // use dummy circuit to generate nova F (don't translate witnesses)
-
-    // iterations
     let num_steps = doc.chars().count(); // len of document
     println!("Doc len is {}", num_steps);
-    let mut chars = doc.chars();
 
-    let mut cs_i = ConstraintSystem::new_ref();
-    let mut curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(domain_states.get_offset())).unwrap();
+    let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
+        Strength::Standard,
+    );
+    let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, pc.clone());
+    println!("generate commitment");
+    r1cs_converter.gen_commitment();
+    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs(num_steps);
+
+    // use "empty" (witness-less) circuit to generate nova F
+    let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
+        &prover_data.r1cs,
+        None,
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        pc.clone(),
+    );
+
+    // trivial circuit
+    let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
+
+    // produce public parameters
+    println!("Producing public parameters...");
+    let pp = PublicParams::<
+        G1,
+        G2,
+        DFAStepCircuit<<G1 as Group>::Scalar>,
+        TrivialTestCircuit<<G2 as Group>::Scalar>,
+    >::setup(circuit_primary.clone(), circuit_secondary.clone())
+    .unwrap();
+    println!(
+        "Number of constraints (primary circuit): {}",
+        pp.num_constraints().0
+    );
+    println!(
+        "Number of constraints (secondary circuit): {}",
+        pp.num_constraints().1
+    );
+
+    println!(
+        "Number of variables (primary circuit): {}",
+        pp.num_variables().0
+    );
+    println!(
+        "Number of variables (secondary circuit): {}",
+        pp.num_variables().1
+    );
+
+    // trivial
+    let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
+
+    type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
+    type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
+    // recursive SNARK
+    let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
+
+    let mut current_state = dfa.get_init_state();
+    let z0_primary = vec![
+        <G1 as Group>::Scalar::from(current_state),
+        <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
+        <G1 as Group>::Scalar::from(0),
+        <G1 as Group>::Scalar::from(0),
+    ];
+    // TODO check "ingrained" bool out
+    let mut prev_hash = <G1 as Group>::Scalar::from(0);
+    let precomp = prover_data.clone().precompute;
     for i in 0..num_steps {
+        println!("STEP {}", i);
+
         // allocate real witnesses for round i
-        let c_i = domain_ab.get(chars.next().unwrap() as u64);
-        let civar = FpVar::new_witness(ns!(cs_i, "char i"), || Ok(c_i)).unwrap();
+        let (wits, next_state) = r1cs_converter.gen_wit_i(i, current_state);
+        //println!("prover_data {:#?}", prover_data.clone());
+        //println!("wits {:#?}", wits.clone());
+        let extended_wit = precomp.eval(&wits);
+        //println!("extended wit {:#?}", extended_wit);
 
-        // regenerate circuit (only needed for validation, not for nova)
-        let next_state = dfa.cond_delta(civar, curr_state.clone(), &domain_states).value().unwrap();
-        assert!(cs_i.is_satisfied().unwrap());
+        prover_data.r1cs.check_all(&extended_wit);
 
-        // generate nova witness vector i
-        println!("# wit: {}", cs_i.num_witness_variables());
-        //println!("wit: {:#?}", cs_i.borrow().unwrap().witness_assignment);
-        //println!("inp: {:#?}", cs_i.borrow().unwrap().instance_assignment);
+        let current_char = doc.chars().nth(i).unwrap();
+        let mut next_char = '#';
+        if i + 1 < num_steps {
+            next_char = doc.chars().nth(i + 1).unwrap();
+        };
+        //println!("next char = {}", next_char);
 
-        let wit = cs_i.borrow().unwrap().witness_assignment.clone();
-        let inp = cs_i.borrow().unwrap().instance_assignment.clone();
-        cs_i.finalize();
-        let ark_matrices = cs_i.to_matrices().unwrap();
-        //println!("DUMMY {:#?}", ark_matrices);
+        // expected poseidon
+        let mut data = vec![
+            prev_hash,
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
+        ];
+        let mut p = Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
+        let expected_next_hash: <G1 as Group>::Scalar = p.hash();
 
-        // translate wit to nova, fold
+        println!("expected next hash in main {:#?}", expected_next_hash);
+
+        let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
+            &prover_data.r1cs,
+            Some(extended_wit),
+            <G1 as Group>::Scalar::from(current_state),
+            <G1 as Group>::Scalar::from(next_state),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(next_char)),
+            <G1 as Group>::Scalar::from(prev_hash),
+            <G1 as Group>::Scalar::from(expected_next_hash),
+            <G1 as Group>::Scalar::from(i as u64),
+            pc.clone(),
+        );
+
+        //println!("STEP CIRC WIT for i={}: {:#?}", i, circuit_primary);
+        // snark
+        let result = RecursiveSNARK::prove_step(
+            &pp,
+            recursive_snark,
+            circuit_primary.clone(),
+            circuit_secondary.clone(),
+            z0_primary.clone(),
+            z0_secondary.clone(),
+        );
+        //println!("prove step {:#?}", result);
+
+        assert!(result.is_ok());
+        println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
+        recursive_snark = Some(result.unwrap());
 
         // for next i+1 round
-        cs_i = ConstraintSystem::new_ref();
-        cs_i.set_optimization_goal(OptimizationGoal::None);
-        println!("in state {:#?}", curr_state.value().unwrap());
-        println!("out state {:#?}", next_state);
-
-        curr_state = FpVar::new_witness(ns!(cs_i, "state i"), || Ok(next_state)).unwrap();
+        current_state = next_state;
+        prev_hash = expected_next_hash;
     }
-    // fold + compile nova
 
-    //    let init_state = FpVar::constant(pdfa.init); // starting state (folding wit carrying CS)
-    /*
+    assert!(recursive_snark.is_some());
+    let recursive_snark = recursive_snark.unwrap();
 
-        let c = doc.chars().next().unwrap();
-        //for c in doc.chars() {
-        //let c_name = "character_".to_owned() + &i.to_string();
-        let c_i = FpVar::new_witness(ns!(ark_cs, "thing"), || Ok(nth(&domain, c as u64))).unwrap();
+    // verify recursive
+    let res = recursive_snark.verify(
+        &pp,
+        FINAL_EXTERNAL_COUNTER,
+        z0_primary.clone(),
+        z0_secondary.clone(),
+    );
+    //println!("Recursive res: {:#?}", res);
 
+    assert!(res.is_ok());
 
-        //let state = pdfa.clone().to_cs(c_i, init_state);
+    // compressed SNARK
+    type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+    type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
+    type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
+    type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
+    let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
+    assert!(res.is_ok());
+    let compressed_snark = res.unwrap();
 
-        //println!("loop {}", i);
-        // TODO: convert state to circuit
-        //}
-
-        // check ark_cs looks good
-        assert!(ark_cs.is_satisfied().unwrap());
-        println!("number of ark constraints: {}", ark_cs.num_constraints());
-    */
-    // TODO: check conversion is good
-    // NOVA
-    /*
-        // main circuit F w/empty witness
-        let circuit_primary = DFAStepCircuit {
-            wit: DFAStepWitness {
-                x_i: <G1 as Group>::Scalar::zero(),
-                x_i_plus_1: <G1 as Group>::Scalar::zero(),
-            },
-        };
-
-        // trivial circuit
-        let circuit_secondary = TrivialTestCircuit::default();
-
-        // produce public parameters
-        println!("Producing public parameters...");
-        let pp = PublicParams::<
-            G1,
-            G2,
-            DFAStepCircuit<<G1 as Group>::Scalar>,
-            TrivialTestCircuit<<G2 as Group>::Scalar>,
-        >::setup(circuit_primary.clone(), circuit_secondary.clone());
-        println!(
-            "Number of constraints (primary circuit): {}",
-            pp.num_constraints().0
-        );
-        println!(
-            "Number of constraints (secondary circuit): {}",
-            pp.num_constraints().1
-        );
-
-        println!(
-            "Number of variables (primary circuit): {}",
-            pp.num_variables().0
-        );
-        println!(
-            "Number of variables (secondary circuit): {}",
-            pp.num_variables().1
-        );
-
-        println!("{:#?}", circuit_primary.clone());
-    */
-    /*
-        // circuit
-        let (z0_primary, circuits_primary) = DFAStepCircuit::new(
-            num_steps,
-            <G1 as Group>::Scalar::one() + <G1 as Group>::Scalar::one(),
-        );
-
-        // trivial
-        let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
-
-        type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
-        type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
-
-        // recursive SNARK
-        let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
-
-        for (i, circuit_primary) in circuits_primary.iter().take(num_steps).enumerate() {
-            let result = RecursiveSNARK::prove_step(
-                &pp,
-                recursive_snark,
-                circuit_primary.clone(),
-                circuit_secondary.clone(),
-                z0_primary.clone(),
-                z0_secondary.clone(),
-            );
-            assert!(result.is_ok());
-            println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
-            recursive_snark = Some(result.unwrap());
-        }
-
-        assert!(recursive_snark.is_some());
-        let recursive_snark = recursive_snark.unwrap();
-
-        // verify recursive
-        let res = recursive_snark.verify(&pp, num_steps, z0_primary.clone(), z0_secondary.clone());
-        assert!(res.is_ok());
-
-        // compressed SNARK
-        type S1 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G1>;
-        type S2 = nova_snark::spartan_with_ipa_pc::RelaxedR1CSSNARK<G2>;
-        let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
-        assert!(res.is_ok());
-        let compressed_snark = res.unwrap();
-
-        // verify compressed
-        let res = compressed_snark.verify(&pp, num_steps, z0_primary, z0_secondary);
-        assert!(res.is_ok());
-    */
+    // verify compressed
+    let res = compressed_snark.verify(&pp, FINAL_EXTERNAL_COUNTER, z0_primary, z0_secondary);
+    assert!(res.is_ok());
 }

@@ -1,4 +1,4 @@
-use ark_ff::FftField;
+use ark_std::Zero;use ark_ff::FftField;
 use ark_pallas::Fr;
 use ark_r1cs_std::bits::ToBitsGadget;
 use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
@@ -7,14 +7,13 @@ use ark_r1cs_std::select::CondSelectGadget;
 use ark_r1cs_std::R1CSVar;
 use std::collections::HashMap;
 use std::collections::HashSet;
-
 use std::vec::Vec;
+use ark_std::Zero;
+use ark_std::One;
 
 use crate::deriv::{mk_dfa, DFA};
 use crate::parser::re::Regex;
 
-use ark_std::One;
-use ark_std::Zero;
 
 
 /// This creates the big switch across polynomials used in the outer loop
@@ -43,8 +42,10 @@ pub fn dfa_to_cs(self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
     ps[0].clone()
 }
 
+
+
       // For testing
-      pub fn is_match(&self, doc: &String) -> bool {
+pub fn is_match(&self, doc: &String) -> bool {
           let mut s = self.init;
           // For "abb" compute [P_b(P_b(P_a(init)))]
           for c in doc.chars() {
@@ -54,7 +55,6 @@ pub fn dfa_to_cs(self, c: FpVar<Fr>, state: FpVar<Fr>) -> FpVar<Fr> {
           }
           // If it is in the final states, then success
           self.fin.contains(&s)
-      }
   }
 
 pub fn frth(n: u64) -> Fr {
@@ -148,15 +148,7 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
         // Sort by x
         pairs.sort_by(|(a, _, _), (b, _, _)| a.cmp(b));
 
-        println!("PAIRS {:#?}", pairs);
-
-        let mut result = Vec::new();
-        result.push(domain.offset.clone());
-        for _ in 1..(1 << domain.dim) {
-            let new_element = result.last().unwrap() * domain.gen;
-            result.push(new_element);
-        }
-        println!("ELEMENTS! {:#?}", result);
+        //println!("PAIRS {:#?}", pairs);
 
         // Take ys
         let evals = pairs
@@ -164,7 +156,7 @@ pub fn mk_poly(q0: &Regex, ab: &String) -> PolyDFA {
             .map(|(_, _, to)| FpVar::constant(nth(&domain, *to))) //nth(&domain, *to)))
             .collect::<Vec<_>>();
 
-        println!("EVALS {:#?}", evals);
+        //println!("EVALS {:#?}", evals);
 
         let poly = EvaluationsVar::from_vec_and_domain(evals, domain.clone(), true);
 

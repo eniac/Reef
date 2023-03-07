@@ -8,22 +8,19 @@ edition = "2021"
 [dependencies]
 hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch = "phash"}
 structopt = "0.3"
-ark-ec = { version = "^0.3.0" }
-ark-ff = { version = "^0.3.0", features=["std"] }
-ark-std = "^0.3.0"
-ark-relations = "^0.3.0"
-ark-r1cs-std = { version = "^0.3.0", features = ["std"] }
-ark-bls12-381 = "^0.3.0"
-ark-pallas = "^0.3.0"
+circ = { git = "https://github.com/jkwoods/circ", branch = "nova2", features = ["zok", "smt", "r1cs", "bellman"] }
+#circ = { path = "nova-circ", features = ["zok", "smt", "r1cs", "bellman"] }
 regex-syntax = "0.6"
 itertools = "0.10"
-nova-snark = "0.8.1" # backend
-bellperson = { version = "0.22", default-features = false }
-pasta_curves = { version = "0.4.0", features = ["repr-c"] }
+nova-snark ={ git = "https://github.com/sga001/Nova" }
+bellperson = { version = "0.24", default-features = false }
+pasta_curves = { version = "0.5.2", features = ["repr-c", "serde"], package = "fil_pasta_curves" }
 ff = "0.12.0"
-ark-poly = { version = "^0.3.0", default-features = false }
 prettyprint = "0.8.1"
-#ark-test-curves = { version = "^0.3.0", default-features = false, features
-#= ["bls12_381_scalar_field", "bls12_381_curve", "mnt4_753_scalar_field"] }
+rug = { version = "1.11", features = ["serde"] }
+fxhash = "0.2"
+neptune = "8.1.0"
+generic-array = "0.14.4"
 
-
+[dev-dependencies]
+dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8" }

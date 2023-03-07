@@ -1,22 +1,17 @@
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::io::{Result, Error, ErrorKind};
-use itertools::Itertools;
+use std::io::{Error, ErrorKind, Result};
 
-use ark_r1cs_std::bits::ToBitsGadget;
-use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
-use ark_r1cs_std::select::CondSelectGadget;
-use ark_r1cs_std::R1CSVar;
-use ark_pallas::Fr;
-
-use crate::parser::re::Regex;
 use crate::deriv::nullable;
-use crate::domain::DomainRadix2;
+use crate::parser::re::Regex;
 
 #[derive(Debug)]
 pub struct DFA<'a> {
     /// Alphabet
     pub ab: &'a str,
+    /// map of alphabet -> u64
+    pub chars: HashMap<char, u64>,
     /// Set of states (and their index)
     pub states: HashMap<Regex, u64>,
     /// Transition relation from [state -> state], given [char]
@@ -25,10 +20,27 @@ pub struct DFA<'a> {
 
 impl<'a> DFA<'a> {
     pub fn new(ab: &'a str) -> Self {
+        let mut char_map = HashMap::new();
+        for (i, c) in ab.chars().sorted().enumerate() {
+            char_map.insert(c, i as u64);
+        }
+
         Self {
             ab,
+            chars: char_map,
             states: HashMap::new(),
             trans: HashSet::new(),
+        }
+    }
+
+    pub fn ab_to_num(&self, c: char) -> u64 {
+        /*let sorted_ab = self.ab.chars().sorted().collect::<String>();
+        let num = sorted_ab.chars().position(|x| x == c).unwrap();
+        num as u64
+        */
+        match c {
+            '#' => self.chars.len() as u64, // TODO better solution
+            _ => self.chars[&c],
         }
     }
 
@@ -36,14 +48,9 @@ impl<'a> DFA<'a> {
         self.states.len()
     }
 
-    pub fn nab(&self) -> usize {
-        self.ab.len()
-    }
-
     pub fn add_transition(&mut self, from: &Regex, c: char, to: &Regex) {
         self.trans.insert((from.clone(), c, to.clone()));
     }
-
 
     pub fn add_state(&mut self, new_state: &Regex) {
         self.states.insert(new_state.clone(), self.nstates() as u64);
@@ -71,25 +78,31 @@ impl<'a> DFA<'a> {
             .collect()
     }
 
+    /// All states
+    pub fn get_states(&self) -> HashSet<u64> {
+        self.states.clone().into_values().collect()
+    }
+
     /// DFA step function [delta(s, c) = s'] function
-    fn delta(&self, state: u64, ch: char) -> Result<u64> {
-       let res : Vec<u64> = self.deltas()
+    pub fn delta(&self, state: u64, ch: char) -> Result<u64> {
+        let res: Vec<u64> = self
+            .deltas()
             .clone()
             .into_iter()
-            .filter_map(|(s, c, t)|
-                if s == state && c == ch {
-                    Some(t)
-                } else { None })
+            .filter_map(|(s, c, t)| if s == state && c == ch { Some(t) } else { None })
             .collect();
 
         if res.len() == 1 {
             Ok(res[0])
         } else {
-            Err(Error::new(ErrorKind::InvalidInput, "Invalidated DFA invariant"))
+            Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Invalidated DFA invariant (determinism)",
+            ))
         }
     }
 
-    fn deltas(&self) -> Vec<(u64, char, u64)> {
+    pub fn deltas(&self) -> Vec<(u64, char, u64)> {
         self.trans
             .clone()
             .into_iter()
@@ -97,23 +110,170 @@ impl<'a> DFA<'a> {
             .collect()
     }
 
-    /// Make a DFA delta function into a circuit
-    /// Both [c] and [state] are in index
-    /// form in a [DomainRadix2] in [src/domain.rs]
-    pub fn cond_delta(&self, c: FpVar<Fr>, state: FpVar<Fr>, state_domain: &DomainRadix2) -> FpVar<Fr> {
-        let ic = c.to_bits_le().unwrap();
-        let istate = state.to_bits_le().unwrap();
+    pub fn is_match(&self, doc: &String) -> bool {
+        let mut s = self.get_init_state();
+        for c in doc.chars() {
+            s = self.delta(s, c).unwrap();
+        }
+        // If it is in the final states, then success
+        self.get_final_states().contains(&s)
+    }
 
-        // Sort so indexing by (state, char) works correctly in the CondGadget
-        let ds: Vec<FpVar<Fr>> = self.deltas()
-            .into_iter()
-            .sorted()
-            .map(|(_, _ ,c)| FpVar::constant(state_domain.get(c)))
-            .collect();
-        // Concat the bits of [istate] and [ic], warning did not debug this yet!
-        let index = [&istate[..], &ic[..]].concat();
+    pub fn equiv_classes(&self) -> HashMap<char, HashSet<char>> {
+        let mut char_classes: HashMap<char, HashSet<char>> = HashMap::new();
 
-        CondSelectGadget::conditionally_select_power_of_two_vector(&index, &ds).unwrap()
+        for a in self.ab.chars() {
+            for b in self.ab.chars() {
+                if !char_classes.contains_key(&a) {
+                    char_classes.insert(a, HashSet::from([a]));
+                }
+                if !char_classes.contains_key(&b) {
+                    char_classes.insert(b, HashSet::from([b]));
+                }
+                let mut equivalent = true;
+                for s in self.get_states() {
+                    if self.delta(s, a).unwrap() != self.delta(s, b).unwrap() {
+                        equivalent = false;
+                    }
+                }
+                // Merge equivalence classes
+                if equivalent {
+                    let union: HashSet<char> =
+                        char_classes[&a].union(&char_classes[&b]).cloned().collect();
+                    char_classes.insert(a, union.clone());
+                    char_classes.insert(b, union);
+                }
+            }
+        }
+
+        char_classes
     }
 }
 
+#[cfg(test)]
+mod tests {
+
+    use crate::deriv::{mk_dfa, nullable};
+    use crate::dfa::DFA;
+    use crate::parser::re::Regex;
+    use crate::parser::regex_parser;
+
+    fn set_up_delta_test(r: &str, alpha: &str, tocheck: &str) -> bool {
+        let ab = String::from(alpha);
+        let regex = regex_parser(&String::from(r), &ab);
+        let input = String::from(tocheck);
+
+        let mut dfa = DFA::new(&ab[..]);
+        mk_dfa(&regex, &ab, &mut dfa);
+        let mut s = dfa.get_init_state();
+
+        for i in 0..input.len() {
+            s = dfa.delta(s, input.chars().nth(i).unwrap()).unwrap();
+        }
+        let re_match = dfa.get_final_states().contains(&s);
+        return re_match;
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_basic() {
+        let re_match = set_up_delta_test("a", "ab", "a");
+        assert!(re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_basic_nonmatch() {
+        let re_match = set_up_delta_test("a", "ab", "b");
+        assert!(!re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit() {
+        let re_match = set_up_delta_test("aba", "ab", "aba");
+        assert!(re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_nonmatch() {
+        let re_match = set_up_delta_test("aba", "ab", "ab");
+        assert!(!re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_star() {
+        let re_match = set_up_delta_test("a.*a", "ab", "abba");
+        assert!(re_match);
+    }
+
+    #[test]
+    fn test_dfa_delta_non_circuit_stat_nonmatch() {
+        let re_match = set_up_delta_test("a.*a", "ab", "abb");
+        assert!(!re_match);
+    }
+
+    use itertools::Itertools;
+    use std::fmt::{Display, Error, Formatter};
+    use std::fs::File;
+
+    #[test]
+    fn dot_dfa() {
+        let ab = String::from("ab");
+        let regex = regex_parser(&String::from(".*ab"), &ab);
+
+        let mut dfa = DFA::new(&ab[..]);
+        mk_dfa(&regex, &ab, &mut dfa);
+
+        // Output file
+        let mut buffer = File::create("graphs/dfa.dot").unwrap();
+
+        dot::render(&dfa, &mut buffer).unwrap()
+    }
+
+    type Ed = (Regex, Vec<char>, Regex);
+
+    impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
+        fn graph_id(&'a self) -> dot::Id<'a> {
+            dot::Id::new("example").unwrap()
+        }
+        fn node_id(&'a self, n: &Regex) -> dot::Id<'a> {
+            dot::Id::new(format!("N{}", self.states[n])).unwrap()
+        }
+        fn node_label<'b>(&'b self, r: &Regex) -> dot::LabelText<'b> {
+            dot::LabelText::LabelStr(format!("{}", r).into())
+        }
+        fn edge_label<'b>(&'b self, e: &Ed) -> dot::LabelText<'b> {
+            let mut comma_separated = String::new();
+
+            for num in &e.1[0..e.1.len() - 1] {
+                comma_separated.push_str(&num.to_string());
+                comma_separated.push_str(", ");
+            }
+
+            comma_separated.push_str(&e.1[e.1.len() - 1].to_string());
+
+            dot::LabelText::LabelStr(format!("{}", comma_separated).into())
+        }
+    }
+
+    impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA<'a> {
+        fn nodes(&'a self) -> dot::Nodes<'a, Regex> {
+            self.states.clone().into_keys().collect()
+        }
+        fn edges(&'a self) -> dot::Edges<'a, Ed> {
+            self.trans
+                .clone()
+                .into_iter()
+                .map(|(a, c, b)| ((a, b), c))
+                .into_group_map()
+                .into_iter()
+                .map(|((a, b), c)| (a, c, b))
+                .collect()
+        }
+
+        fn source(&self, e: &Ed) -> Regex {
+            e.0.clone()
+        }
+        fn target(&self, e: &Ed) -> Regex {
+            e.2.clone()
+        }
+    }
+}
