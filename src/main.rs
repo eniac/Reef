@@ -97,6 +97,9 @@ fn main() {
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
         pc.clone(),
     );
 
@@ -142,6 +145,9 @@ fn main() {
     let z0_primary = vec![
         <G1 as Group>::Scalar::from(current_state),
         <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
+        <G1 as Group>::Scalar::from(0),
+        <G1 as Group>::Scalar::from(0),
+        <G1 as Group>::Scalar::from((num_steps == 1) as u64),
     ];
 
     let mut prev_hash = <G1 as Group>::Scalar::from(0);
@@ -170,15 +176,26 @@ fn main() {
         let mut p = Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
         let expected_next_hash: <G1 as Group>::Scalar = p.hash();
 
+        println!("expected next hash in main {:#?}", expected_next_hash);
+
+        let mut bool_out = false;
+        let bool_out_next = false;
+        if i == num_steps - 1 {
+            bool_out = true;
+        }
+
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
             Some(extended_wit),
             <G1 as Group>::Scalar::from(current_state),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
             <G1 as Group>::Scalar::from(next_state),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
             <G1 as Group>::Scalar::from(dfa.ab_to_num(next_char)),
             <G1 as Group>::Scalar::from(prev_hash),
             <G1 as Group>::Scalar::from(expected_next_hash),
+            <G1 as Group>::Scalar::from(i as u64),
+            <G1 as Group>::Scalar::from(bool_out as u64),
+            <G1 as Group>::Scalar::from(bool_out_next as u64),
             pc.clone(),
         );
 

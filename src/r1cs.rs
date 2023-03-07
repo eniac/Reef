@@ -183,7 +183,7 @@ fn horners_eval(coeffs: Vec<Integer>, x_lookup: Integer) -> Integer {
 // coeffs = [constant, x, x^2 ...]
 fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
     let num_c = coeffs.len();
-    println!("coeffs = {:#?}", coeffs);
+    //println!("coeffs = {:#?}", coeffs);
 
     let mut horners = term(
         Op::PfNaryOp(PfNaryOp::Mul),
@@ -226,23 +226,23 @@ pub struct R1CS<'a> {
     batching: JBatching,
     assertions: Vec<Term>,
     pub_inputs: Vec<Term>,
-    batch_size: usize, 
-    doc: String, 
+    batch_size: usize,
+    doc: String,
     is_match: bool,
 }
 
 impl<'a> R1CS<'a> {
     pub fn new(dfa: &'a DFA<'a>, doc: String, batch_size: usize) -> Self {
-        let batching: JBatching = Self::opt_cost_model_select(&dfa,batch_size, dfa.is_match(&doc));
         let is_match = dfa.is_match(&doc);
         // run cost model (with Poseidon) to decide batching
+        let batching: JBatching = Self::opt_cost_model_select(&dfa, batch_size, dfa.is_match(&doc));
 
         Self {
             dfa,
-            batching: batching, //Plookup,
+            batching: JBatching::NaivePolys, // TODO
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
-            batch_size: batch_size, 
+            batch_size: batch_size,
             doc: doc,
             is_match: is_match,
         }
@@ -304,10 +304,7 @@ impl<'a> R1CS<'a> {
         return (prover_data, verifier_data);
     }
 
-    pub fn to_r1cs(
-        &mut self,
-        doc_length: usize,
-    ) -> (ProverData, VerifierData) {
+    pub fn to_r1cs(&mut self, doc_length: usize) -> (ProverData, VerifierData) {
         match self.batching {
             JBatching::NaivePolys => self.to_polys(doc_length),
             JBatching::Nlookup => self.to_nlookup(doc_length),
@@ -316,10 +313,7 @@ impl<'a> R1CS<'a> {
     }
 
     // TODO batch size (1 currently)
-    fn to_polys(
-        &mut self,
-        doc_length: usize,
-    ) -> (ProverData, VerifierData) {
+    fn to_polys(&mut self, doc_length: usize) -> (ProverData, VerifierData) {
         let coeffs = self.lagrange_from_dfa();
         //println!("lagrange coeffs {:#?}", coeffs);
 
@@ -516,10 +510,7 @@ impl<'a> R1CS<'a> {
         }
     }
 
-    pub fn to_nlookup(
-        &mut self,
-        doc_length: usize,
-    ) -> (ProverData, VerifierData) {
+    pub fn to_nlookup(&mut self, doc_length: usize) -> (ProverData, VerifierData) {
         // generate v's
         let mut v = vec![];
 
@@ -595,11 +586,9 @@ impl<'a> R1CS<'a> {
         current_state: u64,
     ) -> (FxHashMap<String, Value>, u64) {
         match self.batching {
-            JBatching::NaivePolys => {
-                self.gen_wit_i_polys(round_num, current_state)
-            }
-            JBatching::Plookup => self.gen_wit_i_nlookup(round_num, current_state),
-            JBatching::Nlookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
+            JBatching::NaivePolys => self.gen_wit_i_polys(round_num, current_state),
+            JBatching::Nlookup => self.gen_wit_i_nlookup(round_num, current_state),
+            JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
@@ -627,7 +616,11 @@ impl<'a> R1CS<'a> {
         let mut state_i = current_state;
         let mut next_state = 0;
         for i in 0..self.batch_size {
-            let c = self.doc.chars().nth(batch_num * self.batch_size + i).unwrap();
+            let c = self
+                .doc
+                .chars()
+                .nth(batch_num * self.batch_size + i)
+                .unwrap();
             next_state = self.dfa.delta(state_i, c).unwrap();
 
             wits.insert(format!("state_{}", i), new_wit(state_i));
@@ -771,24 +764,24 @@ impl<'a> R1CS<'a> {
         cost
     }
 
-    pub fn opt_cost_model_select(dfa: &'a DFA<'a>, batch_size: usize, is_match: bool) -> JBatching
-    {
-        let mut opt_batching:JBatching = JBatching::NaivePolys;
-        let mut cost: usize = Self::full_round_cost_model(dfa, batch_size, JBatching::NaivePolys, is_match);
+    pub fn opt_cost_model_select(dfa: &'a DFA<'a>, batch_size: usize, is_match: bool) -> JBatching {
+        let mut opt_batching: JBatching = JBatching::NaivePolys;
+        let mut cost: usize =
+            Self::full_round_cost_model(dfa, batch_size, JBatching::NaivePolys, is_match);
 
         if cost < 10000 {
             cost = 10000
         }
 
         if Self::full_round_cost_model(dfa, batch_size, JBatching::Nlookup, is_match) < cost {
-                cost = Self::full_round_cost_model(dfa, batch_size, JBatching::Nlookup, is_match);
-                opt_batching = JBatching::Nlookup;
+            cost = Self::full_round_cost_model(dfa, batch_size, JBatching::Nlookup, is_match);
+            opt_batching = JBatching::Nlookup;
         }
 
         if Self::full_round_cost_model(dfa, batch_size, JBatching::Plookup, is_match) < cost {
-                    cost = Self::full_round_cost_model(dfa, batch_size, JBatching::Plookup, is_match);
-                    opt_batching = JBatching::Plookup;
-                }
+            cost = Self::full_round_cost_model(dfa, batch_size, JBatching::Plookup, is_match);
+            opt_batching = JBatching::Plookup;
+        }
         opt_batching
     }
 }
@@ -866,7 +859,47 @@ mod tests {
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
 
-        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(),1);
+        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1);
+        let (prover_data, _) = r1cs_converter.to_r1cs(num_steps);
+        let precomp = prover_data.clone().precompute;
+        //println!("{:#?}", prover_data);
+
+        let mut current_state = dfa.get_init_state();
+
+        for i in 0..num_steps {
+            let (values, next_state) = r1cs_converter.gen_wit_i(i, current_state);
+            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
+            let extd_val = precomp.eval(&values);
+
+            prover_data.r1cs.check_all(&extd_val);
+
+            // for next i+1 round
+            current_state = next_state;
+        }
+
+        println!(
+            "cost model: {:#?}",
+            R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
+        );
+        println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
+        assert!(
+            prover_data.r1cs.constraints().len()
+                <= R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
+        );
+    }
+
+    fn plookup_test_func_no_hash(ab: String, regex: String, doc: String) {
+        //set_up_cfg("1019".to_owned());
+
+        let r = regex_parser(&regex, &ab);
+        let mut dfa = DFA::new(&ab[..]);
+        mk_dfa(&r, &ab, &mut dfa);
+        //println!("{:#?}", dfa);
+
+        let mut chars = doc.chars();
+        let num_steps = doc.chars().count();
+
+        let mut r1cs_converter = R1CS::new(&dfa, doc, 1);
         let (prover_data, _) = r1cs_converter.to_r1cs(num_steps);
         let precomp = prover_data.clone().precompute;
         println!("{:#?}", prover_data);
@@ -886,55 +919,9 @@ mod tests {
 
         println!(
             "cost model: {:#?}",
-            R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
+            R1CS::plookup_cost_model_nohash(&dfa, 1)
         );
-        println!(
-            "actual cost: {:#?}",
-            prover_data.r1cs.constraints().len()
-        );
-        assert!(
-            prover_data.r1cs.constraints().len()
-                <= R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
-        );
-    }
-
-    fn plookup_test_func_no_hash(ab: String, regex: String, doc: String) {
-            //set_up_cfg("1019".to_owned());
-
-            let r = regex_parser(&regex, &ab);
-            let mut dfa = DFA::new(&ab[..]);
-            mk_dfa(&r, &ab, &mut dfa);
-            //println!("{:#?}", dfa);
-    
-            let mut chars = doc.chars();
-            let num_steps = doc.chars().count();
-    
-            let mut r1cs_converter = R1CS::new(&dfa, doc,1);
-            let (prover_data, _) = r1cs_converter.to_r1cs(num_steps);
-            let precomp = prover_data.clone().precompute;
-            println!("{:#?}", prover_data); 
-    
-            let mut current_state = dfa.get_init_state();
-    
-            for i in 0..num_steps {
-                let (values, next_state) = r1cs_converter.gen_wit_i(i, current_state);
-                //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-                let extd_val = precomp.eval(&values);
-    
-                prover_data.r1cs.check_all(&extd_val);
-    
-                // for next i+1 round
-                current_state = next_state;
-            }
-    
-            println!(
-                "cost model: {:#?}",
-                R1CS::plookup_cost_model_nohash(&dfa, 1)
-            );
-            assert!(
-                prover_data.r1cs.constraints().len()
-                    <= R1CS::plookup_cost_model_nohash(&dfa, 1)
-            );
+        assert!(prover_data.r1cs.constraints().len() <= R1CS::plookup_cost_model_nohash(&dfa, 1));
     }
 
     fn nlookup_test_func(ab: String, regex: String, doc: String) {
