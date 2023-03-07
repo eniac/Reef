@@ -144,15 +144,17 @@ fn main() {
     let mut current_state = dfa.get_init_state();
     let z0_primary = vec![
         <G1 as Group>::Scalar::from(current_state),
-        <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
-        <G1 as Group>::Scalar::from(0),
-        <G1 as Group>::Scalar::from(0),
-        <G1 as Group>::Scalar::from((num_steps == 1) as u64),
+        //<G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
+        //        <G1 as Group>::Scalar::from(0),
+        //        <G1 as Group>::Scalar::from(0),
+        //        <G1 as Group>::Scalar::from((num_steps == 1) as u64),
     ];
 
     let mut prev_hash = <G1 as Group>::Scalar::from(0);
     let precomp = prover_data.clone().precompute;
     for i in 0..num_steps {
+        println!("STEP {}", i);
+
         // allocate real witnesses for round i
         let (wits, next_state) = r1cs_converter.gen_wit_i(i, current_state);
         //println!("prover_data {:#?}", prover_data.clone());
@@ -208,6 +210,8 @@ fn main() {
             z0_primary.clone(),
             z0_secondary.clone(),
         );
+        //println!("prove step {:#?}", result);
+
         assert!(result.is_ok());
         println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
         recursive_snark = Some(result.unwrap());
@@ -223,10 +227,12 @@ fn main() {
     // verify recursive
     let res = recursive_snark.verify(
         &pp,
-        FINAL_EXTERNAL_COUNTER,
+        num_steps, //FINAL_EXTERNAL_COUNTER,
         z0_primary.clone(),
         z0_secondary.clone(),
     );
+    //println!("Recursive res: {:#?}", recursive_snark);
+
     assert!(res.is_ok());
 
     // compressed SNARK
