@@ -26,11 +26,8 @@ use crate::dfa::DFA;
 use crate::parser::regex_parser;
 use crate::r1cs::*;
 
-/*
-fn type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
-*/
+#[cfg(feature="plot")]
+pub mod plot;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
@@ -68,6 +65,9 @@ fn main() {
     let mut dfa = DFA::new(&ab[..]);
     mk_dfa(&r, &ab, &mut dfa);
     println!("dfa: {:#?}", dfa);
+
+    #[cfg(feature = "plot")]
+    plot::plot_dfa(&dfa).expect("Failed to plot DFA to a pdf file");
 
     let num_steps = doc.chars().count(); // len of document
     println!("Doc len is {}", num_steps);

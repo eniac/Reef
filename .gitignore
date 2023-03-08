@@ -1,3 +1,5 @@
 /target
 /min/target
 out*
+*.dot
+*.pdf

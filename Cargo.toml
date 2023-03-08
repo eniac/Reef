@@ -21,6 +21,8 @@ rug = { version = "1.11", features = ["serde"] }
 fxhash = "0.2"
 neptune = "8.1.0"
 generic-array = "0.14.4"
+dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8", optional = true }
 
-[dev-dependencies]
-dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8" }
+[features]
+plot = ["dep:dot"]
+
