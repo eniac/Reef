@@ -78,7 +78,7 @@ fn main() {
     let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, pc.clone());
     println!("generate commitment");
     r1cs_converter.gen_commitment();
-    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs(num_steps);
+    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs();
 
     // use "empty" (witness-less) circuit to generate nova F
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(

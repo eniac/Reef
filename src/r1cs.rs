@@ -329,16 +329,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         return (prover_data, verifier_data);
     }
 
-    pub fn to_r1cs(&mut self, doc_length: usize) -> (ProverData, VerifierData) {
+    pub fn to_r1cs(&mut self) -> (ProverData, VerifierData) {
         match self.batching {
-            JBatching::NaivePolys => self.to_polys(doc_length),
-            JBatching::Nlookup => self.to_nlookup(doc_length),
+            JBatching::NaivePolys => self.to_polys(),
+            JBatching::Nlookup => self.to_nlookup(),
             JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
     // TODO batch size (1 currently)
-    fn to_polys(&mut self, doc_length: usize) -> (ProverData, VerifierData) {
+    fn to_polys(&mut self) -> (ProverData, VerifierData) {
         let coeffs = self.lagrange_from_dfa();
         //println!("lagrange coeffs {:#?}", coeffs);
 
@@ -398,7 +398,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             vec![
                 term(
                     Op::Eq,
-                    vec![new_var("round_num".to_owned()), new_const(doc_length - 1)],
+                    vec![
+                        new_var("round_num".to_owned()),
+                        new_const(self.doc.len() - 1),
+                    ],
                 ), // if in final round
                 term(Op::Eq, vec![vanishing_poly, new_const(0)]), // true -> check next_state (not) in final_states
                 new_bool_const(true),                             // not in correct round
@@ -542,7 +545,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
-    pub fn to_nlookup(&mut self, doc_length: usize) -> (ProverData, VerifierData) {
+    pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
         // generate v's
         let mut v = vec![];
 
@@ -886,8 +889,8 @@ mod tests {
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
 
-        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1);
-        let (prover_data, _) = r1cs_converter.to_r1cs(num_steps);
+        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, pc);
+        let (prover_data, _) = r1cs_converter.to_r1cs();
         let precomp = prover_data.clone().precompute;
         //println!("{:#?}", prover_data);
 
@@ -913,78 +916,6 @@ mod tests {
             prover_data.r1cs.constraints().len()
                 <= R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
         );
-    }
-
-    fn plookup_test_func_no_hash(ab: String, regex: String, doc: String) {
-        //set_up_cfg("1019".to_owned());
-
-        let r = regex_parser(&regex, &ab);
-        let mut dfa = DFA::new(&ab[..]);
-        mk_dfa(&r, &ab, &mut dfa);
-        //println!("{:#?}", dfa);
-
-        let mut chars = doc.chars();
-        let num_steps = doc.chars().count();
-
-        let mut r1cs_converter = R1CS::new(&dfa, doc, 1);
-        let (prover_data, _) = r1cs_converter.to_r1cs(num_steps);
-        let precomp = prover_data.clone().precompute;
-        println!("{:#?}", prover_data);
-
-        let mut current_state = dfa.get_init_state();
-
-        for i in 0..num_steps {
-            let (values, next_state) = r1cs_converter.gen_wit_i(i, current_state);
-            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-            let extd_val = precomp.eval(&values);
-
-            prover_data.r1cs.check_all(&extd_val);
-
-            // for next i+1 round
-            current_state = next_state;
-        }
-
-        println!(
-            "cost model: {:#?}",
-            R1CS::plookup_cost_model_nohash(&dfa, 1)
-        );
-        assert!(prover_data.r1cs.constraints().len() <= R1CS::plookup_cost_model_nohash(&dfa, 1));
-    }
-
-    fn nlookup_test_func(ab: String, regex: String, doc: String) {
-        //set_up_cfg("1019".to_owned());
-
-        let r = regex_parser(&regex, &ab);
-        let mut dfa = DFA::new(&ab[..]);
-        mk_dfa(&r, &ab, &mut dfa);
-        //println!("{:#?}", dfa);
-
-        let mut chars = doc.chars();
-        let num_steps = doc.chars().count();
-        /*
-                let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
-                let precomp = prover_data.clone().precompute;
-                println!("{:#?}", prover_data);
-
-                let mut current_state = dfa.get_init_state();
-
-                for i in 0..num_steps {
-                    let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
-                    //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-                    let extd_val = precomp.eval(&values);
-
-                    prover_data.r1cs.check_all(&extd_val);
-
-                    // for next i+1 round
-                    current_state = next_state;
-                }
-
-                println!(
-                    "cost model: {:#?}",
-                    polys_cost_model(&dfa, dfa.is_match(&doc))
-                );
-                assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
-        */
     }
 
     #[test]
