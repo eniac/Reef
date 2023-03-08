@@ -13,6 +13,8 @@ use generic_array::typenum;
 use itertools::Itertools;
 use neptune::{
     poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
+    sponge::api::{IOPattern, SpongeAPI, SpongeOp},
+    sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
 use nova_snark::{
@@ -260,14 +262,25 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn gen_commitment(&mut self) {
-        let mut hash = F::from(0);
+        let mut hash = vec![F::from(0)];
         for c in self.doc.chars() {
-            let mut data = vec![hash, F::from(self.dfa.ab_to_num(c))];
-            let mut p = Poseidon::<F, typenum::U2>::new_with_preimage(&data, &self.pc);
-            hash = p.hash();
+            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+            let acc = &mut ();
+
+            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+            sponge.start(parameter, None, acc);
+            SpongeAPI::absorb(
+                &mut sponge,
+                2,
+                &[hash[0], F::from(self.dfa.ab_to_num(c))],
+                acc,
+            );
+            hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            println!("intm hash out: {:#?}", hash);
+            sponge.finish(acc).unwrap();
         }
         println!("commitment = {:#?}", hash.clone());
-        self.commitment = Some(hash);
+        self.commitment = Some(hash[0]);
     }
 
     fn lagrange_from_dfa(&self) -> Vec<Integer> {
@@ -637,14 +650,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // TODO - what needs to be public?
 
         // generate claim r
-        let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
+        /*let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
             Strength::Standard,
         );
         let mut data = vec![<G1 as Group>::Scalar::zero(), <G1 as Group>::Scalar::zero()];
 
         let mut p = Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
         let claim_r: <G1 as Group>::Scalar = p.hash();
-
+        */
         // TODO GET INT wits.insert(format!("claim_r"), new_wit(claim_r));
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)

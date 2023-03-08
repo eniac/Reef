@@ -9,6 +9,8 @@ use circ::target::r1cs::nova::*;
 use generic_array::typenum;
 use neptune::{
     poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
+    sponge::api::{IOPattern, SpongeAPI, SpongeOp},
+    sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
 use nova_snark::{
@@ -72,10 +74,9 @@ fn main() {
     let num_steps = doc.chars().count(); // len of document
     println!("Doc len is {}", num_steps);
 
-    let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
-        Strength::Standard,
-    );
-    let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, pc.clone());
+    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
+
+    let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, sc.clone());
     println!("generate commitment");
     r1cs_converter.gen_commitment();
     let (prover_data, _verifier_data) = r1cs_converter.to_r1cs();
@@ -91,7 +92,7 @@ fn main() {
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
-        pc.clone(),
+        sc.clone(),
     );
 
     // trivial circuit
@@ -142,6 +143,21 @@ fn main() {
     // TODO check "ingrained" bool out
     let mut prev_hash = <G1 as Group>::Scalar::from(0);
     let precomp = prover_data.clone().precompute;
+
+    // for expected hash
+    /*
+    let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
+    let acc = &mut ();
+    */
+    /*let mut seq = vec![];
+    for i in 0..num_steps {
+        seq.push(SpongeOp::Absorb(2));
+        seq.push(SpongeOp::Squeeze(1));
+    }*/
+    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+
+    //sponge.start(parameter, None, acc);
+
     for i in 0..num_steps {
         println!("STEP {}", i);
 
@@ -162,14 +178,23 @@ fn main() {
         //println!("next char = {}", next_char);
 
         // expected poseidon
-        let mut data = vec![
-            prev_hash,
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
-        ];
-        let mut p = Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
-        let expected_next_hash: <G1 as Group>::Scalar = p.hash();
+        let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
+        let acc = &mut ();
 
-        //println!("expected next hash in main {:#?}", expected_next_hash);
+        sponge.start(parameter.clone(), None, acc);
+        SpongeAPI::absorb(
+            &mut sponge,
+            2,
+            &[
+                prev_hash,
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
+            ],
+            acc,
+        );
+        let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+
+        println!("expected next hash in main {:#?}", expected_next_hash);
+        sponge.finish(acc).unwrap(); // assert expected hash finished correctly
 
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
@@ -179,9 +204,9 @@ fn main() {
             <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
             <G1 as Group>::Scalar::from(dfa.ab_to_num(next_char)),
             <G1 as Group>::Scalar::from(prev_hash),
-            <G1 as Group>::Scalar::from(expected_next_hash),
+            <G1 as Group>::Scalar::from(expected_next_hash[0]),
             <G1 as Group>::Scalar::from(i as u64),
-            pc.clone(),
+            sc.clone(),
         );
 
         //println!("STEP CIRC WIT for i={}: {:#?}", i, circuit_primary);
@@ -202,7 +227,7 @@ fn main() {
 
         // for next i+1 round
         current_state = next_state;
-        prev_hash = expected_next_hash;
+        prev_hash = expected_next_hash[0];
     }
 
     assert!(recursive_snark.is_some());
