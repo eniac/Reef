@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Result};
 
-use crate::deriv::nullable;
+use crate::deriv::{deriv, nullable};
 use crate::parser::re::Regex;
 
 #[derive(Debug)]
@@ -19,18 +19,39 @@ pub struct DFA<'a> {
 }
 
 impl<'a> DFA<'a> {
-    pub fn new(ab: &'a str) -> Self {
+    pub fn new(ab: &'a str, re: Regex) -> Self {
         let mut char_map = HashMap::new();
         for (i, c) in ab.chars().sorted().enumerate() {
             char_map.insert(c, i as u64);
         }
 
-        Self {
+        let mut d = Self {
             ab,
             chars: char_map,
             states: HashMap::new(),
             trans: HashSet::new(),
+        };
+
+        // Recursive funtion
+        fn mk_dfa(d: &mut DFA, q: &Regex) {
+          // Add to DFA if not already there
+          d.add_state(q);
+
+          // Explore derivatives
+          for c in d.ab.chars() {
+              let q_c = deriv(c, q);
+              d.add_transition(q, c, &q_c);
+              if d.contains_state(&q_c) {
+                  continue;
+              } else {
+                  mk_dfa(d, &q_c);
+              }
+          }
         }
+
+        // Recursively build transitions
+        mk_dfa(&mut d, &re);
+        d
     }
 
     pub fn ab_to_num(&self, c: char) -> u64 {

@@ -20,6 +20,21 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
     fn node_label<'b>(&'b self, r: &Regex) -> dot::LabelText<'b> {
         dot::LabelText::LabelStr(format!("{}", r).into())
     }
+    fn node_style(&'a self, n: &Regex) -> dot::Style {
+        let init = self.get_init_state();
+        let finals = self.get_final_states();
+        let s = self.get_state_num(&n);
+        if s == init && finals.contains(&s) {
+            dot::Style::Filled
+        } else if finals.contains(&s) {
+            dot::Style::Striped
+        } else if s == init {
+            dot::Style::Dashed
+        } else {
+            dot::Style::None
+        }
+    }
+
     fn edge_label<'b>(&'b self, e: &Ed) -> dot::LabelText<'b> {
         let mut comma_separated = String::new();
 

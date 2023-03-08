@@ -23,7 +23,6 @@ pub mod dfa;
 pub mod parser;
 pub mod r1cs;
 
-use crate::deriv::*;
 use crate::dfa::DFA;
 use crate::parser::regex_parser;
 use crate::r1cs::*;
@@ -64,8 +63,7 @@ fn main() {
     cfg::set(&circ);
 
     // Convert the Regex to a DFA
-    let mut dfa = DFA::new(&ab[..]);
-    mk_dfa(&r, &ab, &mut dfa);
+    let dfa = DFA::new(&ab[..], r);
     println!("dfa: {:#?}", dfa);
 
     #[cfg(feature = "plot")]
