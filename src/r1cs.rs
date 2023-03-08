@@ -1,4 +1,3 @@
-use crate::deriv::nullable;
 use crate::dfa::DFA;
 use circ::cfg::*;
 use circ::ir::opt::*;
@@ -10,7 +9,7 @@ use circ::target::r1cs::{
 use ff::PrimeField;
 use fxhash::FxHashMap;
 use generic_array::typenum;
-use itertools::Itertools;
+use std::collections::HashSet;
 use neptune::{
     poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -103,9 +102,9 @@ fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
     return inv;
 }
 
-fn vanishing(xs: Vec<u64>) -> Vec<Integer> {
+fn vanishing(xs: HashSet<u64>) -> Vec<Integer> {
     let mut evals = vec![];
-    for xi in xs {
+    for xi in xs.into_iter() {
         evals.push((Integer::from(xi), Integer::from(0)));
     }
     // note we don't just want y = 0
@@ -381,15 +380,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // final state (non) match check
         let mut vanishing_poly;
-        let mut final_states = vec![];
-        let mut non_final_states = vec![];
-        for (k, v) in self.dfa.states.clone() {
-            if nullable(&k) {
-                final_states.push(v);
-            } else {
-                non_final_states.push(v);
-            }
-        }
+        let mut final_states = self.dfa.get_final_states();
+        let mut non_final_states = self.dfa.get_non_final_states();
 
         if self.is_match {
             //println!("MEMBERSHIP");
@@ -721,7 +713,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         if is_match {
             cost += dfa.get_final_states().len() + 3;
         } else {
-            cost += (dfa.nstates() - dfa.get_final_states().len()) + 3;
+            cost += dfa.get_non_final_states().len() + 3;
         }
 
         cost
@@ -832,7 +824,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 #[cfg(test)]
 mod tests {
 
-    use crate::deriv::*;
     use crate::dfa::DFA;
     use crate::parser::regex_parser;
     use crate::r1cs::*;
@@ -895,8 +886,7 @@ mod tests {
         //set_up_cfg("1019".to_owned());
 
         let r = regex_parser(&regex, &ab);
-        let mut dfa = DFA::new(&ab[..]);
-        mk_dfa(&r, &ab, &mut dfa);
+        let mut dfa = DFA::new(&ab[..], r);
         //println!("{:#?}", dfa);
 
         let mut chars = doc.chars();

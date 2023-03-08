@@ -90,12 +90,21 @@ impl<'a> DFA<'a> {
         0
     }
 
-    /// Final state
+    /// Final states
     pub fn get_final_states(&self) -> HashSet<u64> {
         self.states
             .clone()
             .into_iter()
             .filter_map(|(k, v)| if nullable(&k) { Some(v) } else { None })
+            .collect()
+    }
+
+    /// Non final states
+    pub fn get_non_final_states(&self) -> HashSet<u64> {
+        self.states
+            .clone()
+            .into_iter()
+            .filter_map(|(k, v)| if nullable(&k) { None } else { Some(v) })
             .collect()
     }
 
@@ -174,9 +183,7 @@ impl<'a> DFA<'a> {
 #[cfg(test)]
 mod tests {
 
-    use crate::deriv::{mk_dfa, nullable};
     use crate::dfa::DFA;
-    use crate::parser::re::Regex;
     use crate::parser::regex_parser;
 
     fn set_up_delta_test(r: &str, alpha: &str, tocheck: &str) -> bool {
@@ -184,8 +191,7 @@ mod tests {
         let regex = regex_parser(&String::from(r), &ab);
         let input = String::from(tocheck);
 
-        let mut dfa = DFA::new(&ab[..]);
-        mk_dfa(&regex, &ab, &mut dfa);
+        let mut dfa = DFA::new(&ab[..], regex);
         let mut s = dfa.get_init_state();
 
         for i in 0..input.len() {

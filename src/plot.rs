@@ -23,7 +23,6 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
     fn node_style(&'a self, n: &Regex) -> dot::Style {
         let init = self.get_init_state();
         let finals = self.get_final_states();
-        println!("Final states {:?}", finals);
         let s = self.get_state_num(&n);
         if s == init && finals.contains(&s) {
             dot::Style::Filled
