@@ -28,7 +28,7 @@ use crate::dfa::DFA;
 use crate::parser::regex_parser;
 use crate::r1cs::*;
 
-#[cfg(feature="plot")]
+#[cfg(feature = "plot")]
 pub mod plot;
 
 #[derive(Debug, StructOpt)]

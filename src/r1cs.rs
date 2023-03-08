@@ -27,7 +27,7 @@ use rug::Integer;
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
-static POSEIDON_NUM: usize = 237;
+static POSEIDON_NUM: usize = 238; // jess took literal measurement and 238 is the real diff
 
 pub enum JBatching {
     NaivePolys,
@@ -902,7 +902,8 @@ mod tests {
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
 
-        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, pc);
+        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
+        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, sc);
         let (prover_data, _) = r1cs_converter.to_r1cs();
         let precomp = prover_data.clone().precompute;
         //println!("{:#?}", prover_data);
@@ -922,12 +923,12 @@ mod tests {
 
         println!(
             "cost model: {:#?}",
-            R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
+            R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
         );
         println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
         assert!(
             prover_data.r1cs.constraints().len()
-                <= R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
+                <= R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
         );
     }
 
