@@ -23,11 +23,12 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
     fn node_style(&'a self, n: &Regex) -> dot::Style {
         let init = self.get_init_state();
         let finals = self.get_final_states();
+        println!("Final states {:?}", finals);
         let s = self.get_state_num(&n);
         if s == init && finals.contains(&s) {
             dot::Style::Filled
         } else if finals.contains(&s) {
-            dot::Style::Striped
+            dot::Style::Bold
         } else if s == init {
             dot::Style::Dashed
         } else {
@@ -75,20 +76,22 @@ impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA<'a> {
 
 #[cfg(feature = "plot")]
 pub fn plot_dfa<'a>(dfa: &'a DFA) -> Result<ExitStatus> {
+    let dotfile = "dfa.dot";
+
     // Output file
-    let mut buffer = File::create("dfa.dot").unwrap();
+    let mut buffer = File::create(dotfile).unwrap();
 
     // render .dot file
     dot::render(dfa, &mut buffer).unwrap();
+    println!("Wrote DOT file {}.", dotfile);
 
     // Convert to pdf
     let mut child = Command::new("dot")
                         .arg("-Tpdf")
-                        .arg("dfa.dot")
+                        .arg(dotfile)
                         .arg("-o")
                         .arg("dfa.pdf")
                         .spawn()
                         .expect("[dot] CLI failed to convert dfa to [pdf] file");
-
     child.wait()
 }
