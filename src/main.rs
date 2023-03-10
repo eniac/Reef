@@ -1,3 +1,4 @@
+#![feature(associated_type_defaults)]
 #![allow(missing_docs)]
 use structopt::StructOpt;
 
@@ -22,10 +23,12 @@ pub mod deriv;
 pub mod dfa;
 pub mod parser;
 pub mod r1cs;
+pub mod config;
 
 use crate::dfa::DFA;
 use crate::parser::regex_parser;
 use crate::r1cs::*;
+use crate::config::{Config, CharTransform, read_with_config};
 
 #[cfg(feature = "plot")]
 pub mod plot;
@@ -33,13 +36,12 @@ pub mod plot;
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
 struct Options {
-    #[structopt(short = "ab", long = "alphabet", parse(from_str))]
-    alphabet: String,
-
+    /// Configuration options, charset ["ascii", "utf8", "dna"]
+    #[structopt(subcommand)]
+    config: Config,
     /// regular expression
     #[structopt(short = "r", long = "regex", parse(from_str))]
     regex: String,
-
     #[structopt(short = "i", long = "input", parse(from_str))]
     input: String,
 }
@@ -47,7 +49,7 @@ struct Options {
 fn main() {
     let opt = Options::from_args();
     // Alphabet
-    let ab = opt.alphabet;
+    let ab = opt.config.get_alphabet();
 
     // Regular expresion
     let r = regex_parser(&opt.regex, &ab);
