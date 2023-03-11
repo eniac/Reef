@@ -1,36 +1,39 @@
 use std::fs::File;
 use std::io::{BufReader, Read};
 use bitvec::prelude::*;
-use structopt::*;
+use clap::{Subcommand, Args, ValueEnum};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::marker::PhantomData;
 
-#[derive(Debug, StructOpt)]
+#[derive(Clone, ValueEnum)]
 pub enum CharTransform {
-    #[structopt(long="alpha-numeric")]
     AlphaNumeric,
-    #[structopt(long="ignore-whitespace")]
     IgnoreWhitespace,
-    #[structopt(long="case-insensitive")]
-    CaseInsensitive
+    CaseInsensitive,
+    NoTransform
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Subcommand)]
 pub enum Config {
-    Ascii(Option<CharTransform>),
-    Utf8(Option<CharTransform>),
+    Ascii {
+        #[clap(value_enum, default_value_t=CharTransform::NoTransform)]
+        tr: CharTransform
+    },
+    Utf8 {
+        #[clap(value_enum, default_value_t=CharTransform::NoTransform)]
+        tr: CharTransform
+    },
     Dna
 }
 
 /// Define how to encode a Datatype
 /// preserves length.
-trait Encoder<I, F> {
-    type S = I;
+pub trait Encoder<I, F> {
     fn alphabet(&self, s: &Vec<I>) -> Vec<F>;
     fn apply(&self, s: I) -> F;
     fn get_alphabet(&self) -> Vec<F> {
-        self.alphabet(Vec::new())
+        self.alphabet(&Vec::new())
     }
 }
 
@@ -130,11 +133,11 @@ impl Encoder<char,char> for IgnoreWhitespaceEncoder {
          .collect()
     }
     fn apply(&self, s: char) -> char {
-        if !s.is_whitespace() { s } else { ' ' }
+        if s.is_whitespace() { ' ' } else { s }
     }
 }
 
-/// Make all characters uppercase (ASCII) UTF8 returns an iterator?
+/// Make all characters uppercase (ASCII)
 struct CaseInsensitiveEncoder;
 impl Encoder<char,char> for CaseInsensitiveEncoder {
     fn alphabet(&self, s: &Vec<char>) -> Vec<char> {
@@ -153,56 +156,59 @@ impl Encoder<char,char> for &CharTransform {
         match self {
             AlphaNumeric => AlphaNumericEncoder.get_alphabet(),
             IgnoreWhitespace => IgnoreWhitespaceEncoder.alphabet(s),
-            CaseInsensitive => CaseInsensitiveEncoder.alphabet(s)
+            CaseInsensitive => CaseInsensitiveEncoder.alphabet(s),
+            NoTransform => s.clone()
         }
     }
     fn apply(&self, s: char) -> char {
         match self {
             AlphaNumeric => AlphaNumericEncoder.apply(s),
             IgnoreWhitespace => IgnoreWhitespaceEncoder.apply(s),
-            CaseInsensitive => CaseInsensitiveEncoder.apply(s)
+            CaseInsensitive => CaseInsensitiveEncoder.apply(s),
+            NoTransform => s
         }
     }
 }
 
+/// One more disjoint union, Config is an encoder
 impl Encoder<u32, char> for Config {
     fn alphabet(&self, s: &Vec<u32>) -> Vec<char> {
       match self {
-          Config::Ascii(None) => AsciiEncoder.get_alphabet(),
-          Config::Utf8(None) => Utf8Encoder.get_alphabet(),
-          Config::Ascii(Some(tr)) => Compose::new(&AsciiEncoder, &tr).get_alphabet(),
-          Config::Utf8(Some(tr)) => Compose::new(&Utf8Encoder, &tr).get_alphabet(),
+          Config::Ascii { tr } => Compose::new(&AsciiEncoder, &tr).get_alphabet(),
+          Config::Utf8 { tr } => Compose::new(&Utf8Encoder, &tr).get_alphabet(),
           Config::Dna => DnaEncoder.get_alphabet()
       }
     }
 
     fn apply(&self, s: u32) -> char {
       match self {
-          Config::Ascii(None) => AsciiEncoder.apply(s),
-          Config::Utf8(None) => Utf8Encoder.apply(s),
-          Config::Ascii(Some(tr)) => Compose::new(&AsciiEncoder, &tr).apply(s),
-          Config::Utf8(Some(tr)) => Compose::new(&Utf8Encoder, &tr).apply(s),
+          Config::Ascii { tr } => Compose::new(&AsciiEncoder, &tr).apply(s),
+          Config::Utf8 { tr } => Compose::new(&Utf8Encoder, &tr).apply(s),
           Config::Dna => DnaEncoder.apply(s)
       }
     }
 }
 
-/// Define how to deserialize a file
-pub fn read_with_config(filename: &PathBuf, conf: Config) {
-
+impl Config {
     // Number of bits in each segment
-    let nbits = match conf {
-        Config::Ascii(_) => 8,
-        Config::Utf8(_) => 32,
-        Config::Dna => 2
-    };
+    fn nbits(&self) -> usize {
+        match self {
+            Config::Ascii { tr } => 8,
+            Config::Utf8 { tr } => 32,
+            Config::Dna => 2
+        }
+    }
+}
 
+/// Define how to deserialize a file
+pub fn read_with_config(filename: &PathBuf, conf: Config) -> String {
     // Start buffering
-    let mut file = File::open(filename).expect("Unable to open file");
+    let file = File::open(filename).expect("Unable to open file");
     let mut buf_reader = BufReader::new(file);
-    let mut buffer = [0, 1];
-    let mut bit_vec = BitVec::<u32, Lsb0>::new();
+    let mut buffer = [0u8, 1u8];
+    let mut bit_vec = BitVec::<u8, Lsb0>::new();
     loop {
+        println!("Buffer {:?}", buffer);
         match buf_reader.read(&mut buffer) {
             Ok(0) => break,
             Ok(_) => {
@@ -212,8 +218,7 @@ pub fn read_with_config(filename: &PathBuf, conf: Config) {
             Err(_) => panic!("Failed to read file {}.", filename.display()),
         }
     }
-    bit_vec.as_bitslice()
-           .chunks(nbits)
-           .map(|chunk| conf.apply(chunk.load_le::<u32>()))
-           .collect::<Vec<char>>();
+    String::from_iter(bit_vec.as_bitslice()
+           .chunks(conf.nbits())
+           .map(|chunk| conf.apply(chunk.load_le::<u32>())))
 }

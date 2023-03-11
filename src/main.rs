@@ -1,13 +1,13 @@
-#![feature(associated_type_defaults)]
-#![allow(missing_docs)]
-use structopt::StructOpt;
-
+#![allow(missing_docs, non_snake_case)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::target::r1cs::nova::*;
 use generic_array::typenum;
+use clap::{Args, Parser, Subcommand};
+use std::path::PathBuf;
+
 use neptune::{
     poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -28,34 +28,35 @@ pub mod config;
 use crate::dfa::DFA;
 use crate::parser::regex_parser;
 use crate::r1cs::*;
-use crate::config::{Config, CharTransform, read_with_config};
+use crate::config::*;
 
 #[cfg(feature = "plot")]
 pub mod plot;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "rezk", about = "Rezk: The regex to circuit compiler")]
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
 struct Options {
     /// Configuration options, charset ["ascii", "utf8", "dna"]
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     config: Config,
     /// regular expression
-    #[structopt(short = "r", long = "regex", parse(from_str))]
+    #[arg(short = 'r', long)]
     regex: String,
-    #[structopt(short = "i", long = "input", parse(from_str))]
-    input: String,
+    #[arg(short = 'i', long, value_name = "FILE")]
+    input: PathBuf,
 }
 
 fn main() {
-    let opt = Options::from_args();
+    let opt = Options::parse();
+
     // Alphabet
-    let ab = opt.config.get_alphabet();
+    let ab = String::from_iter(opt.config.get_alphabet());
 
     // Regular expresion
     let r = regex_parser(&opt.regex, &ab);
 
     // Input document
-    let doc = opt.input;
+    let doc = read_with_config(&opt.input, opt.config);
 
     // set up CirC library
     let mut circ: CircOpt = Default::default();
