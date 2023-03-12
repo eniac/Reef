@@ -26,25 +26,11 @@ pub mod r1cs;
 pub mod config;
 
 use crate::dfa::DFA;
-use crate::parser::regex_parser;
 use crate::r1cs::*;
 use crate::config::*;
 
 #[cfg(feature = "plot")]
 pub mod plot;
-
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Options {
-    /// Configuration options, charset ["ascii", "utf8", "dna"]
-    #[command(subcommand)]
-    config: Config,
-    /// regular expression
-    #[arg(short = 'r', long)]
-    regex: String,
-    #[arg(short = 'i', long, value_name = "FILE")]
-    input: PathBuf,
-}
 
 fn main() {
     let opt = Options::parse();
@@ -52,11 +38,11 @@ fn main() {
     // Alphabet
     let ab = String::from_iter(opt.config.get_alphabet());
 
-    // Regular expresion
-    let r = regex_parser(&opt.regex, &ab);
+    // Regular expresion parser
+    let r = parse_regex(&opt.config);
 
     // Input document
-    let doc = read_with_config(&opt.input, opt.config);
+    let doc = read_from_config(&opt.config);
 
     // set up CirC library
     let mut circ: CircOpt = Default::default();
