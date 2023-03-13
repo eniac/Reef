@@ -56,6 +56,7 @@ pub enum Config {
 #[derive(Debug, Clone, ValueEnum)]
 pub enum CharTransform {
     AlphaNumeric,
+    BasicEnglish,
     IgnoreWhitespace,
     CaseInsensitive
 }
@@ -202,9 +203,9 @@ impl Encoder<u32,char> for AutoEncoder {
 struct AlphaNumericEncoder;
 impl Encoder<char,char> for AlphaNumericEncoder {
     fn alphabet(&self, s: &Vec<char>) -> Vec<char> {
-        let lower = 'a'..'z';
-        let upper = 'A'..'Z';
-        let numbers = '0'..'9';
+        let lower = 'a'..='z';
+        let upper = 'A'..='Z';
+        let numbers = '0'..='9';
         lower.into_iter()
             .chain(upper.into_iter())
             .chain(numbers.into_iter())
@@ -245,6 +246,30 @@ impl Encoder<char,char> for CaseInsensitiveEncoder {
     }
 }
 
+/// Basic english alphabet + symbols [,.!?;:-'$&*+@"]
+struct BasicEnglishEncoder;
+impl Encoder<char,char> for BasicEnglishEncoder {
+    fn alphabet(&self, s: &Vec<char>) -> Vec<char> {
+      let lower = 'a'..='z';
+      let upper = 'A'..='Z';
+      let numbers = '0'..='9';
+      let mut whitespace = vec![' ','\n'];
+      let mut symbols = vec![',','.','!','?',';',':','-','\'','"','$','&','*','+','@'];
+      let mut v: Vec<char> = (lower.chain(upper).chain(numbers)).collect();
+      v.append(&mut symbols);
+      v.append(&mut whitespace);
+      v
+    }
+
+    fn apply(&self, s: char) -> Option<char> {
+        if self.get_alphabet().contains(&s) {
+            Some(s)
+        } else {
+            panic!("Symbol {:?} is not in the basic english alphabet", s)
+        }
+    }
+}
+
 /// The disjoint union of encoders defined for transforms above
 impl Encoder<char,char> for &CharTransform {
     fn alphabet(&self, s: &Vec<char>) -> Vec<char> {
@@ -252,6 +277,7 @@ impl Encoder<char,char> for &CharTransform {
             CharTransform::AlphaNumeric => AlphaNumericEncoder.get_alphabet(),
             CharTransform::IgnoreWhitespace => IgnoreWhitespaceEncoder.alphabet(s),
             CharTransform::CaseInsensitive => CaseInsensitiveEncoder.alphabet(s),
+            CharTransform::BasicEnglish => BasicEnglishEncoder.alphabet(s),
         }
     }
     fn apply(&self, s: char) -> Option<char> {
@@ -259,6 +285,7 @@ impl Encoder<char,char> for &CharTransform {
             CharTransform::AlphaNumeric => AlphaNumericEncoder.apply(s),
             CharTransform::IgnoreWhitespace => IgnoreWhitespaceEncoder.apply(s),
             CharTransform::CaseInsensitive => CaseInsensitiveEncoder.apply(s),
+            CharTransform::BasicEnglish => BasicEnglishEncoder.apply(s),
         }
     }
 }

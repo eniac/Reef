@@ -40,6 +40,48 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA {
     }
 }
 
+// Function to find consecutive ranges
+fn consecutive_ranges(a: Vec<String>) -> Vec<String> {
+    let mut length = 1;
+    let mut list : Vec<String> = Vec::new();
+
+    fn str_diff(a: &String, b: &String) -> Option<usize> {
+        if a.len() == 0 || b.len() == 0 {
+            None
+        } else if a[1..] == b[1..] {
+            Some(a.chars().last().unwrap() as usize - b.chars().last().unwrap() as usize)
+        } else {
+            None
+        }
+    }
+
+    let (symbols, letters): (Vec<String>, Vec<String>) =
+        a.into_iter().partition(|s|s.chars().all(|c| !c.is_alphanumeric()));
+
+    if letters.len() == 0 {
+        return list;
+    }
+
+    // Traverse the array from first position
+    for i in 1 .. letters.len() {
+        if i == letters.len() || str_diff(&letters[i], &letters[i - 1]) != Some(1) {
+            if length == 1 {
+                list.push(String::from(letters[i - 1].clone()));
+            }
+            else {
+                list.push(letters[i - length].clone() + "-" + &letters[i - 1]);
+            }
+            length = 1;
+        }
+        else {
+            length = length + 1;
+        }
+    }
+
+    list.append(&mut (symbols.clone()));
+    return list;
+}
+
 #[cfg(feature = "plot")]
 impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA {
     fn nodes(&'a self) -> dot::Nodes<'a, Regex> {
@@ -52,7 +94,15 @@ impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA {
             .map(|((a,c),b)| ((a, b), c))
             .into_group_map()
             .into_iter()
-            .map(|((a, b), c)| (a, c.iter().sorted().join(","), b))
+            .map(|((a, b), c)| (a, consecutive_ranges(c.iter()
+                                    .map(|c|
+                                        if c.trim().is_empty() {
+                                            String::from("' '")
+                                        } else { c.clone() })
+                                    .sorted()
+                                    .collect())
+                                    .into_iter()
+                                    .join(", "), b))
             .collect()
     }
 
