@@ -4,10 +4,10 @@ use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{
     opt::reduce_linearities, trans::to_r1cs, Lc, ProverData, R1cs, VerifierData,
 };
+use factorial::Factorial;
 use ff::PrimeField;
 use fxhash::FxHashMap;
 use generic_array::typenum;
-use std::collections::HashSet;
 use neptune::{
     poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -19,6 +19,7 @@ use nova_snark::{
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 use rug::{integer::Order, rand::RandState, Integer};
+use std::collections::HashSet;
 
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
@@ -166,6 +167,44 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
     }
 
     l
+}
+
+// to compute g coeffs each sum check round
+// "mle" is coeffs of mle [const, ...]
+// "at" should be [rand_0, rand_i, ...., -1, {0,1}, {0,1} ...]
+// the -1 slot is the "hole" (this will only create a degree 1 univar poly)
+// returns [coeff (of "hole"), constant]
+// if there is no hole, this will return [0, full result]
+fn mle_partial_eval(mle: Vec<Integer>, at: Vec<&Integer>) -> Vec<Integer> {
+    let base: usize = 2;
+    assert_eq!(base.pow(at.len() as u32), mle.len()); // number of combos = coeffs
+                                                      // mle could potentially be computed faster w/better organization .... ugh. we could be optimizing this till we die
+                                                      // it's "prover work" tho, so whatever for now
+
+    let mut coeff = Integer::from(0);
+    let mut con = Integer::from(0);
+    for i in 0..(mle.len()) {
+        // for each term
+        let mut new_term = mle[i].clone();
+        let mut hole_included = false;
+        for j in 0..at.len() {
+            // for each possible var in this term
+            hole_included = hole_included || (at[j].clone() == -1);
+            if ((i / base.pow(j as u32)) % 2 == 1) && !hole_included {
+                // is this var in this term? AND is this var NOT the hole?
+                new_term = mul(&new_term, &at[j]);
+                // note this loop is never triggered for constant :)
+            }
+        }
+        // does this eval belong as a hole coeff? (does this term include the hole?)
+        if hole_included {
+            coeff = add(&coeff, &new_term);
+        } else {
+            con = add(&con, &new_term);
+        }
+    }
+
+    vec![coeff, con]
 }
 
 fn horners_eval(coeffs: Vec<Integer>, x_lookup: Integer) -> Integer {
@@ -421,7 +460,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Op::Eq,
                     vec![
                         new_var("round_num".to_owned()),
-                        new_const(self.doc.len() - 1),
+                        new_const(self.doc.len() - 1), // TODO make private
                     ],
                 ), // if in final round
                 term(Op::Eq, vec![vanishing_poly, new_const(0)]), // true -> check next_state (not) in final_states
@@ -703,11 +742,18 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             // next round
             state_i = next_state;
         }
-        // todo last state (?)
+        // TODO last state
+        v.push(Integer::from(1)); // dummy!! TODO
 
         // generate polynomial g's for sum check
         let mle_T = mle_from_pts(v);
-        for i in 0..self.batch_size + 1 {}
+        //let mut sc_rs = vec![];
+        for i in 0..self.batch_size + 1 {
+            // new sumcheck rand for the round
+            let rand = self.prover_random_from_seed(i as u64); // TODO make gen
+                                                               //sc_rs.push(rand);
+            wits.insert(format!("sc_r_{}", i), new_wit(rand));
+        }
 
         // generate sum check helper vals
 
@@ -1047,7 +1093,9 @@ mod tests {
                         &mul(&mul(&mul(&mle[7], &x), &y), &z),
                     );
 
+                    let mle_eval = mle_partial_eval(mle.clone(), vec![&z, &y, &x]);
                     assert_eq!(mle_out, uni_out);
+                    assert_eq!(mle_out, mle_eval[1]);
                 }
             }
         }

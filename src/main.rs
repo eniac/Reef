@@ -180,7 +180,7 @@ fn main() {
         );
         let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
 
-        println!("expected next hash in main {:#?}", expected_next_hash);
+        //println!("expected next hash in main {:#?}", expected_next_hash);
         sponge.finish(acc).unwrap(); // assert expected hash finished correctly
 
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(

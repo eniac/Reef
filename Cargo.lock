@@ -869,6 +869,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ba569491c70ec8471e34aa7e9c0b9e82bb5d2464c0398442d17d3c4af814e5a"
 
 [[package]]
+name = "factorial"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d18df35a8a0dadf5b6f2e12fcb1c8c041171065b3a31e4c5b8777ba449cb414a"
+dependencies = [
+ "num-traits",
+ "primal-sieve",
+]
+
+[[package]]
 name = "failure"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1068,6 +1078,12 @@ dependencies = [
  "rand_xorshift",
  "subtle",
 ]
+
+[[package]]
+name = "hamming"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65043da274378d68241eb9a8f8f8aa54e349136f7b8e12f63e3ef44043cc30e1"
 
 [[package]]
 name = "hashbrown"
@@ -1660,6 +1676,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "primal-bit"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ce4fe11b2a87850ca3bd5dc9c7cb9f66e32a09edab221be406ac5ff677f2241"
+dependencies = [
+ "hamming",
+]
+
+[[package]]
+name = "primal-estimate"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7374f14c76f23e1271e6be806981ac5dd9e52b59132b0a2f10bcc412495f9159"
+
+[[package]]
+name = "primal-sieve"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f2a14766f8c543620824b5b2cec356abf2681b76966a7ac4b4ed2c0011e696a"
+dependencies = [
+ "primal-bit",
+ "primal-estimate",
+ "smallvec",
+]
+
+[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1833,6 +1875,7 @@ dependencies = [
  "circ",
  "clap 4.1.8",
  "dot",
+ "factorial",
  "ff",
  "fil_pasta_curves",
  "fxhash",
@@ -2042,6 +2085,12 @@ dependencies = [
  "bitmaps",
  "typenum",
 ]
+
+[[package]]
+name = "smallvec"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
 name = "spin"
