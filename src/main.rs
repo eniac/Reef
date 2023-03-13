@@ -42,7 +42,7 @@ fn main() {
     let r = parse_regex(&opt.config);
 
     // Input document
-    let doc = read_from_config(&opt.config);
+    let doc: Vec<String> = read_from_config(&opt.config).chars().map(|c|c.to_string()).collect();
 
     // set up CirC library
     let mut circ: CircOpt = Default::default();
@@ -58,12 +58,12 @@ fn main() {
     #[cfg(feature = "plot")]
     plot::plot_dfa(&dfa).expect("Failed to plot DFA to a pdf file");
 
-    let num_steps = doc.chars().count(); // len of document
+    let num_steps = doc.len();
     println!("Doc len is {}", num_steps);
 
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
 
-    let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, sc.clone());
+    let mut r1cs_converter = R1CS::new(&dfa, &doc, 1, sc.clone());
     println!("generate commitment");
     r1cs_converter.gen_commitment();
     let (prover_data, _verifier_data) = r1cs_converter.to_r1cs();
@@ -123,7 +123,7 @@ fn main() {
     let mut current_state = dfa.get_init_state();
     let z0_primary = vec![
         <G1 as Group>::Scalar::from(current_state),
-        <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
+        <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0])),
         <G1 as Group>::Scalar::from(0),
         <G1 as Group>::Scalar::from(0),
     ];
@@ -157,10 +157,10 @@ fn main() {
 
         prover_data.r1cs.check_all(&extended_wit);
 
-        let current_char = doc.chars().nth(i).unwrap();
-        let mut next_char = '#';
+        let current_char = doc[i].clone();
+        let mut next_char: String = String::from("");
         if i + 1 < num_steps {
-            next_char = doc.chars().nth(i + 1).unwrap();
+            next_char = doc[i+1].clone();
         };
         //println!("next char = {}", next_char);
 
@@ -174,7 +174,7 @@ fn main() {
             2,
             &[
                 prev_hash,
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char)),
             ],
             acc,
         );
@@ -188,8 +188,8 @@ fn main() {
             Some(extended_wit),
             <G1 as Group>::Scalar::from(current_state),
             <G1 as Group>::Scalar::from(next_state),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(next_char)),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char)),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(&next_char)),
             <G1 as Group>::Scalar::from(prev_hash),
             <G1 as Group>::Scalar::from(expected_next_hash[0]),
             <G1 as Group>::Scalar::from(i as u64),

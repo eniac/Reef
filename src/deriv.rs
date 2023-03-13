@@ -10,12 +10,12 @@ pub fn nullable(r: &Regex) -> bool {
     }
 }
 
-pub fn deriv(c: char, r: &Regex) -> Regex {
+pub fn deriv(c: &String, r: &Regex) -> Regex {
     match &**r {
         RegexF::Nil => re::empty(),
         RegexF::Empty => re::empty(),
         RegexF::Dot => re::nil(),
-        RegexF::Char(x) if *x == c => re::nil(),
+        RegexF::Char(x) if x == c => re::nil(),
         RegexF::Char(_) => re::empty(),
         RegexF::Not(ref r) => re::not(deriv(c, r)),
         RegexF::App(ref a, ref b) if nullable(a) => {

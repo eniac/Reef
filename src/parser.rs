@@ -17,7 +17,7 @@ pub mod re {
         Nil,
         Empty,
         Dot,
-        Char(char),
+        Char(String),
         Not(Regex),
         App(Regex, Regex),
         Alt(Regex, Regex),
@@ -55,8 +55,8 @@ pub mod re {
         G.mk(RegexF::Empty)
     }
 
-    pub fn character(c: char) -> Regex {
-        G.mk(RegexF::Char(c))
+    pub fn character(c: String) -> Regex {
+        G.mk(RegexF::Char(c.clone()))
     }
 
     pub fn dot() -> Regex {
@@ -129,7 +129,7 @@ fn to_regex<'a>(h: &'a Hir, ab: &'a str) -> Regex {
         }
         Group(g) => to_regex(&g.hir, ab),
         Class(_) => re::dot(),
-        Literal(Unicode(c)) => re::character(*c),
+        Literal(Unicode(c)) => re::character(c.to_string()),
         _ => panic!("Unsupported regex {:?}", h),
     }
 }
