@@ -23,5 +23,6 @@ bitvec = "1"
 dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8", optional = true }
 
 [features]
+default = [ "plot"]
 plot = ["dep:dot"]
 

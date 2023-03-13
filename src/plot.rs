@@ -7,10 +7,10 @@ use std::io::Result;
 use crate::dfa::DFA;
 use crate::parser::re::Regex;
 
-type Ed = (Regex, Vec<char>, Regex);
+type Ed = (Regex, String, Regex);
 
 #[cfg(feature = "plot")]
-impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
+impl<'a> dot::Labeller<'a, Regex, Ed> for DFA {
     fn graph_id(&'a self) -> dot::Id<'a> {
         dot::Id::new("example").unwrap()
     }
@@ -23,7 +23,7 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
     fn node_style(&'a self, n: &Regex) -> dot::Style {
         let init = self.get_init_state();
         let finals = self.get_final_states();
-        let s = self.get_state_num(&n);
+        let s = self.get_state_num(&n).unwrap();
         if s == init && finals.contains(&s) {
             dot::Style::Filled
         } else if finals.contains(&s) {
@@ -36,21 +36,12 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
     }
 
     fn edge_label<'b>(&'b self, e: &Ed) -> dot::LabelText<'b> {
-        let mut comma_separated = String::new();
-
-        for num in &e.1[0..e.1.len() - 1] {
-            comma_separated.push_str(&num.to_string());
-            comma_separated.push_str(", ");
-        }
-
-        comma_separated.push_str(&e.1[e.1.len() - 1].to_string());
-
-        dot::LabelText::LabelStr(format!("{}", comma_separated).into())
+        dot::LabelText::LabelStr(format!("{}", e.1).into())
     }
 }
 
 #[cfg(feature = "plot")]
-impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA<'a> {
+impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA {
     fn nodes(&'a self) -> dot::Nodes<'a, Regex> {
         self.states.clone().into_keys().collect()
     }
@@ -58,10 +49,10 @@ impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA<'a> {
         self.trans
             .clone()
             .into_iter()
-            .map(|(a, c, b)| ((a, b), c))
+            .map(|((a,c),b)| ((a, b), c))
             .into_group_map()
             .into_iter()
-            .map(|((a, b), c)| (a, c, b))
+            .map(|((a, b), c)| (a, c.iter().sorted().join(","), b))
             .collect()
     }
 
