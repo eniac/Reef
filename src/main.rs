@@ -4,8 +4,8 @@ type G2 = pasta_curves::vesta::Point;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::target::r1cs::nova::*;
-use generic_array::typenum;
 use clap::{Args, Parser, Subcommand};
+use generic_array::typenum;
 use std::path::PathBuf;
 
 use neptune::{
@@ -19,15 +19,15 @@ use nova_snark::{
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 
+pub mod config;
 pub mod deriv;
 pub mod dfa;
 pub mod parser;
 pub mod r1cs;
-pub mod config;
 
+use crate::config::*;
 use crate::dfa::DFA;
 use crate::r1cs::*;
-use crate::config::*;
 
 #[cfg(feature = "plot")]
 pub mod plot;

@@ -1,8 +1,6 @@
 use crate::dfa::DFA;
 use circ::cfg::*;
-use circ::ir::opt::*;
-use circ::ir::proof::Constraints;
-use circ::ir::term::*;
+use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{
     opt::reduce_linearities, trans::to_r1cs, Lc, ProverData, R1cs, VerifierData,
 };
@@ -20,8 +18,7 @@ use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
-use rug::rand::RandState;
-use rug::Integer;
+use rug::{integer::Order, rand::RandState, Integer};
 
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
@@ -226,6 +223,10 @@ pub struct R1CS<'a, F: PrimeField> {
     dfa: &'a DFA<'a>,
     batching: JBatching,
     assertions: Vec<Term>,
+    // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
+    // the black box, and will not optimize them away"
+    // at the nova level, we will "reprivitize" everything, it's just important to see the hooks
+    // sticking out here
     pub_inputs: Vec<Term>,
     batch_size: usize,
     doc: String,
@@ -280,6 +281,21 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         println!("commitment = {:#?}", hash.clone());
         self.commitment = Some(hash[0]);
+    }
+
+    // seed Questions todo
+    fn prover_random_from_seed(&self, s: u64) -> Integer {
+        let mut seed = F::from(s); // TODO GEN
+        let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+        let acc = &mut ();
+        let parameter = IOPattern(vec![SpongeOp::Absorb(1), SpongeOp::Squeeze(1)]);
+
+        sponge.start(parameter, None, acc);
+        SpongeAPI::absorb(&mut sponge, 1, &[seed], acc);
+        let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
+        sponge.finish(acc).unwrap();
+
+        Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf)
     }
 
     fn lagrange_from_dfa(&self) -> Vec<Integer> {
@@ -440,7 +456,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // for use at the end of sum check
     // eq([x0,x1,x2...],[e0,e1,e2...])
     // m = dim of bool hypercube
-    fn bit_eq_circuit(&self, m: u64, q_name: String) -> Term {
+    fn bit_eq_circuit(&mut self, m: u64, q_name: String) -> Term {
         let mut eq = new_const(1); // dummy, not used
 
         for i in 0..m {
@@ -481,6 +497,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     ),
                 ],
             );
+
+            self.pub_inputs.push(new_var(format!("{}_q_{}", q_name, i)));
+            self.pub_inputs.push(new_var(format!("eq_j_{}", i)));
+
             if i == 0 {
                 eq = next;
             } else {
@@ -554,7 +574,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // generate v's
         let mut v = vec![];
 
-        // TODO pub inputs
+        // TODO pub inputs -> can make which priv?
         for i in 0..self.batch_size {
             self.pub_inputs.push(new_var(format!("state_{}", i)));
             self.pub_inputs.push(new_var(format!("char_{}", i)));
@@ -595,6 +615,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
             v.push(v_i);
         }
+        v.push(new_var(format!("v_for_T"))); // the optimization T(j) check
 
         // generate claim on lhs
         let mut lhs = horners_circuit_vars(&v, new_var(format!("claim_r")));
@@ -642,19 +663,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // TODO - what needs to be public?
 
         // generate claim r
-        /*let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
-            Strength::Standard,
-        );
-        let mut data = vec![<G1 as Group>::Scalar::zero(), <G1 as Group>::Scalar::zero()];
+        let claim_r = self.prover_random_from_seed(5); // TODO make general
 
-        let mut p = Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
-        let claim_r: <G1 as Group>::Scalar = p.hash();
-        */
-        // TODO GET INT wits.insert(format!("claim_r"), new_wit(claim_r));
+        wits.insert(format!("claim_r"), new_wit(claim_r));
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
         let mut state_i = current_state;
         let mut next_state = 0;
+        let mut v = vec![];
         for i in 0..self.batch_size {
             let c = self
                 .doc
@@ -666,16 +682,37 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             wits.insert(format!("state_{}", i), new_wit(state_i));
             wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(c)));
 
+            // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
+            v.push(add(
+                &add(
+                    &mul(
+                        &Integer::from(state_i),
+                        &mul(
+                            &Integer::from(self.dfa.nstates()),
+                            &Integer::from(self.dfa.ab.len()),
+                        ),
+                    ),
+                    &mul(
+                        &Integer::from(next_state),
+                        &Integer::from(self.dfa.ab.len()),
+                    ),
+                ),
+                &Integer::from(self.dfa.ab_to_num(c)),
+            ));
+
+            // next round
             state_i = next_state;
         }
         // todo last state (?)
 
         // generate polynomial g's for sum check
+        let mle_T = mle_from_pts(v);
+        for i in 0..self.batch_size + 1 {}
 
-        // generate sum check r's
+        // generate sum check helper vals
 
         // other
-        wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
+        // wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
 
         (wits, next_state)
     }
