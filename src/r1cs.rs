@@ -275,7 +275,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 acc,
             );
             hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            println!("intm hash out: {:#?}", hash);
             sponge.finish(acc).unwrap();
         }
         println!("commitment = {:#?}", hash.clone());
@@ -683,7 +682,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         current_state: u64,
     ) -> (FxHashMap<String, Value>, u64) {
         let doc_i = self.doc[round_num].clone();
-        let next_state = self.dfa.delta(&current_state, &doc_i).unwrap();
+        let next_state = self.dfa.delta(&current_state, &doc_i.clone()).unwrap();
 
         let values: FxHashMap<String, Value> = vec![
             ("round_num".to_owned(), new_wit(round_num)),
