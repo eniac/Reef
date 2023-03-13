@@ -1,4 +1,3 @@
-use crate::deriv::nullable;
 use crate::dfa::DFA;
 use circ::cfg::*;
 use circ::ir::opt::*;
@@ -10,9 +9,11 @@ use circ::target::r1cs::{
 use ff::PrimeField;
 use fxhash::FxHashMap;
 use generic_array::typenum;
-use itertools::Itertools;
+use std::collections::HashSet;
 use neptune::{
     poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
+    sponge::api::{IOPattern, SpongeAPI, SpongeOp},
+    sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
 use nova_snark::{
@@ -25,7 +26,7 @@ use rug::Integer;
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
-static POSEIDON_NUM: usize = 237;
+static POSEIDON_NUM: usize = 238; // jess took literal measurement and 238 is the real diff
 
 pub enum JBatching {
     NaivePolys,
@@ -101,9 +102,9 @@ fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
     return inv;
 }
 
-fn vanishing(xs: Vec<u64>) -> Vec<Integer> {
+fn vanishing(xs: HashSet<u64>) -> Vec<Integer> {
     let mut evals = vec![];
-    for xi in xs {
+    for xi in xs.into_iter() {
         evals.push((Integer::from(xi), Integer::from(0)));
     }
     // note we don't just want y = 0
@@ -260,14 +261,25 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn gen_commitment(&mut self) {
-        let mut hash = F::from(0);
+        let mut hash = vec![F::from(0)];
         for c in self.doc.chars() {
-            let mut data = vec![hash, F::from(self.dfa.ab_to_num(c))];
-            let mut p = Poseidon::<F, typenum::U2>::new_with_preimage(&data, &self.pc);
-            hash = p.hash();
+            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+            let acc = &mut ();
+
+            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+            sponge.start(parameter, None, acc);
+            SpongeAPI::absorb(
+                &mut sponge,
+                2,
+                &[hash[0], F::from(self.dfa.ab_to_num(c))],
+                acc,
+            );
+            hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            println!("intm hash out: {:#?}", hash);
+            sponge.finish(acc).unwrap();
         }
         println!("commitment = {:#?}", hash.clone());
-        self.commitment = Some(hash);
+        self.commitment = Some(hash[0]);
     }
 
     fn lagrange_from_dfa(&self) -> Vec<Integer> {
@@ -329,16 +341,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         return (prover_data, verifier_data);
     }
 
-    pub fn to_r1cs(&mut self, doc_length: usize) -> (ProverData, VerifierData) {
+    pub fn to_r1cs(&mut self) -> (ProverData, VerifierData) {
         match self.batching {
-            JBatching::NaivePolys => self.to_polys(doc_length),
-            JBatching::Nlookup => self.to_nlookup(doc_length),
+            JBatching::NaivePolys => self.to_polys(),
+            JBatching::Nlookup => self.to_nlookup(),
             JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
     // TODO batch size (1 currently)
-    fn to_polys(&mut self, doc_length: usize) -> (ProverData, VerifierData) {
+    fn to_polys(&mut self) -> (ProverData, VerifierData) {
         let coeffs = self.lagrange_from_dfa();
         //println!("lagrange coeffs {:#?}", coeffs);
 
@@ -368,15 +380,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // final state (non) match check
         let mut vanishing_poly;
-        let mut final_states = vec![];
-        let mut non_final_states = vec![];
-        for (k, v) in self.dfa.states.clone() {
-            if nullable(&k) {
-                final_states.push(v);
-            } else {
-                non_final_states.push(v);
-            }
-        }
+        let mut final_states = self.dfa.get_final_states();
+        let mut non_final_states = self.dfa.get_non_final_states();
 
         if self.is_match {
             //println!("MEMBERSHIP");
@@ -398,7 +403,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             vec![
                 term(
                     Op::Eq,
-                    vec![new_var("round_num".to_owned()), new_const(doc_length - 1)],
+                    vec![
+                        new_var("round_num".to_owned()),
+                        new_const(self.doc.len() - 1),
+                    ],
                 ), // if in final round
                 term(Op::Eq, vec![vanishing_poly, new_const(0)]), // true -> check next_state (not) in final_states
                 new_bool_const(true),                             // not in correct round
@@ -542,7 +550,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
-    pub fn to_nlookup(&mut self, doc_length: usize) -> (ProverData, VerifierData) {
+    pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
         // generate v's
         let mut v = vec![];
 
@@ -634,14 +642,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // TODO - what needs to be public?
 
         // generate claim r
-        let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
+        /*let pc = PoseidonConstants::<<G1 as Group>::Scalar, typenum::U2>::new_with_strength(
             Strength::Standard,
         );
         let mut data = vec![<G1 as Group>::Scalar::zero(), <G1 as Group>::Scalar::zero()];
 
         let mut p = Poseidon::<<G1 as Group>::Scalar, typenum::U2>::new_with_preimage(&data, &pc);
         let claim_r: <G1 as Group>::Scalar = p.hash();
-
+        */
         // TODO GET INT wits.insert(format!("claim_r"), new_wit(claim_r));
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
@@ -705,7 +713,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         if is_match {
             cost += dfa.get_final_states().len() + 3;
         } else {
-            cost += (dfa.nstates() - dfa.get_final_states().len()) + 3;
+            cost += dfa.get_non_final_states().len() + 3;
         }
 
         cost
@@ -816,7 +824,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 #[cfg(test)]
 mod tests {
 
-    use crate::deriv::*;
     use crate::dfa::DFA;
     use crate::parser::regex_parser;
     use crate::r1cs::*;
@@ -879,15 +886,15 @@ mod tests {
         //set_up_cfg("1019".to_owned());
 
         let r = regex_parser(&regex, &ab);
-        let mut dfa = DFA::new(&ab[..]);
-        mk_dfa(&r, &ab, &mut dfa);
+        let mut dfa = DFA::new(&ab[..], r);
         //println!("{:#?}", dfa);
 
         let mut chars = doc.chars();
         let num_steps = doc.chars().count();
 
-        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1);
-        let (prover_data, _) = r1cs_converter.to_r1cs(num_steps);
+        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
+        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, sc);
+        let (prover_data, _) = r1cs_converter.to_r1cs();
         let precomp = prover_data.clone().precompute;
         //println!("{:#?}", prover_data);
 
@@ -906,85 +913,13 @@ mod tests {
 
         println!(
             "cost model: {:#?}",
-            R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
+            R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
         );
         println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
         assert!(
             prover_data.r1cs.constraints().len()
-                <= R1CS::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
+                <= R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
         );
-    }
-
-    fn plookup_test_func_no_hash(ab: String, regex: String, doc: String) {
-        //set_up_cfg("1019".to_owned());
-
-        let r = regex_parser(&regex, &ab);
-        let mut dfa = DFA::new(&ab[..]);
-        mk_dfa(&r, &ab, &mut dfa);
-        //println!("{:#?}", dfa);
-
-        let mut chars = doc.chars();
-        let num_steps = doc.chars().count();
-
-        let mut r1cs_converter = R1CS::new(&dfa, doc, 1);
-        let (prover_data, _) = r1cs_converter.to_r1cs(num_steps);
-        let precomp = prover_data.clone().precompute;
-        println!("{:#?}", prover_data);
-
-        let mut current_state = dfa.get_init_state();
-
-        for i in 0..num_steps {
-            let (values, next_state) = r1cs_converter.gen_wit_i(i, current_state);
-            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-            let extd_val = precomp.eval(&values);
-
-            prover_data.r1cs.check_all(&extd_val);
-
-            // for next i+1 round
-            current_state = next_state;
-        }
-
-        println!(
-            "cost model: {:#?}",
-            R1CS::plookup_cost_model_nohash(&dfa, 1)
-        );
-        assert!(prover_data.r1cs.constraints().len() <= R1CS::plookup_cost_model_nohash(&dfa, 1));
-    }
-
-    fn nlookup_test_func(ab: String, regex: String, doc: String) {
-        //set_up_cfg("1019".to_owned());
-
-        let r = regex_parser(&regex, &ab);
-        let mut dfa = DFA::new(&ab[..]);
-        mk_dfa(&r, &ab, &mut dfa);
-        //println!("{:#?}", dfa);
-
-        let mut chars = doc.chars();
-        let num_steps = doc.chars().count();
-        /*
-                let (prover_data, _) = to_polys(&dfa, dfa.is_match(&doc), num_steps);
-                let precomp = prover_data.clone().precompute;
-                println!("{:#?}", prover_data);
-
-                let mut current_state = dfa.get_init_state();
-
-                for i in 0..num_steps {
-                    let (values, next_state) = gen_wit_i(&dfa, i, current_state, &doc);
-                    //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-                    let extd_val = precomp.eval(&values);
-
-                    prover_data.r1cs.check_all(&extd_val);
-
-                    // for next i+1 round
-                    current_state = next_state;
-                }
-
-                println!(
-                    "cost model: {:#?}",
-                    polys_cost_model(&dfa, dfa.is_match(&doc))
-                );
-                assert!(prover_data.r1cs.constraints().len() <= polys_cost_model(&dfa, dfa.is_match(&doc)));
-        */
     }
 
     #[test]

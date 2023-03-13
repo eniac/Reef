@@ -1,4 +1,3 @@
-use crate::dfa::DFA;
 use crate::parser::re::{self, Regex, RegexF};
 
 pub fn nullable(r: &Regex) -> bool {
@@ -28,19 +27,4 @@ pub fn deriv(c: char, r: &Regex) -> Regex {
     }
 }
 
-/// Top level, generate a DFA using derivatives [Owens et al. 06]
-pub fn mk_dfa(q: &Regex, ab: &String, d: &mut DFA) {
-    // Add to DFA if not already there
-    d.add_state(q);
 
-    // Explore derivatives
-    for c in ab.chars() {
-        let q_c = deriv(c, q);
-        d.add_transition(q, c, &q_c);
-        if d.contains_state(&q_c) {
-            continue;
-        } else {
-            mk_dfa(&q_c, ab, d);
-        }
-    }
-}
