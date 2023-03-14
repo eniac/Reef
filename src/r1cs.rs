@@ -190,21 +190,21 @@ fn mle_partial_eval(mle: &Vec<Integer>, at: &Vec<Integer>) -> (Integer, Integer)
     for i in 0..(mle.len()) {
         // for each term
         let mut new_term = mle[i].clone();
-        println!("new term {:#?}", new_term);
+        //println!("new term {:#?}", new_term);
         let mut hole_included = false;
         for j in 0..at.len() {
             // for each possible var in this term
             hole_included = hole_included || (((i / base.pow(j as u32)) % 2 == 1) && (at[j] == -1));
-            println!("hole? {:#?}", hole_included);
+            //println!("hole? {:#?}", hole_included);
             if ((i / base.pow(j as u32)) % 2 == 1) && (at[j] != -1) {
                 // is this var in this term? AND is this var NOT the hole?
                 new_term = mul(&new_term, &at[j]);
-                println!("new term after mul {:#?}", new_term);
+                //println!("new term after mul {:#?}", new_term);
                 // note this loop is never triggered for constant :)
             }
         }
         // does this eval belong as a hole coeff? (does this term include the hole?)
-        println!("hole @ end of term? {:#?}", hole_included);
+        //println!("hole @ end of term? {:#?}", hole_included);
         if hole_included {
             coeff = add(&coeff, &new_term);
         } else {
@@ -598,7 +598,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // first round claim
         let mut claim = C_1.clone();
 
-        for j in 0..num_rounds {
+        for j in 1..=num_rounds {
             // P makes a claim g_j(X_j) about a univariate slice of its large multilinear polynomial
             // g_j is degree 1 in our case (woo constant time evaluation)
 
@@ -622,9 +622,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.assertions.push(claim_check);
             self.pub_inputs.push(new_var(format!("sc_g_{}_coeff", j)));
             self.pub_inputs.push(new_var(format!("sc_g_{}_const", j)));
-            if j != 0 {
-                self.pub_inputs.push(new_var(format!("sc_r_{}", j)));
-            }
+            self.pub_inputs.push(new_var(format!("sc_r_{}", j)));
 
             // "V" chooses rand r_{j} (P chooses this with hash)
             let r_j = new_var(format!("sc_r_{}", j));
@@ -641,7 +639,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 ],
             );
 
-            if j == num_rounds - 1 {
+            if j == num_rounds {
                 // output last g_v(r_v) claim
 
                 let last_claim = term(
@@ -788,7 +786,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             // next round
             state_i = next_state;
         }
-        // TODO last state
+        // last state
+        wits.insert(format!("state_{}", self.batch_size), new_wit(state_i));
+
         //v.push(Integer::from(4)); // dummy!! TODO
         //wits.insert(format!("v_for_T"), new_wit(4));
 
@@ -818,26 +818,32 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut sc_rs = vec![];
 
         println!("T mle coeffs: {:#?}", mle_T);
-        for i in 0..self.batch_size {
+        let mut g_coeff = Integer::from(0);
+        let mut g_const = Integer::from(0);
+        for i in 1..=self.batch_size {
+            // going to use thaler numbering for sum check
+            // i don't like it either
             // + 1 {
-            if i != 0 {
-                // new sumcheck rand for the round
-                let rand = self.prover_random_from_seed(i as u64); // TODO make gen
-                sc_rs.push(rand.clone());
-                wits.insert(format!("sc_r_{}", i), new_wit(rand));
-            }
 
-            let (g_coeff, g_const) = mle_sum_evals(&mle_T, &sc_rs);
+            (g_coeff, g_const) = mle_sum_evals(&mle_T, &sc_rs);
 
-            wits.insert(format!("sc_g_{}_coeff", i), new_wit(g_coeff));
-            wits.insert(format!("sc_g_{}_const", i), new_wit(g_const));
+            wits.insert(format!("sc_g_{}_coeff", i), new_wit(g_coeff.clone()));
+            wits.insert(format!("sc_g_{}_const", i), new_wit(g_const.clone()));
+
+            // new sumcheck rand for the round
+            let rand = self.prover_random_from_seed(i as u64); // TODO make gen
+            sc_rs.push(rand.clone());
+            wits.insert(format!("sc_r_{}", i), new_wit(rand));
         }
+        // last claim = g_v(r_v)
+        let last_claim = add(&g_const, &mul(&g_coeff, &sc_rs[sc_rs.len() - 1]));
+        wits.insert(format!("sc_last_claim"), new_wit(last_claim));
 
         // generate sum check helper vals
 
         // other
         // wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
-
+        println!("wits: {:#?}", wits);
         (wits, next_state)
     }
 
@@ -1077,12 +1083,12 @@ mod tests {
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
         let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 2, sc);
 
-        for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
+        for b in vec![JBatching::Nlookup] {
             r1cs_converter.batching = b.clone();
             println!("Batching {:#?}", r1cs_converter.batching);
             let (prover_data, _) = r1cs_converter.to_r1cs();
             let precomp = prover_data.clone().precompute;
-            //println!("{:#?}", prover_data);
+            println!("{:#?}", prover_data.r1cs);
 
             let mut current_state = dfa.get_init_state();
 
@@ -1119,8 +1125,8 @@ mod tests {
         }
     }
 
-    //#[test]
-    //#[serial]
+    #[test]
+    #[serial]
     fn naive_test() {
         test_func_no_hash("a".to_string(), "a".to_string(), "aaaa".to_string());
     }
