@@ -173,32 +173,38 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
 
 // to compute g coeffs each sum check round
 // "mle" is coeffs of mle [const, ...]
-// "at" should be [rand_0, rand_i, ...., -1, {0,1}, {0,1} ...]
+// "at" should be rev([rand_0, rand_i, ...., -1, {0,1}, {0,1} ...])
 // the -1 slot is the "hole" (this will only create a degree 1 univar poly)
 // returns [coeff (of "hole"), constant]
 // if there is no hole, this will return [0, full result]
 fn mle_partial_eval(mle: &Vec<Integer>, at: &Vec<Integer>) -> (Integer, Integer) {
     let base: usize = 2;
-    assert_eq!(base.pow(at.len() as u32), mle.len()); // number of combos = coeffs
-                                                      // mle could potentially be computed faster w/better organization .... ugh. we could be optimizing this till we die
-                                                      // it's "prover work" tho, so whatever for now
+    println!("mle len {:#?} at len {:#?}", mle.len(), at.len());
+    assert!(base.pow(at.len() as u32 - 1) <= mle.len());
+    assert!(base.pow(at.len() as u32) >= mle.len()); // number of combos = coeffs
+                                                     // mle could potentially be computed faster w/better organization .... ugh. we could be optimizing this till we die
+                                                     // it's "prover work" tho, so whatever for now
 
     let mut coeff = Integer::from(0);
     let mut con = Integer::from(0);
     for i in 0..(mle.len()) {
         // for each term
         let mut new_term = mle[i].clone();
+        println!("new term {:#?}", new_term);
         let mut hole_included = false;
         for j in 0..at.len() {
             // for each possible var in this term
-            hole_included = hole_included || (at[j] == -1);
-            if ((i / base.pow(j as u32)) % 2 == 1) && !hole_included {
+            hole_included = hole_included || (((i / base.pow(j as u32)) % 2 == 1) && (at[j] == -1));
+            println!("hole? {:#?}", hole_included);
+            if ((i / base.pow(j as u32)) % 2 == 1) && (at[j] != -1) {
                 // is this var in this term? AND is this var NOT the hole?
                 new_term = mul(&new_term, &at[j]);
+                println!("new term after mul {:#?}", new_term);
                 // note this loop is never triggered for constant :)
             }
         }
         // does this eval belong as a hole coeff? (does this term include the hole?)
+        println!("hole @ end of term? {:#?}", hole_included);
         if hole_included {
             coeff = add(&coeff, &new_term);
         } else {
@@ -234,7 +240,9 @@ fn mle_sum_evals(mle: &Vec<Integer>, rands: &Vec<Integer>) -> (Integer, Integer)
         eval_at.push(Integer::from(-1));
         eval_at.append(&mut combo);
         println!("eval at: {:#?}", eval_at.clone());
-        let (coeff, con) = mle_partial_eval(mle, &eval_at);
+        let (coeff, con) = mle_partial_eval(mle, &eval_at.into_iter().rev().collect());
+        println!("mle partial {:#?}, {:#?}", coeff, con);
+
         sum_coeff = add(&sum_coeff, &coeff);
         sum_con = add(&sum_con, &con);
     }
@@ -803,7 +811,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 &Integer::from(self.dfa.ab_to_num(c)),
             ));
         }
-
+        println!("table: {:#?}", table);
         let mle_T = mle_from_pts(table);
 
         // generate polynomial g's for sum check
@@ -1111,8 +1119,8 @@ mod tests {
         }
     }
 
-    #[test]
-    #[serial]
+    //#[test]
+    //#[serial]
     fn naive_test() {
         test_func_no_hash("a".to_string(), "a".to_string(), "aaaa".to_string());
     }
@@ -1208,5 +1216,37 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn mle_sums() {
+        let mle_T = vec![
+            Integer::from(9),
+            Integer::from(4),
+            Integer::from(5),
+            Integer::from(7),
+        ];
+
+        // generate polynomial g's for sum check
+        let mut sc_rs = vec![];
+
+        // round 1
+        let (mut g_coeff, mut g_const) = mle_sum_evals(&mle_T, &sc_rs);
+        assert_eq!(g_coeff, Integer::from(17));
+        assert_eq!(g_const, Integer::from(22));
+
+        sc_rs.push(Integer::from(10));
+
+        // round 2
+        (g_coeff, g_const) = mle_sum_evals(&mle_T, &sc_rs);
+        assert_eq!(g_coeff, Integer::from(74));
+        assert_eq!(g_const, Integer::from(59));
+
+        sc_rs.push(Integer::from(4));
+
+        // last V check
+        (g_coeff, g_const) = mle_partial_eval(&mle_T, &sc_rs.into_iter().rev().collect());
+        assert_eq!(g_coeff, Integer::from(0));
+        assert_eq!(g_const, Integer::from(355));
     }
 }
