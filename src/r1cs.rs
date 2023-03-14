@@ -1,13 +1,14 @@
 use crate::dfa::DFA;
+use bitvec::prelude::*;
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{
     opt::reduce_linearities, trans::to_r1cs, Lc, ProverData, R1cs, VerifierData,
 };
-use factorial::Factorial;
 use ff::PrimeField;
 use fxhash::FxHashMap;
 use generic_array::typenum;
+use itertools::Itertools;
 use neptune::{
     poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -26,6 +27,7 @@ type G2 = pasta_curves::vesta::Point;
 
 static POSEIDON_NUM: usize = 238; // jess took literal measurement and 238 is the real diff
 
+#[derive(Debug, Clone)]
 pub enum JBatching {
     NaivePolys,
     Plookup,
@@ -175,7 +177,7 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
 // the -1 slot is the "hole" (this will only create a degree 1 univar poly)
 // returns [coeff (of "hole"), constant]
 // if there is no hole, this will return [0, full result]
-fn mle_partial_eval(mle: Vec<Integer>, at: Vec<&Integer>) -> Vec<Integer> {
+fn mle_partial_eval(mle: &Vec<Integer>, at: &Vec<Integer>) -> (Integer, Integer) {
     let base: usize = 2;
     assert_eq!(base.pow(at.len() as u32), mle.len()); // number of combos = coeffs
                                                       // mle could potentially be computed faster w/better organization .... ugh. we could be optimizing this till we die
@@ -189,7 +191,7 @@ fn mle_partial_eval(mle: Vec<Integer>, at: Vec<&Integer>) -> Vec<Integer> {
         let mut hole_included = false;
         for j in 0..at.len() {
             // for each possible var in this term
-            hole_included = hole_included || (at[j].clone() == -1);
+            hole_included = hole_included || (at[j] == -1);
             if ((i / base.pow(j as u32)) % 2 == 1) && !hole_included {
                 // is this var in this term? AND is this var NOT the hole?
                 new_term = mul(&new_term, &at[j]);
@@ -204,7 +206,40 @@ fn mle_partial_eval(mle: Vec<Integer>, at: Vec<&Integer>) -> Vec<Integer> {
         }
     }
 
-    vec![coeff, con]
+    (coeff, con)
+}
+
+// for sum check, computes the sum of many mle univar slices
+// takes mle coeffs, and rands = [r_0, r_1,...], leaving off the hole and x_i's
+fn mle_sum_evals(mle: &Vec<Integer>, rands: &Vec<Integer>) -> (Integer, Integer) {
+    let mut sum_coeff = Integer::from(0);
+    let mut sum_con = Integer::from(0);
+    let hole = rands.len();
+    let total = (mle.len() as f32).log2().ceil() as usize; // total # mle terms
+
+    println!("#r: {:#?}, #total: {:#?}", hole, total);
+
+    let num_x = total - hole - 1;
+    assert!(num_x >= 0, "batch size too small for nlookup");
+    let mut opts = vec![];
+    for i in 0..num_x {
+        opts.push(Integer::from(0));
+        opts.push(Integer::from(1));
+    }
+
+    for mut combo in opts.into_iter().permutations(num_x).unique() {
+        println!("combo: {:#?}", combo);
+
+        let mut eval_at = rands.clone();
+        eval_at.push(Integer::from(-1));
+        eval_at.append(&mut combo);
+        println!("eval at: {:#?}", eval_at.clone());
+        let (coeff, con) = mle_partial_eval(mle, &eval_at);
+        sum_coeff = add(&sum_coeff, &coeff);
+        sum_con = add(&sum_con, &con);
+    }
+    println!("mle sums {:#?}, {:#?}", sum_coeff, sum_con);
+    (sum_coeff, sum_con)
 }
 
 fn horners_eval(coeffs: Vec<Integer>, x_lookup: Integer) -> Integer {
@@ -579,7 +614,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.assertions.push(claim_check);
             self.pub_inputs.push(new_var(format!("sc_g_{}_coeff", j)));
             self.pub_inputs.push(new_var(format!("sc_g_{}_const", j)));
-            self.pub_inputs.push(new_var(format!("sc_r_{}", j)));
+            if j != 0 {
+                self.pub_inputs.push(new_var(format!("sc_r_{}", j)));
+            }
 
             // "V" chooses rand r_{j} (P chooses this with hash)
             let r_j = new_var(format!("sc_r_{}", j));
@@ -654,7 +691,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
             v.push(v_i);
         }
-        v.push(new_var(format!("v_for_T"))); // the optimization T(j) check
+        //v.push(new_var(format!("v_for_T"))); // the optimization T(j) check
 
         // generate claim on lhs
         let mut lhs = horners_circuit_vars(&v, new_var(format!("claim_r")));
@@ -662,6 +699,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // size of table (T -> mle)
         let sc_l = (self.dfa.trans.len() as f64).log2().ceil() as u64;
+        println!("table size: {}", self.dfa.trans.len());
         println!("sum check rounds: {}", sc_l);
 
         self.sum_check_circuit(lhs, sc_l);
@@ -669,12 +707,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // calculate eq's
         // TODO check ordering correct
         // TODO pub wits for eq circ
-        let mut eq_evals = vec![];
+        /*let mut eq_evals = vec![];
         for i in 0..v.len() {
             eq_evals.push(self.bit_eq_circuit(sc_l, format!("eq{}", i)));
         }
         horners_circuit_vars(&eq_evals, new_var(format!("claim_r")));
-
+        */
         // add last v_m+1 check (for T(j) optimization) - TODO
 
         self.r1cs_conv()
@@ -743,16 +781,48 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             state_i = next_state;
         }
         // TODO last state
-        v.push(Integer::from(1)); // dummy!! TODO
+        //v.push(Integer::from(4)); // dummy!! TODO
+        //wits.insert(format!("v_for_T"), new_wit(4));
+
+        println!("v: {:#?}", v.clone());
+
+        // generate T
+        let mut table = vec![];
+        for (ins, c, out) in self.dfa.deltas() {
+            table.push(add(
+                &add(
+                    &mul(
+                        &Integer::from(ins),
+                        &mul(
+                            &Integer::from(self.dfa.nstates()),
+                            &Integer::from(self.dfa.ab.len()),
+                        ),
+                    ),
+                    &mul(&Integer::from(out), &Integer::from(self.dfa.ab.len())),
+                ),
+                &Integer::from(self.dfa.ab_to_num(c)),
+            ));
+        }
+
+        let mle_T = mle_from_pts(table);
 
         // generate polynomial g's for sum check
-        let mle_T = mle_from_pts(v);
-        //let mut sc_rs = vec![];
-        for i in 0..self.batch_size + 1 {
-            // new sumcheck rand for the round
-            let rand = self.prover_random_from_seed(i as u64); // TODO make gen
-                                                               //sc_rs.push(rand);
-            wits.insert(format!("sc_r_{}", i), new_wit(rand));
+        let mut sc_rs = vec![];
+
+        println!("T mle coeffs: {:#?}", mle_T);
+        for i in 0..self.batch_size {
+            // + 1 {
+            if i != 0 {
+                // new sumcheck rand for the round
+                let rand = self.prover_random_from_seed(i as u64); // TODO make gen
+                sc_rs.push(rand.clone());
+                wits.insert(format!("sc_r_{}", i), new_wit(rand));
+            }
+
+            let (g_coeff, g_const) = mle_sum_evals(&mle_T, &sc_rs);
+
+            wits.insert(format!("sc_g_{}_coeff", i), new_wit(g_coeff));
+            wits.insert(format!("sc_g_{}_const", i), new_wit(g_const));
         }
 
         // generate sum check helper vals
@@ -867,6 +937,20 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         cost
     }
 
+    pub fn full_round_cost_model_nohash(
+        dfa: &'a DFA<'a>,
+        batch_size: usize,
+        lookup_type: JBatching,
+        is_match: bool,
+    ) -> usize {
+        let mut cost: usize = match lookup_type {
+            JBatching::NaivePolys => Self::naive_cost_model_nohash(dfa, is_match) * batch_size,
+            JBatching::Nlookup => Self::nlookup_cost_model_nohash(dfa, batch_size),
+            JBatching::Plookup => Self::plookup_cost_model_nohash(dfa, batch_size),
+        };
+        cost
+    }
+
     pub fn full_round_cost_model(
         dfa: &'a DFA<'a>,
         batch_size: usize,
@@ -912,15 +996,21 @@ mod tests {
     use crate::r1cs::*;
     use circ::cfg;
     use circ::cfg::CircOpt;
+    use serial_test::serial;
 
     fn set_up_cfg(m: String) {
-        let mut circ: CircOpt = Default::default();
-        circ.field.custom_modulus = m.into();
+        println!("cfg set? {:#?}", cfg::is_cfg_set());
+        if !cfg::is_cfg_set() {
+            let m = "1019".to_owned();
+            let mut circ: CircOpt = Default::default();
+            circ.field.custom_modulus = m.into();
 
-        cfg::set(&circ);
+            cfg::set(&circ);
+        }
     }
 
     #[test]
+    #[serial]
     fn basic_lg() {
         set_up_cfg("1019".to_owned());
         //set_up_cfg("79".to_owned());
@@ -944,8 +1034,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn lg_1() {
-        //set_up_cfg("1019".to_owned());
+        set_up_cfg("1019".to_owned());
 
         let points = vec![
             (Integer::from(1), Integer::from(2)),
@@ -965,7 +1056,7 @@ mod tests {
         assert_eq!(coeffs, expected);
     }
 
-    fn naive_test_func_no_hash(ab: String, regex: String, doc: String) {
+    fn test_func_no_hash(ab: String, regex: String, doc: String) {
         //set_up_cfg("1019".to_owned());
 
         let r = regex_parser(&regex, &ab);
@@ -976,77 +1067,93 @@ mod tests {
         let num_steps = doc.chars().count();
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
-        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, sc);
-        let (prover_data, _) = r1cs_converter.to_r1cs();
-        let precomp = prover_data.clone().precompute;
-        //println!("{:#?}", prover_data);
+        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 2, sc);
 
-        let mut current_state = dfa.get_init_state();
+        for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
+            r1cs_converter.batching = b.clone();
+            println!("Batching {:#?}", r1cs_converter.batching);
+            let (prover_data, _) = r1cs_converter.to_r1cs();
+            let precomp = prover_data.clone().precompute;
+            //println!("{:#?}", prover_data);
 
-        for i in 0..num_steps {
-            let (values, next_state) = r1cs_converter.gen_wit_i(i, current_state);
-            //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-            let extd_val = precomp.eval(&values);
+            let mut current_state = dfa.get_init_state();
 
-            prover_data.r1cs.check_all(&extd_val);
+            for i in 0..num_steps {
+                let (values, next_state) = r1cs_converter.gen_wit_i(i, current_state);
+                //println!("VALUES ROUND {:#?}: {:#?}", i, values);
+                let extd_val = precomp.eval(&values);
 
-            // for next i+1 round
-            current_state = next_state;
+                prover_data.r1cs.check_all(&extd_val);
+
+                // for next i+1 round
+                current_state = next_state;
+            }
+
+            println!(
+                "cost model: {:#?}",
+                R1CS::<<G1 as Group>::Scalar>::full_round_cost_model_nohash(
+                    &dfa,
+                    2,
+                    b.clone(),
+                    dfa.is_match(&doc)
+                )
+            );
+            println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
+            assert!(
+                prover_data.r1cs.constraints().len()
+                    <= R1CS::<<G1 as Group>::Scalar>::full_round_cost_model_nohash(
+                        &dfa,
+                        2,
+                        b.clone(),
+                        dfa.is_match(&doc)
+                    )
+            );
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn naive_test() {
+        test_func_no_hash("a".to_string(), "a".to_string(), "aaaa".to_string());
+    }
+    /*
+        #[test]
+        fn dfa_2() {
+            test_func_no_hash("ab".to_string(), "ab".to_string(), "ab".to_string());
+            test_func_no_hash("abc".to_string(), "ab".to_string(), "ab".to_string());
         }
 
-        println!(
-            "cost model: {:#?}",
-            R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
-        );
-        println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
-        assert!(
-            prover_data.r1cs.constraints().len()
-                <= R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&doc))
-        );
-    }
+        #[test]
+        fn dfa_star() {
+            test_func_no_hash("ab".to_string(), "a*b*".to_string(), "ab".to_string());
+            test_func_no_hash(
+                "ab".to_string(),
+                "a*b*".to_string(),
+                "aaaabbbbbbbbbbbbbb".to_string(),
+            );
+            test_func_no_hash(
+                "ab".to_string(),
+                "a*b*".to_string(),
+                "aaaaaaaaaaab".to_string(),
+            );
+        }
 
-    #[test]
-    fn naive_test() {
-        naive_test_func_no_hash("a".to_string(), "a".to_string(), "a".to_string());
-    }
+        #[test]
+        fn dfa_non_match() {
+            test_func_no_hash("ab".to_string(), "a".to_string(), "b".to_string());
+            test_func_no_hash(
+                "ab".to_string(),
+                "a*b*".to_string(),
+                "aaabaaaaaaaab".to_string(),
+            );
+        }
 
-    #[test]
-    fn dfa_2() {
-        naive_test_func_no_hash("ab".to_string(), "ab".to_string(), "ab".to_string());
-        naive_test_func_no_hash("abc".to_string(), "ab".to_string(), "ab".to_string());
-    }
-
-    #[test]
-    fn dfa_star() {
-        naive_test_func_no_hash("ab".to_string(), "a*b*".to_string(), "ab".to_string());
-        naive_test_func_no_hash(
-            "ab".to_string(),
-            "a*b*".to_string(),
-            "aaaabbbbbbbbbbbbbb".to_string(),
-        );
-        naive_test_func_no_hash(
-            "ab".to_string(),
-            "a*b*".to_string(),
-            "aaaaaaaaaaab".to_string(),
-        );
-    }
-
-    #[test]
-    fn dfa_non_match() {
-        naive_test_func_no_hash("ab".to_string(), "a".to_string(), "b".to_string());
-        naive_test_func_no_hash(
-            "ab".to_string(),
-            "a*b*".to_string(),
-            "aaabaaaaaaaab".to_string(),
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    fn dfa_bad_1() {
-        naive_test_func_no_hash("ab".to_string(), "a".to_string(), "c".to_string());
-    }
-
+        #[test]
+        #[should_panic]
+        fn dfa_bad_1() {
+            test_func_no_hash("ab".to_string(), "a".to_string(), "c".to_string());
+        }
+    */
     #[test]
     fn mle_1() {
         let mut rand = RandState::new();
@@ -1093,9 +1200,11 @@ mod tests {
                         &mul(&mul(&mul(&mle[7], &x), &y), &z),
                     );
 
-                    let mle_eval = mle_partial_eval(mle.clone(), vec![&z, &y, &x]);
+                    let vec = vec![z.clone(), y.clone(), x.clone()];
+                    let mle_eval = mle_partial_eval(&mle, &vec);
+
                     assert_eq!(mle_out, uni_out);
-                    assert_eq!(mle_out, mle_eval[1]);
+                    assert_eq!(mle_out, mle_eval.1);
                 }
             }
         }

@@ -21,7 +21,7 @@ neptune = "8.1.0"
 generic-array = "0.14.4"
 bitvec = "1"
 dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8", optional = true }
-factorial = "0.3.0"
+serial_test = "1.0.0"
 
 [features]
 plot = ["dep:dot"]

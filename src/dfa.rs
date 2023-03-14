@@ -34,19 +34,19 @@ impl<'a> DFA<'a> {
 
         // Recursive funtion
         fn mk_dfa(d: &mut DFA, q: &Regex) {
-          // Add to DFA if not already there
-          d.add_state(q);
+            // Add to DFA if not already there
+            d.add_state(q);
 
-          // Explore derivatives
-          for c in d.ab.chars() {
-              let q_c = deriv(c, q);
-              d.add_transition(q, c, &q_c);
-              if d.contains_state(&q_c) {
-                  continue;
-              } else {
-                  mk_dfa(d, &q_c);
-              }
-          }
+            // Explore derivatives
+            for c in d.ab.chars() {
+                let q_c = deriv(c, q);
+                d.add_transition(q, c, &q_c);
+                if d.contains_state(&q_c) {
+                    continue;
+                } else {
+                    mk_dfa(d, &q_c);
+                }
+            }
         }
 
         // Recursively build transitions
