@@ -36,13 +36,14 @@ fn main() {
     let opt = Options::parse();
 
     // Alphabet
-    let ab = String::from_iter(opt.config.get_alphabet());
+    let ab = String::from_iter(opt.config.alphabet());
 
-    // Regular expresion parser
-    let r = parse_regex(&opt.config);
+    // Regular expresion parser and convert the Regex to a DFA
+    let dfa = opt.config.compile_dfa();
+    println!("dfa: {:#?}", dfa);
 
     // Input document
-    let doc: Vec<String> = read_from_config(&opt.config).chars().map(|c|c.to_string()).collect();
+    let doc: Vec<String> = opt.config.read_doc().into_iter().map(|c|c.to_string()).collect();
 
     // set up CirC library
     let mut circ: CircOpt = Default::default();
@@ -51,9 +52,6 @@ fn main() {
                                                                                                 //"28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); // pallas curve (i think?)
     cfg::set(&circ);
 
-    // Convert the Regex to a DFA
-    let dfa = DFA::new(&ab[..], r);
-    println!("dfa: {:#?}", dfa);
 
     #[cfg(feature = "plot")]
     plot::plot_dfa(&dfa).expect("Failed to plot DFA to a pdf file");

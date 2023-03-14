@@ -1,13 +1,13 @@
 use std::fs::File;
 use std::io::{BufReader, Read};
-use bitvec::prelude::*;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 
-use crate::parser::{regex_parser, re :: *};
+use crate::parser::{regex_parser, re};
+use crate::dfa::DFA;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -37,7 +37,14 @@ pub enum Config {
         #[arg(short = 'i', long, value_name = "FILE")]
         inp: PathBuf,
     },
-    #[clap(about = "Accepts DNA base encoded binary files (2-bits/base)")]
+    #[clap(about = "Accepts .pcap files and Snort rules")]
+    Snort {
+        #[arg(short = 'r', long = "rules", value_name = "FILE", help = "Snort rule file")]
+        rulesfile: PathBuf,
+        #[arg(short = 'i', long = "input", value_name = "FILE", help = "Pcap file")]
+        pcapfile: PathBuf
+    },
+    #[clap(about = "Accepts DNA base ASCII files")]
     Dna {
         #[arg(short = 'r', long)]
         re: String,
@@ -61,47 +68,45 @@ pub enum CharTransform {
     CaseInsensitive
 }
 
+/// Top level
 impl Config {
-    // Number of bits in each segment
-    fn nbits(&self) -> usize {
+    pub fn read_doc(&self) -> Vec<char> {
         match self {
-            Config::Ascii { .. } => 8,
-            Config::Utf8 { .. } => 32,
-            Config::Dna { .. } => 2,
-            Config::Auto { .. } => 8
+            Config::Ascii { inp, .. } => self.read_file(inp),
+            Config::Utf8 { inp, .. } => self.read_file(inp),
+            Config::Dna { inp, .. } => self.read_file(inp),
+            Config::Auto { inp, .. } => self.read_file(inp),
+            Config::Snort { .. } => Vec::new() // TODO
         }
     }
 
-    fn filename(&self) -> &PathBuf {
-        match self {
-            Config::Ascii { inp, .. } => inp,
-            Config::Utf8 { inp, .. } => inp,
-            Config::Dna { inp, .. } => inp,
-            Config::Auto { inp, .. } => inp
-        }
-    }
-}
-
-pub fn parse_regex(conf: &Config) -> Regex {
-        let ab = String::from_iter(conf.get_alphabet());
-        match conf {
+    pub fn compile_dfa(&self) -> DFA {
+        let ab = String::from_iter(self.alphabet());
+        let re = match self {
             Config::Ascii { re, .. } => regex_parser(re, &ab),
             Config::Utf8 { re, .. } => regex_parser(re, &ab),
             Config::Dna { re, .. } => regex_parser(re, &ab),
             Config::Auto { re, .. } => regex_parser(re, &ab),
-        }
+            Config::Snort { .. } => re::empty() // TODO
+        };
+        DFA::new(&ab, re)
+    }
 }
 
-
-// #[clap(value_enum, default_value_t=CharTransform::NoTransform)]
 /// Define how to encode a Datatype
-/// preserves length.
 pub trait Encoder<I, F> {
     fn alphabet(&self, s: &Vec<I>) -> Vec<F>;
     fn apply(&self, s: I) -> Option<F>;
+    fn priority(&self) -> usize;
     fn get_alphabet(&self) -> Vec<F> {
         self.alphabet(&Vec::new())
     }
+}
+
+/// How to read an input file
+pub trait BaseParser<F> {
+    fn alphabet(&self) -> Vec<F>;
+    fn read_file(&self, file: &PathBuf) -> Vec<F>;
 }
 
 /// Encoders are compositional like functions
@@ -113,60 +118,97 @@ struct Compose <'a, A, B, C, F, G> where F: Encoder<A,B>, G: Encoder<B,C> {
     ghost_c: PhantomData<C>
 }
 
+/// BaseParsers can be composed with encoders
+struct ComposeBase <'a, A, B, F, G> where F: BaseParser<A>, G: Encoder<A,B> {
+    f: &'a F, g: &'a G,
+    ghost_a: PhantomData<A>,
+    ghost_b: PhantomData<B>
+}
+
+
+/// Compose encoders (ctor)
 impl<'a, A, B, C, F, G> Compose <'a, A, B, C, F, G> where F: Encoder<A,B>, G: Encoder<B,C> {
     fn new(f: &'a F, g: &'a G) -> Self {
         Self { f, g, ghost_a: PhantomData, ghost_b: PhantomData, ghost_c: PhantomData }
     }
 }
 
+/// Compose encoders (semantics)
 impl<'a, A, B, C, F: Encoder<A,B>, G: Encoder<B,C>> Encoder<A,C> for Compose<'a, A, B, C, F, G> {
     fn alphabet(&self, s: &Vec<A>) -> Vec<C> { self.g.alphabet(&self.f.alphabet(s)) }
+    fn priority(&self) -> usize { self.f.priority().max(self.g.priority()) }
     fn apply(&self, s: A) -> Option<C> {
         self.f.apply(s).and_then(|c| self.g.apply(c))
     }
 }
 
-/// Encoder for ascii char
-struct AsciiEncoder;
-impl Encoder<u32,char> for AsciiEncoder {
-    fn alphabet(&self, s: &Vec<u32>) -> Vec<char> {
-        (0..127)
-            .filter_map(std::char::from_u32)
-            .collect()
-    }
-
-    fn apply(&self, s: u32) -> Option<char> {
-        std::char::from_u32(s)
+/// Compose base parsers + encoders (ctor)
+impl<'a, A, B, F, G> ComposeBase <'a, A, B, F, G> where F: BaseParser<A>, G: Encoder<A,B> {
+    fn new(f: &'a F, g: &'a G) -> Self {
+        Self { f, g, ghost_a: PhantomData, ghost_b: PhantomData }
     }
 }
 
-/// Encoder for UTF8 char
-struct Utf8Encoder;
-impl Encoder<u32,char> for Utf8Encoder {
-    fn alphabet(&self, s: &Vec<u32>) -> Vec<char> {
+/// Compose base parsers + encoders (semantics)
+impl<'a, A, B, F: BaseParser<A>, G: Encoder<A,B>> BaseParser<B> for ComposeBase<'a, A, B, F, G> {
+    fn alphabet(&self) -> Vec<B> { self.g.alphabet(&self.f.alphabet()) }
+    fn read_file(&self, file: &PathBuf) -> Vec<B> {
+        self.f.read_file(file).into_iter().filter_map(|c| self.g.apply(c)).collect()
+    }
+}
+
+/// Parser for ASCII files
+struct AsciiParser;
+impl BaseParser<char> for AsciiParser {
+    fn alphabet(&self) -> Vec<char> {
+        (0..128)
+            .filter_map(std::char::from_u32)
+            .collect()
+    }
+    fn read_file(&self, file: &PathBuf) -> Vec<char> {
+        let f = File::open(file).expect("Could not read document");
+        let mut reader = BufReader::new(f);
+        let mut buffer: Vec<u8> = Vec::new();
+        // Read file into vector.
+        reader.read_to_end(&mut buffer);
+        buffer.into_iter().map(|i| i as char).collect()
+    }
+}
+
+/// Parser for UTF8 files
+struct Utf8Parser;
+impl BaseParser<char> for Utf8Parser {
+    fn alphabet(&self) -> Vec<char> {
         (0..=0x10FFFF)
             .filter_map(std::char::from_u32)
             .collect()
     }
-    fn apply(&self, s: u32) -> Option<char> {
-        std::char::from_u32(s)
+    fn read_file(&self, file: &PathBuf) -> Vec<char> {
+        std::fs::read_to_string(file)
+            .expect("file not found!")
+            .chars()
+            .collect()
     }
 }
 
-/// Take two bits into DNA bases
-struct DnaEncoder;
-impl Encoder<u32,char> for DnaEncoder {
-    fn alphabet(&self, s: &Vec<u32>) -> Vec<char> {
+/// Read Ascii encoded DNA bases
+struct DnaParser;
+impl BaseParser<char> for DnaParser {
+    fn alphabet(&self) -> Vec<char> {
         vec!['A', 'C', 'G', 'T']
     }
-    fn apply(&self, s: u32) -> Option<char> {
-        self.get_alphabet().get(s as usize).map(|c| c.clone())
+    fn read_file(&self, file: &PathBuf) -> Vec<char> {
+        let doc = AsciiParser.read_file(file);
+        for c in doc.iter() {
+            assert!(self.alphabet().contains(&c), "{} not in the alphabet {:?}", c, self.alphabet());
+        }
+        doc
     }
 }
 
 /// Automatically infer the alphabet from the alphanumeric chars of the regex
-struct AutoEncoder { ab: Vec<char> }
-impl AutoEncoder {
+struct AutoParser { ab: Vec<char> }
+impl AutoParser {
     fn new(inp: &PathBuf, re: &String) -> Self {
         let docab = std::fs::read_to_string(inp)
             .expect("Could not read document")
@@ -182,18 +224,18 @@ impl AutoEncoder {
     }
 }
 
-impl Encoder<u32,char> for AutoEncoder {
-    fn alphabet(&self, s: &Vec<u32>) -> Vec<char> {
+impl BaseParser<char> for AutoParser {
+    fn alphabet(&self) -> Vec<char> {
         self.ab.clone()
     }
-    fn apply(&self, s: u32) -> Option<char> {
-        let ab = self.get_alphabet();
-        let c = std::char::from_u32(s).unwrap();
-        assert!(ab.contains(&c), "{} not in the alphabet {:?}", c, ab);
-        Some(c)
+    fn read_file(&self, file: &PathBuf) -> Vec<char> {
+        let doc = Utf8Parser.read_file(file);
+        for c in doc.iter() {
+            assert!(self.ab.contains(&c), "{} not in the alphabet {:?}", c, self.ab);
+        }
+        doc
     }
 }
-
 
 ////////////////////////////////////////////////////////////
 ////////////////////// TRANSFORMATIONS /////////////////////
@@ -211,6 +253,7 @@ impl Encoder<char,char> for AlphaNumericEncoder {
             .chain(numbers.into_iter())
             .collect()
     }
+    fn priority(&self) -> usize { 99999 }
     fn apply(&self, s: char) -> Option<char> {
         if self.get_alphabet().contains(&s) {
             Some(s)
@@ -228,6 +271,7 @@ impl Encoder<char,char> for IgnoreWhitespaceEncoder {
          .filter(|c| !c.is_whitespace())
          .collect()
     }
+    fn priority(&self) -> usize { 100 }
     fn apply(&self, s: char) -> Option<char> {
         if s.is_whitespace() { None } else { Some(s) }
     }
@@ -241,6 +285,7 @@ impl Encoder<char,char> for CaseInsensitiveEncoder {
          .filter(|c| !c.is_ascii_lowercase())
          .collect()
     }
+    fn priority(&self) -> usize { 200 }
     fn apply(&self, s: char) -> Option<char> {
         Some(s.to_ascii_uppercase())
     }
@@ -260,7 +305,7 @@ impl Encoder<char,char> for BasicEnglishEncoder {
       v.append(&mut whitespace);
       v
     }
-
+    fn priority(&self) -> usize { 999999 }
     fn apply(&self, s: char) -> Option<char> {
         if self.get_alphabet().contains(&s) {
             Some(s)
@@ -274,10 +319,18 @@ impl Encoder<char,char> for BasicEnglishEncoder {
 impl Encoder<char,char> for &CharTransform {
     fn alphabet(&self, s: &Vec<char>) -> Vec<char> {
         match self {
-            CharTransform::AlphaNumeric => AlphaNumericEncoder.get_alphabet(),
+            CharTransform::AlphaNumeric => AlphaNumericEncoder.alphabet(s),
             CharTransform::IgnoreWhitespace => IgnoreWhitespaceEncoder.alphabet(s),
             CharTransform::CaseInsensitive => CaseInsensitiveEncoder.alphabet(s),
             CharTransform::BasicEnglish => BasicEnglishEncoder.alphabet(s),
+        }
+    }
+    fn priority(&self) -> usize {
+        match self {
+            CharTransform::AlphaNumeric => AlphaNumericEncoder.priority(),
+            CharTransform::IgnoreWhitespace => IgnoreWhitespaceEncoder.priority(),
+            CharTransform::CaseInsensitive => CaseInsensitiveEncoder.priority(),
+            CharTransform::BasicEnglish => BasicEnglishEncoder.priority()
         }
     }
     fn apply(&self, s: char) -> Option<char> {
@@ -294,50 +347,34 @@ impl Encoder<char,char> for &Vec<CharTransform> {
     fn alphabet(&self, s: &Vec<char>) -> Vec<char> {
        self.iter().fold(s.clone(), |acc, enc| enc.alphabet(&acc))
     }
+    fn priority(&self) -> usize {
+       self.iter().fold(0, |acc, enc| enc.priority().max(acc))
+    }
     fn apply(&self, s: char) -> Option<char> {
        self.iter().fold(Some(s), |acc, enc| acc.and_then(|c| enc.apply(c)))
     }
 }
 
 /// One more disjoint union, Config is an encoder
-impl Encoder<u32, char> for Config {
-    fn alphabet(&self, s: &Vec<u32>) -> Vec<char> {
+impl BaseParser<char> for Config {
+    fn alphabet(&self) -> Vec<char> {
       match self {
-          Config::Ascii { trs, .. } => Compose::new(&AsciiEncoder, &trs).get_alphabet(),
-          Config::Utf8 { trs, .. } => Compose::new(&Utf8Encoder, &trs).get_alphabet(),
-          Config::Dna { .. } => DnaEncoder.get_alphabet(),
-          Config::Auto { re, inp, .. } => AutoEncoder::new(inp, re).get_alphabet()
+          Config::Ascii { trs, .. } => ComposeBase::new(&AsciiParser, &trs).alphabet(),
+          Config::Utf8 { trs, .. } => ComposeBase::new(&Utf8Parser, &trs).alphabet(),
+          Config::Dna { .. } => DnaParser.alphabet(),
+          Config::Auto { re, inp, .. } => AutoParser::new(inp, re).alphabet(),
+          Config::Snort { .. } => Vec::new() // TODO
       }
     }
 
-    fn apply(&self, s: u32) -> Option<char> {
+    fn read_file(&self, file: &PathBuf) -> Vec<char> {
       match self {
-          Config::Ascii { trs, .. } => Compose::new(&AsciiEncoder, &trs).apply(s),
-          Config::Utf8 { trs, .. } => Compose::new(&Utf8Encoder, &trs).apply(s),
-          Config::Dna { .. } => DnaEncoder.apply(s),
-          Config::Auto { re, inp, .. } => AutoEncoder::new(inp,re).apply(s)
+          Config::Ascii { trs, .. } => ComposeBase::new(&AsciiParser, &trs).read_file(file),
+          Config::Utf8 { trs, .. } => ComposeBase::new(&Utf8Parser, &trs).read_file(file),
+          Config::Dna { .. } => DnaParser.read_file(file),
+          Config::Auto { re, inp, .. } => AutoParser::new(inp,re).read_file(file),
+          Config::Snort { .. } => Vec::new() // TODO
       }
     }
 }
 
-/// Define how to deserialize a file
-pub fn read_from_config(conf: &Config) -> String {
-    // Start buffering
-    let filename = conf.filename();
-    let file = File::open(filename).expect("Unable to open input file");
-    let mut buf_reader = BufReader::new(file);
-    let mut buffer = [0u8];
-    let mut bit_vec = BitVec::<u8, Lsb0>::new();
-    loop {
-        match buf_reader.read(&mut buffer) {
-            Ok(0) => break,
-            Ok(_) => if buffer[0] != 0x0a {
-                bit_vec.extend_from_raw_slice(&buffer)
-            },
-            Err(_) => panic!("Failed to read file {}.", filename.display()),
-        }
-    }
-    String::from_iter(bit_vec.as_bitslice()
-           .chunks(conf.nbits())
-           .filter_map(|chunk| conf.apply(chunk.load_le::<u32>())))
-}
