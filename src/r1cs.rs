@@ -328,7 +328,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         println!("Match? {:#?}", is_match);
 
         // run cost model (with Poseidon) to decide batching
-        let batching: JBatching = Self::opt_cost_model_select(&dfa, batch_size, dfa.is_match(&doc));
+        let batching: JBatching = Self::opt_cost_model_select(&dfa, batch_size,batch_size, dfa.is_match(&doc));
 
         Self {
             dfa,
@@ -980,10 +980,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         cost
     }
 
-    pub fn opt_cost_model_select(dfa: &'a DFA<'a>, batch_size: usize, is_match: bool) -> JBatching {
+    pub fn opt_cost_model_select_with_batch(dfa: &'a DFA<'a>, batch_size: usize, is_match: bool) -> (JBatching, usize) {
         let mut opt_batching: JBatching = JBatching::NaivePolys;
-        let mut cost: usize =
-            Self::full_round_cost_model(dfa, batch_size, JBatching::NaivePolys, is_match);
+        let mut cost:usize = Self::full_round_cost_model(dfa, batch_size, JBatching::NaivePolys, is_match);
 
         if cost < 10000 {
             cost = 10000
@@ -997,6 +996,21 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         if Self::full_round_cost_model(dfa, batch_size, JBatching::Plookup, is_match) < cost {
             cost = Self::full_round_cost_model(dfa, batch_size, JBatching::Plookup, is_match);
             opt_batching = JBatching::Plookup;
+        }
+
+        (opt_batching,cost)
+    }
+
+    pub fn opt_cost_model_select(dfa: &'a DFA<'a>, batch_range_lower: usize, batch_range_upper: usize, is_match: bool) -> JBatching {
+        let mut opt_batching: JBatching = JBatching::NaivePolys;
+        let mut cost:usize = Self::full_round_cost_model(dfa, 2<< batch_range_lower, JBatching::NaivePolys, is_match);
+
+        for n in batch_range_lower..batch_range_upper+1 {
+            let mut batching_and_cost:(JBatching, usize) = Self::opt_cost_model_select_with_batch(dfa,2<<n, is_match);
+            if batching_and_cost.1 < cost { 
+                cost = batching_and_cost.1; 
+                opt_batching = batching_and_cost.0;
+            }
         }
         opt_batching
     }
