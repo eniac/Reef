@@ -19,9 +19,8 @@ use nova_snark::{
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 
-pub mod deriv;
 pub mod dfa;
-pub mod parser;
+pub mod regex;
 pub mod r1cs;
 pub mod config;
 

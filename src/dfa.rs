@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Result};
 
-use crate::deriv::{deriv, nullable};
-use crate::parser::re::Regex;
+use crate::regex::Regex;
 
 #[derive(Debug)]
 pub struct DFA {
@@ -36,7 +35,7 @@ impl DFA {
 
           // Explore derivatives
           for c in &ab[..] {
-              let q_c = deriv(&c, q);
+              let q_c = q.deriv(&c);
               trans.insert((q.clone(), c.clone()), q_c.clone());
               if states.contains_key(&q_c) {
                   continue;
@@ -91,7 +90,7 @@ impl DFA {
         self.states
             .clone()
             .into_iter()
-            .filter_map(|(k, v)| if nullable(&k) { Some(v) } else { None })
+            .filter_map(|(k, v)| if k.nullable() { Some(v) } else { None })
             .collect()
     }
 
@@ -100,7 +99,7 @@ impl DFA {
         self.states
             .clone()
             .into_iter()
-            .filter_map(|(k, v)| if nullable(&k) { None } else { Some(v) })
+            .filter_map(|(k, v)| if k.nullable() { None } else { Some(v) })
             .collect()
     }
 
@@ -188,13 +187,12 @@ impl DFA {
 
 #[cfg(test)]
 mod tests {
-
     use crate::dfa::DFA;
-    use crate::parser::regex_parser;
+    use crate::regex::Regex;
 
     fn set_up_delta_test(r: &str, alpha: &str, tocheck: &str) -> bool {
         let ab = String::from(alpha);
-        let regex = regex_parser(&String::from(r), &ab);
+        let regex = Regex::new(r);
         let input : Vec<String> = tocheck.chars().map(|c| c.to_string()).collect();
 
         let mut dfa = DFA::new(&ab[..], regex);

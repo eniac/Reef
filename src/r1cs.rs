@@ -820,7 +820,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 mod tests {
 
     use crate::dfa::DFA;
-    use crate::parser::regex_parser;
+    use crate::regex::Regex;
     use crate::r1cs::*;
     use circ::cfg;
     use circ::cfg::CircOpt;
@@ -877,10 +877,10 @@ mod tests {
         assert_eq!(coeffs, expected);
     }
 
-    fn naive_test_func_no_hash(ab: String, regex: String, doc: String) {
+    fn naive_test_func_no_hash(ab: String, rstr: String, doc: String) {
         //set_up_cfg("1019".to_owned());
 
-        let r = regex_parser(&regex, &ab);
+        let r = Regex::new(&rstr);
         let mut dfa = DFA::new(&ab[..], r);
         //println!("{:#?}", dfa);
 

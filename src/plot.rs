@@ -5,7 +5,7 @@ use std::process::{Command, ExitStatus};
 use std::io::Result;
 
 use crate::dfa::DFA;
-use crate::parser::re::Regex;
+use crate::regex::Regex;
 
 type Ed = (Regex, String, Regex);
 

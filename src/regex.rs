@@ -33,7 +33,7 @@ use core::fmt::Formatter;
 
 impl fmt::Display for Regex {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self.0 {
+        match &*self.0 {
             RegexF::Nil => write!(f, "ε"),
             RegexF::Empty => write!(f, "∅"),
             RegexF::Dot => write!(f, "."),
@@ -47,7 +47,7 @@ impl fmt::Display for Regex {
 }
 
 impl Regex {
-    fn new<'a>(r: &'a str) -> Self {
+    pub fn new<'a>(r: &'a str) -> Self {
         fn to_regex<'a>(h: &'a Hir) -> Regex {
             match h.kind() {
                 Concat(l) => l
@@ -98,7 +98,7 @@ impl Regex {
     }
 
     pub fn app(a: Regex, b: Regex) -> Regex {
-        match (*a.0, *b.0) {
+        match (&*a.0, &*b.0) {
             (RegexF::App(x, y), _) => Regex::app(x.clone(), Regex::app(y.clone(), b)),
             (_, RegexF::Nil) => a,
             (RegexF::Nil, _) => b,
@@ -109,7 +109,7 @@ impl Regex {
     }
 
     pub fn alt(a: Regex, b: Regex) -> Regex {
-        match (*a.0, *b.0) {
+        match (&*a.0, &*b.0) {
             (x, y) if x == y => a,
             (RegexF::Alt(x, y), _) => Regex::alt(x.clone(), Regex::alt(y.clone(), b)),
             (RegexF::Not(inner), _) if *inner.0 == RegexF::Empty => Regex(G.mk(RegexF::Not(Regex::empty()))),
@@ -123,7 +123,7 @@ impl Regex {
     }
 
     pub fn star(a: Regex) -> Regex {
-        match *a.0 {
+        match &*a.0 {
             RegexF::Star(_) | RegexF::Nil => a,
             RegexF::Empty => Regex::nil(),
             _ => Regex(G.mk(RegexF::Star(a))),
@@ -131,9 +131,36 @@ impl Regex {
     }
 
     pub fn not(a: Regex) -> Regex {
-        match *a.0 {
+        match &*a.0 {
             RegexF::Not(a) => a.clone(),
             _ => Regex(G.mk(RegexF::Not(a))),
+        }
+    }
+
+    pub fn nullable(&self) -> bool {
+        match *self.0 {
+            RegexF::Nil | RegexF::Star(_) => true,
+            RegexF::Empty | RegexF::Char(_) | RegexF::Dot => false,
+            RegexF::Not(ref r) => !r.nullable(),
+            RegexF::App(ref a, ref b) => a.nullable() && b.nullable(),
+            RegexF::Alt(ref a, ref b) => a.nullable() || b.nullable(),
+        }
+    }
+
+    pub fn deriv(&self, c: &String) -> Regex {
+        match *self.0 {
+            RegexF::Nil => Regex::empty(),
+            RegexF::Empty => Regex::empty(),
+            RegexF::Dot => Regex::nil(),
+            RegexF::Char(ref x) if x == c => Regex::nil(),
+            RegexF::Char(_) => Regex::empty(),
+            RegexF::Not(ref r) => Regex::not(r.deriv(c)),
+            RegexF::App(ref a, ref b) if a.nullable() => {
+                Regex::alt(Regex::app(a.deriv(c), b.clone()), b.deriv(c))
+            }
+            RegexF::App(ref a, ref b) => Regex::app(a.deriv(c), b.clone()),
+            RegexF::Alt(ref a, ref b) => Regex::alt(a.deriv(c), b.deriv(c)),
+            RegexF::Star(ref a) => Regex::app(a.deriv(c), Regex::star(a.clone())),
         }
     }
 }

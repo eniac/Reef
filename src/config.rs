@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 
-use crate::parser::{regex_parser, re};
+use crate::regex::Regex;
 use crate::dfa::DFA;
 
 #[derive(Parser)]
@@ -83,11 +83,11 @@ impl Config {
     pub fn compile_dfa(&self) -> DFA {
         let ab = String::from_iter(self.alphabet());
         let re = match self {
-            Config::Ascii { re, .. } => regex_parser(re, &ab),
-            Config::Utf8 { re, .. } => regex_parser(re, &ab),
-            Config::Dna { re, .. } => regex_parser(re, &ab),
-            Config::Auto { re, .. } => regex_parser(re, &ab),
-            Config::Snort { .. } => re::empty() // TODO
+            Config::Ascii { re, .. } => Regex::new(re),
+            Config::Utf8 { re, .. } => Regex::new(re),
+            Config::Dna { re, .. } => Regex::new(re),
+            Config::Auto { re, .. } => Regex::new(re),
+            Config::Snort { .. } => Regex::empty() // TODO
         };
         DFA::new(&ab, re)
     }
