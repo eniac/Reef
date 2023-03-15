@@ -164,7 +164,7 @@ fn main() {
         println!("STEP {}", i);
 
         // allocate real witnesses for round i
-        let (wits, next_state) = r1cs_converter.gen_wit_i(i, current_state);
+        let (wits, next_state) = r1cs_converter.gen_wit_i(i as u64, current_state);
         //println!("prover_data {:#?}", prover_data.clone());
         //println!("wits {:#?}", wits.clone());
         let extended_wit = precomp.eval(&wits);

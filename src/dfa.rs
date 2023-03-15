@@ -65,8 +65,12 @@ impl<'a> DFA<'a> {
         }
     }
 
-    pub fn nstates(&self) -> usize {
-        self.states.len()
+    pub fn nstates(&self) -> u64 {
+        self.states.len() as u64
+    }
+
+    pub fn nchars(&self) -> u64 {
+        self.ab.len() as u64
     }
 
     pub fn add_transition(&mut self, from: &Regex, c: char, to: &Regex) {
