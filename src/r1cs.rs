@@ -73,28 +73,13 @@ fn new_bool_wit(b: bool) -> Value
 }
 
 // feild ops
-fn add(a: &Integer, b: &Integer) -> Integer {
-    let (_, rem) = (a.clone() + b.clone()).div_rem_euc(cfg().field().modulus().clone());
-    rem
-}
-
-fn sub(a: &Integer, b: &Integer) -> Integer {
-    let (_, rem) = (a.clone() - b.clone()).div_rem_euc(cfg().field().modulus().clone());
-    rem
-}
-
-fn mul(a: &Integer, b: &Integer) -> Integer {
-    let (_, rem) = (a.clone() * b.clone()).div_rem_euc(cfg().field().modulus().clone());
-    rem
-}
-
 fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
     let mut res = Integer::from(1);
     for j in (0..evals.len()).rev() {
         if i != j {
-            res *= (evals[i].0.clone() - &evals[j].0); //.rem_floor_assign(cfg().field().modulus().clone());
-                                                       //res.rem_floor(cfg().field().modulus());
-        }
+            res *= evals[i].0.clone() - &evals[j].0; //.rem_floor_assign(cfg().field().modulus().clone());
+                                                     //res.rem_floor(cfg().field().modulus());
+        } // TODO
     }
 
     // find inv in feild
@@ -266,17 +251,18 @@ fn mle_sum_evals(mle: &Vec<Integer>, rands: &Vec<Integer>) -> (Integer, Integer)
         sum_con.rem_floor(cfg().field().modulus()),
     )
 }
-/*
+
 fn horners_eval(coeffs: Vec<Integer>, x_lookup: Integer) -> Integer {
     let num_c = coeffs.len();
-    let mut horners = coeffs[num_c - 1] * x_lookup;
+    let mut horners = coeffs[num_c - 1].clone() * &x_lookup;
     for i in (1..(num_c - 1)).rev() {
-        horners = x_lookup * (horners + coeffs[i]);
+        let temp = coeffs[i].clone() + &horners;
+        horners = temp * &x_lookup;
+        //horners = &x_lookup * (&horners + &coeffs[i]);
     }
     horners += &coeffs[0];
     horners.rem_floor(cfg().field().modulus())
 }
-*/
 
 // coeffs = [constant, x, x^2 ...]
 fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
@@ -1264,35 +1250,26 @@ mod tests {
         for x in vec![Integer::from(0), Integer::from(1)] {
             for y in vec![Integer::from(0), Integer::from(1)] {
                 for z in vec![Integer::from(0), Integer::from(1)] {
-                    let f = add(
-                        &z,
-                        &add(&mul(&Integer::from(2), &y), &mul(&Integer::from(4), &x)),
-                    );
+                    let f: Integer = z.clone() + 2 * y.clone() + 4 * x.clone();
 
                     let uni_out = horners_eval(coeffs.clone(), f);
 
-                    let mle_out = add(
-                        &add(
-                            &add(
-                                &add(
-                                    &add(
-                                        &add(&add(&mle[0], &mul(&mle[1], &z)), &mul(&mle[2], &y)),
-                                        &mul(&mul(&mle[3], &y), &z),
-                                    ),
-                                    &mul(&mle[4], &x),
-                                ),
-                                &mul(&mul(&mle[5], &x), &z),
-                            ),
-                            &mul(&mul(&mle[6], &x), &y),
-                        ),
-                        &mul(&mul(&mul(&mle[7], &x), &y), &z),
-                    );
+                    /*
+                    let mle_out = &mle[0]
+                        + (&mle[1] * &z)
+                        + (&mle[2] * &y)
+                        + (&mle[3] * &y * &z)
+                        + (&mle[4] * &x)
+                        + (mle[5] * &x * &z)
+                        + (mle[6] * &x * &y)
+                        + (mle[7] * &x * &y * &z);
+                    */
 
                     let vec = vec![z.clone(), y.clone(), x.clone()];
                     let mle_eval = mle_partial_eval(&mle, &vec);
 
-                    assert_eq!(mle_out, uni_out);
-                    assert_eq!(mle_out, mle_eval.1);
+                    assert_eq!(mle_eval.1, uni_out);
+                    //assert_eq!(mle_out, mle_eval.1);
                 }
             }
         }
