@@ -19,9 +19,9 @@ use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
-use rug::{integer::Order, rand::RandState, Integer};
+use rug::{integer::Order, rand::RandState, Assign, Integer};
 use std::collections::HashSet;
-
+use std::time::{Duration, Instant};
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 
@@ -96,8 +96,11 @@ fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
         }
     }
 
+    let i_time = Instant::now();
     // find inv in feild
     let inv = res.invert(cfg().field().modulus()).unwrap();
+    let inv_ms = i_time.elapsed().as_millis();
+    //println!("inv time {:#?}", inv_ms);
 
     return inv;
 }
@@ -136,8 +139,8 @@ fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
                     range = (0..(k + 1)).rev();
                 }
                 for j in range {
-                    new_l_i[j + 1] = add(&new_l_i[j + 1], &l_i[j]);
-                    new_l_i[j] = sub(&new_l_i[j], &mul(&evals[k].0, &l_i[j]));
+                    new_l_i[j + 1] += &l_i[j];
+                    new_l_i[j] -= (&evals[k].0 * &l_i[j]);
                     //println!("new_li j, j+1 = {:#?}, {:#?}", new_l_i[j], new_l_i[j + 1]);
                 }
                 l_i = new_l_i;
@@ -147,7 +150,8 @@ fn lagrange_field(evals: Vec<(Integer, Integer)>) -> Vec<Integer> {
         //println!("li = {:#?}", l_i);
         // mult y's
         for k in 0..num_pts {
-            coeffs[k] = add(&coeffs[k], &mul(&evals[i].1, &l_i[k]));
+            coeffs[k] += (&evals[i].1 * &l_i[k]); //.div_rem_euc(&cfg().field().modulus());
+                                                  //coeffs[k] = rem;
         }
     }
 
@@ -161,6 +165,8 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
     }
 
     let h = num_pts / 2;
+    println!("num_pts {}, h {}", num_pts, h);
+
     let mut l = mle_from_pts(pts[..h].to_vec());
     let r = mle_from_pts(pts[h..].to_vec());
 
@@ -393,6 +399,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
+        let time = Instant::now();
         let cs = Computation::from_constraint_system_parts(
             self.assertions.clone(),
             self.pub_inputs.clone(),
@@ -430,11 +437,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
 
         //println!("Prover data {:#?}", prover_data);
-
+        let ms = time.elapsed().as_millis();
         println!(
             "Final R1cs size (no hashes): {}",
             prover_data.r1cs.constraints().len()
         );
+        println!("r1cs conv: {:#?}", ms);
 
         return (prover_data, verifier_data);
     }
@@ -449,7 +457,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // TODO batch size (1 currently)
     fn to_polys(&mut self) -> (ProverData, VerifierData) {
+        let l_time = Instant::now();
         let coeffs = self.lagrange_from_dfa();
+        let lag_ms = l_time.elapsed().as_millis();
         //println!("lagrange coeffs {:#?}", coeffs);
 
         // hash the in state and char -> Integer::from(si * (dfa.chars.len() as u64) + dfa.ab_to_num(c))
@@ -481,6 +491,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut final_states = self.dfa.get_final_states();
         let mut non_final_states = self.dfa.get_non_final_states();
 
+        let v_time = Instant::now();
         if self.is_match {
             //println!("MEMBERSHIP");
             //println!("in states: {:#?}", final_states);
@@ -495,6 +506,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 new_var("next_state".to_owned()),
             );
         }
+        let vanish_ms = v_time.elapsed().as_millis();
+
+        println!("lag {:#?}, vanish {:#?}", lag_ms, vanish_ms);
 
         let match_term = term(
             Op::Ite,
@@ -537,7 +551,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // for use at the end of sum check
     // eq([x0,x1,x2...],[e0,e1,e2...])
-    // m = dim of bool hypercube
     fn bit_eq_circuit(&mut self, m: u64, q_name: String) -> Term {
         let mut eq = new_const(1); // dummy, not used
 
@@ -713,12 +726,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // calculate eq's
         // TODO check ordering correct
         // TODO pub wits for eq circ
-        /*let mut eq_evals = vec![];
+        let mut eq_evals = vec![];
         for i in 0..v.len() {
             eq_evals.push(self.bit_eq_circuit(sc_l, format!("eq{}", i)));
         }
         horners_circuit_vars(&eq_evals, new_var(format!("claim_r")));
-        */
+
         // add last v_m+1 check (for T(j) optimization) - TODO
 
         self.r1cs_conv()
@@ -755,6 +768,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut next_state = 0;
         let mut v = vec![];
         for i in 0..self.batch_size {
+            println!("overflow? {:#?}", batch_num * self.batch_size + i);
             let c = self
                 .doc
                 .chars()
@@ -811,8 +825,30 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 &Integer::from(self.dfa.ab_to_num(c)),
             ));
         }
+
+        // need to round out table size
+        let base: usize = 2;
+        while table.len() < base.pow((table.len() as f32).log2().ceil() as u32) {
+            table.push(add(
+                &add(
+                    &mul(
+                        &Integer::from(self.dfa.nstates()),
+                        &mul(
+                            &Integer::from(self.dfa.nstates()),
+                            &Integer::from(self.dfa.ab.len()),
+                        ),
+                    ),
+                    &mul(
+                        &Integer::from(self.dfa.nstates()),
+                        &Integer::from(self.dfa.ab.len()),
+                    ),
+                ),
+                &Integer::from(self.dfa.ab.len()),
+            ));
+        }
+
         println!("table: {:#?}", table);
-        let mle_T = mle_from_pts(table);
+        let mle_T = mle_from_pts(table.clone());
 
         // generate polynomial g's for sum check
         let mut sc_rs = vec![];
@@ -839,7 +875,30 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let last_claim = add(&g_const, &mul(&g_coeff, &sc_rs[sc_rs.len() - 1]));
         wits.insert(format!("sc_last_claim"), new_wit(last_claim));
 
-        // generate sum check helper vals
+        // generate sum check eq vals
+        // find qi list
+        let mut qis = vec![];
+        for i in 0..table.len() {
+            //v.len() {
+            // TODO clone elim
+            qis.push(table.clone().into_iter().position(|t| t == v[i]).unwrap());
+
+            // convert to bits
+            let qi_bits: Vec<Integer> = (0..((table.len() as f32).log2().ceil() as usize))
+                .map(|n| Integer::from((qis[i] >> n) & 1))
+                .collect();
+            println!("qi bits {:#?}", qi_bits);
+            let temp_eval = mle_partial_eval(&mle_T, &qi_bits.into_iter().rev().collect());
+            println!("T eval {:#?}", temp_eval);
+
+            /*for b in bits {
+                wits.insert(format!("eq{}_q_{}", i, b), new_wit(BIT));
+
+            }*/
+        }
+        println!("qis {:#?}", qis);
+
+        // sanity check, lhs = rhs
 
         // other
         // wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
@@ -1087,18 +1146,19 @@ mod tests {
         let mut dfa = DFA::new(&ab[..], r);
         //println!("{:#?}", dfa);
 
+        let batch_size = 2;
         let mut chars = doc.chars();
-        let num_steps = doc.chars().count();
+        let num_steps = doc.chars().count() / batch_size;
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
-        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 2, sc);
+        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), batch_size, sc);
 
         for b in vec![JBatching::Nlookup] {
             r1cs_converter.batching = b.clone();
             println!("Batching {:#?}", r1cs_converter.batching);
             let (prover_data, _) = r1cs_converter.to_r1cs();
             let precomp = prover_data.clone().precompute;
-            println!("{:#?}", prover_data.r1cs);
+            //println!("{:#?}", prover_data.r1cs);
 
             let mut current_state = dfa.get_init_state();
 
@@ -1117,7 +1177,7 @@ mod tests {
                 "cost model: {:#?}",
                 R1CS::<<G1 as Group>::Scalar>::full_round_cost_model_nohash(
                     &dfa,
-                    2,
+                    batch_size,
                     b.clone(),
                     dfa.is_match(&doc)
                 )
@@ -1127,7 +1187,7 @@ mod tests {
                 prover_data.r1cs.constraints().len()
                     <= R1CS::<<G1 as Group>::Scalar>::full_round_cost_model_nohash(
                         &dfa,
-                        2,
+                        batch_size,
                         b.clone(),
                         dfa.is_match(&doc)
                     )
