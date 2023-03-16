@@ -4,10 +4,8 @@ type G2 = pasta_curves::vesta::Point;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::target::r1cs::nova::*;
-use generic_array::typenum;
 use clap::{Args, Parser, Subcommand};
-use std::path::PathBuf;
-
+use generic_array::typenum;
 use neptune::{
     poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -18,20 +16,23 @@ use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
-pub mod dfa;
-pub mod regex;
-pub mod r1cs;
 pub mod config;
+pub mod dfa;
+pub mod r1cs;
+pub mod regex;
 
+use crate::config::*;
 use crate::dfa::DFA;
 use crate::r1cs::*;
-use crate::config::*;
 
 #[cfg(feature = "plot")]
 pub mod plot;
 
 fn main() {
+    let p_time = Instant::now();
     let opt = Options::parse();
 
     // Alphabet
@@ -42,7 +43,12 @@ fn main() {
     println!("dfa: {:#?}", dfa);
 
     // Input document
-    let doc: Vec<String> = opt.config.read_doc().into_iter().map(|c|c.to_string()).collect();
+    let doc: Vec<String> = opt
+        .config
+        .read_doc()
+        .into_iter()
+        .map(|c| c.to_string())
+        .collect();
 
     // set up CirC library
     let mut circ: CircOpt = Default::default();
@@ -50,7 +56,6 @@ fn main() {
         "28948022309329048855892746252171976963363056481941647379679742748393362948097".into(); // vesta (fuck???)
                                                                                                 //"28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); // pallas curve (i think?)
     cfg::set(&circ);
-
 
     #[cfg(feature = "plot")]
     plot::plot_dfa(&dfa).expect("Failed to plot DFA to a pdf file");
@@ -61,10 +66,18 @@ fn main() {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
 
     let mut r1cs_converter = R1CS::new(&dfa, &doc, 1, sc.clone());
+    let parse_ms = p_time.elapsed().as_millis();
+
+    let c_time = Instant::now();
     println!("generate commitment");
     r1cs_converter.gen_commitment();
-    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs();
+    let commit_ms = c_time.elapsed().as_millis();
 
+    let r_time = Instant::now();
+    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs();
+    let r1cs_ms = r_time.elapsed().as_millis();
+
+    let s_time = Instant::now();
     // use "empty" (witness-less) circuit to generate nova F
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
         &prover_data.r1cs,
@@ -119,14 +132,19 @@ fn main() {
 
     let mut current_state = dfa.get_init_state();
     let z0_primary = vec![
-        <G1 as Group>::Scalar::from(current_state),
-        <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0])),
+        <G1 as Group>::Scalar::from(current_state as u64),
+        <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
         <G1 as Group>::Scalar::from(0),
         <G1 as Group>::Scalar::from(0),
     ];
     // TODO check "ingrained" bool out
     let mut prev_hash = <G1 as Group>::Scalar::from(0);
+
+    let setup_ms = s_time.elapsed().as_millis();
+
+    let q_time = Instant::now();
     let precomp = prover_data.clone().precompute;
+    let precomp_ms = q_time.elapsed().as_millis();
 
     // for expected hash
     /*
@@ -142,6 +160,7 @@ fn main() {
 
     //sponge.start(parameter, None, acc);
 
+    let n_time = Instant::now();
     for i in 0..num_steps {
         println!("STEP {}", i);
 
@@ -157,7 +176,7 @@ fn main() {
         let current_char = doc[i].clone();
         let mut next_char: String = String::from("");
         if i + 1 < num_steps {
-            next_char = doc[i+1].clone();
+            next_char = doc[i + 1].clone();
         };
         //println!("next char = {}", next_char);
 
@@ -171,22 +190,22 @@ fn main() {
             2,
             &[
                 prev_hash,
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char)),
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
             ],
             acc,
         );
         let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
 
-        println!("expected next hash in main {:#?}", expected_next_hash);
+        //println!("expected next hash in main {:#?}", expected_next_hash);
         sponge.finish(acc).unwrap(); // assert expected hash finished correctly
 
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
             Some(extended_wit),
-            <G1 as Group>::Scalar::from(current_state),
-            <G1 as Group>::Scalar::from(next_state),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char)),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(&next_char)),
+            <G1 as Group>::Scalar::from(current_state as u64),
+            <G1 as Group>::Scalar::from(next_state as u64),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(&next_char) as u64),
             <G1 as Group>::Scalar::from(prev_hash),
             <G1 as Group>::Scalar::from(expected_next_hash[0]),
             <G1 as Group>::Scalar::from(i as u64),
@@ -240,4 +259,8 @@ fn main() {
     // verify compressed
     let res = compressed_snark.verify(&pp, FINAL_EXTERNAL_COUNTER, z0_primary, z0_secondary);
     assert!(res.is_ok());
+
+    let nova_ms = n_time.elapsed().as_millis();
+
+    println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }

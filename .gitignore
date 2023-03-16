@@ -1,5 +1,7 @@
+/nova-circ
 /target
 /min/target
 out*
 *.dot
 *.pdf
+*.txt
