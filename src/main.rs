@@ -20,10 +20,9 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 pub mod config;
-pub mod deriv;
 pub mod dfa;
-pub mod parser;
 pub mod r1cs;
+pub mod regex;
 
 use crate::config::*;
 use crate::dfa::DFA;
@@ -37,13 +36,19 @@ fn main() {
     let opt = Options::parse();
 
     // Alphabet
-    let ab = String::from_iter(opt.config.get_alphabet());
+    let ab = String::from_iter(opt.config.alphabet());
 
-    // Regular expresion parser
-    let r = parse_regex(&opt.config);
+    // Regular expresion parser and convert the Regex to a DFA
+    let dfa = opt.config.compile_dfa();
+    println!("dfa: {:#?}", dfa);
 
     // Input document
-    let doc = read_from_config(&opt.config);
+    let doc: Vec<String> = opt
+        .config
+        .read_doc()
+        .into_iter()
+        .map(|c| c.to_string())
+        .collect();
 
     // set up CirC library
     let mut circ: CircOpt = Default::default();
@@ -52,19 +57,15 @@ fn main() {
                                                                                                 //"28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); // pallas curve (i think?)
     cfg::set(&circ);
 
-    // Convert the Regex to a DFA
-    let dfa = DFA::new(&ab[..], r);
-    println!("dfa: {:#?}", dfa);
-
     #[cfg(feature = "plot")]
     plot::plot_dfa(&dfa).expect("Failed to plot DFA to a pdf file");
 
-    let num_steps = doc.chars().count(); // len of document
+    let num_steps = doc.len();
     println!("Doc len is {}", num_steps);
 
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
 
-    let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), 1, sc.clone());
+    let mut r1cs_converter = R1CS::new(&dfa, &doc, 1, sc.clone());
     let parse_ms = p_time.elapsed().as_millis();
 
     let c_time = Instant::now();
@@ -132,7 +133,7 @@ fn main() {
     let mut current_state = dfa.get_init_state();
     let z0_primary = vec![
         <G1 as Group>::Scalar::from(current_state as u64),
-        <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap()) as u64),
+        <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
         <G1 as Group>::Scalar::from(0),
         <G1 as Group>::Scalar::from(0),
     ];
@@ -172,10 +173,10 @@ fn main() {
 
         prover_data.r1cs.check_all(&extended_wit);
 
-        let current_char = doc.chars().nth(i).unwrap();
-        let mut next_char = '#';
+        let current_char = doc[i].clone();
+        let mut next_char: String = String::from("");
         if i + 1 < num_steps {
-            next_char = doc.chars().nth(i + 1).unwrap();
+            next_char = doc[i + 1].clone();
         };
         //println!("next char = {}", next_char);
 
@@ -189,7 +190,7 @@ fn main() {
             2,
             &[
                 prev_hash,
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char) as u64),
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
             ],
             acc,
         );
@@ -203,8 +204,8 @@ fn main() {
             Some(extended_wit),
             <G1 as Group>::Scalar::from(current_state as u64),
             <G1 as Group>::Scalar::from(next_state as u64),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char) as u64),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(next_char) as u64),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(&next_char) as u64),
             <G1 as Group>::Scalar::from(prev_hash),
             <G1 as Group>::Scalar::from(expected_next_hash[0]),
             <G1 as Group>::Scalar::from(i as u64),

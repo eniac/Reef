@@ -24,5 +24,6 @@ dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8", optional 
 serial_test = "1.0.0"
 
 [features]
+default = [ "plot"]
 plot = ["dep:dot"]
 

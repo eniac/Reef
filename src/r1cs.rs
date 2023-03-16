@@ -306,7 +306,7 @@ fn horners_circuit_const(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
 }
 
 pub struct R1CS<'a, F: PrimeField> {
-    dfa: &'a DFA<'a>,
+    dfa: &'a DFA,
     batching: JBatching,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
@@ -315,7 +315,7 @@ pub struct R1CS<'a, F: PrimeField> {
     // sticking out here
     pub_inputs: Vec<Term>,
     batch_size: usize,
-    doc: String,
+    doc: Vec<String>,
     is_match: bool,
     pc: PoseidonConstants<F, typenum::U2>,
     commitment: Option<F>,
@@ -323,12 +323,12 @@ pub struct R1CS<'a, F: PrimeField> {
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
     pub fn new(
-        dfa: &'a DFA<'a>,
-        doc: String,
+        dfa: &'a DFA,
+        doc: &Vec<String>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U2>,
     ) -> Self {
-        let is_match = dfa.is_match(&doc);
+        let is_match = dfa.is_match(doc);
         println!("Match? {:#?}", is_match);
 
         // run cost model (with Poseidon) to decide batching
@@ -345,9 +345,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             batching: JBatching::NaivePolys, // TODO
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
-            batch_size: batch_size,
-            doc: doc,
-            is_match: is_match,
+            batch_size,
+            doc: doc.clone(),
+            is_match,
             pc: pcs,
             commitment: None,
         }
@@ -355,7 +355,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     pub fn gen_commitment(&mut self) {
         let mut hash = vec![F::from(0)];
-        for c in self.doc.chars() {
+        for c in self.doc.clone().into_iter() {
             let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
             let acc = &mut ();
 
@@ -364,11 +364,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             SpongeAPI::absorb(
                 &mut sponge,
                 2,
-                &[hash[0], F::from(self.dfa.ab_to_num(c) as u64)],
+                &[hash[0], F::from(self.dfa.ab_to_num(&c.to_string()) as u64)],
                 acc,
             );
             hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            println!("intm hash out: {:#?}", hash);
             sponge.finish(acc).unwrap();
         }
         println!("commitment = {:#?}", hash.clone());
@@ -394,7 +393,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut evals = vec![];
         for (si, c, so) in self.dfa.deltas() {
             evals.push((
-                Integer::from(si * self.dfa.nchars() + self.dfa.ab_to_num(c)),
+                Integer::from(si * self.dfa.nchars() + self.dfa.ab_to_num(&c.to_string())),
                 Integer::from(so),
             ));
         }
@@ -772,16 +771,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut next_state = 0;
         let mut v = vec![];
         for i in 0..self.batch_size {
-            println!("overflow? {:#?}", batch_num * self.batch_size + i);
-            let c = self
-                .doc
-                .chars()
-                .nth((batch_num * self.batch_size + i) as usize)
-                .unwrap();
-            next_state = self.dfa.delta(state_i, c).unwrap();
+            let c = self.doc[batch_num * self.batch_size + i].clone();
+            next_state = self.dfa.delta(&state_i, &c.to_string()).unwrap();
 
             wits.insert(format!("state_{}", i), new_wit(state_i));
-            wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(c)));
+            wits.insert(
+                format!("char_{}", i),
+                new_wit(self.dfa.ab_to_num(&c.to_string())),
+            );
 
             // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
 
@@ -789,7 +786,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 Integer::from(
                     (state_i * self.dfa.nstates() * self.dfa.nchars())
                         + (next_state * self.dfa.nchars())
-                        + self.dfa.ab_to_num(c),
+                        + self.dfa.ab_to_num(&c.to_string()),
                 )
                 .rem_floor(cfg().field().modulus()),
             );
@@ -809,7 +806,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 Integer::from(
                     (ins * self.dfa.nstates() * self.dfa.nchars())
                         + (out * self.dfa.nchars())
-                        + self.dfa.ab_to_num(c),
+                        + self.dfa.ab_to_num(&c.to_string()),
                 )
                 .rem_floor(cfg().field().modulus()),
             );
@@ -895,14 +892,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         round_num: usize,
         current_state: usize,
     ) -> (FxHashMap<String, Value>, usize) {
-        let doc_i = self.doc.chars().nth(round_num as usize).unwrap();
-        let next_state = self.dfa.delta(current_state, doc_i).unwrap();
+        let doc_i = self.doc[round_num].clone();
+        let next_state = self.dfa.delta(&current_state, &doc_i.clone()).unwrap();
 
         let values: FxHashMap<String, Value> = vec![
             ("round_num".to_owned(), new_wit(round_num)),
             ("next_round_num".to_owned(), new_wit(round_num + 1)),
             ("current_state".to_owned(), new_wit(current_state)),
-            ("char".to_owned(), new_wit(self.dfa.ab_to_num(doc_i))),
+            ("char".to_owned(), new_wit(self.dfa.ab_to_num(&doc_i))),
             ("next_state".to_owned(), new_wit(next_state)),
         ]
         .into_iter()
@@ -911,7 +908,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         return (values, next_state);
     }
 
-    pub fn naive_cost_model_nohash(dfa: &'a DFA<'a>, is_match: bool) -> usize {
+    pub fn naive_cost_model_nohash(dfa: &'a DFA, is_match: bool) -> usize {
         // horners selection - poly of degree m * n - 1, +1 for x_lookup
         let mut cost = dfa.nstates() * dfa.nchars();
 
@@ -928,7 +925,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         cost
     }
 
-    pub fn plookup_cost_model_nohash(dfa: &'a DFA<'a>, batch_size: usize) -> usize {
+    pub fn plookup_cost_model_nohash(dfa: &'a DFA, batch_size: usize) -> usize {
         let mut cost = 0;
         // 2 prove sequence constructions
         cost = dfa.nstates() * dfa.nchars();
@@ -944,8 +941,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         cost
     }
 
-    pub fn plookup_cost_model_hash(dfa: &'a DFA<'a>, batch_size: usize) -> usize {
-        let mut cost = Self::plookup_cost_model_nohash(dfa, batch_size);
+    pub fn plookup_cost_model_hash(dfa: &'a DFA, batch_size: usize) -> usize {
+        let mut cost: usize = Self::plookup_cost_model_nohash(dfa, batch_size);
 
         //Randomized difference
         cost += 2 * POSEIDON_NUM;
@@ -956,10 +953,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         cost
     }
 
-    pub fn nlookup_cost_model_nohash(dfa: &'a DFA<'a>, batch_size: usize) -> usize {
-        let mn = dfa.nstates() * dfa.nchars();
-        let log_mn = (mn as f32).log2().ceil() as usize;
-        let mut cost = 0;
+    pub fn nlookup_cost_model_nohash(dfa: &'a DFA, batch_size: usize) -> usize {
+        let mn: usize = dfa.nstates() * dfa.ab.len();
+        let log_mn: usize = (mn as f32).log2().ceil() as usize;
+        let mut cost: usize = 0;
 
         //Multiplications
         cost += batch_size + 1;
@@ -979,9 +976,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         cost
     }
 
-    pub fn nlookup_cost_model_hash(dfa: &'a DFA<'a>, batch_size: usize) -> usize {
-        let mn = dfa.nstates() * dfa.nchars();
-        let log_mn = (mn as f32).log2().ceil() as usize;
+    pub fn nlookup_cost_model_hash(dfa: &'a DFA, batch_size: usize) -> usize {
+        let mn: usize = dfa.nstates() * dfa.ab.len();
+        let log_mn: usize = (mn as f32).log2().ceil() as usize;
         let mut cost = Self::nlookup_cost_model_nohash(dfa, batch_size);
 
         //R generation hashes
@@ -994,7 +991,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn full_round_cost_model_nohash(
-        dfa: &'a DFA<'a>,
+        dfa: &'a DFA,
         batch_size: usize,
         lookup_type: JBatching,
         is_match: bool,
@@ -1008,7 +1005,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn full_round_cost_model(
-        dfa: &'a DFA<'a>,
+        dfa: &'a DFA,
         batch_size: usize,
         lookup_type: JBatching,
         is_match: bool,
@@ -1023,7 +1020,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn opt_cost_model_select_with_batch(
-        dfa: &'a DFA<'a>,
+        dfa: &'a DFA,
         batch_size: usize,
         is_match: bool,
         doc_length: usize,
@@ -1044,9 +1041,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         (opt_batching, cost * (doc_length / batch_size))
     }
-
     pub fn opt_cost_model_select(
-        dfa: &'a DFA<'a>,
+        dfa: &'a DFA,
         batch_range_lower: usize,
         batch_range_upper: usize,
         is_match: bool,
@@ -1076,8 +1072,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 mod tests {
 
     use crate::dfa::DFA;
-    use crate::parser::regex_parser;
     use crate::r1cs::*;
+    use crate::regex::Regex;
     use circ::cfg;
     use circ::cfg::CircOpt;
     use serial_test::serial;
@@ -1140,27 +1136,25 @@ mod tests {
         assert_eq!(coeffs, expected);
     }
 
-    fn test_func_no_hash(ab: String, regex: String, doc: String) {
-        //set_up_cfg("1019".to_owned());
-
-        let r = regex_parser(&regex, &ab);
+    fn test_func_no_hash(ab: String, rstr: String, doc: String) {
+        let r = Regex::new(&rstr);
         let mut dfa = DFA::new(&ab[..], r);
         //println!("{:#?}", dfa);
 
         let batch_size = 2 as usize;
-        let mut chars = doc.chars();
-        let num_steps = doc.chars().count() as usize / batch_size;
+        let mut chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
+        let num_steps = doc.len();
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
-        let mut r1cs_converter = R1CS::new(&dfa, doc.clone(), batch_size, sc);
+        let mut r1cs_converter =
+            R1CS::new(&dfa, &doc.chars().map(|c| c.to_string()).collect(), 1, sc);
 
         for b in vec![JBatching::Nlookup] {
             r1cs_converter.batching = b.clone();
             println!("Batching {:#?}", r1cs_converter.batching);
+            //println!("{:#?}", prover_data.r1cs);
             let (prover_data, _) = r1cs_converter.to_r1cs();
             let precomp = prover_data.clone().precompute;
-            //println!("{:#?}", prover_data.r1cs);
-
             let mut current_state = dfa.get_init_state();
 
             for i in 0..num_steps {
@@ -1169,18 +1163,32 @@ mod tests {
                 let extd_val = precomp.eval(&values);
 
                 prover_data.r1cs.check_all(&extd_val);
-
                 // for next i+1 round
                 current_state = next_state;
             }
+            /* this got screwed up during merge, not sure where it should be @ Eli
+                    println!(
+                        "cost model: {:#?}",
+                        R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&chars))
+                    );
+                    println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
+                    assert!(
+                        prover_data.r1cs.constraints().len()
+                            <= R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&chars))
+                    );
+                }
 
+                            // for next i+1 round
+                            current_state = next_state;
+                        }
+            */
             println!(
                 "cost model: {:#?}",
                 R1CS::<<G1 as Group>::Scalar>::full_round_cost_model_nohash(
                     &dfa,
                     batch_size,
                     b.clone(),
-                    dfa.is_match(&doc)
+                    dfa.is_match(&chars)
                 )
             );
             println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
@@ -1190,7 +1198,7 @@ mod tests {
                         &dfa,
                         batch_size,
                         b.clone(),
-                        dfa.is_match(&doc)
+                        dfa.is_match(&chars)
                     )
             );
         }

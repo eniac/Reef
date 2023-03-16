@@ -5,12 +5,12 @@ use std::process::{Command, ExitStatus};
 use std::io::Result;
 
 use crate::dfa::DFA;
-use crate::parser::re::Regex;
+use crate::regex::Regex;
 
-type Ed = (Regex, Vec<char>, Regex);
+type Ed = (Regex, String, Regex);
 
 #[cfg(feature = "plot")]
-impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
+impl<'a> dot::Labeller<'a, Regex, Ed> for DFA {
     fn graph_id(&'a self) -> dot::Id<'a> {
         dot::Id::new("example").unwrap()
     }
@@ -23,7 +23,7 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
     fn node_style(&'a self, n: &Regex) -> dot::Style {
         let init = self.get_init_state();
         let finals = self.get_final_states();
-        let s = self.get_state_num(&n);
+        let s = self.get_state_num(&n).unwrap();
         if s == init && finals.contains(&s) {
             dot::Style::Filled
         } else if finals.contains(&s) {
@@ -36,21 +36,54 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA<'a> {
     }
 
     fn edge_label<'b>(&'b self, e: &Ed) -> dot::LabelText<'b> {
-        let mut comma_separated = String::new();
-
-        for num in &e.1[0..e.1.len() - 1] {
-            comma_separated.push_str(&num.to_string());
-            comma_separated.push_str(", ");
-        }
-
-        comma_separated.push_str(&e.1[e.1.len() - 1].to_string());
-
-        dot::LabelText::LabelStr(format!("{}", comma_separated).into())
+        dot::LabelText::LabelStr(format!("{}", e.1).into())
     }
 }
 
+// Function to find consecutive ranges
+fn consecutive_ranges(a: Vec<String>) -> Vec<String> {
+    let mut length = 1;
+    let mut list : Vec<String> = Vec::new();
+
+    fn str_diff(a: &String, b: &String) -> Option<usize> {
+        if a.len() == 0 || b.len() == 0 {
+            None
+        } else if a[1..] == b[1..] {
+            Some(a.chars().last().unwrap() as usize - b.chars().last().unwrap() as usize)
+        } else {
+            None
+        }
+    }
+
+    let (symbols, letters): (Vec<String>, Vec<String>) =
+        a.into_iter().partition(|s|s.chars().all(|c| !c.is_alphanumeric()));
+
+    if letters.len() == 0 {
+        return list;
+    }
+
+    // Traverse the array from first position
+    for i in 1 .. letters.len() {
+        if i == letters.len() || str_diff(&letters[i], &letters[i - 1]) != Some(1) {
+            if length == 1 {
+                list.push(String::from(letters[i - 1].clone()));
+            }
+            else {
+                list.push(letters[i - length].clone() + "-" + &letters[i - 1]);
+            }
+            length = 1;
+        }
+        else {
+            length = length + 1;
+        }
+    }
+
+    list.append(&mut (symbols.clone()));
+    return list;
+}
+
 #[cfg(feature = "plot")]
-impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA<'a> {
+impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA {
     fn nodes(&'a self) -> dot::Nodes<'a, Regex> {
         self.states.clone().into_keys().collect()
     }
@@ -58,10 +91,18 @@ impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA<'a> {
         self.trans
             .clone()
             .into_iter()
-            .map(|(a, c, b)| ((a, b), c))
+            .map(|((a,c),b)| ((a, b), c))
             .into_group_map()
             .into_iter()
-            .map(|((a, b), c)| (a, c, b))
+            .map(|((a, b), c)| (a, consecutive_ranges(c.iter()
+                                    .map(|c|
+                                        if c.trim().is_empty() {
+                                            String::from("' '")
+                                        } else { c.clone() })
+                                    .sorted()
+                                    .collect())
+                                    .into_iter()
+                                    .join(", "), b))
             .collect()
     }
 

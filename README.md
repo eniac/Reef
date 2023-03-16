@@ -47,4 +47,11 @@ $ echo -n "aA\tb" > input.txt
 $ reef ascii -t ignore-whitespace,alpha-numeric,case-insensitive -i input.txt -r ".*B"
 ```
 
-Thank you for using Reef, happy proving!
+or another example
+```
+$ echo "hello world happy to be here" > hello.txt
+$ reef ascii -t ignore-whitespace,alpha-numeric -i hello.txt -r "hello.*"
+```
+
+Thank you for using Reef,
+Happy proving!

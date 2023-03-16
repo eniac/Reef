@@ -3,65 +3,61 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Result};
 
-use crate::deriv::{deriv, nullable};
-use crate::parser::re::Regex;
+use crate::regex::Regex;
 
 #[derive(Debug)]
-pub struct DFA<'a> {
+pub struct DFA {
     /// Alphabet
-    pub ab: &'a str,
-    /// map of alphabet -> usize
-    pub chars: HashMap<char, usize>,
+    pub ab: Vec<String>,
     /// Set of states (and their index)
     pub states: HashMap<Regex, usize>,
-    /// Transition relation from [state -> state], given [char]
-    pub trans: HashSet<(Regex, char, Regex)>,
+    /// Transition relation from [state -> state] given an input
+    pub trans: HashMap<(Regex, String), Regex>,
 }
 
-impl<'a> DFA<'a> {
-    pub fn new(ab: &'a str, re: Regex) -> Self {
-        let mut char_map = HashMap::new();
-        for (i, c) in ab.chars().sorted().enumerate() {
-            char_map.insert(c, i as usize);
-        }
+impl DFA {
+    pub fn new<'a>(alphabet: &'a str, re: Regex) -> Self {
+        let ab: Vec<String> = alphabet.chars().sorted().map(|c| c.to_string()).collect();
 
-        let mut d = Self {
-            ab,
-            chars: char_map,
-            states: HashMap::new(),
-            trans: HashSet::new(),
-        };
+        let mut trans: HashMap<(Regex, String), Regex> = HashMap::new();
+        let mut states: HashMap<Regex, usize> = HashMap::new();
 
         // Recursive funtion
-        fn mk_dfa(d: &mut DFA, q: &Regex) {
+        fn build_trans(
+            states: &mut HashMap<Regex, usize>,
+            trans: &mut HashMap<(Regex, String), Regex>,
+            ab: &Vec<String>,
+            q: &Regex,
+        ) {
             // Add to DFA if not already there
-            d.add_state(q);
+            states.insert(q.clone(), states.len() as usize);
 
             // Explore derivatives
-            for c in d.ab.chars() {
-                let q_c = deriv(c, q);
-                d.add_transition(q, c, &q_c);
-                if d.contains_state(&q_c) {
+            for c in &ab[..] {
+                let q_c = q.deriv(&c);
+                trans.insert((q.clone(), c.clone()), q_c.clone());
+                if states.contains_key(&q_c) {
                     continue;
                 } else {
-                    mk_dfa(d, &q_c);
+                    build_trans(states, trans, ab, &q_c);
                 }
             }
         }
 
         // Recursively build transitions
-        mk_dfa(&mut d, &re);
-        d
+        build_trans(&mut states, &mut trans, &ab, &re);
+        Self { ab, states, trans }
     }
 
-    pub fn ab_to_num(&self, c: char) -> usize {
+    pub fn ab_to_num(&self, c: &String) -> usize {
         /*let sorted_ab = self.ab.chars().sorted().collect::<String>();
         let num = sorted_ab.chars().position(|x| x == c).unwrap();
         num as usize
         */
-        match c {
-            '#' => self.chars.len() as usize, // TODO better solution
-            _ => self.chars[&c],
+        if c == "" {
+            self.ab.len() as usize // TODO better solution
+        } else {
+            self.ab.iter().position(|x| x == c).unwrap() as usize
         }
     }
 
@@ -73,21 +69,18 @@ impl<'a> DFA<'a> {
         self.ab.len()
     }
 
-    pub fn add_transition(&mut self, from: &Regex, c: char, to: &Regex) {
-        self.trans.insert((from.clone(), c, to.clone()));
-    }
-
-    pub fn add_state(&mut self, new_state: &Regex) {
-        self.states
-            .insert(new_state.clone(), self.nstates() as usize);
-    }
-
     pub fn contains_state(&self, state: &Regex) -> bool {
         self.states.contains_key(state)
     }
 
-    pub fn get_state_num(&self, state: &Regex) -> usize {
-        self.states[state]
+    pub fn get_state_num(&self, state: &Regex) -> Option<usize> {
+        self.states.get(state).map(|c| c.clone())
+    }
+
+    pub fn get_state_regex(&self, n: &usize) -> Option<Regex> {
+        self.states
+            .iter()
+            .find_map(|(k, v)| if v == n { Some(k.clone()) } else { None })
     }
 
     /// Initial state
@@ -100,7 +93,7 @@ impl<'a> DFA<'a> {
         self.states
             .clone()
             .into_iter()
-            .filter_map(|(k, v)| if nullable(&k) { Some(v) } else { None })
+            .filter_map(|(k, v)| if k.nullable() { Some(v) } else { None })
             .collect()
     }
 
@@ -109,7 +102,7 @@ impl<'a> DFA<'a> {
         self.states
             .clone()
             .into_iter()
-            .filter_map(|(k, v)| if nullable(&k) { None } else { Some(v) })
+            .filter_map(|(k, v)| if k.nullable() { None } else { Some(v) })
             .collect()
     }
 
@@ -119,64 +112,81 @@ impl<'a> DFA<'a> {
     }
 
     /// DFA step function [delta(s, c) = s'] function
-    pub fn delta(&self, state: usize, ch: char) -> Result<usize> {
-        let res: Vec<usize> = self
-            .deltas()
-            .clone()
-            .into_iter()
-            .filter_map(|(s, c, t)| if s == state && c == ch { Some(t) } else { None })
-            .collect();
-
-        if res.len() == 1 {
-            Ok(res[0])
-        } else {
-            Err(Error::new(
-                ErrorKind::InvalidInput,
-                "Invalidated DFA invariant (determinism)",
-            ))
-        }
+    pub fn delta(&self, state: &usize, ch: &String) -> Option<usize> {
+        self.get_state_regex(&state)
+            .and_then(|r| self.trans.get(&(r, ch.clone())))
+            .and_then(|s| self.get_state_num(s))
     }
 
-    pub fn deltas(&self) -> Vec<(usize, char, usize)> {
+    pub fn deltas(&self) -> Vec<(usize, String, usize)> {
         self.trans
             .clone()
             .into_iter()
-            .map(|(a, b, c)| (self.get_state_num(&a), b, self.get_state_num(&c)))
+            .map(|((a, b), c)| {
+                (
+                    self.get_state_num(&a).unwrap(),
+                    b,
+                    self.get_state_num(&c).unwrap(),
+                )
+            })
             .collect()
     }
 
-    pub fn is_match(&self, doc: &String) -> bool {
+    pub fn is_match(&self, doc: &Vec<String>) -> bool {
         let mut s = self.get_init_state();
-        for c in doc.chars() {
-            s = self.delta(s, c).unwrap();
+        for c in doc.into_iter() {
+            s = self.delta(&s, c).unwrap();
         }
         // If it is in the final states, then success
         self.get_final_states().contains(&s)
     }
 
-    pub fn equiv_classes(&self) -> HashMap<char, HashSet<char>> {
-        let mut char_classes: HashMap<char, HashSet<char>> = HashMap::new();
+    /// Double the stride of the DFA, can be nested k-times
+    /// TODO: Figure out accepting states
+    ///       Figure out O(|ab|*n^2) algorithm
+    pub fn double_stride(&self) -> Self {
+        let mut ab = Vec::new();
+        let mut trans = HashMap::new();
+        for c0 in &self.ab {
+            for c1 in &self.ab {
+                for (a, _) in &self.states {
+                    let b = self.trans.get(&(a.clone(), c0.clone())).unwrap();
+                    let c = self.trans.get(&(b.clone(), c1.clone())).unwrap();
+                    trans.insert((a.clone(), c0.clone() + &c1), c.clone());
+                    ab.push(c0.clone() + &c1);
+                }
+            }
+        }
 
-        for a in self.ab.chars() {
-            for b in self.ab.chars() {
-                if !char_classes.contains_key(&a) {
-                    char_classes.insert(a, HashSet::from([a]));
+        // TODO: Accepting states
+        let states = self.states.clone();
+        Self { ab, states, trans }
+    }
+
+    /// Compute equivalence classes from the DFA
+    /// and output for each character its equivalence class
+    /// TODO: Make algorithm O(|ab|*n)
+    pub fn equiv_classes(&self) -> HashMap<String, HashSet<String>> {
+        let mut char_classes: HashMap<String, HashSet<String>> = HashMap::new();
+
+        for a in &self.ab {
+            for b in &self.ab {
+                if !char_classes.contains_key(a) {
+                    char_classes.insert(a.clone(), HashSet::from([a.clone()]));
                 }
-                if !char_classes.contains_key(&b) {
-                    char_classes.insert(b, HashSet::from([b]));
-                }
-                let mut equivalent = true;
-                for s in self.get_states() {
-                    if self.delta(s, a).unwrap() != self.delta(s, b).unwrap() {
-                        equivalent = false;
-                    }
+                if !char_classes.contains_key(b) {
+                    char_classes.insert(b.clone(), HashSet::from([b.clone()]));
                 }
                 // Merge equivalence classes
-                if equivalent {
-                    let union: HashSet<char> =
-                        char_classes[&a].union(&char_classes[&b]).cloned().collect();
-                    char_classes.insert(a, union.clone());
-                    char_classes.insert(b, union);
+                if self
+                    .states
+                    .iter()
+                    .all(|(_, s)| self.delta(&s, &a).unwrap() == self.delta(&s, &b).unwrap())
+                {
+                    let union: HashSet<String> =
+                        char_classes[a].union(&char_classes[b]).cloned().collect();
+                    char_classes.insert(a.clone(), union.clone());
+                    char_classes.insert(b.clone(), union);
                 }
             }
         }
@@ -187,20 +197,19 @@ impl<'a> DFA<'a> {
 
 #[cfg(test)]
 mod tests {
-
     use crate::dfa::DFA;
-    use crate::parser::regex_parser;
+    use crate::regex::Regex;
 
     fn set_up_delta_test(r: &str, alpha: &str, tocheck: &str) -> bool {
         let ab = String::from(alpha);
-        let regex = regex_parser(&String::from(r), &ab);
-        let input = String::from(tocheck);
+        let regex = Regex::new(r);
+        let input: Vec<String> = tocheck.chars().map(|c| c.to_string()).collect();
 
         let mut dfa = DFA::new(&ab[..], regex);
         let mut s = dfa.get_init_state();
 
         for i in 0..input.len() {
-            s = dfa.delta(s, input.chars().nth(i).unwrap()).unwrap();
+            s = dfa.delta(&s, &input[i]).unwrap();
         }
         let re_match = dfa.get_final_states().contains(&s);
         return re_match;
