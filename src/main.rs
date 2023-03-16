@@ -131,8 +131,8 @@ fn main() {
 
     let mut current_state = dfa.get_init_state();
     let z0_primary = vec![
-        <G1 as Group>::Scalar::from(current_state),
-        <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap())),
+        <G1 as Group>::Scalar::from(current_state as u64),
+        <G1 as Group>::Scalar::from(dfa.ab_to_num(doc.chars().nth(0).unwrap()) as u64),
         <G1 as Group>::Scalar::from(0),
         <G1 as Group>::Scalar::from(0),
     ];
@@ -164,7 +164,7 @@ fn main() {
         println!("STEP {}", i);
 
         // allocate real witnesses for round i
-        let (wits, next_state) = r1cs_converter.gen_wit_i(i as u64, current_state);
+        let (wits, next_state) = r1cs_converter.gen_wit_i(i, current_state);
         //println!("prover_data {:#?}", prover_data.clone());
         //println!("wits {:#?}", wits.clone());
         let extended_wit = precomp.eval(&wits);
@@ -189,7 +189,7 @@ fn main() {
             2,
             &[
                 prev_hash,
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char) as u64),
             ],
             acc,
         );
@@ -201,10 +201,10 @@ fn main() {
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
             Some(extended_wit),
-            <G1 as Group>::Scalar::from(current_state),
-            <G1 as Group>::Scalar::from(next_state),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char)),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(next_char)),
+            <G1 as Group>::Scalar::from(current_state as u64),
+            <G1 as Group>::Scalar::from(next_state as u64),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(current_char) as u64),
+            <G1 as Group>::Scalar::from(dfa.ab_to_num(next_char) as u64),
             <G1 as Group>::Scalar::from(prev_hash),
             <G1 as Group>::Scalar::from(expected_next_hash[0]),
             <G1 as Group>::Scalar::from(i as u64),

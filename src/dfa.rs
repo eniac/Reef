@@ -10,10 +10,10 @@ use crate::parser::re::Regex;
 pub struct DFA<'a> {
     /// Alphabet
     pub ab: &'a str,
-    /// map of alphabet -> u64
-    pub chars: HashMap<char, u64>,
+    /// map of alphabet -> usize
+    pub chars: HashMap<char, usize>,
     /// Set of states (and their index)
-    pub states: HashMap<Regex, u64>,
+    pub states: HashMap<Regex, usize>,
     /// Transition relation from [state -> state], given [char]
     pub trans: HashSet<(Regex, char, Regex)>,
 }
@@ -22,7 +22,7 @@ impl<'a> DFA<'a> {
     pub fn new(ab: &'a str, re: Regex) -> Self {
         let mut char_map = HashMap::new();
         for (i, c) in ab.chars().sorted().enumerate() {
-            char_map.insert(c, i as u64);
+            char_map.insert(c, i as usize);
         }
 
         let mut d = Self {
@@ -54,23 +54,23 @@ impl<'a> DFA<'a> {
         d
     }
 
-    pub fn ab_to_num(&self, c: char) -> u64 {
+    pub fn ab_to_num(&self, c: char) -> usize {
         /*let sorted_ab = self.ab.chars().sorted().collect::<String>();
         let num = sorted_ab.chars().position(|x| x == c).unwrap();
-        num as u64
+        num as usize
         */
         match c {
-            '#' => self.chars.len() as u64, // TODO better solution
+            '#' => self.chars.len() as usize, // TODO better solution
             _ => self.chars[&c],
         }
     }
 
-    pub fn nstates(&self) -> u64 {
-        self.states.len() as u64
+    pub fn nstates(&self) -> usize {
+        self.states.len()
     }
 
-    pub fn nchars(&self) -> u64 {
-        self.ab.len() as u64
+    pub fn nchars(&self) -> usize {
+        self.ab.len()
     }
 
     pub fn add_transition(&mut self, from: &Regex, c: char, to: &Regex) {
@@ -78,24 +78,25 @@ impl<'a> DFA<'a> {
     }
 
     pub fn add_state(&mut self, new_state: &Regex) {
-        self.states.insert(new_state.clone(), self.nstates() as u64);
+        self.states
+            .insert(new_state.clone(), self.nstates() as usize);
     }
 
     pub fn contains_state(&self, state: &Regex) -> bool {
         self.states.contains_key(state)
     }
 
-    pub fn get_state_num(&self, state: &Regex) -> u64 {
+    pub fn get_state_num(&self, state: &Regex) -> usize {
         self.states[state]
     }
 
     /// Initial state
-    pub fn get_init_state(&self) -> u64 {
+    pub fn get_init_state(&self) -> usize {
         0
     }
 
     /// Final states
-    pub fn get_final_states(&self) -> HashSet<u64> {
+    pub fn get_final_states(&self) -> HashSet<usize> {
         self.states
             .clone()
             .into_iter()
@@ -104,7 +105,7 @@ impl<'a> DFA<'a> {
     }
 
     /// Non final states
-    pub fn get_non_final_states(&self) -> HashSet<u64> {
+    pub fn get_non_final_states(&self) -> HashSet<usize> {
         self.states
             .clone()
             .into_iter()
@@ -113,13 +114,13 @@ impl<'a> DFA<'a> {
     }
 
     /// All states
-    pub fn get_states(&self) -> HashSet<u64> {
+    pub fn get_states(&self) -> HashSet<usize> {
         self.states.clone().into_values().collect()
     }
 
     /// DFA step function [delta(s, c) = s'] function
-    pub fn delta(&self, state: u64, ch: char) -> Result<u64> {
-        let res: Vec<u64> = self
+    pub fn delta(&self, state: usize, ch: char) -> Result<usize> {
+        let res: Vec<usize> = self
             .deltas()
             .clone()
             .into_iter()
@@ -136,7 +137,7 @@ impl<'a> DFA<'a> {
         }
     }
 
-    pub fn deltas(&self) -> Vec<(u64, char, u64)> {
+    pub fn deltas(&self) -> Vec<(usize, char, usize)> {
         self.trans
             .clone()
             .into_iter()
