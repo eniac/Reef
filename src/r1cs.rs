@@ -305,6 +305,35 @@ fn horners_circuit_const(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
     horners_circuit_vars(&vars, x_lookup)
 }
 
+// eval circuit
+fn poly_eval_circuit(points: Vec<Integer>, x_lookup: Term) -> Term {
+    let mut eval = new_const(1); // dummy
+
+    for p in points {
+        // for sub
+        let sub = if p == 0 {
+            p
+        } else {
+            cfg().field().modulus() - p
+        };
+
+        eval = term(
+            Op::PfNaryOp(PfNaryOp::Mul),
+            vec![
+                eval,
+                term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![x_lookup.clone(), new_const(sub)], // subtraction
+                                                            // - TODO for
+                                                            // bit eq too
+                ),
+            ],
+        );
+    }
+
+    eval
+}
+
 pub struct R1CS<'a, F: PrimeField> {
     dfa: &'a DFA,
     batching: JBatching,
@@ -389,6 +418,43 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf)
     }
 
+    fn lookup_idxs(&mut self) -> Vec<Term> {
+        let mut v = vec![];
+        for i in 1..=self.batch_size {
+            let v_i = term(
+                Op::PfNaryOp(PfNaryOp::Add),
+                vec![
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Add),
+                        vec![
+                            term(
+                                Op::PfNaryOp(PfNaryOp::Mul),
+                                vec![
+                                    new_var(format!("state_{}", i - 1)),
+                                    new_const(self.dfa.nstates() * self.dfa.nchars()),
+                                ],
+                            ),
+                            term(
+                                Op::PfNaryOp(PfNaryOp::Mul),
+                                vec![
+                                    new_var(format!("state_{}", i)),
+                                    new_const(self.dfa.nchars()),
+                                ],
+                            ),
+                        ],
+                    ),
+                    new_var(format!("char_{}", i - 1)),
+                ],
+            );
+            v.push(v_i);
+            self.pub_inputs.push(new_var(format!("state_{}", i - 1)));
+            self.pub_inputs.push(new_var(format!("char_{}", i - 1)));
+        }
+        self.pub_inputs
+            .push(new_var(format!("state_{}", self.batch_size)));
+        v
+    }
+
     fn lagrange_from_dfa(&self) -> Vec<Integer> {
         let mut evals = vec![];
         for (si, c, so) in self.dfa.deltas() {
@@ -461,54 +527,55 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // TODO batch size (1 currently)
     fn to_polys(&mut self) -> (ProverData, VerifierData) {
         let l_time = Instant::now();
-        let coeffs = self.lagrange_from_dfa();
+        let lookup = self.lookup_idxs();
+
+        let mut evals = vec![];
+        for (si, c, so) in self.dfa.deltas() {
+            println!("trans: {:#?},{:#?},{:#?}", si, c, so);
+            evals.push(
+                Integer::from(
+                    (si * self.dfa.nstates() * self.dfa.nchars())
+                        + (so * self.dfa.nchars())
+                        + self.dfa.ab_to_num(&c.to_string()),
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
+        }
+        println!("eval form poly {:#?}", evals);
+
+        for i in 0..self.batch_size {
+            let eq = term(
+                Op::Eq,
+                vec![
+                    new_const(0), // vanishing
+                    poly_eval_circuit(evals.clone(), lookup[i].clone()), // this means repeats, but I think circ
+                                                                         // takes care of; TODO also clones
+                ],
+            );
+            self.assertions.push(eq);
+        }
         let lag_ms = l_time.elapsed().as_millis();
-        //println!("lagrange coeffs {:#?}", coeffs);
-
-        // hash the in state and char -> Integer::from(si * (dfa.chars.len() as usize) + dfa.ab_to_num(c))
-        let x_lookup = term(
-            Op::PfNaryOp(PfNaryOp::Add),
-            vec![
-                term(
-                    Op::PfNaryOp(PfNaryOp::Mul),
-                    vec![
-                        new_var("current_state".to_owned()),
-                        new_const(self.dfa.nchars()),
-                    ],
-                ),
-                new_var("char".to_owned()),
-            ],
-        );
-
-        // next_state
-        let eq = term(
-            Op::Eq,
-            vec![
-                new_var("next_state".to_owned()),
-                horners_circuit_const(coeffs, x_lookup),
-            ],
-        );
 
         // final state (non) match check
         let mut vanishing_poly;
         let mut final_states = self.dfa.get_final_states();
         let mut non_final_states = self.dfa.get_non_final_states();
-
+        let mut vanish_on = vec![];
         let v_time = Instant::now();
         if self.is_match {
-            //println!("MEMBERSHIP");
             //println!("in states: {:#?}", final_states);
             // proof of membership
-            vanishing_poly =
-                horners_circuit_const(vanishing(final_states), new_var("next_state".to_owned()));
+            for xi in final_states.into_iter() {
+                vanish_on.push(Integer::from(xi));
+            }
         } else {
-            //println!("NONMEMBERSHIP");
             //println!("in states: {:#?}", non_final_states);
-            vanishing_poly = horners_circuit_const(
-                vanishing(non_final_states),
-                new_var("next_state".to_owned()),
-            );
+            for xi in non_final_states.into_iter() {
+                vanish_on.push(Integer::from(xi));
+            }
         }
+        vanishing_poly =
+            poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
         let vanish_ms = v_time.elapsed().as_millis();
 
         println!("lag {:#?}, vanish {:#?}", lag_ms, vanish_ms);
@@ -520,7 +587,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Op::Eq,
                     vec![
                         new_var("round_num".to_owned()),
-                        new_const(self.doc.len() - 1), // TODO make private
+                        new_const(self.doc.len() - 1), // TODO make private + hashing crap
+                                                       // + batching crap + element might be too
+                                                       // big for feild crap
                     ],
                 ), // if in final round
                 term(Op::Eq, vec![vanishing_poly, new_const(0)]), // true -> check next_state (not) in final_states
@@ -539,15 +608,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             ],
         );
 
-        self.assertions.push(eq);
         self.assertions.push(match_term);
         self.assertions.push(round_term);
 
         self.pub_inputs.push(new_var("round_num".to_owned()));
         self.pub_inputs.push(new_var("next_round_num".to_owned()));
-        self.pub_inputs.push(new_var("current_state".to_owned()));
-        self.pub_inputs.push(new_var("char".to_owned()));
-        self.pub_inputs.push(new_var("next_state".to_owned()));
 
         self.r1cs_conv()
     }
@@ -670,7 +735,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
         // generate v's
-        let mut v = vec![];
+        let mut v: Vec<Term> = vec![]; // TODO
 
         // TODO pub inputs -> can make which priv?
         for i in 0..self.batch_size {
@@ -684,35 +749,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.pub_inputs
             .push(new_var(format!("state_{}", self.batch_size)));
 
-        for i in 1..self.batch_size {
-            // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
-            let v_i = term(
-                Op::PfNaryOp(PfNaryOp::Add),
-                vec![
-                    term(
-                        Op::PfNaryOp(PfNaryOp::Add),
-                        vec![
-                            term(
-                                Op::PfNaryOp(PfNaryOp::Mul),
-                                vec![
-                                    new_var(format!("state_{}", i - 1)),
-                                    new_const(self.dfa.nstates() * self.dfa.nchars()),
-                                ],
-                            ),
-                            term(
-                                Op::PfNaryOp(PfNaryOp::Mul),
-                                vec![
-                                    new_var(format!("state_{}", i)),
-                                    new_const(self.dfa.nchars()),
-                                ],
-                            ),
-                        ],
-                    ),
-                    new_var(format!("char_{}", i)),
-                ],
-            );
-            v.push(v_i);
-        }
+        let v = self.lookup_idxs();
         //v.push(new_var(format!("v_for_T"))); // the optimization T(j) check
 
         // generate claim on lhs
@@ -742,12 +779,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     pub fn gen_wit_i(
         &self,
-        round_num: usize,
+        batch_num: usize,
         current_state: usize,
     ) -> (FxHashMap<String, Value>, usize) {
         match self.batching {
-            JBatching::NaivePolys => self.gen_wit_i_polys(round_num, current_state),
-            JBatching::Nlookup => self.gen_wit_i_nlookup(round_num, current_state),
+            JBatching::NaivePolys => self.gen_wit_i_polys(batch_num, current_state),
+            JBatching::Nlookup => self.gen_wit_i_nlookup(batch_num, current_state),
             JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
@@ -889,28 +926,34 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // TODO BATCH SIZE (rn = 1)
     fn gen_wit_i_polys(
         &self,
-        round_num: usize,
+        batch_num: usize,
         current_state: usize,
     ) -> (FxHashMap<String, Value>, usize) {
-        let doc_i = self.doc[round_num].clone();
-        let next_state = self.dfa.delta(&current_state, &doc_i.clone()).unwrap();
+        let mut wits = FxHashMap::default();
+        let mut state_i = current_state;
+        let mut next_state = 0;
 
-        let values: FxHashMap<String, Value> = vec![
-            ("round_num".to_owned(), new_wit(round_num)),
-            ("next_round_num".to_owned(), new_wit(round_num + 1)),
-            ("current_state".to_owned(), new_wit(current_state)),
-            ("char".to_owned(), new_wit(self.dfa.ab_to_num(&doc_i))),
-            ("next_state".to_owned(), new_wit(next_state)),
-        ]
-        .into_iter()
-        .collect();
+        for i in 0..self.batch_size {
+            let doc_i = self.doc[batch_num * self.batch_size + i].clone();
+            next_state = self.dfa.delta(&state_i, &doc_i.clone()).unwrap();
 
-        return (values, next_state);
+            wits.insert(format!("state_{}", i), new_wit(state_i));
+            wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(&doc_i)));
+
+            state_i = next_state;
+        }
+        wits.insert(format!("state_{}", self.batch_size), new_wit(state_i));
+
+        wits.insert("round_num".to_owned(), new_wit(batch_num));
+        wits.insert("next_round_num".to_owned(), new_wit(batch_num + 1));
+
+        return (wits, next_state);
     }
 
-    pub fn naive_cost_model_nohash(dfa: &'a DFA, is_match: bool) -> usize {
-        // horners selection - poly of degree m * n - 1, +1 for x_lookup
-        let mut cost = dfa.nstates() * dfa.nchars();
+    pub fn naive_cost_model_nohash(dfa: &'a DFA, batch_size: usize, is_match: bool) -> usize {
+        // vanishing poly - m * n multiplications + 2 for lookup
+        let mut cost = dfa.nstates() * dfa.nchars() + 2;
+        cost *= batch_size;
 
         // vanishing selection for final check
         // poly of degree (# final states - 1)
@@ -997,7 +1040,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         is_match: bool,
     ) -> usize {
         let mut cost = match lookup_type {
-            JBatching::NaivePolys => Self::naive_cost_model_nohash(dfa, is_match) * batch_size,
+            JBatching::NaivePolys => Self::naive_cost_model_nohash(dfa, batch_size, is_match),
             JBatching::Nlookup => Self::nlookup_cost_model_nohash(dfa, batch_size),
             JBatching::Plookup => Self::plookup_cost_model_nohash(dfa, batch_size),
         };
@@ -1011,7 +1054,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         is_match: bool,
     ) -> usize {
         let mut cost = match lookup_type {
-            JBatching::NaivePolys => Self::naive_cost_model_nohash(dfa, is_match) * batch_size,
+            JBatching::NaivePolys => Self::naive_cost_model_nohash(dfa, batch_size, is_match),
             JBatching::Nlookup => Self::nlookup_cost_model_hash(dfa, batch_size),
             JBatching::Plookup => Self::plookup_cost_model_hash(dfa, batch_size),
         };
@@ -1136,117 +1179,143 @@ mod tests {
         assert_eq!(coeffs, expected);
     }
 
-    fn test_func_no_hash(ab: String, rstr: String, doc: String) {
+    fn test_func_no_hash(ab: String, rstr: String, doc: String, batch_sizes: Vec<usize>) {
         let r = Regex::new(&rstr);
         let mut dfa = DFA::new(&ab[..], r);
         //println!("{:#?}", dfa);
 
-        let batch_size = 2 as usize;
         let mut chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
-        let num_steps = doc.len();
 
-        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
-        let mut r1cs_converter =
-            R1CS::new(&dfa, &doc.chars().map(|c| c.to_string()).collect(), 1, sc);
+        for s in batch_sizes {
+            let sc =
+                Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
+            let mut r1cs_converter =
+                R1CS::new(&dfa, &doc.chars().map(|c| c.to_string()).collect(), s, sc);
+            let num_steps = doc.len() / s;
+            for b in vec![JBatching::NaivePolys] {
+                r1cs_converter.batching = b.clone(); // hacky - don't do this outside tests
 
-        for b in vec![JBatching::Nlookup] {
-            r1cs_converter.batching = b.clone();
-            println!("Batching {:#?}", r1cs_converter.batching);
-            //println!("{:#?}", prover_data.r1cs);
-            let (prover_data, _) = r1cs_converter.to_r1cs();
-            let precomp = prover_data.clone().precompute;
-            let mut current_state = dfa.get_init_state();
+                println!("Batching {:#?}", r1cs_converter.batching);
+                //println!("{:#?}", prover_data.r1cs);
+                let (prover_data, _) = r1cs_converter.to_r1cs();
+                //println!("{:#?}", prover_data.r1cs);
+                let precomp = prover_data.clone().precompute;
+                let mut current_state = dfa.get_init_state();
 
-            for i in 0..num_steps {
-                let (values, next_state) = r1cs_converter.gen_wit_i(i, current_state);
-                //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-                let extd_val = precomp.eval(&values);
+                for i in 0..num_steps {
+                    let (values, next_state) = r1cs_converter.gen_wit_i(i, current_state);
+                    //println!("VALUES ROUND {:#?}: {:#?}", i, values);
+                    let extd_val = precomp.eval(&values);
 
-                prover_data.r1cs.check_all(&extd_val);
-                // for next i+1 round
-                current_state = next_state;
-            }
-            /* this got screwed up during merge, not sure where it should be @ Eli
-                    println!(
-                        "cost model: {:#?}",
-                        R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&chars))
-                    );
-                    println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
-                    assert!(
-                        prover_data.r1cs.constraints().len()
-                            <= R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&chars))
-                    );
+                    prover_data.r1cs.check_all(&extd_val);
+                    // for next i+1 round
+                    current_state = next_state;
                 }
+                /* this got screwed up during merge, not sure where it should be @ Eli
+                        println!(
+                            "cost model: {:#?}",
+                            R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&chars))
+                        );
+                        println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
+                        assert!(
+                            prover_data.r1cs.constraints().len()
+                                <= R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&chars))
+                        );
+                    }
 
-                            // for next i+1 round
-                            current_state = next_state;
-                        }
-            */
-            println!(
-                "cost model: {:#?}",
-                R1CS::<<G1 as Group>::Scalar>::full_round_cost_model_nohash(
-                    &dfa,
-                    batch_size,
-                    b.clone(),
-                    dfa.is_match(&chars)
-                )
-            );
-            println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
-            assert!(
-                prover_data.r1cs.constraints().len() as usize
-                    <= R1CS::<<G1 as Group>::Scalar>::full_round_cost_model_nohash(
+                                // for next i+1 round
+                                current_state = next_state;
+                            }
+                */
+                println!(
+                    "cost model: {:#?}",
+                    R1CS::<<G1 as Group>::Scalar>::full_round_cost_model_nohash(
                         &dfa,
-                        batch_size,
+                        s,
                         b.clone(),
                         dfa.is_match(&chars)
                     )
-            );
+                );
+                println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
+                assert!(
+                    prover_data.r1cs.constraints().len() as usize
+                        <= R1CS::<<G1 as Group>::Scalar>::full_round_cost_model_nohash(
+                            &dfa,
+                            s,
+                            b.clone(),
+                            dfa.is_match(&chars)
+                        )
+                );
+            }
         }
     }
 
     #[test]
     #[serial]
     fn naive_test() {
-        test_func_no_hash("a".to_string(), "a".to_string(), "aaaa".to_string());
+        test_func_no_hash(
+            "a".to_string(),
+            "a".to_string(),
+            "aaaa".to_string(),
+            vec![1, 2],
+        );
     }
-    /*
-        #[test]
-        fn dfa_2() {
-            test_func_no_hash("ab".to_string(), "ab".to_string(), "ab".to_string());
-            test_func_no_hash("abc".to_string(), "ab".to_string(), "ab".to_string());
-        }
 
-        #[test]
-        fn dfa_star() {
-            test_func_no_hash("ab".to_string(), "a*b*".to_string(), "ab".to_string());
-            test_func_no_hash(
-                "ab".to_string(),
-                "a*b*".to_string(),
-                "aaaabbbbbbbbbbbbbb".to_string(),
-            );
-            test_func_no_hash(
-                "ab".to_string(),
-                "a*b*".to_string(),
-                "aaaaaaaaaaab".to_string(),
-            );
-        }
+    #[test]
+    fn dfa_2() {
+        test_func_no_hash(
+            "ab".to_string(),
+            "ab".to_string(),
+            "ab".to_string(),
+            vec![1],
+        );
+        test_func_no_hash(
+            "abc".to_string(),
+            "ab".to_string(),
+            "ab".to_string(),
+            vec![1],
+        );
+    }
 
-        #[test]
-        fn dfa_non_match() {
-            test_func_no_hash("ab".to_string(), "a".to_string(), "b".to_string());
-            test_func_no_hash(
-                "ab".to_string(),
-                "a*b*".to_string(),
-                "aaabaaaaaaaab".to_string(),
-            );
-        }
+    #[test]
+    fn dfa_star() {
+        test_func_no_hash(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "ab".to_string(),
+            vec![1],
+        );
+        test_func_no_hash(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaaaaabbbbbbbbbbbbbb".to_string(),
+            vec![1, 2, 4],
+        );
+        test_func_no_hash(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaaaaaaaaaab".to_string(),
+            vec![1, 2, 4],
+        );
+    }
 
-        #[test]
-        #[should_panic]
-        fn dfa_bad_1() {
-            test_func_no_hash("ab".to_string(), "a".to_string(), "c".to_string());
-        }
-    */
+    #[test]
+    fn dfa_non_match() {
+        test_func_no_hash("ab".to_string(), "a".to_string(), "b".to_string(), vec![1]);
+        test_func_no_hash(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaabaaaaaaaabbb".to_string(),
+            vec![1, 2, 4],
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn dfa_bad_1() {
+        test_func_no_hash("ab".to_string(), "a".to_string(), "c".to_string(), vec![1]);
+    }
+
     #[test]
     fn mle_1() {
         let mut rand = RandState::new();
