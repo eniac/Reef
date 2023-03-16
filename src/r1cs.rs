@@ -333,7 +333,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // run cost model (with Poseidon) to decide batching
         let batching: JBatching =
-            Self::opt_cost_model_select(&dfa, batch_size, batch_size, dfa.is_match(&doc));
+            Self::opt_cost_model_select(&dfa, batch_size, batch_size, dfa.is_match(&doc),doc.len());
 
         Self {
             dfa,
@@ -1017,6 +1017,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         dfa: &'a DFA<'a>,
         batch_size: u64,
         is_match: bool,
+        doc_length: usize
     ) -> (JBatching, u64) {
         let mut opt_batching: JBatching = JBatching::NaivePolys;
         let mut cost: u64 =
@@ -1032,7 +1033,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             opt_batching = JBatching::Plookup;
         }
 
-        (opt_batching, cost)
+        (opt_batching, cost*(doc_length as u64/batch_size))
     }
 
     pub fn opt_cost_model_select(
@@ -1040,6 +1041,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         batch_range_lower: u64,
         batch_range_upper: u64,
         is_match: bool,
+        doc_length: usize,
     ) -> JBatching {
         let mut opt_batching: JBatching = JBatching::NaivePolys;
         let mut cost = Self::full_round_cost_model(
@@ -1051,8 +1053,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         for n in batch_range_lower..batch_range_upper + 1 {
             let mut batching_and_cost: (JBatching, u64) =
-                Self::opt_cost_model_select_with_batch(dfa, 2 << n, is_match);
-            if batching_and_cost.1 < cost {
+                Self::opt_cost_model_select_with_batch(dfa, 2 << n, is_match, doc_length);
+            if batching_and_cost.1  < cost {
                 cost = batching_and_cost.1;
                 opt_batching = batching_and_cost.0;
             }
