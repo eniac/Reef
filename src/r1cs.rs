@@ -154,7 +154,7 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
     }
 
     let h = num_pts / 2;
-    println!("num_pts {}, h {}", num_pts, h);
+    //println!("num_pts {}, h {}", num_pts, h);
 
     let mut l = mle_from_pts(pts[..h].to_vec());
     let mut r = mle_from_pts(pts[h..].to_vec());
@@ -175,7 +175,7 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
 // if there is no hole, this will return [0, full result]
 fn mle_partial_eval(mle: &Vec<Integer>, at: &Vec<Integer>) -> (Integer, Integer) {
     let base: usize = 2;
-    println!("mle len {:#?} at len {:#?}", mle.len(), at.len());
+    //println!("mle len {:#?} at len {:#?}", mle.len(), at.len());
     assert!(base.pow(at.len() as u32 - 1) <= mle.len());
     assert!(base.pow(at.len() as u32) >= mle.len()); // number of combos = coeffs
                                                      // mle could potentially be computed faster w/better organization .... ugh. we could be optimizing this till we die
@@ -222,7 +222,7 @@ fn mle_sum_evals(mle: &Vec<Integer>, rands: &Vec<Integer>) -> (Integer, Integer)
     let hole = rands.len();
     let total = (mle.len() as f32).log2().ceil() as usize; // total # mle terms
 
-    println!("#r: {:#?}, #total: {:#?}", hole, total);
+    //println!("#r: {:#?}, #total: {:#?}", hole, total);
 
     let num_x = total - hole - 1;
     assert!(num_x >= 0, "batch size too small for nlookup");
@@ -233,19 +233,19 @@ fn mle_sum_evals(mle: &Vec<Integer>, rands: &Vec<Integer>) -> (Integer, Integer)
     }
 
     for mut combo in opts.into_iter().permutations(num_x).unique() {
-        println!("combo: {:#?}", combo);
+        //println!("combo: {:#?}", combo);
 
         let mut eval_at = rands.clone();
         eval_at.push(Integer::from(-1));
         eval_at.append(&mut combo);
-        println!("eval at: {:#?}", eval_at.clone());
+        //println!("eval at: {:#?}", eval_at.clone());
         let (coeff, con) = mle_partial_eval(mle, &eval_at.into_iter().rev().collect());
-        println!("mle partial {:#?}, {:#?}", coeff, con);
+        //println!("mle partial {:#?}, {:#?}", coeff, con);
 
         sum_coeff += &coeff;
         sum_con += &con;
     }
-    println!("mle sums {:#?}, {:#?}", sum_coeff, sum_con);
+    //println!("mle sums {:#?}, {:#?}", sum_coeff, sum_con);
     (
         sum_coeff.rem_floor(cfg().field().modulus()),
         sum_con.rem_floor(cfg().field().modulus()),
@@ -531,7 +531,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let mut evals = vec![];
         for (si, c, so) in self.dfa.deltas() {
-            println!("trans: {:#?},{:#?},{:#?}", si, c, so);
+            //println!("trans: {:#?},{:#?},{:#?}", si, c, so);
             evals.push(
                 Integer::from(
                     (si * self.dfa.nstates() * self.dfa.nchars())
@@ -541,7 +541,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 .rem_floor(cfg().field().modulus()),
             );
         }
-        println!("eval form poly {:#?}", evals);
+        //println!("eval form poly {:#?}", evals);
 
         for i in 0..self.batch_size {
             let eq = term(
