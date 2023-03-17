@@ -94,6 +94,7 @@ fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
 // where -1 is the "hole"
 // returns (coeff (of "hole"), constant)
 // if no hole, returns (crap, full result)
+// O(mn log mn) :)
 fn prover_mle_t_partial_eval(table: Vec<Integer>, x: Vec<Integer>) -> (Integer, Integer) {
     let base: usize = 2;
     let m = x.len();
@@ -139,6 +140,37 @@ fn prover_mle_t_partial_eval(table: Vec<Integer>, x: Vec<Integer>) -> (Integer, 
 }
 
 // CIRCUITS
+
+// coeffs = [constant, x, x^2 ...]
+fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
+    let num_c = coeffs.len();
+    //println!("coeffs = {:#?}", coeffs);
+
+    let mut horners = term(
+        Op::PfNaryOp(PfNaryOp::Mul),
+        vec![coeffs[num_c - 1].clone(), x_lookup.clone()],
+    );
+    for i in (1..(num_c - 1)).rev() {
+        horners = term(
+            Op::PfNaryOp(PfNaryOp::Mul),
+            vec![
+                x_lookup.clone(),
+                term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![horners, coeffs[i].clone()],
+                ),
+            ],
+        );
+    }
+
+    // constant
+    horners = term(
+        Op::PfNaryOp(PfNaryOp::Add),
+        vec![horners, coeffs[0].clone()],
+    );
+
+    horners
+}
 
 // eval circuit
 fn poly_eval_circuit(points: Vec<Integer>, x_lookup: Term) -> Term {
@@ -557,46 +589,43 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
-        /*        // generate v's
-                let mut v: Vec<Term> = vec![]; // TODO
-
-                // TODO pub inputs -> can make which priv?
-                for i in 0..self.batch_size {
-                    self.pub_inputs.push(new_var(format!("state_{}", i)));
-                    self.pub_inputs.push(new_var(format!("char_{}", i)));
-                }
-
-                // last state_batch is final "next_state" output
-                // v_{batch-1} = (state_{batch-1}, c, state_batch)
-                // v_batch = T eval check (optimization)
-                self.pub_inputs
-                    .push(new_var(format!("state_{}", self.batch_size)));
-
-                let v = self.lookup_idxs();
-                //v.push(new_var(format!("v_for_T"))); // the optimization T(j) check
-
-                // generate claim on lhs
-                let mut lhs = horners_circuit_vars(&v, new_var(format!("claim_r")));
-                self.pub_inputs.push(new_var(format!("claim_r")));
-
-                // size of table (T -> mle)
-                let sc_l = (self.dfa.trans.len() as f64).log2().ceil() as usize;
-                println!("table size: {}", self.dfa.trans.len());
-                println!("sum check rounds: {}", sc_l);
-
-                self.sum_check_circuit(lhs, sc_l);
-
-                // calculate eq's
-                // TODO check ordering correct
-                // TODO pub wits for eq circ
-                let mut eq_evals = vec![];
-                for i in 0..v.len() {
-                    eq_evals.push(self.bit_eq_circuit(sc_l, format!("eq{}", i)));
-                }
-                horners_circuit_vars(&eq_evals, new_var(format!("claim_r")));
-
-                // add last v_m+1 check (for T(j) optimization) - TODO
+        // TODO pub inputs -> can make which priv?
+        /*                for i in 0..self.batch_size {
+                            self.pub_inputs.push(new_var(format!("state_{}", i)));
+                            self.pub_inputs.push(new_var(format!("char_{}", i)));
+                        }
         */
+        // last state_batch is final "next_state" output
+        // v_{batch-1} = (state_{batch-1}, c, state_batch)
+        // v_batch = T eval check (optimization)
+        //                self.pub_inputs
+        //                    .push(new_var(format!("state_{}", self.batch_size)));
+
+        let v = self.lookup_idxs();
+        //v.push(new_var(format!("v_for_T"))); // the optimization T(j) check
+
+        // generate claim on lhs
+        let mut lhs = horners_circuit_vars(&v, new_var(format!("claim_r")));
+        self.pub_inputs.push(new_var(format!("claim_r")));
+
+        // size of table (T -> mle)
+        let sc_l = (self.dfa.trans.len() as f64).log2().ceil() as usize;
+        println!("table size: {}", self.dfa.trans.len());
+        println!("sum check rounds: {}", sc_l);
+
+        self.sum_check_circuit(lhs, sc_l);
+
+        // calculate eq's
+        // TODO check ordering correct
+        // TODO pub wits for eq circ
+        let mut eq_evals = vec![];
+        for i in 0..v.len() {
+            eq_evals.push(self.bit_eq_circuit(sc_l, format!("eq{}", i)));
+        }
+        horners_circuit_vars(&eq_evals, new_var(format!("claim_r")));
+
+        // add last v_m+1 check (for T(j) optimization) - TODO
+
         self.r1cs_conv()
     }
 

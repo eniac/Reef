@@ -20,37 +20,6 @@ fn horners_circuit_const(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
     horners_circuit_vars(&vars, x_lookup)
 }
 
-// coeffs = [constant, x, x^2 ...]
-fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
-    let num_c = coeffs.len();
-    //println!("coeffs = {:#?}", coeffs);
-
-    let mut horners = term(
-        Op::PfNaryOp(PfNaryOp::Mul),
-        vec![coeffs[num_c - 1].clone(), x_lookup.clone()],
-    );
-    for i in (1..(num_c - 1)).rev() {
-        horners = term(
-            Op::PfNaryOp(PfNaryOp::Mul),
-            vec![
-                x_lookup.clone(),
-                term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![horners, coeffs[i].clone()],
-                ),
-            ],
-        );
-    }
-
-    // constant
-    horners = term(
-        Op::PfNaryOp(PfNaryOp::Add),
-        vec![horners, coeffs[0].clone()],
-    );
-
-    horners
-}
-
 fn horners_eval(coeffs: Vec<Integer>, x_lookup: Integer) -> Integer {
     let num_c = coeffs.len();
     let mut horners = coeffs[num_c - 1].clone() * &x_lookup;
