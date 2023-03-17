@@ -1,14 +1,14 @@
 fn lagrange_from_dfa(&self) -> Vec<Integer> {
-        let mut evals = vec![];
-        for (si, c, so) in self.dfa.deltas() {
-            evals.push((
-                Integer::from(si * self.dfa.nchars() + self.dfa.ab_to_num(&c.to_string())),
-                Integer::from(so),
-            ));
-        }
-
-        lagrange_field(evals)
+    let mut evals = vec![];
+    for (si, c, so) in self.dfa.deltas() {
+        evals.push((
+            Integer::from(si * self.dfa.nchars() + self.dfa.ab_to_num(&c.to_string())),
+            Integer::from(so),
+        ));
     }
+
+    lagrange_field(evals)
+}
 
 // if your mult terms are not yet CirC Terms
 fn horners_circuit_const(coeffs: Vec<Integer>, x_lookup: Term) -> Term {
@@ -229,127 +229,127 @@ fn mle_sum_evals(mle: &Vec<Integer>, rands: &Vec<Integer>) -> (Integer, Integer)
 }
 
 #[test]
-    #[serial]
-    fn basic_lg() {
-        set_up_cfg("1019".to_owned());
-        //set_up_cfg("79".to_owned());
+#[serial]
+fn basic_lg() {
+    set_up_cfg("1019".to_owned());
+    //set_up_cfg("79".to_owned());
 
-        let points = vec![
-            (Integer::from(1), Integer::from(1)),
-            (Integer::from(10), Integer::from(10)),
-            (Integer::from(3), Integer::from(3)),
-            (Integer::from(4), Integer::from(4)),
-        ];
-        let coeffs = lagrange_field(points);
+    let points = vec![
+        (Integer::from(1), Integer::from(1)),
+        (Integer::from(10), Integer::from(10)),
+        (Integer::from(3), Integer::from(3)),
+        (Integer::from(4), Integer::from(4)),
+    ];
+    let coeffs = lagrange_field(points);
 
-        let expected = vec![
-            Integer::from(0),
-            Integer::from(1),
-            Integer::from(0),
-            Integer::from(0),
-        ];
+    let expected = vec![
+        Integer::from(0),
+        Integer::from(1),
+        Integer::from(0),
+        Integer::from(0),
+    ];
 
-        assert_eq!(coeffs, expected);
-    }
-
-#[test]
-    #[serial]
-    fn lg_1() {
-        set_up_cfg("1019".to_owned());
-
-        let points = vec![
-            (Integer::from(1), Integer::from(2)),
-            (Integer::from(10), Integer::from(3)),
-            (Integer::from(3), Integer::from(3)),
-            (Integer::from(4), Integer::from(9)),
-        ];
-        let coeffs = lagrange_field(points);
-
-        let expected = vec![
-            Integer::from(124),
-            Integer::from(742),
-            Integer::from(929),
-            Integer::from(245),
-        ];
-
-        assert_eq!(coeffs, expected);
-    }
+    assert_eq!(coeffs, expected);
+}
 
 #[test]
-    fn mle_1() {
-        let mut rand = RandState::new();
+#[serial]
+fn lg_1() {
+    set_up_cfg("1019".to_owned());
 
-        let mut points: Vec<(Integer, Integer)> = vec![];
-        for x in 0..8 {
-            let mut lim = Integer::from(1019);
-            lim.random_below_mut(&mut rand);
-            points.push((Integer::from(x), lim));
-        }
-        println!("points: {:#?}", points);
-        let uni = points.clone().into_iter().map(|(_, y)| y).collect();
+    let points = vec![
+        (Integer::from(1), Integer::from(2)),
+        (Integer::from(10), Integer::from(3)),
+        (Integer::from(3), Integer::from(3)),
+        (Integer::from(4), Integer::from(9)),
+    ];
+    let coeffs = lagrange_field(points);
 
-        let coeffs = lagrange_field(points);
-        println!("coeffs: {:#?}", coeffs);
+    let expected = vec![
+        Integer::from(124),
+        Integer::from(742),
+        Integer::from(929),
+        Integer::from(245),
+    ];
 
-        let mle = mle_from_pts(uni);
-        println!("mle coeffs: {:#?}", mle);
+    assert_eq!(coeffs, expected);
+}
 
-        for x in vec![Integer::from(0), Integer::from(1)] {
-            for y in vec![Integer::from(0), Integer::from(1)] {
-                for z in vec![Integer::from(0), Integer::from(1)] {
-                    let f: Integer = z.clone() + 2 * y.clone() + 4 * x.clone();
+#[test]
+fn mle_1() {
+    let mut rand = RandState::new();
 
-                    let uni_out = horners_eval(coeffs.clone(), f);
+    let mut points: Vec<(Integer, Integer)> = vec![];
+    for x in 0..8 {
+        let mut lim = Integer::from(1019);
+        lim.random_below_mut(&mut rand);
+        points.push((Integer::from(x), lim));
+    }
+    println!("points: {:#?}", points);
+    let uni = points.clone().into_iter().map(|(_, y)| y).collect();
 
-                    /*
-                    let mle_out = &mle[0]
-                        + (&mle[1] * &z)
-                        + (&mle[2] * &y)
-                        + (&mle[3] * &y * &z)
-                        + (&mle[4] * &x)
-                        + (mle[5] * &x * &z)
-                        + (mle[6] * &x * &y)
-                        + (mle[7] * &x * &y * &z);
-                    */
+    let coeffs = lagrange_field(points);
+    println!("coeffs: {:#?}", coeffs);
 
-                    let vec = vec![z.clone(), y.clone(), x.clone()];
-                    let mle_eval = mle_partial_eval(&mle, &vec);
+    let mle = mle_from_pts(uni);
+    println!("mle coeffs: {:#?}", mle);
 
-                    assert_eq!(mle_eval.1, uni_out);
-                    //assert_eq!(mle_out, mle_eval.1);
-                }
+    for x in vec![Integer::from(0), Integer::from(1)] {
+        for y in vec![Integer::from(0), Integer::from(1)] {
+            for z in vec![Integer::from(0), Integer::from(1)] {
+                let f: Integer = z.clone() + 2 * y.clone() + 4 * x.clone();
+
+                let uni_out = horners_eval(coeffs.clone(), f);
+
+                /*
+                let mle_out = &mle[0]
+                    + (&mle[1] * &z)
+                    + (&mle[2] * &y)
+                    + (&mle[3] * &y * &z)
+                    + (&mle[4] * &x)
+                    + (mle[5] * &x * &z)
+                    + (mle[6] * &x * &y)
+                    + (mle[7] * &x * &y * &z);
+                */
+
+                let vec = vec![z.clone(), y.clone(), x.clone()];
+                let mle_eval = mle_partial_eval(&mle, &vec);
+
+                assert_eq!(mle_eval.1, uni_out);
+                //assert_eq!(mle_out, mle_eval.1);
             }
         }
     }
+}
 
 #[test]
-    fn mle_sums() {
-        let mle_T = vec![
-            Integer::from(9),
-            Integer::from(4),
-            Integer::from(5),
-            Integer::from(7),
-        ];
+fn mle_sums() {
+    let mle_T = vec![
+        Integer::from(9),
+        Integer::from(4),
+        Integer::from(5),
+        Integer::from(7),
+    ];
 
-        // generate polynomial g's for sum check
-        let mut sc_rs = vec![];
+    // generate polynomial g's for sum check
+    let mut sc_rs = vec![];
 
-        // round 1
-        let (mut g_coeff, mut g_const) = mle_sum_evals(&mle_T, &sc_rs);
-        assert_eq!(g_coeff, Integer::from(17));
-        assert_eq!(g_const, Integer::from(22));
+    // round 1
+    let (mut g_coeff, mut g_const) = mle_sum_evals(&mle_T, &sc_rs);
+    assert_eq!(g_coeff, Integer::from(17));
+    assert_eq!(g_const, Integer::from(22));
 
-        sc_rs.push(Integer::from(10));
+    sc_rs.push(Integer::from(10));
 
-        // round 2
-        (g_coeff, g_const) = mle_sum_evals(&mle_T, &sc_rs);
-        assert_eq!(g_coeff, Integer::from(74));
-        assert_eq!(g_const, Integer::from(59));
+    // round 2
+    (g_coeff, g_const) = mle_sum_evals(&mle_T, &sc_rs);
+    assert_eq!(g_coeff, Integer::from(74));
+    assert_eq!(g_const, Integer::from(59));
 
-        sc_rs.push(Integer::from(4));
+    sc_rs.push(Integer::from(4));
 
-        // last V check
-        (g_coeff, g_const) = mle_partial_eval(&mle_T, &sc_rs.into_iter().rev().collect());
-        assert_eq!(g_coeff, Integer::from(0));
-        assert_eq!(g_const, Integer::from(355));
-    }
+    // last V check
+    (g_coeff, g_const) = mle_partial_eval(&mle_T, &sc_rs.into_iter().rev().collect());
+    assert_eq!(g_coeff, Integer::from(0));
+    assert_eq!(g_const, Integer::from(355));
+}
