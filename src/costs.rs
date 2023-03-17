@@ -3,13 +3,15 @@ use crate::dfa::DFA;
 
 static POSEIDON_NUM: usize = 238; // jess took literal measurement and 238 is the real diff
 
+
+#[derive(Debug, Clone)]
 pub enum JBatching {
     NaivePolys,
     Plookup,
     Nlookup,
 }
 
-pub fn naive_cost_model_nohash(dfa: &'a DFA, batch_size: usize, is_match: bool) -> usize {
+pub fn naive_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize, is_match: bool) -> usize {
     // vanishing poly - m * n multiplications + 2 for lookup
     let mut cost = dfa.nstates() * dfa.nchars() + 2;
     cost *= batch_size;
@@ -27,7 +29,7 @@ pub fn naive_cost_model_nohash(dfa: &'a DFA, batch_size: usize, is_match: bool) 
     cost
 }
 
-pub fn plookup_cost_model_nohash(dfa: &'a DFA, batch_size: usize) -> usize {
+pub fn plookup_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
     let mut cost = 0;
     // 2 prove sequence constructions
     cost = dfa.nstates() * dfa.nchars();
@@ -43,7 +45,7 @@ pub fn plookup_cost_model_nohash(dfa: &'a DFA, batch_size: usize) -> usize {
     cost
 }
 
-pub fn plookup_cost_model_hash(dfa: &'a DFA, batch_size: usize) -> usize {
+pub fn plookup_cost_model_hash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
     let mut cost: usize = plookup_cost_model_nohash(dfa, batch_size);
 
     //Randomized difference
@@ -55,7 +57,7 @@ pub fn plookup_cost_model_hash(dfa: &'a DFA, batch_size: usize) -> usize {
     cost
 }
 
-pub fn nlookup_cost_model_nohash(dfa: &'a DFA, batch_size: usize) -> usize {
+pub fn nlookup_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
     let mn: usize = dfa.nstates() * dfa.ab.len();
     let log_mn: usize = (mn as f32).log2().ceil() as usize;
     let mut cost: usize = 0;
@@ -78,7 +80,7 @@ pub fn nlookup_cost_model_nohash(dfa: &'a DFA, batch_size: usize) -> usize {
     cost
 }
 
-pub fn nlookup_cost_model_hash(dfa: &'a DFA, batch_size: usize) -> usize {
+pub fn nlookup_cost_model_hash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
     let mn: usize = dfa.nstates() * dfa.ab.len();
     let log_mn: usize = (mn as f32).log2().ceil() as usize;
     let mut cost = nlookup_cost_model_nohash(dfa, batch_size);
@@ -92,7 +94,7 @@ pub fn nlookup_cost_model_hash(dfa: &'a DFA, batch_size: usize) -> usize {
     cost
 }
 
-pub fn full_round_cost_model_nohash(
+pub fn full_round_cost_model_nohash<'a>(
     dfa: &'a DFA,
     batch_size: usize,
     lookup_type: JBatching,
@@ -106,7 +108,7 @@ pub fn full_round_cost_model_nohash(
     cost
 }
 
-pub fn full_round_cost_model(
+pub fn full_round_cost_model<'a>(
     dfa: &'a DFA,
     batch_size: usize,
     lookup_type: JBatching,
@@ -121,7 +123,7 @@ pub fn full_round_cost_model(
     cost
 }
 
-pub fn opt_cost_model_select_with_batch(
+pub fn opt_cost_model_select_with_batch<'a>(
     dfa: &'a DFA,
     batch_size: usize,
     is_match: bool,
@@ -143,7 +145,7 @@ pub fn opt_cost_model_select_with_batch(
 
     (opt_batching, cost * (doc_length / batch_size))
 }
-pub fn opt_cost_model_select(
+pub fn opt_cost_model_select<'a>(
     dfa: &'a DFA,
     batch_range_lower: usize,
     batch_range_upper: usize,
