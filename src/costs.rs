@@ -143,7 +143,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
         opt_batching = JBatching::Plookup;
     }
 
-    (opt_batching, cost * (doc_length / batch_size))
+    (opt_batching, (cost + 10000)*(2*(doc_length / batch_size)+8))
 }
 pub fn opt_cost_model_select<'a>(
     dfa: &'a DFA,
