@@ -236,17 +236,6 @@ fn main() {
     assert!(recursive_snark.is_some());
     let recursive_snark = recursive_snark.unwrap();
 
-    // verify recursive
-    let res = recursive_snark.verify(
-        &pp,
-        FINAL_EXTERNAL_COUNTER,
-        z0_primary.clone(),
-        z0_secondary.clone(),
-    );
-    //println!("Recursive res: {:#?}", res);
-
-    assert!(res.is_ok());
-
     // compressed SNARK
     type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
     type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
@@ -256,11 +245,15 @@ fn main() {
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
 
+    let nova_prover_ms = n_time.elapsed().as_millis();
+
+    let n_time = Instant::now();
+
     // verify compressed
     let res = compressed_snark.verify(&pp, FINAL_EXTERNAL_COUNTER, z0_primary, z0_secondary);
     assert!(res.is_ok());
 
-    let nova_ms = n_time.elapsed().as_millis();
+    let nova_verifier_ms = n_time.elapsed().as_millis();
 
-    println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
+    println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_prover_ms {:#?}, nova_verifier_ms {:#?}",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_prover_ms, nova_verifier_ms);
 }
