@@ -88,7 +88,7 @@ fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
 // returns (coeff (of "hole"), constant)
 // if no hole, returns (crap, full result)
 // O(mn log mn) :)
-fn prover_mle_t_partial_eval(table: Vec<Integer>, x: Vec<Integer>) -> (Integer, Integer) {
+fn prover_mle_t_partial_eval(table: &Vec<Integer>, x: &Vec<Integer>) -> (Integer, Integer) {
     let base: usize = 2;
     let m = x.len();
     assert!(base.pow(m as u32 - 1) <= table.len());
@@ -130,6 +130,39 @@ fn prover_mle_t_partial_eval(table: Vec<Integer>, x: Vec<Integer>) -> (Integer, 
     }
     hole_coeff -= &minus_coeff;
     (hole_coeff, minus_coeff)
+}
+
+// for sum check, computes the sum of many mle univar slices
+// takes raw table (pre mle'd), and rands = [r_0, r_1,...], leaving off the hole and x_i's
+fn prover_mle_t_sum_eval(table: &Vec<Integer>, rands: &Vec<Integer>) -> (Integer, Integer) {
+    let mut sum_coeff = Integer::from(0);
+    let mut sum_con = Integer::from(0);
+    let hole = rands.len();
+    let total = (table.len() as f32).log2().ceil() as usize;
+    let num_x = total - hole - 1;
+    assert!(num_x >= 0, "batch size too small for nlookup");
+
+    let base: usize = 2;
+
+    for combo in 0..base.pow(num_x as u32) {
+        let mut eval_at = rands.clone();
+        eval_at.push(Integer::from(-1));
+
+        for i in 0..num_x {
+            eval_at.push(Integer::from((combo >> i) & 1));
+        }
+
+        println!("eval at: {:#?}", eval_at.clone());
+        let (coeff, con) = prover_mle_t_partial_eval(table, &eval_at.into_iter().rev().collect()); // TODO
+
+        sum_coeff += &coeff;
+        sum_con += &con;
+    }
+
+    (
+        sum_coeff.rem_floor(cfg().field().modulus()),
+        sum_con.rem_floor(cfg().field().modulus()),
+    )
 }
 
 // CIRCUITS
@@ -629,7 +662,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     ) -> (FxHashMap<String, Value>, usize) {
         match self.batching {
             JBatching::NaivePolys => self.gen_wit_i_polys(batch_num, current_state),
-            JBatching::Nlookup => todo!(), //self.gen_wit_i_nlookup(batch_num, current_state),
+            JBatching::Nlookup => self.gen_wit_i_nlookup(batch_num, current_state),
             JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
@@ -641,78 +674,79 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     ) -> (FxHashMap<String, Value>, usize) {
         let mut wits = FxHashMap::default();
 
-        /*        // TODO - what needs to be public?
+        // TODO - what needs to be public?
 
-                // generate claim r
-                let claim_r = self.prover_random_from_seed(5); // TODO make general
+        // generate claim r
+        let claim_r = self.prover_random_from_seed(5); // TODO make general
 
-                wits.insert(format!("claim_r"), new_wit(claim_r));
+        wits.insert(format!("claim_r"), new_wit(claim_r));
 
-                // generate claim v's (well, v isn't a real named var, generate the states/chars)
-                let mut state_i = current_state;
-                let mut next_state = 0;
-                let mut v = vec![];
-                for i in 0..self.batch_size {
-                    let c = self.doc[batch_num * self.batch_size + i].clone();
-                    next_state = self.dfa.delta(&state_i, &c.to_string()).unwrap();
+        // generate claim v's (well, v isn't a real named var, generate the states/chars)
+        let mut state_i = current_state;
+        let mut next_state = 0;
+        let mut v = vec![];
+        for i in 1..=self.batch_size {
+            let c = self.doc[batch_num * self.batch_size + i - 1].clone();
+            next_state = self.dfa.delta(&state_i, &c.to_string()).unwrap();
 
-                    wits.insert(format!("state_{}", i), new_wit(state_i));
-                    wits.insert(
-                        format!("char_{}", i),
-                        new_wit(self.dfa.ab_to_num(&c.to_string())),
-                    );
+            wits.insert(format!("state_{}", i - 1), new_wit(state_i));
+            wits.insert(
+                format!("char_{}", i - 1),
+                new_wit(self.dfa.ab_to_num(&c.to_string())),
+            );
 
-                    // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
+            // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
 
-                    v.push(
-                        Integer::from(
-                            (state_i * self.dfa.nstates() * self.dfa.nchars())
-                                + (next_state * self.dfa.nchars())
-                                + self.dfa.ab_to_num(&c.to_string()),
-                        )
-                        .rem_floor(cfg().field().modulus()),
-                    );
-                }
-                // last state
-                wits.insert(format!("state_{}", self.batch_size), new_wit(state_i));
+            v.push(
+                Integer::from(
+                    (state_i * self.dfa.nstates() * self.dfa.nchars())
+                        + (next_state * self.dfa.nchars())
+                        + self.dfa.ab_to_num(&c.to_string()),
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
+        }
+        // last state
+        wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
 
-                //v.push(Integer::from(4)); // dummy!! TODO
-                //wits.insert(format!("v_for_T"), new_wit(4));
+        //v.push(Integer::from(4)); // dummy!! TODO
+        //wits.insert(format!("v_for_T"), new_wit(4));
 
-                println!("v: {:#?}", v.clone());
+        println!("v: {:#?}", v.clone());
 
-                // generate T
-                let mut table = vec![];
-                for (ins, c, out) in self.dfa.deltas() {
-                    table.push(
-                        Integer::from(
-                            (ins * self.dfa.nstates() * self.dfa.nchars())
-                                + (out * self.dfa.nchars())
-                                + self.dfa.ab_to_num(&c.to_string()),
-                        )
-                        .rem_floor(cfg().field().modulus()),
-                    );
-                }
+        // generate T
+        let mut table = vec![];
+        for (ins, c, out) in self.dfa.deltas() {
+            table.push(
+                Integer::from(
+                    (ins * self.dfa.nstates() * self.dfa.nchars())
+                        + (out * self.dfa.nchars())
+                        + self.dfa.ab_to_num(&c.to_string()),
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
+        }
 
-                // need to round out table size
-                let base: usize = 2;
-                while table.len() < base.pow((table.len() as f32).log2().ceil() as u32) {
-                    table.push(
-                        Integer::from(
-                            (self.dfa.nstates() * self.dfa.nstates() * self.dfa.nchars())
-                                + (self.dfa.nstates() * self.dfa.nchars())
-                                + self.dfa.nchars(),
-                        )
-                        .rem_floor(cfg().field().modulus()),
-                    );
-                }
+        /*
+        // need to round out table size
+        let base: usize = 2;
+        while table.len() < base.pow((table.len() as f32).log2().ceil() as u32) {
+            table.push(
+                Integer::from(
+                    (self.dfa.nstates() * self.dfa.nstates() * self.dfa.nchars())
+                        + (self.dfa.nstates() * self.dfa.nchars())
+                        + self.dfa.nchars(),
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
+        }
+        */
 
-                println!("table: {:#?}", table);
-                let mle_T = mle_from_pts(table.clone());
+        println!("table: {:#?}", table);
 
-                // generate polynomial g's for sum check
-                let mut sc_rs = vec![];
-
+        // generate polynomial g's for sum check
+        //let mut sc_rs = vec![];
+        /*
                 println!("T mle coeffs: {:#?}", mle_T);
                 let mut g_coeff = Integer::from(0);
                 let mut g_const = Integer::from(0);
@@ -841,7 +875,7 @@ mod tests {
             for x_2 in v.clone() {
                 for x_3 in v.clone() {
                     let x = vec![Integer::from(x_3), Integer::from(x_2), Integer::from(x_1)];
-                    let (coeff, con) = prover_mle_t_partial_eval(table.clone(), x);
+                    let (coeff, con) = prover_mle_t_partial_eval(&table, &x);
                     println!(
                         "coeff {:#?}, con {:#?} @ {:#?}{:#?}{:#?}",
                         coeff, con, x_1, x_2, x_3
@@ -874,6 +908,41 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    #[serial]
+    fn mle_sums() {
+        let table = vec![
+            Integer::from(9),
+            Integer::from(4),
+            Integer::from(5),
+            Integer::from(7),
+        ];
+
+        // generate polynomial g's for sum check
+        let mut sc_rs = vec![];
+
+        // round 1
+        let (mut g_coeff, mut g_const) = prover_mle_t_sum_eval(&table, &sc_rs);
+        println!("mle sums {:#?}, {:#?}", g_coeff, g_const);
+        assert_eq!(g_coeff, Integer::from(1018));
+        assert_eq!(g_const, Integer::from(13));
+
+        sc_rs.push(Integer::from(10));
+
+        // round 2
+        (g_coeff, g_const) = prover_mle_t_sum_eval(&table, &sc_rs);
+        println!("mle sums {:#?}, {:#?}", g_coeff, g_const);
+        assert_eq!(g_coeff, Integer::from(65));
+        assert_eq!(g_const, Integer::from(988));
+
+        sc_rs.push(Integer::from(4));
+
+        // last V check
+        (g_coeff, g_const) = prover_mle_t_partial_eval(&table, &sc_rs.into_iter().rev().collect());
+        println!("mle sums {:#?}, {:#?}", g_coeff, g_const);
+        assert_eq!(g_const, Integer::from(229));
     }
 
     fn test_func_no_hash(ab: String, rstr: String, doc: String, batch_sizes: Vec<usize>) {
