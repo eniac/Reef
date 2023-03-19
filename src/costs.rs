@@ -161,7 +161,7 @@ pub fn opt_cost_model_select<'a>(
     );
 
     for n in batch_range_lower..batch_range_upper + 1 {
-        let mut batching_and_cost: (JBatching, usize) =
+        let batching_and_cost: (JBatching, usize) =
             opt_cost_model_select_with_batch(dfa, 2 << n, is_match, doc_length);
         if batching_and_cost.1 < cost {
             cost = batching_and_cost.1;
