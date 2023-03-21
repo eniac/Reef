@@ -1,6 +1,6 @@
-use crate::dfa::DFA;
 use crate::costs;
-use crate::costs::{JBatching,opt_cost_model_select};
+use crate::costs::{opt_cost_model_select, JBatching};
+use crate::dfa::DFA;
 use bitvec::prelude::*;
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
@@ -88,37 +88,43 @@ fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
 // returns (coeff (of "hole"), constant)
 // if no hole, returns (crap, full result)
 // O(mn log mn) :)
-fn prover_mle_t_partial_eval(table: &Vec<Integer>, x: &Vec<Integer>) -> (Integer, Integer) {
+// x = eval_at, prods = coeffs of eq(), e's = e/q's
+fn prover_mle_partial_eval(
+    prods: &Vec<Integer>,
+    x: &Vec<Integer>,
+    es: &Vec<usize>,
+) -> (Integer, Integer) {
     let base: usize = 2;
     let m = x.len();
-    assert!(base.pow(m as u32 - 1) <= table.len());
-    assert!(base.pow(m as u32) >= table.len());
+    assert!(base.pow(m as u32 - 1) <= prods.len());
+    assert!(base.pow(m as u32) >= prods.len());
 
     let mut sum = Integer::from(0);
     let mut hole_coeff = Integer::from(0);
     let mut minus_coeff = Integer::from(0);
-    for e in 0..table.len() {
-        let mut prod = table[e].clone();
+    for i in 0..es.len() {
+        //e in 0..table.len() {
+        let mut prod = prods[i].clone();
 
         // ~eq(x,e)
         let mut next_hole_coeff = 0;
         let mut next_minus_coeff = 0;
-        for i in 0..m {
-            let ei = (e >> i) & 1;
+        for j in 0..m {
+            let ej = (es[i] >> j) & 1;
             // for each x
-            if (x[i] == -1) {
-                // if x_i is the hole
-                next_hole_coeff = ei;
-                next_minus_coeff = 1 - ei;
+            if (x[j] == -1) {
+                // if x_j is the hole
+                next_hole_coeff = ej;
+                next_minus_coeff = 1 - ej;
             } else {
                 let mut intm = Integer::from(1);
-                if ei == 1 {
-                    intm.assign(&x[i]);
+                if ej == 1 {
+                    intm.assign(&x[j]);
                 } else {
-                    // ei == 0
-                    intm -= &x[i];
+                    // ej == 0
+                    intm -= &x[j];
                 }
-                prod *= intm; //&x[i] * ei + (1 - &x[i]) * (1 - ei);
+                prod *= intm; //&x[j] * ej + (1 - &x[j]) * (1 - ej);
             }
         }
         if next_hole_coeff == 1 {
@@ -129,13 +135,22 @@ fn prover_mle_t_partial_eval(table: &Vec<Integer>, x: &Vec<Integer>) -> (Integer
         }
     }
     hole_coeff -= &minus_coeff;
-    (hole_coeff, minus_coeff)
+    (
+        hole_coeff.rem_floor(cfg().field().modulus()),
+        minus_coeff.rem_floor(cfg().field().modulus()),
+    )
 }
 
 // for sum check, computes the sum of many mle univar slices
 // takes raw table (pre mle'd), and rands = [r_0, r_1,...], leaving off the hole and x_i's
-fn prover_mle_t_sum_eval(table: &Vec<Integer>, rands: &Vec<Integer>) -> (Integer, Integer) {
-    let mut sum_coeff = Integer::from(0);
+fn prover_mle_sum_eval(
+    table: &Vec<Integer>,
+    rands: &Vec<Integer>,
+    qs: &Vec<usize>,
+    claim_r: &Integer,
+) -> (Integer, Integer, Integer) {
+    let mut sum_xsq = Integer::from(0);
+    let mut sum_x = Integer::from(0);
     let mut sum_con = Integer::from(0);
     let hole = rands.len();
     let total = (table.len() as f32).log2().ceil() as usize;
@@ -153,14 +168,35 @@ fn prover_mle_t_sum_eval(table: &Vec<Integer>, rands: &Vec<Integer>) -> (Integer
         }
 
         println!("eval at: {:#?}", eval_at.clone());
-        let (coeff, con) = prover_mle_t_partial_eval(table, &eval_at.into_iter().rev().collect()); // TODO
+        // T(j)
+        let (coeff_a, con_a) = prover_mle_partial_eval(
+            table,
+            &eval_at.clone().into_iter().rev().collect(), // TODO
+            &(0..table.len()).collect(),
+        ); // TODO
+        println!("T {:#?}, {:#?}", coeff_a, con_a);
 
-        sum_coeff += &coeff;
-        sum_con += &con;
+        // r^i * eq(q_i,j) for all i
+        // TODO - eq must be an MLE? ask
+
+        // make rs (horner esq)
+        let mut rs = vec![claim_r.clone()];
+        for i in 1..qs.len() {
+            rs.push(rs[i - 1].clone() * claim_r);
+        }
+
+        let (coeff_b, con_b) =
+            prover_mle_partial_eval(&rs, &eval_at.into_iter().rev().collect(), &qs);
+        println!("eq {:#?}, {:#?}", coeff_b, con_b);
+        sum_xsq += &coeff_a * &coeff_b;
+        sum_x += &coeff_b * &con_a;
+        sum_x += &coeff_a * &con_b;
+        sum_con += &con_a * &con_b;
     }
 
     (
-        sum_coeff.rem_floor(cfg().field().modulus()),
+        sum_xsq.rem_floor(cfg().field().modulus()),
+        sum_x.rem_floor(cfg().field().modulus()),
         sum_con.rem_floor(cfg().field().modulus()),
     )
 }
@@ -565,6 +601,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             // g_j is degree 1 in our case (woo constant time evaluation)
 
             // V checks g_{j-1}(r_{j-1}) = g_j(0) + g_j(1)
+            // Ax^2 + Bx + C -> A + B + C + C TODO
             let g_j = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
@@ -672,6 +709,19 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         batch_num: usize,
         current_state: usize,
     ) -> (FxHashMap<String, Value>, usize) {
+        // generate T
+        let mut table = vec![];
+        for (ins, c, out) in self.dfa.deltas() {
+            table.push(
+                Integer::from(
+                    (ins * self.dfa.nstates() * self.dfa.nchars())
+                        + (out * self.dfa.nchars())
+                        + self.dfa.ab_to_num(&c.to_string()),
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
+        }
+
         let mut wits = FxHashMap::default();
 
         // TODO - what needs to be public?
@@ -679,12 +729,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // generate claim r
         let claim_r = self.prover_random_from_seed(5); // TODO make general
 
-        wits.insert(format!("claim_r"), new_wit(claim_r));
+        wits.insert(format!("claim_r"), new_wit(claim_r.clone()));
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
         let mut state_i = current_state;
         let mut next_state = 0;
         let mut v = vec![];
+        let mut q = vec![];
         for i in 1..=self.batch_size {
             let c = self.doc[batch_num * self.batch_size + i - 1].clone();
             next_state = self.dfa.delta(&state_i, &c.to_string()).unwrap();
@@ -705,6 +756,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 )
                 .rem_floor(cfg().field().modulus()),
             );
+
+            q.push(table.iter().position(|val| val == &v[i]).unwrap());
         }
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
@@ -713,19 +766,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         //wits.insert(format!("v_for_T"), new_wit(4));
 
         println!("v: {:#?}", v.clone());
-
-        // generate T
-        let mut table = vec![];
-        for (ins, c, out) in self.dfa.deltas() {
-            table.push(
-                Integer::from(
-                    (ins * self.dfa.nstates() * self.dfa.nchars())
-                        + (out * self.dfa.nchars())
-                        + self.dfa.ab_to_num(&c.to_string()),
-                )
-                .rem_floor(cfg().field().modulus()),
-            );
-        }
 
         /*
         // need to round out table size
@@ -745,63 +785,61 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         println!("table: {:#?}", table);
 
         // generate polynomial g's for sum check
-        //let mut sc_rs = vec![];
-        /*
-                println!("T mle coeffs: {:#?}", mle_T);
-                let mut g_coeff = Integer::from(0);
-                let mut g_const = Integer::from(0);
-                for i in 1..=self.batch_size {
-                    // going to use thaler numbering for sum check
-                    // i don't like it either
-                    // + 1 {
+        let mut sc_rs = vec![];
 
-                    (g_coeff, g_const) = mle_sum_evals(&mle_T, &sc_rs);
+        let mut g_xsq = Integer::from(0);
+        let mut g_x = Integer::from(0);
+        let mut g_const = Integer::from(0);
+        for i in 1..=self.batch_size {
+            // + 1 {
 
-                    wits.insert(format!("sc_g_{}_coeff", i), new_wit(g_coeff.clone()));
-                    wits.insert(format!("sc_g_{}_const", i), new_wit(g_const.clone()));
+            (g_xsq, g_x, g_const) = prover_mle_sum_eval(&table, &sc_rs, &q, &claim_r);
 
-                    // new sumcheck rand for the round
-                    let rand = self.prover_random_from_seed(i); // TODO make gen
-                    sc_rs.push(rand.clone());
-                    wits.insert(format!("sc_r_{}", i), new_wit(rand));
-                }
-                // last claim = g_v(r_v)
-                g_coeff *= &sc_rs[sc_rs.len() - 1];
-                g_const += &g_coeff;
-                let last_claim = g_const.rem_floor(cfg().field().modulus());
-                wits.insert(format!("sc_last_claim"), new_wit(last_claim));
+            wits.insert(format!("sc_g_{}_xsq", i), new_wit(g_xsq.clone()));
+            wits.insert(format!("sc_g_{}_x", i), new_wit(g_x.clone()));
+            wits.insert(format!("sc_g_{}_const", i), new_wit(g_const.clone()));
 
-                // generate sum check eq vals
-                // find qi list
-                let mut qis = vec![];
-                for i in 0..table.len() {
-                    //v.len() {
-                    // TODO clone elim
-                    qis.push(table.clone().into_iter().position(|t| t == v[i]).unwrap());
+            // new sumcheck rand for the round
+            let rand = self.prover_random_from_seed(i); // TODO make gen
+            sc_rs.push(rand.clone());
+            wits.insert(format!("sc_r_{}", i), new_wit(rand));
+        }
+        // last claim = g_v(r_v)
+        g_x *= &sc_rs[sc_rs.len() - 1];
+        g_const += &g_x; // hard TODO
 
-                    // convert to bits
-                    let qi_bits: Vec<Integer> = (0..((table.len() as f32).log2().ceil() as usize))
-                        .map(|n| Integer::from((qis[i] >> n) & 1))
-                        .collect();
-                    println!("qi bits {:#?}", qi_bits);
-                    let temp_eval = mle_partial_eval(&mle_T, &qi_bits.into_iter().rev().collect());
-                    println!("T eval {:#?}", temp_eval);
+        let last_claim = g_const.rem_floor(cfg().field().modulus());
+        wits.insert(format!("sc_last_claim"), new_wit(last_claim));
 
-                    /*for b in bits {
-                        wits.insert(format!("eq{}_q_{}", i, b), new_wit(BIT));
+        // generate sum check eq vals
+        // find qi list
+        /*let mut qis = vec![];
+                        for i in 0..table.len() {
+                            //v.len() {
+                            // TODO clone elim
+                            qis.push(table.clone().into_iter().position(|t| t == v[i]).unwrap());
 
-                    }*/
-                }
-                println!("qis {:#?}", qis);
+                            // convert to bits
+                            let qi_bits: Vec<Integer> = (0..((table.len() as f32).log2().ceil() as usize))
+                                .map(|n| Integer::from((qis[i] >> n) & 1))
+                                .collect();
+                            println!("qi bits {:#?}", qi_bits);
+                            let temp_eval = mle_partial_eval(&mle_T, &qi_bits.into_iter().rev().collect());
+                            println!("T eval {:#?}", temp_eval);
 
-                // sanity check, lhs = rhs
+                            /*for b in bits {
+                                wits.insert(format!("eq{}_q_{}", i, b), new_wit(BIT));
 
-                // other
-                // wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
-                println!("wits: {:#?}", wits);
-                (wits, next_state)
+                            }*/
+                        }
+                        println!("qis {:#?}", qis);
         */
-        (wits, 0)
+        // sanity check, lhs = rhs
+
+        // other
+        // wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
+        println!("wits: {:#?}", wits);
+        (wits, next_state)
     }
 
     // TODO BATCH SIZE (rn = 1)
@@ -875,7 +913,8 @@ mod tests {
             for x_2 in v.clone() {
                 for x_3 in v.clone() {
                     let x = vec![Integer::from(x_3), Integer::from(x_2), Integer::from(x_1)];
-                    let (coeff, con) = prover_mle_t_partial_eval(&table, &x);
+                    let (coeff, con) =
+                        prover_mle_partial_eval(&table, &x, &(0..table.len()).collect());
                     println!(
                         "coeff {:#?}, con {:#?} @ {:#?}{:#?}{:#?}",
                         coeff, con, x_1, x_2, x_3
@@ -884,19 +923,19 @@ mod tests {
                     if ((x_1 == -1) ^ (x_2 == -1) ^ (x_3 == -1)) & !(x_1 + x_2 + x_3 == -3) {
                         if x_1 == -1 {
                             assert_eq!(
-                                coeff.clone() + con.clone(),
+                                (coeff.clone() + con.clone()).rem_floor(cfg().field().modulus()),
                                 table[(4 + x_2 * 2 + x_3) as usize]
                             );
                             assert_eq!(con.clone(), table[(x_2 * 2 + x_3) as usize]);
                         } else if x_2 == -1 {
                             assert_eq!(
-                                coeff.clone() + con.clone(),
+                                (coeff.clone() + con.clone()).rem_floor(cfg().field().modulus()),
                                 table[(x_1 * 4 + 2 + x_3) as usize]
                             );
                             assert_eq!(con.clone(), table[(x_1 * 4 + x_3) as usize]);
                         } else if x_3 == -1 {
                             assert_eq!(
-                                coeff.clone() + con.clone(),
+                                (coeff.clone() + con.clone()).rem_floor(cfg().field().modulus()),
                                 table[(x_1 * 4 + x_2 * 2 + 1) as usize]
                             );
                             assert_eq!(con.clone(), table[(x_1 * 4 + x_2 * 2) as usize]);
@@ -922,27 +961,43 @@ mod tests {
 
         // generate polynomial g's for sum check
         let mut sc_rs = vec![];
+        let claim_r = Integer::from(17);
 
         // round 1
-        let (mut g_coeff, mut g_const) = prover_mle_t_sum_eval(&table, &sc_rs);
-        println!("mle sums {:#?}, {:#?}", g_coeff, g_const);
-        assert_eq!(g_coeff, Integer::from(1018));
-        assert_eq!(g_const, Integer::from(13));
+        let (mut g_xsq, mut g_x, mut g_const) =
+            prover_mle_sum_eval(&table, &sc_rs, &vec![1, 0], &claim_r);
+        println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
+        assert_eq!(g_xsq, Integer::from(86));
+        assert_eq!(g_x, Integer::from(302));
+        assert_eq!(g_const, Integer::from(631));
 
         sc_rs.push(Integer::from(10));
 
         // round 2
-        (g_coeff, g_const) = prover_mle_t_sum_eval(&table, &sc_rs);
-        println!("mle sums {:#?}, {:#?}", g_coeff, g_const);
-        assert_eq!(g_coeff, Integer::from(65));
-        assert_eq!(g_const, Integer::from(988));
+        (g_xsq, g_x, g_const) = prover_mle_sum_eval(&table, &sc_rs, &vec![1, 0], &claim_r);
+        println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
+        assert_eq!(g_xsq, Integer::from(156));
+        assert_eq!(g_x, Integer::from(626));
+        assert_eq!(g_const, Integer::from(130));
 
         sc_rs.push(Integer::from(4));
 
         // last V check
-        (g_coeff, g_const) = prover_mle_t_partial_eval(&table, &sc_rs.into_iter().rev().collect());
-        println!("mle sums {:#?}, {:#?}", g_coeff, g_const);
-        assert_eq!(g_const, Integer::from(229));
+        let (_, mut con_a) = prover_mle_partial_eval(
+            &table,
+            &sc_rs.clone().into_iter().rev().collect(),
+            &(0..table.len()).collect(),
+        );
+        //println!("mle sums {:#?}, {:#?}", g_x, g_const);
+
+        let (_, mut con_b) = prover_mle_partial_eval(
+            &vec![Integer::from(17), Integer::from(289)],
+            &sc_rs.into_iter().rev().collect(),
+            &vec![1, 0],
+        );
+        con_a *= &con_b;
+
+        assert_eq!(con_a.rem_floor(cfg().field().modulus()), Integer::from(35));
     }
 
     fn test_func_no_hash(ab: String, rstr: String, doc: String, batch_sizes: Vec<usize>) {
@@ -995,12 +1050,7 @@ mod tests {
                 */
                 println!(
                     "cost model: {:#?}",
-                    costs::full_round_cost_model_nohash(
-                        &dfa,
-                        s,
-                        b.clone(),
-                        dfa.is_match(&chars)
-                    )
+                    costs::full_round_cost_model_nohash(&dfa, s, b.clone(), dfa.is_match(&chars))
                 );
                 println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
                 assert!(
