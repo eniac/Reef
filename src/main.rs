@@ -20,10 +20,10 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 pub mod config;
+pub mod costs;
 pub mod dfa;
 pub mod r1cs;
 pub mod regex;
-pub mod costs;
 
 use crate::config::*;
 use crate::dfa::DFA;
