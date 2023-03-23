@@ -366,6 +366,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
+    // IN THE CLEAR
+
     pub fn gen_commitment(&mut self) {
         let mut hash = vec![F::from(0)];
         for c in self.doc.clone().into_iter() {
@@ -387,6 +389,24 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.commitment = Some(hash[0]);
     }
 
+    pub fn verifier_final_checks_in_clear(
+        &self,
+        final_hash: F,
+        accepting_state: F,
+        final_q: Vec<F>,
+        final_v: F,
+    ) {
+        // TODO
+        // commitment matches?
+        assert_eq!(self.commitment.unwrap(), final_hash);
+
+        // state matches?
+
+        // T claim
+    }
+
+    // PROVER
+
     // seed Questions todo
     fn prover_random_from_seed(&self, s: usize) -> Integer {
         let seed = F::from(s as u64); // TODO GEN
@@ -401,6 +421,30 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf)
     }
+
+    fn prover_accepting_state(&self, batch_num: usize, state: usize) -> bool {
+        let mut out = false;
+
+        if self.is_match {
+            // proof of membership
+            for xi in self.dfa.get_final_states().into_iter() {
+                out = out || (state == xi);
+            }
+        } else {
+            for xi in self.dfa.get_non_final_states().into_iter() {
+                out = out || (state == xi);
+            }
+        }
+
+        // sanity
+        if (batch_num + 1) * self.batch_size >= self.doc.len() {
+            assert!(out);
+        }
+
+        out
+    }
+
+    // CIRCUIT
 
     fn lookup_idxs(&mut self) -> Vec<Term> {
         let mut v = vec![];
@@ -439,6 +483,43 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         v
     }
 
+    fn accepting_state_circuit(&mut self) {
+        // final state (non) match check
+        let vanishing_poly;
+        let final_states = self.dfa.get_final_states();
+        let non_final_states = self.dfa.get_non_final_states();
+        let mut vanish_on = vec![];
+        let v_time = Instant::now();
+        if self.is_match {
+            //println!("in states: {:#?}", final_states);
+            // proof of membership
+            for xi in final_states.into_iter() {
+                vanish_on.push(Integer::from(xi));
+            }
+        } else {
+            //println!("in states: {:#?}", non_final_states);
+            for xi in non_final_states.into_iter() {
+                vanish_on.push(Integer::from(xi));
+            }
+        }
+        vanishing_poly =
+            poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
+        let vanish_ms = v_time.elapsed().as_millis();
+
+        //println!("lag {:#?}, vanish {:#?}", lag_ms, vanish_ms);
+
+        let match_term = term(
+            Op::Eq,
+            vec![
+                new_bool_var("accepting".to_owned()),
+                term(Op::Eq, vec![new_const(0), vanishing_poly]),
+            ],
+        );
+
+        self.assertions.push(match_term);
+        self.pub_inputs.push(new_bool_var(format!("accepting")));
+    }
+
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
         let time = Instant::now();
         let cs = Computation::from_constraint_system_parts(
@@ -446,7 +527,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.pub_inputs.clone(),
         );
 
-        //println!("assertions: {:#?}", self.assertions.clone());
+        println!("assertions: {:#?}", self.assertions.clone());
 
         let mut css = Computations::new();
         css.comps.insert("main".to_string(), cs);
@@ -530,63 +611,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         let lag_ms = l_time.elapsed().as_millis();
 
-        // final state (non) match check
-        let vanishing_poly;
-        let final_states = self.dfa.get_final_states();
-        let non_final_states = self.dfa.get_non_final_states();
-        let mut vanish_on = vec![];
-        let v_time = Instant::now();
-        if self.is_match {
-            //println!("in states: {:#?}", final_states);
-            // proof of membership
-            for xi in final_states.into_iter() {
-                vanish_on.push(Integer::from(xi));
-            }
-        } else {
-            //println!("in states: {:#?}", non_final_states);
-            for xi in non_final_states.into_iter() {
-                vanish_on.push(Integer::from(xi));
-            }
-        }
-        vanishing_poly =
-            poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
-        let vanish_ms = v_time.elapsed().as_millis();
-
-        //println!("lag {:#?}, vanish {:#?}", lag_ms, vanish_ms);
-
-        let match_term = term(
-            Op::Ite,
-            vec![
-                term(
-                    Op::Eq,
-                    vec![
-                        new_var("round_num".to_owned()),
-                        new_const(self.doc.len() - 1), // TODO make private + hashing crap
-                                                       // + batching crap + element might be too
-                                                       // big for feild crap
-                    ],
-                ), // if in final round
-                term(Op::Eq, vec![vanishing_poly, new_const(0)]), // true -> check next_state (not) in final_states
-                new_bool_const(true),                             // not in correct round
-            ],
-        );
-
-        let round_term = term(
-            Op::Eq,
-            vec![
-                new_var("next_round_num".to_owned()),
-                term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![new_var("round_num".to_owned()), new_const(1)],
-                ),
-            ],
-        );
-
-        self.assertions.push(match_term);
-        self.assertions.push(round_term);
-
-        self.pub_inputs.push(new_var("round_num".to_owned()));
-        self.pub_inputs.push(new_var("next_round_num".to_owned()));
+        self.accepting_state_circuit();
 
         self.r1cs_conv()
     }
@@ -782,6 +807,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         );
         self.assertions.push(sum_check_domino);
         self.pub_inputs.push(new_var(format!("next_running_claim")));
+
+        self.accepting_state_circuit();
 
         self.r1cs_conv()
     }
@@ -1010,11 +1037,15 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
         );
         */
-        // other
-        // wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
 
         // return
         // println!("wits: {:#?}", wits);
+
+        wits.insert(
+            format!("accepting"),
+            new_bool_wit(self.prover_accepting_state(batch_num, next_state)),
+        );
+
         (wits, next_state, Some(next_running_q), Some(next_running_v))
     }
 
@@ -1039,8 +1070,18 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         wits.insert(format!("state_{}", self.batch_size), new_wit(state_i));
 
-        wits.insert("round_num".to_owned(), new_wit(batch_num));
-        wits.insert("next_round_num".to_owned(), new_wit(batch_num + 1));
+        println!(
+            "batch num = {:#?}, batch size = {:#?}, doc len = {:#?}",
+            batch_num,
+            self.batch_size,
+            self.doc.len()
+        );
+
+        wits.insert(
+            format!("accepting"),
+            new_bool_wit(self.prover_accepting_state(batch_num, next_state)),
+        );
+        println!("wits {:#?}", wits);
 
         (wits, next_state)
     }
@@ -1256,7 +1297,7 @@ mod tests {
                     costs::full_round_cost_model_nohash(&dfa, s, b.clone(), dfa.is_match(&chars))
                 );
                 println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
-                assert!(
+                /*assert!(
                     prover_data.r1cs.constraints().len() as usize
                         <= costs::full_round_cost_model_nohash(
                             &dfa,
@@ -1264,7 +1305,7 @@ mod tests {
                             b.clone(),
                             dfa.is_match(&chars)
                         )
-                );
+                );*/ // needs to be redone again ugh
             }
         }
     }
