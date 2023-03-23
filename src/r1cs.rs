@@ -95,7 +95,7 @@ fn prover_mle_partial_eval(
 ) -> (Integer, Integer) {
     let base: usize = 2;
     let m = x.len();
-    println!("m {:#?}, prods {:#?}", m, prods.len());
+    //println!("m {:#?}, prods {:#?}", m, prods.len());
 
     if for_t {
         assert!(base.pow(m as u32 - 1) <= prods.len());
@@ -197,10 +197,11 @@ fn prover_mle_sum_eval(
     let hole = rands.len();
     let total = (table.len() as f32).log2().ceil() as usize;
 
-    println!(
+    /*println!(
         "sum eval: rands: {:#?}, table: {:#?}, table log {:#?}",
         rands, table, total
     );
+    */
     assert!(hole + 1 <= total, "batch size too small for nlookup");
     let num_x = total - hole - 1;
 
@@ -214,7 +215,7 @@ fn prover_mle_sum_eval(
             eval_at.push(Integer::from((combo >> i) & 1));
         }
 
-        println!("eval at: {:#?}", eval_at.clone());
+        //println!("eval at: {:#?}", eval_at.clone());
         // T(j)
         let (coeff_a, con_a) = prover_mle_partial_eval(
             table,
@@ -223,7 +224,7 @@ fn prover_mle_sum_eval(
             true,
             None,
         ); // TODO
-        println!("T {:#?}, {:#?}", coeff_a, con_a);
+           //println!("T {:#?}, {:#?}", coeff_a, con_a);
 
         // r^i * eq(q_i,j) for all i
         // TODO - eq must be an MLE? ask
@@ -241,7 +242,7 @@ fn prover_mle_sum_eval(
             false,
             last_q,
         );
-        println!("eq {:#?}, {:#?}", coeff_b, con_b);
+        //println!("eq {:#?}, {:#?}", coeff_b, con_b);
         sum_xsq += &coeff_a * &coeff_b;
         sum_x += &coeff_b * &con_a;
         sum_x += &coeff_a * &con_b;
@@ -445,7 +446,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.pub_inputs.clone(),
         );
 
-        println!("assertions: {:#?}", self.assertions.clone());
+        //println!("assertions: {:#?}", self.assertions.clone());
 
         let mut css = Computations::new();
         css.comps.insert("main".to_string(), cs);
@@ -551,7 +552,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
         let vanish_ms = v_time.elapsed().as_millis();
 
-        println!("lag {:#?}, vanish {:#?}", lag_ms, vanish_ms);
+        //println!("lag {:#?}, vanish {:#?}", lag_ms, vanish_ms);
 
         let match_term = term(
             Op::Ite,
@@ -875,13 +876,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             q.push(table.iter().position(|val| val == &v[i - 1]).unwrap());
 
-            println!(
+            /*println!(
                 "state {:#?} -> {:#?} -> state {:#?} is {:#?} in table",
                 state_i,
                 self.dfa.ab_to_num(&c.to_string()),
                 next_state,
                 &q[i - 1]
-            );
+            );*/
 
             state_i = next_state;
         }
@@ -927,7 +928,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         */
 
-        println!("table: {:#?}", table);
+        //println!("table: {:#?}", table);
 
         // generate polynomial g's for sum check
         let mut sc_rs = vec![];
@@ -947,15 +948,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             let rand = self.prover_random_from_seed(i); // TODO make gen
             sc_rs.push(rand.clone());
             wits.insert(format!("sc_r_{}", i), new_wit(rand.clone()));
-            println!(
-                "{:#?}x^2 + {:#?}x + {:#?}",
-                g_xsq.clone(),
-                g_x.clone(),
-                g_const.clone()
-            );
         }
         // last claim = g_v(r_v)
-        println!("sc rs {:#?}", sc_rs.clone());
+        //println!("sc rs {:#?}", sc_rs.clone());
         g_xsq *= &sc_rs[sc_rs.len() - 1];
         g_xsq *= &sc_rs[sc_rs.len() - 1];
         g_x *= &sc_rs[sc_rs.len() - 1];
@@ -1019,7 +1014,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // wits.insert(format!("round_num"), new_wit(batch_num)); // TODO circuit for this wit
 
         // return
-        println!("wits: {:#?}", wits);
+        // println!("wits: {:#?}", wits);
         (wits, next_state, Some(next_running_q), Some(next_running_v))
     }
 
@@ -1154,7 +1149,7 @@ mod tests {
         // round 1
         let (mut g_xsq, mut g_x, mut g_const) =
             prover_mle_sum_eval(&table, &sc_rs, &vec![1, 0], &claim_r, None);
-        println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
+        //println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
 
         let mut claim = claim_r.clone() * table[1].clone()
             + claim_r.clone() * claim_r.clone() * table[0].clone();
@@ -1169,7 +1164,7 @@ mod tests {
 
         // round 2
         (g_xsq, g_x, g_const) = prover_mle_sum_eval(&table, &sc_rs, &vec![1, 0], &claim_r, None);
-        println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
+        //println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
         assert_eq!(
             claim.rem_floor(cfg().field().modulus()),
             (g_xsq.clone() + g_x.clone() + g_const.clone() + g_const.clone())
@@ -1249,34 +1244,19 @@ mod tests {
                     );
                     //println!("VALUES ROUND {:#?}: {:#?}", i, values);
                     let extd_val = precomp.eval(&values);
-                    println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
+                    //println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
 
                     prover_data.r1cs.check_all(&extd_val);
                     // for next i+1 round
                     current_state = next_state;
                 }
-                /* this got screwed up during merge, not sure where it should be @ Eli
-                        println!(
-                            "cost model: {:#?}",
-                            R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&chars))
-                        );
-                        println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
-                        assert!(
-                            prover_data.r1cs.constraints().len()
-                                <= R1CS::<<G1 as Group>::Scalar>::naive_cost_model_nohash(&dfa, dfa.is_match(&chars))
-                        );
-                    }
-
-                                // for next i+1 round
-                                current_state = next_state;
-                            }
-                */
+                println!("b? {:#?}", b.clone());
                 println!(
                     "cost model: {:#?}",
                     costs::full_round_cost_model_nohash(&dfa, s, b.clone(), dfa.is_match(&chars))
                 );
                 println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
-                /*assert!(
+                assert!(
                     prover_data.r1cs.constraints().len() as usize
                         <= costs::full_round_cost_model_nohash(
                             &dfa,
@@ -1284,7 +1264,7 @@ mod tests {
                             b.clone(),
                             dfa.is_match(&chars)
                         )
-                );*/
+                );
             }
         }
     }

@@ -1,8 +1,6 @@
-
 use crate::dfa::DFA;
 
 static POSEIDON_NUM: usize = 238; // jess took literal measurement and 238 is the real diff
-
 
 #[derive(Debug, Clone)]
 pub enum JBatching {
@@ -69,13 +67,13 @@ pub fn nlookup_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
     cost += log_mn * 3;
 
     //eq calc
-    cost += (batch_size + 1) * (2*log_mn);
+    cost += (batch_size + 1) * (2 * log_mn);
 
     //horners
-    cost += batch_size+1;
+    cost += batch_size + 1;
 
     //mult by Tj
-    cost+=1;
+    cost += 1;
 
     //v_i creation
     cost += batch_size * 3;
@@ -133,8 +131,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
     doc_length: usize,
 ) -> (JBatching, usize) {
     let mut opt_batching: JBatching = JBatching::NaivePolys;
-    let mut cost: usize =
-        full_round_cost_model(dfa, batch_size, JBatching::NaivePolys, is_match);
+    let mut cost: usize = full_round_cost_model(dfa, batch_size, JBatching::NaivePolys, is_match);
 
     if full_round_cost_model(dfa, batch_size, JBatching::Nlookup, is_match) < cost {
         cost = full_round_cost_model(dfa, batch_size, JBatching::Nlookup, is_match);
@@ -146,7 +143,10 @@ pub fn opt_cost_model_select_with_batch<'a>(
         opt_batching = JBatching::Plookup;
     }
 
-    (opt_batching, (cost + 10000)*(2*(doc_length / batch_size)+8))
+    (
+        opt_batching,
+        (cost + 10000) * (2 * (doc_length / batch_size) + 8),
+    )
 }
 pub fn opt_cost_model_select<'a>(
     dfa: &'a DFA,
@@ -156,12 +156,8 @@ pub fn opt_cost_model_select<'a>(
     doc_length: usize,
 ) -> JBatching {
     let mut opt_batching: JBatching = JBatching::NaivePolys;
-    let mut cost = full_round_cost_model(
-        dfa,
-        2 << batch_range_lower,
-        JBatching::NaivePolys,
-        is_match,
-    );
+    let mut cost =
+        full_round_cost_model(dfa, 2 << batch_range_lower, JBatching::NaivePolys, is_match);
 
     for n in batch_range_lower..batch_range_upper + 1 {
         let batching_and_cost: (JBatching, usize) =
