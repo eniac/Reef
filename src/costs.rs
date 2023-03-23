@@ -32,7 +32,7 @@ pub fn naive_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize, is_match: bo
 pub fn plookup_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
     let mut cost = 0;
     // 2 prove sequence constructions
-    cost = dfa.nstates() * dfa.nchars();
+    cost += dfa.nstates() * dfa.nchars();
     cost += batch_size;
     cost = cost * 2;
 
@@ -69,10 +69,13 @@ pub fn nlookup_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
     cost += log_mn * 3;
 
     //eq calc
-    cost += (batch_size + 1) * log_mn;
+    cost += (batch_size + 1) * (2*log_mn);
 
     //horners
-    cost += batch_size * 2;
+    cost += batch_size+1;
+
+    //mult by Tj
+    cost+=1;
 
     //v_i creation
     cost += batch_size * 3;
@@ -100,7 +103,7 @@ pub fn full_round_cost_model_nohash<'a>(
     lookup_type: JBatching,
     is_match: bool,
 ) -> usize {
-    let mut cost = match lookup_type {
+    let cost = match lookup_type {
         JBatching::NaivePolys => naive_cost_model_nohash(dfa, batch_size, is_match),
         JBatching::Nlookup => nlookup_cost_model_nohash(dfa, batch_size),
         JBatching::Plookup => plookup_cost_model_nohash(dfa, batch_size),
