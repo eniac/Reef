@@ -389,7 +389,34 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.commitment = Some(hash[0]);
     }
 
-    pub fn verifier_final_checks_in_clear(
+    // TODO in main
+    pub fn gen_substring_commitment_start(&mut self, start_at: usize) -> F {
+        let mut hash = vec![F::from(0)];
+        let mut i = 0;
+        for c in self.doc.clone().into_iter() {
+            if i == start_at {
+                break;
+            }
+            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+            let acc = &mut ();
+
+            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+            sponge.start(parameter, None, acc);
+            SpongeAPI::absorb(
+                &mut sponge,
+                2,
+                &[hash[0], F::from(self.dfa.ab_to_num(&c.to_string()) as u64)],
+                acc,
+            );
+            hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            sponge.finish(acc).unwrap();
+            i += 1;
+        }
+
+        hash[0]
+    }
+
+    pub fn verifier_final_checks(
         &self,
         final_hash: F,
         accepting_state: F,
