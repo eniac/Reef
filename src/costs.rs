@@ -64,7 +64,7 @@ pub fn nlookup_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
     cost += batch_size + 1;
 
     //Sum-check additions
-    cost += log_mn * 3;
+    cost += log_mn * 5;
 
     //eq calc
     cost += (batch_size + 1) * (2 * log_mn);
