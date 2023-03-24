@@ -789,6 +789,25 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
+        let lookups = self.lookup_idxs();
+        self.nlookup_gadget(lookups, self.dfa.trans.len());
+
+        self.accepting_state_circuit();
+
+        self.r1cs_conv()
+    }
+
+    fn nlookup_doc_commit(&mut self, start: usize, end: usize) {
+        let mut char_lookups = vec![];
+        for c in start..end {
+            char_lookups.push(new_var(format!("char_val_{}", c)));
+            self.pub_inputs.push(new_var(format!("char_val_{}", c)));
+        }
+
+        self.nlookup_gadget(char_lookups, self.doc.len());
+    }
+
+    fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize) {
         // TODO pub inputs -> can make which priv?
         // last state_batch is final "next_state" output
         // v_{batch-1} = (state_{batch-1}, c, state_batch)
@@ -797,7 +816,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         //                    .push(new_var(format!("state_{}", self.batch_size)));
 
         let mut v = vec![new_const(0)]; // dummy constant term for lhs claim
-        v.append(&mut self.lookup_idxs());
+        v.append(&mut lookup_vals);
         v.push(new_var(format!("prev_running_claim"))); // running claim
         self.pub_inputs.push(new_var(format!("prev_running_claim")));
 
@@ -806,8 +825,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.pub_inputs.push(new_var(format!("claim_r")));
 
         // size of table (T -> mle)
-        let sc_l = (self.dfa.trans.len() as f64).log2().ceil() as usize;
-        println!("table size: {}", self.dfa.trans.len());
+        let sc_l = (t_size as f64).log2().ceil() as usize;
+        println!("table size: {}", t_size);
         println!("sum check rounds: {}", sc_l);
 
         self.sum_check_circuit(lhs, sc_l);
@@ -834,10 +853,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         );
         self.assertions.push(sum_check_domino);
         self.pub_inputs.push(new_var(format!("next_running_claim")));
-
-        self.accepting_state_circuit();
-
-        self.r1cs_conv()
     }
 
     pub fn gen_wit_i(
