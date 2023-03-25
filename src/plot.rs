@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use std::fmt::{Display, Error, Formatter};
 use std::fs::File;
-use std::process::{Command, ExitStatus};
 use std::io::Result;
+use std::process::{Command, ExitStatus};
 
 use crate::dfa::DFA;
 use crate::regex::Regex;
@@ -43,7 +43,7 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA {
 // Function to find consecutive ranges
 fn consecutive_ranges(a: Vec<String>) -> Vec<String> {
     let mut length = 1;
-    let mut list : Vec<String> = Vec::new();
+    let mut list: Vec<String> = Vec::new();
 
     fn str_diff(a: &String, b: &String) -> Option<usize> {
         if a.len() == 0 || b.len() == 0 {
@@ -55,25 +55,24 @@ fn consecutive_ranges(a: Vec<String>) -> Vec<String> {
         }
     }
 
-    let (symbols, letters): (Vec<String>, Vec<String>) =
-        a.into_iter().partition(|s|s.chars().all(|c| !c.is_alphanumeric()));
+    let (symbols, letters): (Vec<String>, Vec<String>) = a
+        .into_iter()
+        .partition(|s| s.chars().all(|c| !c.is_alphanumeric()));
 
     if letters.len() == 0 {
         return list;
     }
 
     // Traverse the array from first position
-    for i in 1 .. letters.len() {
+    for i in 1..letters.len() {
         if i == letters.len() || str_diff(&letters[i], &letters[i - 1]) != Some(1) {
             if length == 1 {
                 list.push(String::from(letters[i - 1].clone()));
-            }
-            else {
+            } else {
                 list.push(letters[i - length].clone() + "-" + &letters[i - 1]);
             }
             length = 1;
-        }
-        else {
+        } else {
             length = length + 1;
         }
     }
@@ -91,18 +90,29 @@ impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA {
         self.trans
             .clone()
             .into_iter()
-            .map(|((a,c),b)| ((a, b), c))
+            .map(|((a, c), b)| ((a, b), c))
             .into_group_map()
             .into_iter()
-            .map(|((a, b), c)| (a, consecutive_ranges(c.iter()
-                                    .map(|c|
-                                        if c.trim().is_empty() {
-                                            String::from("' '")
-                                        } else { c.clone() })
-                                    .sorted()
-                                    .collect())
-                                    .into_iter()
-                                    .join(", "), b))
+            .map(|((a, b), c)| {
+                (
+                    a,
+                    consecutive_ranges(
+                        c.iter()
+                            .map(|c| {
+                                if c.trim().is_empty() {
+                                    String::from("' '")
+                                } else {
+                                    c.clone()
+                                }
+                            })
+                            .sorted()
+                            .collect(),
+                    )
+                    .into_iter()
+                    .join(", "),
+                    b,
+                )
+            })
             .collect()
     }
 
@@ -127,11 +137,11 @@ pub fn plot_dfa<'a>(dfa: &'a DFA) -> Result<ExitStatus> {
 
     // Convert to pdf
     let mut child = Command::new("dot")
-                        .arg("-Tpdf")
-                        .arg(dotfile)
-                        .arg("-o")
-                        .arg("dfa.pdf")
-                        .spawn()
-                        .expect("[dot] CLI failed to convert dfa to [pdf] file");
+        .arg("-Tpdf")
+        .arg(dotfile)
+        .arg("-o")
+        .arg("dfa.pdf")
+        .spawn()
+        .expect("[dot] CLI failed to convert dfa to [pdf] file");
     child.wait()
 }

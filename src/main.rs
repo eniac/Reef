@@ -83,14 +83,21 @@ fn main() {
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
         &prover_data.r1cs,
         None,
-        <G1 as Group>::Scalar::zero(),
-        <G1 as Group>::Scalar::zero(),
-        <G1 as Group>::Scalar::zero(),
-        <G1 as Group>::Scalar::zero(),
-        <G1 as Group>::Scalar::zero(),
-        <G1 as Group>::Scalar::zero(),
-        <G1 as Group>::Scalar::zero(),
+        vec![
+            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(0),
+        ],
+        vec![
+            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(0),
+        ],
+        vec![
+            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(0),
+        ],
+        1,
         sc.clone(),
+        false,
     );
 
     // trivial circuit
@@ -135,7 +142,6 @@ fn main() {
     let z0_primary = vec![
         <G1 as Group>::Scalar::from(current_state as u64),
         <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
-        <G1 as Group>::Scalar::from(0),
         <G1 as Group>::Scalar::from(0),
     ];
     // TODO check "ingrained" bool out
@@ -198,20 +204,30 @@ fn main() {
         );
         let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
 
-        //println!("expected next hash in main {:#?}", expected_next_hash);
+        println!(
+            "prev, expected next hash in main {:#?} {:#?}",
+            prev_hash, expected_next_hash
+        );
         sponge.finish(acc).unwrap(); // assert expected hash finished correctly
 
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
             Some(extended_wit),
-            <G1 as Group>::Scalar::from(current_state as u64),
-            <G1 as Group>::Scalar::from(next_state as u64),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
-            <G1 as Group>::Scalar::from(dfa.ab_to_num(&next_char) as u64),
-            <G1 as Group>::Scalar::from(prev_hash),
-            <G1 as Group>::Scalar::from(expected_next_hash[0]),
-            <G1 as Group>::Scalar::from(i as u64),
+            vec![
+                <G1 as Group>::Scalar::from(current_state as u64),
+                <G1 as Group>::Scalar::from(next_state as u64),
+            ],
+            vec![
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(&next_char) as u64),
+            ],
+            vec![
+                <G1 as Group>::Scalar::from(prev_hash),
+                <G1 as Group>::Scalar::from(expected_next_hash[0]),
+            ],
+            1,
             sc.clone(),
+            false,
         );
 
         //println!("STEP CIRC WIT for i={}: {:#?}", i, circuit_primary);
@@ -224,7 +240,7 @@ fn main() {
             z0_primary.clone(),
             z0_secondary.clone(),
         );
-        //println!("prove step {:#?}", result);
+        println!("prove step {:#?}", result);
 
         assert!(result.is_ok());
         println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
@@ -245,7 +261,7 @@ fn main() {
         z0_primary.clone(),
         z0_secondary.clone(),
     );
-    //println!("Recursive res: {:#?}", res);
+    println!("Recursive res: {:#?}", res);
 
     assert!(res.is_ok());
 

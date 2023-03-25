@@ -110,7 +110,7 @@ fn prover_mle_partial_eval(
     for i in 0..es.len() + 1 {
         //e in 0..table.len() {
 
-        println!("\ni = {:#?}", i);
+        //println!("\ni = {:#?}", i);
         // ~eq(x,e)
         if i < es.len() {
             let mut prod = prods[i].clone();
@@ -141,11 +141,6 @@ fn prover_mle_partial_eval(
                 // next minus coeff == 1
                 minus_coeff += &prod;
             }
-
-            println!(
-                "thus far: hole_coeff {:#?}, minus_coeff {:#?}",
-                hole_coeff, minus_coeff
-            );
         } else {
             // final q?
             match last_q {
@@ -418,21 +413,29 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         assert_eq!(self.commitment.unwrap(), final_hash);
 
         // state matches?
+        assert_eq!(accepting_state, F::from(1));
 
         // T claim
+        // generate table TODO - actually, store the table somewhere
+        /*
+        let (_, running_v) =
+            prover_mle_partial_eval(&table, &final_q, &(0..table.len()).collect(), true, None);
+        assert_eq!(final_v, running_v);
+        */
     }
 
     // PROVER
 
     // seed Questions todo
-    fn prover_random_from_seed(&self, s: usize) -> Integer {
-        let seed = F::from(s as u64); // TODO GEN
+    fn prover_random_from_seed(&self, absorbs: u32, s: &[F]) -> Integer {
+        assert_eq!(absorbs, s.len() as u32);
+
         let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
         let acc = &mut ();
-        let parameter = IOPattern(vec![SpongeOp::Absorb(1), SpongeOp::Squeeze(1)]);
+        let parameter = IOPattern(vec![SpongeOp::Absorb(absorbs), SpongeOp::Squeeze(1)]);
 
         sponge.start(parameter, None, acc);
-        SpongeAPI::absorb(&mut sponge, 1, &[seed], acc);
+        SpongeAPI::absorb(&mut sponge, absorbs, s, acc);
         let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
         sponge.finish(acc).unwrap();
 
@@ -500,6 +503,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         v
     }
 
+    // TODO - we don't want it to always accept state 0
     fn accepting_state_circuit(&mut self) {
         // final state (non) match check
         let vanishing_poly;
@@ -544,7 +548,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.pub_inputs.clone(),
         );
 
-        println!("assertions: {:#?}", self.assertions.clone());
+        //println!("assertions: {:#?}", self.assertions.clone());
 
         let mut css = Computations::new();
         css.comps.insert("main".to_string(), cs);
@@ -790,7 +794,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let lookups = self.lookup_idxs();
         self.nlookup_gadget(lookups, self.dfa.trans.len(), "nl");
 
-        self.accepting_state_circuit();
+        self.accepting_state_circuit(); // TODO
 
         if matches!(self.commit_type, JCommit::Nlookup) {
             self.nlookup_doc_commit();
@@ -831,8 +835,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // size of table (T -> mle)
         let sc_l = (t_size as f64).log2().ceil() as usize;
-        println!("table size: {}", t_size);
-        println!("sum check rounds: {}", sc_l);
+        //println!("table size: {}", t_size);
+        //println!("sum check rounds: {}", sc_l);
 
         self.sum_check_circuit(lhs, sc_l, id);
 
@@ -923,7 +927,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
         }
 
-        println!("TABLE {:#?}", table);
+        //println!("TABLE {:#?}", table);
 
         let mut wits = FxHashMap::default();
 
@@ -954,7 +958,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             q.push(table.iter().position(|val| val == &v_i).unwrap());
 
-            println!("vi = {:#?}", v_i);
+            //println!("vi = {:#?}", v_i);
 
             /*println!(
                 "state {:#?} -> {:#?} -> state {:#?} is {:#?} in table",
@@ -992,7 +996,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, table, q, running_q, running_v, "nl");
         wits = w;
-        println!("next running q out of main {:#?}", next_running_q.clone());
+        //println!("next running q out of main {:#?}", next_running_q.clone());
 
         wits.insert(
             format!("accepting"),
@@ -1005,7 +1009,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             let (w, next_doc_running_q, next_doc_running_v) =
                 self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
             wits = w;
-            println!("RUNNING DOC Q {:#?}", next_doc_running_q.clone());
+            //println!("RUNNING DOC Q {:#?}", next_doc_running_q.clone());
             (
                 wits,
                 next_state,
@@ -1072,7 +1076,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let sc_l = (table.len() as f64).log2().ceil() as usize; // sum check rounds
 
         // generate claim r
-        let claim_r = self.prover_random_from_seed(5); // TODO make general
+        let claim_r = self.prover_random_from_seed(1, &[F::from(5 as u64)]); // TODO make general
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
         // running claim about T (optimization)
@@ -1085,7 +1089,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             Some(v) => v,
             None => table[0].clone(),
         };
-        println!("prev running v {:#?}", prev_running_v.clone());
+        //println!("prev running v {:#?}", prev_running_v.clone());
 
         //v.push(prev_running_v.clone()); // todo get rid of v?
 
@@ -1112,7 +1116,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             // new sumcheck rand for the round
             // generate rands
-            let rand = self.prover_random_from_seed(i); // TODO make gen
+            let rand = self.prover_random_from_seed(1, &[F::from(i as u64)]); // TODO make gen
             sc_rs.push(rand.clone());
             wits.insert(format!("{}_sc_r_{}", id, i), new_wit(rand.clone()));
         }
@@ -1193,12 +1197,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         wits.insert(format!("state_{}", self.batch_size), new_wit(state_i));
 
-        println!(
+        /*println!(
             "batch num = {:#?}, batch size = {:#?}, doc len = {:#?}",
             batch_num,
             self.batch_size,
             self.doc.len()
-        );
+        );*/
 
         wits.insert(
             format!("accepting"),
@@ -1438,13 +1442,8 @@ mod tests {
                             doc_running_q.clone(),
                             doc_running_v.clone(),
                         );
-                        println!(
-                            "TESTS q1 {:#?}, q2 {:#?}",
-                            running_q.clone(),
-                            doc_running_q.clone()
-                        );
 
-                        println!("VALUES ROUND {:#?}: {:#?}", i, values);
+                        //println!("VALUES ROUND {:#?}: {:#?}", i, values);
                         let extd_val = precomp.eval(&values);
                         //println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
 
@@ -1487,6 +1486,7 @@ mod tests {
             "aaaa".to_string(),
             vec![1, 2],
         );
+        panic!();
     }
 
     #[test]
