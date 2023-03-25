@@ -96,7 +96,6 @@ fn prover_mle_partial_eval(
 ) -> (Integer, Integer) {
     let base: usize = 2;
     let m = x.len();
-    //println!("m {:#?}, prods {:#?}", m, prods.len());
 
     if for_t {
         assert!(base.pow(m as u32 - 1) <= prods.len());
@@ -119,7 +118,6 @@ fn prover_mle_partial_eval(
             let mut next_minus_coeff = 0;
             for j in (0..m).rev() {
                 let ej = (es[i] >> j) & 1;
-                println!("ej = {:#?}", ej);
 
                 // for each x
                 if x[m - j - 1] == -1 {
@@ -155,12 +153,9 @@ fn prover_mle_partial_eval(
                     let mut prod = prods[i].clone();
                     let mut next_hole_coeff = Integer::from(1); // in case of no hole
                     let mut next_minus_coeff = Integer::from(1);
-                    println!("last");
                     for j in 0..m {
-                        println!("q is {:#?}", q);
                         let ej = q[j].clone(); // TODO order?
                                                // for each x
-                        println!("ej = {:#?}", ej);
                         if x[j] == -1 {
                             // if x_j is the hole
                             next_hole_coeff = ej.clone();
@@ -171,23 +166,12 @@ fn prover_mle_partial_eval(
                             prod *= intm; //&x[j] * ej + (1 - &x[j]) * (1 - ej);
                         }
                     }
-                    println!(
-                        "prod {:#?}, n_hole_coeff {:#?}, n_m_coeff {:#?}",
-                        prod.clone().rem_floor(cfg().field().modulus()),
-                        next_hole_coeff.clone(),
-                        next_minus_coeff.clone()
-                    );
 
                     hole_coeff += &prod * next_hole_coeff;
                     minus_coeff += &prod * next_minus_coeff;
                 }
                 None => {}
             }
-            println!(
-                "LAST thus far: hole_coeff {:#?}, minus_coeff {:#?}",
-                hole_coeff.clone().rem_floor(cfg().field().modulus()),
-                minus_coeff.clone().rem_floor(cfg().field().modulus())
-            );
         }
     }
     hole_coeff -= &minus_coeff;
@@ -212,11 +196,6 @@ fn prover_mle_sum_eval(
     let hole = rands.len();
     let total = (table.len() as f32).log2().ceil() as usize;
 
-    /*println!(
-        "sum eval: rands: {:#?}, table: {:#?}, table log {:#?}",
-        rands, table, total
-    );
-    */
     assert!(hole + 1 <= total, "batch size too small for nlookup");
     let num_x = total - hole - 1;
 
@@ -246,7 +225,6 @@ fn prover_mle_sum_eval(
         }
 
         let (coeff_b, con_b) = prover_mle_partial_eval(&rs, &eval_at, &qs, false, last_q);
-        //println!("eq {:#?}, {:#?}", coeff_b, con_b);
         sum_xsq += &coeff_a * &coeff_b;
         sum_x += &coeff_b * &con_a;
         sum_x += &coeff_a * &con_b;
@@ -1094,7 +1072,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let sc_l = (table.len() as f64).log2().ceil() as usize; // sum check rounds
 
         // generate claim r
-        let claim_r = Integer::from(17); //self.prover_random_from_seed(5); // TODO make general
+        let claim_r = self.prover_random_from_seed(5); // TODO make general
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
         // running claim about T (optimization)
@@ -1134,7 +1112,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             // new sumcheck rand for the round
             // generate rands
-            let rand = Integer::from(rand::thread_rng().gen_range(0..100)); //self.prover_random_from_seed(i); // TODO make gen
+            let rand = self.prover_random_from_seed(i); // TODO make gen
             sc_rs.push(rand.clone());
             wits.insert(format!("{}_sc_r_{}", id, i), new_wit(rand.clone()));
         }
@@ -1246,9 +1224,10 @@ mod tests {
     fn set_up_cfg() {
         println!("cfg set? {:#?}", cfg::is_cfg_set());
         if !cfg::is_cfg_set() {
-            let m = format!("1019");
-            //"28948022309329048855892746252171976963363056481941647379679742748393362948097"
-            //.to_owned();
+            //let m = format!("1019");
+            let m = format!(
+                "28948022309329048855892746252171976963363056481941647379679742748393362948097"
+            );
             let mut circ: CircOpt = Default::default();
             circ.field.custom_modulus = m.into();
 
@@ -1345,7 +1324,7 @@ mod tests {
             let mut claim = claim_r.clone() * table[1].clone()
                 + claim_r.clone() * claim_r.clone() * table[0].clone();
             if q.is_some() {
-                claim += claim_r.clone() * claim_r.clone() * claim_r.clone() * Integer::from(543);
+                claim += claim_r.clone() * claim_r.clone() * claim_r.clone() * Integer::from(6657);
             }
             assert_eq!(
                 claim.rem_floor(cfg().field().modulus()),
@@ -1380,7 +1359,7 @@ mod tests {
             //println!("mle sums {:#?}, {:#?}", g_x, g_const);
 
             let (_, con_b) = prover_mle_partial_eval(
-                &vec![Integer::from(17), Integer::from(289), Integer::from(837)],
+                &vec![Integer::from(17), Integer::from(289), Integer::from(4913)],
                 &sc_rs.clone(),
                 &vec![1, 0],
                 false,
