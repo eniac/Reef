@@ -1,5 +1,5 @@
 use crate::costs;
-use crate::costs::{opt_cost_model_select, JBatching};
+use crate::costs::{opt_cost_model_select, JBatching, JCommit};
 use crate::dfa::DFA;
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
@@ -14,6 +14,7 @@ use neptune::{
     Strength,
 };
 use nova_snark::traits::Group;
+use rand::Rng;
 use rug::{
     integer::Order,
     ops::{RemRounding, RemRoundingAssign},
@@ -80,7 +81,7 @@ fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
 
 // PROVER WORK
 
-// x = [r_0, r_1, ... -1, {0,1}, {0,1},...].rev()
+// x = [r_0, r_1, ... -1, {0,1}, {0,1},...]
 // where -1 is the "hole"
 // returns (coeff (of "hole"), constant)
 // if no hole, returns (crap, full result)
@@ -110,25 +111,28 @@ fn prover_mle_partial_eval(
     for i in 0..es.len() + 1 {
         //e in 0..table.len() {
 
+        println!("\ni = {:#?}", i);
         // ~eq(x,e)
         if i < es.len() {
             let mut prod = prods[i].clone();
-            let mut next_hole_coeff = 0;
+            let mut next_hole_coeff = 0; // TODO as below ???
             let mut next_minus_coeff = 0;
-            for j in 0..m {
+            for j in (0..m).rev() {
                 let ej = (es[i] >> j) & 1;
+                println!("ej = {:#?}", ej);
+
                 // for each x
-                if x[j] == -1 {
+                if x[m - j - 1] == -1 {
                     // if x_j is the hole
                     next_hole_coeff = ej;
                     next_minus_coeff = 1 - ej;
                 } else {
                     let mut intm = Integer::from(1);
                     if ej == 1 {
-                        intm.assign(&x[j]);
+                        intm.assign(&x[m - j - 1]);
                     } else {
                         // ej == 0
-                        intm -= &x[j];
+                        intm -= &x[m - j - 1];
                     }
                     prod *= intm; //&x[j] * ej + (1 - &x[j]) * (1 - ej);
                 }
@@ -139,40 +143,51 @@ fn prover_mle_partial_eval(
                 // next minus coeff == 1
                 minus_coeff += &prod;
             }
+
+            println!(
+                "thus far: hole_coeff {:#?}, minus_coeff {:#?}",
+                hole_coeff, minus_coeff
+            );
         } else {
             // final q?
             match last_q {
                 Some(q) => {
                     let mut prod = prods[i].clone();
-                    let mut next_hole_coeff = Integer::from(0);
-                    let mut next_minus_coeff = Integer::from(0);
+                    let mut next_hole_coeff = Integer::from(1); // in case of no hole
+                    let mut next_minus_coeff = Integer::from(1);
+                    println!("last");
                     for j in 0..m {
+                        println!("q is {:#?}", q);
                         let ej = q[j].clone(); // TODO order?
                                                // for each x
+                        println!("ej = {:#?}", ej);
                         if x[j] == -1 {
                             // if x_j is the hole
                             next_hole_coeff = ej.clone();
                             next_minus_coeff = Integer::from(1) - &ej;
                         } else {
-                            let mut intm = Integer::from(1);
-                            if ej == 1 {
-                                intm.assign(&x[j]);
-                            } else {
-                                // ej == 0
-                                intm -= &x[j];
-                            }
+                            let mut intm = ej.clone() * &x[j]; // ei*xi
+                            intm += (Integer::from(1) - &ej) * (Integer::from(1) - &x[j]); // +(1-ei)(1-xi)
                             prod *= intm; //&x[j] * ej + (1 - &x[j]) * (1 - ej);
                         }
                     }
-                    if next_hole_coeff == Integer::from(1) {
-                        hole_coeff += &prod;
-                    } else {
-                        // next minus coeff == 1
-                        minus_coeff += &prod;
-                    }
+                    println!(
+                        "prod {:#?}, n_hole_coeff {:#?}, n_m_coeff {:#?}",
+                        prod.clone().rem_floor(cfg().field().modulus()),
+                        next_hole_coeff.clone(),
+                        next_minus_coeff.clone()
+                    );
+
+                    hole_coeff += &prod * next_hole_coeff;
+                    minus_coeff += &prod * next_minus_coeff;
                 }
                 None => {}
             }
+            println!(
+                "LAST thus far: hole_coeff {:#?}, minus_coeff {:#?}",
+                hole_coeff.clone().rem_floor(cfg().field().modulus()),
+                minus_coeff.clone().rem_floor(cfg().field().modulus())
+            );
         }
     }
     hole_coeff -= &minus_coeff;
@@ -217,14 +232,9 @@ fn prover_mle_sum_eval(
 
         //println!("eval at: {:#?}", eval_at.clone());
         // T(j)
-        let (coeff_a, con_a) = prover_mle_partial_eval(
-            table,
-            &eval_at.clone().into_iter().rev().collect(), // TODO
-            &(0..table.len()).collect(),
-            true,
-            None,
-        ); // TODO
-           //println!("T {:#?}, {:#?}", coeff_a, con_a);
+        let (coeff_a, con_a) =
+            prover_mle_partial_eval(table, &eval_at, &(0..table.len()).collect(), true, None); // TODO
+                                                                                               //println!("T {:#?}, {:#?}", coeff_a, con_a);
 
         // r^i * eq(q_i,j) for all i
         // TODO - eq must be an MLE? ask
@@ -235,13 +245,7 @@ fn prover_mle_sum_eval(
             rs.push(rs[i - 1].clone() * claim_r);
         }
 
-        let (coeff_b, con_b) = prover_mle_partial_eval(
-            &rs,
-            &eval_at.into_iter().rev().collect(),
-            &qs,
-            false,
-            last_q,
-        );
+        let (coeff_b, con_b) = prover_mle_partial_eval(&rs, &eval_at, &qs, false, last_q);
         //println!("eq {:#?}, {:#?}", coeff_b, con_b);
         sum_xsq += &coeff_a * &coeff_b;
         sum_x += &coeff_b * &con_a;
@@ -321,6 +325,7 @@ fn poly_eval_circuit(points: Vec<Integer>, x_lookup: Term) -> Term {
 pub struct R1CS<'a, F: PrimeField> {
     dfa: &'a DFA,
     batching: JBatching,
+    commit_type: JCommit,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -356,6 +361,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Self {
             dfa,
             batching: JBatching::NaivePolys, // TODO
+            commit_type: JCommit::HashChain, // TODO
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size,
@@ -369,6 +375,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // IN THE CLEAR
 
     pub fn gen_commitment(&mut self) {
+        if !matches!(self.commit_type, JCommit::HashChain) {
+            panic!(
+                "Tried to generate a hash chain commit when different commit type was specified."
+            );
+        }
+
         let mut hash = vec![F::from(0)];
         for c in self.doc.clone().into_iter() {
             let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
@@ -608,6 +620,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // TODO batch size (1 currently)
     fn to_polys(&mut self) -> (ProverData, VerifierData) {
+        if !matches!(self.commit_type, JCommit::HashChain) {
+            panic!("Tried to use non-hash commit with naive polys, illogical move");
+        }
+
         let l_time = Instant::now();
         let lookup = self.lookup_idxs();
 
@@ -645,10 +661,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // for use at the end of sum check
     // eq([x0,x1,x2...],[e0,e1,e2...])
-    fn bit_eq_circuit(&mut self, m: usize, q_bit: usize) -> Term {
+    fn bit_eq_circuit(&mut self, m: usize, q_bit: usize, id: &str) -> Term {
         let mut eq = new_const(1); // dummy, not used
-
-        let q_name = format!("eq{}", q_bit);
+                                   // TODO ID HERE
+        let q_name = format!("{}_eq{}", id, q_bit);
         for i in 0..m {
             let next = term(
                 Op::PfNaryOp(PfNaryOp::Add),
@@ -657,7 +673,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                         Op::PfNaryOp(PfNaryOp::Mul),
                         vec![
                             new_var(format!("{}_q_{}", q_name, i)),
-                            new_var(format!("sc_r_{}", i + 1)), // sc_r idx's start @1
+                            new_var(format!("{}_sc_r_{}", id, i + 1)), // sc_r idx's start @1
                         ],
                     ),
                     term(
@@ -679,7 +695,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                                     new_const(1),
                                     term(
                                         Op::PfUnOp(PfUnOp::Neg),
-                                        vec![new_var(format!("sc_r_{}", i + 1))],
+                                        vec![new_var(format!("{}_sc_r_{}", id, i + 1))],
                                     ),
                                 ],
                             ),
@@ -707,7 +723,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     // C_1 = LHS/"claim"
-    fn sum_check_circuit(&mut self, C_1: Term, num_rounds: usize) {
+    fn sum_check_circuit(&mut self, C_1: Term, num_rounds: usize, id: &str) {
         // first round claim
         let mut claim = C_1.clone();
 
@@ -720,16 +736,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             let g_j = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
-                    new_var(format!("sc_g_{}_xsq", j)),
+                    new_var(format!("{}_sc_g_{}_xsq", id, j)),
                     term(
                         Op::PfNaryOp(PfNaryOp::Add),
                         vec![
-                            new_var(format!("sc_g_{}_x", j)),
+                            new_var(format!("{}_sc_g_{}_x", id, j)),
                             term(
                                 Op::PfNaryOp(PfNaryOp::Add),
                                 vec![
-                                    new_var(format!("sc_g_{}_const", j)),
-                                    new_var(format!("sc_g_{}_const", j)),
+                                    new_var(format!("{}_sc_g_{}_const", id, j)),
+                                    new_var(format!("{}_sc_g_{}_const", id, j)),
                                 ],
                             ),
                         ],
@@ -740,10 +756,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             let claim_check = term(Op::Eq, vec![claim.clone(), g_j]);
 
             self.assertions.push(claim_check);
-            self.pub_inputs.push(new_var(format!("sc_g_{}_xsq", j)));
-            self.pub_inputs.push(new_var(format!("sc_g_{}_x", j)));
-            self.pub_inputs.push(new_var(format!("sc_g_{}_const", j)));
-            self.pub_inputs.push(new_var(format!("sc_r_{}", j)));
+            self.pub_inputs
+                .push(new_var(format!("{}_sc_g_{}_xsq", id, j)));
+            self.pub_inputs
+                .push(new_var(format!("{}_sc_g_{}_x", id, j)));
+            self.pub_inputs
+                .push(new_var(format!("{}_sc_g_{}_const", id, j)));
+            self.pub_inputs.push(new_var(format!("{}_sc_r_{}", id, j)));
 
             // "V" chooses rand r_{j} (P chooses this with hash)
             //let r_j = new_var(format!("sc_r_{}", j));
@@ -752,20 +771,20 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             claim = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
-                    new_var(format!("sc_g_{}_const", j)),
+                    new_var(format!("{}_sc_g_{}_const", id, j)),
                     term(
                         Op::PfNaryOp(PfNaryOp::Mul),
                         vec![
-                            new_var(format!("sc_r_{}", j)),
+                            new_var(format!("{}_sc_r_{}", id, j)),
                             term(
                                 Op::PfNaryOp(PfNaryOp::Add),
                                 vec![
-                                    new_var(format!("sc_g_{}_x", j)),
+                                    new_var(format!("{}_sc_g_{}_x", id, j)),
                                     term(
                                         Op::PfNaryOp(PfNaryOp::Mul),
                                         vec![
-                                            new_var(format!("sc_r_{}", j)),
-                                            new_var(format!("sc_g_{}_xsq", j)),
+                                            new_var(format!("{}_sc_r_{}", id, j)),
+                                            new_var(format!("{}_sc_g_{}_xsq", id, j)),
                                         ],
                                     ),
                                 ],
@@ -780,34 +799,41 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
                 let last_claim = term(
                     Op::Eq,
-                    vec![claim.clone(), new_var(format!("sc_last_claim"))],
+                    vec![claim.clone(), new_var(format!("{}_sc_last_claim", id))],
                 );
                 self.assertions.push(last_claim);
-                self.pub_inputs.push(new_var(format!("sc_last_claim")));
+                self.pub_inputs
+                    .push(new_var(format!("{}_sc_last_claim", id)));
             }
         }
     }
 
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs();
-        self.nlookup_gadget(lookups, self.dfa.trans.len());
+        self.nlookup_gadget(lookups, self.dfa.trans.len(), "nl");
 
         self.accepting_state_circuit();
+
+        if matches!(self.commit_type, JCommit::Nlookup) {
+            self.nlookup_doc_commit();
+        }
 
         self.r1cs_conv()
     }
 
-    fn nlookup_doc_commit(&mut self, start: usize, end: usize) {
+    fn nlookup_doc_commit(&mut self) {
+        // start: usize, end: usize) {
         let mut char_lookups = vec![];
-        for c in start..end {
-            char_lookups.push(new_var(format!("char_val_{}", c)));
-            self.pub_inputs.push(new_var(format!("char_val_{}", c)));
+        for c in 0..self.batch_size {
+            // TODO details
+            char_lookups.push(new_var(format!("char_{}", c)));
+            //self.pub_inputs.push(new_var(format!("char_{}", c))); <- done elsewhere
         }
 
-        self.nlookup_gadget(char_lookups, self.doc.len());
+        self.nlookup_gadget(char_lookups, self.doc.len(), "nl_doc");
     }
 
-    fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize) {
+    fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
         // TODO pub inputs -> can make which priv?
         // last state_batch is final "next_state" output
         // v_{batch-1} = (state_{batch-1}, c, state_batch)
@@ -817,42 +843,44 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let mut v = vec![new_const(0)]; // dummy constant term for lhs claim
         v.append(&mut lookup_vals);
-        v.push(new_var(format!("prev_running_claim"))); // running claim
-        self.pub_inputs.push(new_var(format!("prev_running_claim")));
+        v.push(new_var(format!("{}_prev_running_claim", id))); // running claim
+        self.pub_inputs
+            .push(new_var(format!("{}_prev_running_claim", id)));
 
         // generate claim on lhs
-        let lhs = horners_circuit_vars(&v, new_var(format!("claim_r")));
-        self.pub_inputs.push(new_var(format!("claim_r")));
+        let lhs = horners_circuit_vars(&v, new_var(format!("{}_claim_r", id)));
+        self.pub_inputs.push(new_var(format!("{}_claim_r", id)));
 
         // size of table (T -> mle)
         let sc_l = (t_size as f64).log2().ceil() as usize;
         println!("table size: {}", t_size);
         println!("sum check rounds: {}", sc_l);
 
-        self.sum_check_circuit(lhs, sc_l);
+        self.sum_check_circuit(lhs, sc_l, id);
 
         // last eq circ on l-element point
 
         //TODO check ordering correct
         let mut eq_evals = vec![new_const(0)]; // dummy for horners
         for i in 0..self.batch_size + 1 {
-            eq_evals.push(self.bit_eq_circuit(sc_l, i));
+            eq_evals.push(self.bit_eq_circuit(sc_l, i, id));
         }
-        let eq_eval = horners_circuit_vars(&eq_evals, new_var(format!("claim_r")));
+        let eq_eval = horners_circuit_vars(&eq_evals, new_var(format!("{}_claim_r", id)));
 
         // last_claim = eq_eval * next_running_claim
         let sum_check_domino = term(
             Op::Eq,
             vec![
-                new_var(format!("sc_last_claim")),
+                new_var(format!("{}_sc_last_claim", id)),
                 term(
                     Op::PfNaryOp(PfNaryOp::Mul),
-                    vec![eq_eval, new_var(format!("next_running_claim"))],
+                    vec![eq_eval, new_var(format!("{}_next_running_claim", id))],
                 ),
             ],
         );
         self.assertions.push(sum_check_domino);
-        self.pub_inputs.push(new_var(format!("next_running_claim")));
+        self.pub_inputs
+            .push(new_var(format!("{}_next_running_claim", id)));
     }
 
     pub fn gen_wit_i(
@@ -861,22 +889,28 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         current_state: usize,
         prev_running_claim_q: Option<Vec<Integer>>,
         prev_running_claim_v: Option<Integer>,
+        prev_doc_running_claim_q: Option<Vec<Integer>>,
+        prev_doc_running_claim_v: Option<Integer>,
     ) -> (
         FxHashMap<String, Value>,
         usize,
+        Option<Vec<Integer>>,
+        Option<Integer>,
         Option<Vec<Integer>>,
         Option<Integer>,
     ) {
         match self.batching {
             JBatching::NaivePolys => {
                 let (wits, next_state) = self.gen_wit_i_polys(batch_num, current_state);
-                (wits, next_state, None, None)
+                (wits, next_state, None, None, None, None)
             }
             JBatching::Nlookup => self.gen_wit_i_nlookup(
                 batch_num,
                 current_state,
                 prev_running_claim_q,
                 prev_running_claim_v,
+                prev_doc_running_claim_q,
+                prev_doc_running_claim_v,
             ),
             JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
@@ -888,9 +922,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         current_state: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
+        doc_running_q: Option<Vec<Integer>>,
+        doc_running_v: Option<Integer>,
     ) -> (
         FxHashMap<String, Value>,
         usize,
+        Option<Vec<Integer>>,
+        Option<Integer>,
         Option<Vec<Integer>>,
         Option<Integer>,
     ) {
@@ -907,20 +945,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
         }
 
+        println!("TABLE {:#?}", table);
+
         let mut wits = FxHashMap::default();
-
-        // TODO - what needs to be public?
-
-        let sc_l = (self.dfa.trans.len() as f64).log2().ceil() as usize; // sum check rounds
-
-        // generate claim r
-        let claim_r = self.prover_random_from_seed(5); // TODO make general
-        wits.insert(format!("claim_r"), new_wit(claim_r.clone()));
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
         let mut state_i = current_state;
         let mut next_state = 0;
-        let mut v = vec![];
+        //      let mut v = vec![];
         let mut q = vec![];
         for i in 1..=self.batch_size {
             let c = self.doc[batch_num * self.batch_size + i - 1].clone();
@@ -934,16 +966,17 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
 
-            v.push(
-                Integer::from(
-                    (state_i * self.dfa.nstates() * self.dfa.nchars())
-                        + (next_state * self.dfa.nchars())
-                        + self.dfa.ab_to_num(&c.to_string()),
-                )
-                .rem_floor(cfg().field().modulus()),
-            );
+            //v.push(
+            let v_i = Integer::from(
+                (state_i * self.dfa.nstates() * self.dfa.nchars())
+                    + (next_state * self.dfa.nchars())
+                    + self.dfa.ab_to_num(&c.to_string()),
+            )
+            .rem_floor(cfg().field().modulus());
 
-            q.push(table.iter().position(|val| val == &v[i - 1]).unwrap());
+            q.push(table.iter().position(|val| val == &v_i).unwrap());
+
+            println!("vi = {:#?}", v_i);
 
             /*println!(
                 "state {:#?} -> {:#?} -> state {:#?} is {:#?} in table",
@@ -955,32 +988,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             state_i = next_state;
         }
+
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
 
-        // running claim about T (optimization)
-        // if first
-        let mut prev_running_q = match running_q {
-            Some(q) => q,
-            None => vec![Integer::from(0); sc_l],
-        };
-        let mut prev_running_v = match running_v {
-            Some(v) => v,
-            None => table[0].clone(),
-        };
-        v.push(prev_running_v.clone()); // todo get rid of v?
-        wits.insert(
-            format!("prev_running_claim"),
-            new_wit(prev_running_v.clone()),
-        );
-        // q.push(prev_running_q);
-
-        println!("v: {:#?}", v.clone());
-
-        /*let (a, b) =
-            prover_mle_partial_eval(&table, &running_q, &(0..table.len()).collect(), true, None);
-        println!("eval of T @ running q {:#?}", b);
-        */
+        //    println!("v: {:#?}", v.clone());
 
         /*
         // need to round out table size
@@ -997,7 +1009,115 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         */
 
-        //println!("table: {:#?}", table);
+        assert!(running_q.is_some() || batch_num == 0);
+        assert!(running_v.is_some() || batch_num == 0);
+        let (w, next_running_q, next_running_v) =
+            self.wit_nlookup_gadget(wits, table, q, running_q, running_v, "nl");
+        wits = w;
+        println!("next running q out of main {:#?}", next_running_q.clone());
+
+        wits.insert(
+            format!("accepting"),
+            new_bool_wit(self.prover_accepting_state(batch_num, next_state)),
+        );
+
+        if matches!(self.commit_type, JCommit::Nlookup) {
+            assert!(doc_running_q.is_some() || batch_num == 0);
+            assert!(doc_running_v.is_some() || batch_num == 0);
+            let (w, next_doc_running_q, next_doc_running_v) =
+                self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
+            wits = w;
+            println!("RUNNING DOC Q {:#?}", next_doc_running_q.clone());
+            (
+                wits,
+                next_state,
+                Some(next_running_q),
+                Some(next_running_v),
+                Some(next_doc_running_q),
+                Some(next_doc_running_v),
+            )
+        } else {
+            (
+                wits,
+                next_state,
+                Some(next_running_q),
+                Some(next_running_v),
+                None,
+                None,
+            )
+        }
+    }
+
+    fn wit_nlookup_doc_commit(
+        &self,
+        mut wits: FxHashMap<String, Value>,
+        batch_num: usize,
+        running_q: Option<Vec<Integer>>,
+        running_v: Option<Integer>,
+    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
+        // generate T
+        let mut doc = vec![];
+        for c in self.doc.clone().into_iter() {
+            // todo save this crap somewhere so we don't recalc
+            doc.push(Integer::from(self.dfa.ab_to_num(&c.to_string())));
+            // .rem_floor(cfg().field().modulus()), // thoughts?
+        }
+
+        let mut q = vec![];
+        for i in 0..self.batch_size {
+            // let c = self.doc[batch_num * self.batch_size + i].clone();
+            // "char val" witnesses already made
+
+            // position in doc
+            q.push(batch_num * self.batch_size + i);
+        }
+
+        let (w, next_running_q, next_running_v) =
+            self.wit_nlookup_gadget(wits, doc, q, running_q, running_v, "nl_doc");
+        wits = w;
+
+        (wits, next_running_q, next_running_v)
+    }
+
+    fn wit_nlookup_gadget(
+        &self,
+        mut wits: FxHashMap<String, Value>,
+        table: Vec<Integer>,
+        q: Vec<usize>,
+        //v: Vec<Integer>,
+        running_q: Option<Vec<Integer>>,
+        running_v: Option<Integer>,
+        id: &str,
+    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
+        // TODO - what needs to be public?
+
+        let sc_l = (table.len() as f64).log2().ceil() as usize; // sum check rounds
+
+        // generate claim r
+        let claim_r = Integer::from(17); //self.prover_random_from_seed(5); // TODO make general
+        wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
+
+        // running claim about T (optimization)
+        // if first (not yet generated)
+        let mut prev_running_q = match running_q {
+            Some(q) => q,
+            None => vec![Integer::from(0); sc_l],
+        };
+        let mut prev_running_v = match running_v {
+            Some(v) => v,
+            None => table[0].clone(),
+        };
+        println!("prev running v {:#?}", prev_running_v.clone());
+
+        //v.push(prev_running_v.clone()); // todo get rid of v?
+
+        wits.insert(
+            format!("{}_prev_running_claim", id),
+            new_wit(prev_running_v.clone()),
+        );
+        // q.push(prev_running_q);
+
+        // println!("v: {:#?}", v.clone());
 
         // generate polynomial g's for sum check
         let mut sc_rs = vec![];
@@ -1008,15 +1128,15 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             (g_xsq, g_x, g_const) =
                 prover_mle_sum_eval(&table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
 
-            wits.insert(format!("sc_g_{}_xsq", i), new_wit(g_xsq.clone()));
-            wits.insert(format!("sc_g_{}_x", i), new_wit(g_x.clone()));
-            wits.insert(format!("sc_g_{}_const", i), new_wit(g_const.clone()));
+            wits.insert(format!("{}_sc_g_{}_xsq", id, i), new_wit(g_xsq.clone()));
+            wits.insert(format!("{}_sc_g_{}_x", id, i), new_wit(g_x.clone()));
+            wits.insert(format!("{}_sc_g_{}_const", id, i), new_wit(g_const.clone()));
 
             // new sumcheck rand for the round
             // generate rands
-            let rand = self.prover_random_from_seed(i); // TODO make gen
+            let rand = Integer::from(rand::thread_rng().gen_range(0..100)); //self.prover_random_from_seed(i); // TODO make gen
             sc_rs.push(rand.clone());
-            wits.insert(format!("sc_r_{}", i), new_wit(rand.clone()));
+            wits.insert(format!("{}_sc_r_{}", id, i), new_wit(rand.clone()));
         }
         // last claim = g_v(r_v)
         //println!("sc rs {:#?}", sc_rs.clone());
@@ -1027,12 +1147,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         g_const += &g_xsq;
 
         let last_claim = g_const.rem_floor(cfg().field().modulus());
-        wits.insert(format!("sc_last_claim"), new_wit(last_claim.clone()));
+        wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
 
         // generate last round eqs
         for i in 0..self.batch_size {
             // regular
-            let q_name = format!("eq{}", i);
+            let q_name = format!("{}_eq{}", id, i);
             for j in 0..sc_l {
                 let qj = (q[i] >> j) & 1;
                 wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
@@ -1040,7 +1160,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         for j in 0..sc_l {
             // running
-            let q_name = format!("eq{}", v.len() - 1);
+            let q_name = format!("{}_eq{}", id, q.len()); //v.len() - 1);
             wits.insert(
                 format!("{}_q_{}", q_name, j),
                 new_wit(prev_running_q[j].clone()),
@@ -1048,47 +1168,30 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
 
         // update running claim
-        let (_, next_running_v) = prover_mle_partial_eval(
-            &table,
-            &sc_rs.clone().into_iter().rev().collect(), // must fix
-            &(0..table.len()).collect(),
-            true,
-            None,
-        );
+        let (_, next_running_v) =
+            prover_mle_partial_eval(&table, &sc_rs, &(0..table.len()).collect(), true, None);
         let next_running_q = sc_rs.clone();
         wits.insert(
-            format!("next_running_claim"),
+            format!("{}_next_running_claim", id),
             new_wit(next_running_v.clone()),
         );
 
         // sanity check - TODO eliminate
         // make rs
-        /*let mut rs = vec![claim_r.clone()];
+        let mut rs = vec![claim_r.clone()];
         for i in 1..(q.len() + 1) {
             rs.push(rs[i - 1].clone() * claim_r.clone());
         }
-        let (_, eq_term) = prover_mle_partial_eval(
-            &rs,
-            &sc_rs.clone().into_iter().rev().collect(),
-            &q,
-            false,
-            Some(&prev_running_q),
-        );
+        let (_, eq_term) = prover_mle_partial_eval(&rs, &sc_rs, &q, false, Some(&prev_running_q));
         assert_eq!(
             last_claim,
             (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
         );
-        */
 
         // return
         // println!("wits: {:#?}", wits);
 
-        wits.insert(
-            format!("accepting"),
-            new_bool_wit(self.prover_accepting_state(batch_num, next_state)),
-        );
-
-        (wits, next_state, Some(next_running_q), Some(next_running_v))
+        (wits, next_running_q, next_running_v)
     }
 
     // TODO BATCH SIZE (rn = 1)
@@ -1123,7 +1226,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             format!("accepting"),
             new_bool_wit(self.prover_accepting_state(batch_num, next_state)),
         );
-        println!("wits {:#?}", wits);
+        //println!("wits {:#?}", wits);
 
         (wits, next_state)
     }
@@ -1143,8 +1246,9 @@ mod tests {
     fn set_up_cfg() {
         println!("cfg set? {:#?}", cfg::is_cfg_set());
         if !cfg::is_cfg_set() {
-            let m = "28948022309329048855892746252171976963363056481941647379679742748393362948097"
-                .to_owned();
+            let m = format!("1019");
+            //"28948022309329048855892746252171976963363056481941647379679742748393362948097"
+            //.to_owned();
             let mut circ: CircOpt = Default::default();
             circ.field.custom_modulus = m.into();
 
@@ -1172,7 +1276,7 @@ mod tests {
         for x_1 in v.clone() {
             for x_2 in v.clone() {
                 for x_3 in v.clone() {
-                    let x = vec![Integer::from(x_3), Integer::from(x_2), Integer::from(x_1)];
+                    let x = vec![Integer::from(x_1), Integer::from(x_2), Integer::from(x_3)];
                     let (coeff, con) = prover_mle_partial_eval(
                         &table,
                         &x,
@@ -1226,60 +1330,69 @@ mod tests {
         ];
 
         // generate polynomial g's for sum check
-        let mut sc_rs = vec![];
-        let claim_r = Integer::from(17);
 
-        // round 1
-        let (mut g_xsq, mut g_x, mut g_const) =
-            prover_mle_sum_eval(&table, &sc_rs, &vec![1, 0], &claim_r, None);
-        //println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
+        // v = [4, 9, extra]
+        // extra: [33, 30] -> 543
+        for q in [None, Some(&vec![Integer::from(33), Integer::from(30)])] {
+            let mut sc_rs = vec![];
+            let claim_r = Integer::from(17);
 
-        let mut claim = claim_r.clone() * table[1].clone()
-            + claim_r.clone() * claim_r.clone() * table[0].clone();
-        assert_eq!(
-            claim.rem_floor(cfg().field().modulus()),
-            (g_xsq.clone() + g_x.clone() + g_const.clone() + g_const.clone())
-                .rem_floor(cfg().field().modulus())
-        );
+            // round 1
+            let (mut g_xsq, mut g_x, mut g_const) =
+                prover_mle_sum_eval(&table, &sc_rs.clone(), &vec![1, 0], &claim_r, q);
+            //println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
 
-        sc_rs.push(Integer::from(10));
-        claim = Integer::from(100) * g_xsq + Integer::from(10) * g_x + g_const;
+            let mut claim = claim_r.clone() * table[1].clone()
+                + claim_r.clone() * claim_r.clone() * table[0].clone();
+            if q.is_some() {
+                claim += claim_r.clone() * claim_r.clone() * claim_r.clone() * Integer::from(543);
+            }
+            assert_eq!(
+                claim.rem_floor(cfg().field().modulus()),
+                (g_xsq.clone() + g_x.clone() + g_const.clone() + g_const.clone())
+                    .rem_floor(cfg().field().modulus())
+            );
 
-        // round 2
-        (g_xsq, g_x, g_const) = prover_mle_sum_eval(&table, &sc_rs, &vec![1, 0], &claim_r, None);
-        //println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
-        assert_eq!(
-            claim.rem_floor(cfg().field().modulus()),
-            (g_xsq.clone() + g_x.clone() + g_const.clone() + g_const.clone())
-                .rem_floor(cfg().field().modulus())
-        );
+            sc_rs.push(Integer::from(10));
+            claim = Integer::from(100) * g_xsq + Integer::from(10) * g_x + g_const;
 
-        sc_rs.push(Integer::from(4));
-        claim = Integer::from(16) * g_xsq + Integer::from(4) * g_x + g_const;
+            // round 2
+            (g_xsq, g_x, g_const) =
+                prover_mle_sum_eval(&table, &sc_rs.clone(), &vec![1, 0], &claim_r, q);
+            //println!("mle sums {:#?}, {:#?}, {:#?}", g_xsq, g_x, g_const);
+            assert_eq!(
+                claim.rem_floor(cfg().field().modulus()),
+                (g_xsq.clone() + g_x.clone() + g_const.clone() + g_const.clone())
+                    .rem_floor(cfg().field().modulus())
+            );
 
-        // last V check
-        let (_, mut con_a) = prover_mle_partial_eval(
-            &table,
-            &sc_rs.clone().into_iter().rev().collect(),
-            &(0..table.len()).collect(),
-            true,
-            None,
-        );
-        //println!("mle sums {:#?}, {:#?}", g_x, g_const);
+            sc_rs.push(Integer::from(4));
+            claim = Integer::from(16) * g_xsq + Integer::from(4) * g_x + g_const;
 
-        let (_, con_b) = prover_mle_partial_eval(
-            &vec![Integer::from(17), Integer::from(289)],
-            &sc_rs.into_iter().rev().collect(),
-            &vec![1, 0],
-            false,
-            None,
-        );
-        con_a *= &con_b;
+            // last V check
+            let (_, mut con_a) = prover_mle_partial_eval(
+                &table,
+                &sc_rs.clone(),
+                &(0..table.len()).collect(),
+                true,
+                None,
+            );
+            //println!("mle sums {:#?}, {:#?}", g_x, g_const);
 
-        assert_eq!(
-            claim.rem_floor(cfg().field().modulus()),
-            con_a.rem_floor(cfg().field().modulus())
-        );
+            let (_, con_b) = prover_mle_partial_eval(
+                &vec![Integer::from(17), Integer::from(289), Integer::from(837)],
+                &sc_rs.clone(),
+                &vec![1, 0],
+                false,
+                q,
+            );
+            con_a *= &con_b;
+
+            assert_eq!(
+                claim.rem_floor(cfg().field().modulus()),
+                con_a.rem_floor(cfg().field().modulus())
+            );
+        }
     }
 
     fn test_func_no_hash(ab: String, rstr: String, doc: String, batch_sizes: Vec<usize>) {
@@ -1292,62 +1405,95 @@ mod tests {
         for s in batch_sizes {
             let num_steps = doc.len() / s;
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
-                let sc =
-                    Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
-                let mut r1cs_converter =
-                    R1CS::new(&dfa, &doc.chars().map(|c| c.to_string()).collect(), s, sc);
-                r1cs_converter.batching = b.clone(); // hacky - don't do this outside tests
-
-                let mut running_q = None;
-                let mut running_v = None;
-                match b {
-                    JBatching::NaivePolys => {}
-                    JBatching::Nlookup => {
-                        if s <= 1 {
-                            break;
-                        }
-                        running_q = None;
-                        running_v = None;
-                    }
-                    JBatching::Plookup => todo!(),
-                }
-
-                println!("Batching {:#?}", r1cs_converter.batching);
-                let (prover_data, _) = r1cs_converter.to_r1cs();
-                //println!("{:#?}", prover_data.r1cs);
-                let precomp = prover_data.clone().precompute;
-                let mut current_state = dfa.get_init_state();
-
-                for i in 0..num_steps {
-                    let (values, next_state, running_q, running_v) = r1cs_converter.gen_wit_i(
-                        i,
-                        current_state,
-                        running_q.clone(),
-                        running_v.clone(),
+                for c in vec![JCommit::HashChain, JCommit::Nlookup] {
+                    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
+                        Strength::Standard,
                     );
-                    //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-                    let extd_val = precomp.eval(&values);
-                    //println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
+                    let mut r1cs_converter =
+                        R1CS::new(&dfa, &doc.chars().map(|c| c.to_string()).collect(), s, sc);
+                    r1cs_converter.batching = b.clone(); // hacky - don't do this outside tests
+                    r1cs_converter.commit_type = c.clone();
 
-                    prover_data.r1cs.check_all(&extd_val);
-                    // for next i+1 round
-                    current_state = next_state;
-                }
-                println!("b? {:#?}", b.clone());
-                println!(
-                    "cost model: {:#?}",
-                    costs::full_round_cost_model_nohash(&dfa, s, b.clone(), dfa.is_match(&chars))
-                );
-                println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
-                /*assert!(
-                    prover_data.r1cs.constraints().len() as usize
-                        <= costs::full_round_cost_model_nohash(
+                    let mut running_q = None;
+                    let mut running_v = None;
+                    let mut doc_running_q = None;
+                    let mut doc_running_v = None;
+                    match b {
+                        JBatching::NaivePolys => {
+                            if matches!(c, JCommit::Nlookup) {
+                                // don't use nlookup commit w/polys
+                                // (makes no sense)
+                                break;
+                            }
+                        }
+                        JBatching::Nlookup => {
+                            if s <= 1 {
+                                // don't use nlookup with batch of 1
+                                break;
+                            }
+                        }
+                        JBatching::Plookup => todo!(),
+                    }
+
+                    println!("\nBatching {:#?}", r1cs_converter.batching);
+                    let (prover_data, _) = r1cs_converter.to_r1cs();
+                    // println!("{:#?}", prover_data.r1cs);
+                    let precomp = prover_data.clone().precompute;
+                    let mut current_state = dfa.get_init_state();
+
+                    let mut values;
+                    let mut next_state;
+                    for i in 0..num_steps {
+                        (
+                            values,
+                            next_state,
+                            running_q,
+                            running_v,
+                            doc_running_q,
+                            doc_running_v,
+                        ) = r1cs_converter.gen_wit_i(
+                            i,
+                            current_state,
+                            running_q.clone(),
+                            running_v.clone(),
+                            doc_running_q.clone(),
+                            doc_running_v.clone(),
+                        );
+                        println!(
+                            "TESTS q1 {:#?}, q2 {:#?}",
+                            running_q.clone(),
+                            doc_running_q.clone()
+                        );
+
+                        println!("VALUES ROUND {:#?}: {:#?}", i, values);
+                        let extd_val = precomp.eval(&values);
+                        //println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
+
+                        prover_data.r1cs.check_all(&extd_val);
+                        // for next i+1 round
+                        current_state = next_state;
+                    }
+                    println!("b? {:#?}", b.clone());
+                    println!(
+                        "cost model: {:#?}",
+                        costs::full_round_cost_model_nohash(
                             &dfa,
                             s,
                             b.clone(),
                             dfa.is_match(&chars)
                         )
-                );*/ // needs to be redone again ugh
+                    );
+                    println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
+                    /*assert!(
+                        prover_data.r1cs.constraints().len() as usize
+                            <= costs::full_round_cost_model_nohash(
+                                &dfa,
+                                s,
+                                b.clone(),
+                                dfa.is_match(&chars)
+                            )
+                    );*/ // needs to be redone again ugh
+                }
             }
         }
     }

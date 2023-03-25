@@ -9,6 +9,12 @@ pub enum JBatching {
     Nlookup,
 }
 
+#[derive(Debug, Clone)]
+pub enum JCommit {
+    HashChain,
+    Nlookup,
+}
+
 pub fn naive_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize, is_match: bool) -> usize {
     // vanishing poly - m * n multiplications + 2 for lookup
     let mut cost = dfa.nstates() * dfa.nchars() + 2;

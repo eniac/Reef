@@ -22,6 +22,9 @@ generic-array = "0.14.4"
 bitvec = "1"
 dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8", optional = true }
 serial_test = "1.0.0"
+rand = "0.8" # todo del (only for troubleshooting)
+
+
 
 [features]
 default = [ "plot"]
