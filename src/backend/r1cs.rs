@@ -325,7 +325,7 @@ pub struct R1CS<'a, F: PrimeField> {
     // at the nova level, we will "reprivitize" everything, it's just important to see the hooks
     // sticking out here
     pub_inputs: Vec<Term>,
-    batch_size: usize,
+    pub batch_size: usize,
     doc: Vec<String>,
     is_match: bool,
     pc: PoseidonConstants<F, typenum::U2>,
@@ -338,18 +338,29 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         doc: &Vec<String>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U2>,
+        batch_override: Option<JBatching>,
+        commit_override: Option<JCommit>,
     ) -> Self {
         let is_match = dfa.is_match(doc);
         println!("Match? {:#?}", is_match);
 
         // run cost model (with Poseidon) to decide batching
-        let batching: JBatching =
-            opt_cost_model_select(&dfa, batch_size, batch_size, dfa.is_match(&doc), doc.len());
+        let batching = match batch_override {
+            None => {
+                opt_cost_model_select(&dfa, batch_size, batch_size, dfa.is_match(&doc), doc.len())
+            }
+            Some(b) => b,
+        };
+
+        let commit = match commit_override {
+            None => JCommit::HashChain, //todo COST MODEL
+            Some(c) => c,
+        };
 
         Self {
             dfa,
-            batching: JBatching::NaivePolys, // TODO
-            commit_type: JCommit::HashChain, // TODO
+            batching: batching, // TODO
+            commit_type: commit,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size,
@@ -1257,7 +1268,7 @@ mod tests {
 
     #[test]
     fn mle_partial() {
-        set_up_cfg();
+        init();
 
         let table = vec![
             Integer::from(1),
@@ -1406,10 +1417,14 @@ mod tests {
                     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
                         Strength::Standard,
                     );
-                    let mut r1cs_converter =
-                        R1CS::new(&dfa, &doc.chars().map(|c| c.to_string()).collect(), s, sc);
-                    r1cs_converter.batching = b.clone(); // hacky - don't do this outside tests
-                    r1cs_converter.commit_type = c.clone();
+                    let mut r1cs_converter = R1CS::new(
+                        &dfa,
+                        &doc.chars().map(|c| c.to_string()).collect(),
+                        s,
+                        sc,
+                        Some(b.clone()),
+                        Some(c.clone()),
+                    );
 
                     let mut running_q = None;
                     let mut running_v = None;

@@ -1,33 +1,17 @@
 #![allow(missing_docs, non_snake_case)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-use circ::cfg;
-use circ::cfg::CircOpt;
-use circ::target::r1cs::nova::*;
 use clap::{Args, Parser, Subcommand};
-use generic_array::typenum;
-use neptune::{
-    poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
-    sponge::api::{IOPattern, SpongeAPI, SpongeOp},
-    sponge::vanilla::{Mode, Sponge, SpongeTrait},
-    Strength,
-};
-use nova_snark::{
-    traits::{circuit::TrivialTestCircuit, Group},
-    CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
-};
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+pub mod backend;
 pub mod config;
-pub mod costs;
 pub mod dfa;
-pub mod r1cs;
 pub mod regex;
 
+use crate::backend::{framework::*, r1cs::init};
 use crate::config::*;
 use crate::dfa::DFA;
-use crate::r1cs::*;
 
 #[cfg(feature = "plot")]
 pub mod plot;
@@ -51,234 +35,14 @@ fn main() {
         .map(|c| c.to_string())
         .collect();
 
-    // set up CirC library
-    let mut circ: CircOpt = Default::default();
-    circ.field.custom_modulus =
-        "28948022309329048855892746252171976963363056481941647379679742748393362948097".into(); // vesta (fuck???)
-                                                                                                //"28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); // pallas curve (i think?)
-    cfg::set(&circ);
-
     #[cfg(feature = "plot")]
     plot::plot_dfa(&dfa).expect("Failed to plot DFA to a pdf file");
 
     let num_steps = doc.len();
     println!("Doc len is {}", num_steps);
 
-    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
+    init();
+    run_backend(&dfa, &doc, None, None, 1); // auto select batching/commit
 
-    let mut r1cs_converter = R1CS::new(&dfa, &doc, 1, sc.clone());
-    let parse_ms = p_time.elapsed().as_millis();
-
-    let c_time = Instant::now();
-    println!("generate commitment");
-    r1cs_converter.gen_commitment();
-    let commit_ms = c_time.elapsed().as_millis();
-
-    let r_time = Instant::now();
-    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs();
-    let r1cs_ms = r_time.elapsed().as_millis();
-
-    let s_time = Instant::now();
-    // use "empty" (witness-less) circuit to generate nova F
-    let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
-        &prover_data.r1cs,
-        None,
-        vec![
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-        ],
-        vec![
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-        ],
-        vec![
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-        ],
-        1,
-        sc.clone(),
-        false,
-    );
-
-    // trivial circuit
-    let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
-
-    // produce public parameters
-    println!("Producing public parameters...");
-    let pp = PublicParams::<
-        G1,
-        G2,
-        DFAStepCircuit<<G1 as Group>::Scalar>,
-        TrivialTestCircuit<<G2 as Group>::Scalar>,
-    >::setup(circuit_primary.clone(), circuit_secondary.clone())
-    .unwrap();
-    println!(
-        "Number of constraints (primary circuit): {}",
-        pp.num_constraints().0
-    );
-    println!(
-        "Number of constraints (secondary circuit): {}",
-        pp.num_constraints().1
-    );
-
-    println!(
-        "Number of variables (primary circuit): {}",
-        pp.num_variables().0
-    );
-    println!(
-        "Number of variables (secondary circuit): {}",
-        pp.num_variables().1
-    );
-
-    // trivial
-    let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
-
-    type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
-    type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
-    // recursive SNARK
-    let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
-
-    let mut current_state = dfa.get_init_state();
-    let z0_primary = vec![
-        <G1 as Group>::Scalar::from(current_state as u64),
-        <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
-        <G1 as Group>::Scalar::from(0),
-    ];
-    // TODO check "ingrained" bool out
-    let mut prev_hash = <G1 as Group>::Scalar::from(0);
-
-    let setup_ms = s_time.elapsed().as_millis();
-
-    let q_time = Instant::now();
-    let precomp = prover_data.clone().precompute;
-    let precomp_ms = q_time.elapsed().as_millis();
-
-    // for expected hash
-    /*
-    let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
-    let acc = &mut ();
-    */
-    /*let mut seq = vec![];
-    for i in 0..num_steps {
-        seq.push(SpongeOp::Absorb(2));
-        seq.push(SpongeOp::Squeeze(1));
-    }*/
-    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-
-    //sponge.start(parameter, None, acc);
-
-    let n_time = Instant::now();
-    for i in 0..num_steps {
-        println!("STEP {}", i);
-
-        // allocate real witnesses for round i
-        let (wits, next_state, _, _, _, _) =
-            r1cs_converter.gen_wit_i(i, current_state, None, None, None, None);
-        //println!("prover_data {:#?}", prover_data.clone());
-        //println!("wits {:#?}", wits.clone());
-        let extended_wit = precomp.eval(&wits);
-        //println!("extended wit {:#?}", extended_wit);
-
-        prover_data.r1cs.check_all(&extended_wit);
-
-        let current_char = doc[i].clone();
-        let mut next_char: String = String::from("");
-        if i + 1 < num_steps {
-            next_char = doc[i + 1].clone();
-        };
-        //println!("next char = {}", next_char);
-
-        // expected poseidon
-        let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
-        let acc = &mut ();
-
-        sponge.start(parameter.clone(), None, acc);
-        SpongeAPI::absorb(
-            &mut sponge,
-            2,
-            &[
-                prev_hash,
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
-            ],
-            acc,
-        );
-        let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-
-        println!(
-            "prev, expected next hash in main {:#?} {:#?}",
-            prev_hash, expected_next_hash
-        );
-        sponge.finish(acc).unwrap(); // assert expected hash finished correctly
-
-        let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
-            &prover_data.r1cs,
-            Some(extended_wit),
-            vec![
-                <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(next_state as u64),
-            ],
-            vec![
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(&next_char) as u64),
-            ],
-            vec![
-                <G1 as Group>::Scalar::from(prev_hash),
-                <G1 as Group>::Scalar::from(expected_next_hash[0]),
-            ],
-            1,
-            sc.clone(),
-            false,
-        );
-
-        //println!("STEP CIRC WIT for i={}: {:#?}", i, circuit_primary);
-        // snark
-        let result = RecursiveSNARK::prove_step(
-            &pp,
-            recursive_snark,
-            circuit_primary.clone(),
-            circuit_secondary.clone(),
-            z0_primary.clone(),
-            z0_secondary.clone(),
-        );
-        println!("prove step {:#?}", result);
-
-        assert!(result.is_ok());
-        println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
-        recursive_snark = Some(result.unwrap());
-
-        // for next i+1 round
-        current_state = next_state;
-        prev_hash = expected_next_hash[0];
-    }
-
-    assert!(recursive_snark.is_some());
-    let recursive_snark = recursive_snark.unwrap();
-
-    // verify recursive
-    let res = recursive_snark.verify(
-        &pp,
-        FINAL_EXTERNAL_COUNTER,
-        z0_primary.clone(),
-        z0_secondary.clone(),
-    );
-    println!("Recursive res: {:#?}", res);
-
-    assert!(res.is_ok());
-
-    // compressed SNARK
-    type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
-    type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
-    type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
-    type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
-    let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
-    assert!(res.is_ok());
-    let compressed_snark = res.unwrap();
-
-    // verify compressed
-    let res = compressed_snark.verify(&pp, FINAL_EXTERNAL_COUNTER, z0_primary, z0_secondary);
-    assert!(res.is_ok());
-
-    let nova_ms = n_time.elapsed().as_millis();
-
-    println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
+    //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }

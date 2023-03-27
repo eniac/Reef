@@ -1,5 +1,6 @@
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
+use crate::backend::costs::{JBatching, JCommit};
 use crate::backend::r1cs::*;
 use crate::dfa::DFA;
 use circ::cfg;
@@ -18,10 +19,17 @@ use nova_snark::{
 use std::time::{Duration, Instant};
 
 // gen R1CS object, commitment, make step circuit for nova
-pub fn run_backend(dfa: &DFA, doc: &Vec<String>) {
+pub fn run_backend(
+    dfa: &DFA,
+    doc: &Vec<String>,
+    batching_type: Option<JBatching>,
+    commit_type: Option<JCommit>,
+    batch_size: usize,
+) {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
 
-    let mut r1cs_converter = R1CS::new(dfa, doc, 1, sc.clone());
+    let mut r1cs_converter =
+        R1CS::new(dfa, doc, batch_size, sc.clone(), batching_type, commit_type);
     //let parse_ms = p_time.elapsed().as_millis();
 
     let c_time = Instant::now();
@@ -38,19 +46,10 @@ pub fn run_backend(dfa: &DFA, doc: &Vec<String>) {
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
         &prover_data.r1cs,
         None,
-        vec![
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-        ],
-        vec![
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-        ],
-        vec![
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-        ],
-        1,
+        vec![<G1 as Group>::Scalar::from(0); 2],
+        vec![<G1 as Group>::Scalar::from(0); 2],
+        vec![<G1 as Group>::Scalar::from(0); 2],
+        batch_size,
         sc.clone(),
         false,
     );
@@ -115,7 +114,7 @@ pub fn run_backend(dfa: &DFA, doc: &Vec<String>) {
     let n_time = Instant::now();
     let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
 
-    let num_steps = doc.len();
+    let num_steps = doc.len() / r1cs_converter.batch_size;
 
     let mut current_state = 0; //dfa.get init state ??
     for i in 0..num_steps {
@@ -131,34 +130,43 @@ pub fn run_backend(dfa: &DFA, doc: &Vec<String>) {
 
         prover_data.r1cs.check_all(&extended_wit);
 
-        let current_char = doc[i].clone();
+        let current_char = doc[i * batch_size].clone();
         let mut next_char: String = String::from("");
         if i + 1 < num_steps {
-            next_char = doc[i + 1].clone();
+            next_char = doc[(i + 1) * batch_size].clone();
         };
         //println!("next char = {}", next_char);
 
-        // expected poseidon
-        let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
-        let acc = &mut ();
+        // todo put this in r1cs
+        let mut next_hash = <G1 as Group>::Scalar::from(0);
+        let mut intm_hash = prev_hash;
+        for b in 0..batch_size {
+            // expected poseidon
+            let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
+            let acc = &mut ();
 
-        sponge.start(parameter.clone(), None, acc);
-        SpongeAPI::absorb(
-            &mut sponge,
-            2,
-            &[
-                prev_hash,
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
-            ],
-            acc,
-        );
-        let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            sponge.start(parameter.clone(), None, acc);
+            SpongeAPI::absorb(
+                &mut sponge,
+                2,
+                &[
+                    intm_hash,
+                    <G1 as Group>::Scalar::from(
+                        dfa.ab_to_num(&doc[i * batch_size + b].clone()) as u64
+                    ),
+                ],
+                acc,
+            );
+            let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            println!(
+                "prev, expected next hash in main {:#?} {:#?}",
+                prev_hash, expected_next_hash
+            );
+            sponge.finish(acc).unwrap(); // assert expected hash finished correctly
 
-        println!(
-            "prev, expected next hash in main {:#?} {:#?}",
-            prev_hash, expected_next_hash
-        );
-        sponge.finish(acc).unwrap(); // assert expected hash finished correctly
+            next_hash = expected_next_hash[0];
+            intm_hash = next_hash;
+        }
 
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
             &prover_data.r1cs,
@@ -173,9 +181,9 @@ pub fn run_backend(dfa: &DFA, doc: &Vec<String>) {
             ],
             vec![
                 <G1 as Group>::Scalar::from(prev_hash),
-                <G1 as Group>::Scalar::from(expected_next_hash[0]),
+                <G1 as Group>::Scalar::from(next_hash),
             ],
-            1,
+            batch_size,
             sc.clone(),
             false,
         );
@@ -192,7 +200,7 @@ pub fn run_backend(dfa: &DFA, doc: &Vec<String>) {
             z0_primary.clone(),
             z0_secondary.clone(),
         );
-        println!("prove step {:#?}", result);
+        //println!("prove step {:#?}", result);
 
         assert!(result.is_ok());
         println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
@@ -200,7 +208,7 @@ pub fn run_backend(dfa: &DFA, doc: &Vec<String>) {
 
         // for next i+1 round
         current_state = next_state;
-        prev_hash = expected_next_hash[0];
+        prev_hash = next_hash;
     }
 
     assert!(recursive_snark.is_some());
@@ -254,18 +262,59 @@ mod tests {
     use serial_test::serial;
     type G1 = pasta_curves::pallas::Point;
 
-    fn backend_test(ab: String, rstr: String, doc: String) {
+    fn backend_test(
+        ab: String,
+        rstr: String,
+        doc: String,
+        batch_type: JBatching,
+        commit_type: JCommit,
+        batch_sizes: Vec<usize>,
+    ) {
         let r = Regex::new(&rstr);
         let dfa = DFA::new(&ab[..], r);
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
         init();
-        run_backend(&dfa, &doc.chars().map(|c| c.to_string()).collect());
+        for b in batch_sizes {
+            run_backend(
+                &dfa,
+                &doc.chars().map(|c| c.to_string()).collect(),
+                Some(batch_type.clone()),
+                Some(commit_type.clone()),
+                b,
+            );
+        }
     }
 
     #[test]
     fn e2e_simple() {
-        // TODO overrides for batching, nlookup, etc here
-        backend_test("ab".to_string(), "a*b*".to_string(), "aaabbb".to_string());
+        backend_test(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaabbb".to_string(),
+            JBatching::NaivePolys,
+            JCommit::HashChain,
+            vec![1, 2],
+        );
+    }
+
+    fn e2e_nlookup() {
+        backend_test(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaabbb".to_string(),
+            JBatching::Nlookup,
+            JCommit::HashChain,
+            vec![2],
+        );
+
+        backend_test(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaabbb".to_string(),
+            JBatching::Nlookup,
+            JCommit::Nlookup,
+            vec![2],
+        );
     }
 }
