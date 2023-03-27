@@ -15,7 +15,6 @@ use neptune::{
     Strength,
 };
 use nova_snark::traits::Group;
-use rand::Rng;
 use rug::{
     integer::Order,
     ops::{RemRounding, RemRoundingAssign},
@@ -569,7 +568,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
         let time = Instant::now();
-        let cs = Computation::from_constraint_system_parts(
+        let mut cs = Computation::from_constraint_system_parts(
             self.assertions.clone(),
             self.pub_inputs.clone(),
         );
@@ -598,27 +597,28 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 Opt::ConstantFold(Box::new([])),
             ],
         );
-        let (mut prover_data, verifier_data) = to_r1cs(css.get("main").clone(), cfg());
+        let final_cs = css.get("main");
+        let mut circ_r1cs = to_r1cs(final_cs, cfg());
 
         println!(
             "Pre-opt R1cs size (no hashes): {}",
-            prover_data.r1cs.constraints().len()
+            circ_r1cs.constraints().len()
         );
         // println!("Prover data {:#?}", prover_data);
-        prover_data.r1cs = reduce_linearities(prover_data.r1cs, cfg());
+        circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
         //println!("Prover data {:#?}", prover_data);
         let ms = time.elapsed().as_millis();
         println!(
             "Final R1cs size (no hashes): {}",
-            prover_data.r1cs.constraints().len()
+            circ_r1cs.constraints().len()
         );
         println!("r1cs conv: {:#?}", ms);
 
-        return (prover_data, verifier_data);
+        circ_r1cs.finalize(&final_cs)
     }
 
-    pub fn to_r1cs(&mut self) -> (ProverData, VerifierData) {
+    pub fn to_circuit(&mut self) -> (ProverData, VerifierData) {
         match self.batching {
             JBatching::NaivePolys => self.to_polys(),
             JBatching::Nlookup => self.to_nlookup(),
@@ -1448,9 +1448,8 @@ mod tests {
                     }
 
                     println!("\nBatching {:#?}", r1cs_converter.batching);
-                    let (prover_data, _) = r1cs_converter.to_r1cs();
-                    // println!("{:#?}", prover_data.r1cs);
-                    let precomp = prover_data.clone().precompute;
+                    let (prover_data, _) = r1cs_converter.to_circuit();
+
                     let mut current_state = dfa.get_init_state();
 
                     let mut values;
@@ -1473,10 +1472,9 @@ mod tests {
                         );
 
                         //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-                        let extd_val = precomp.eval(&values);
                         //println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
 
-                        prover_data.r1cs.check_all(&extd_val);
+                        prover_data.check_all(&values);
                         // for next i+1 round
                         current_state = next_state;
                     }
@@ -1490,7 +1488,7 @@ mod tests {
                             dfa.is_match(&chars)
                         )
                     );
-                    println!("actual cost: {:#?}", prover_data.r1cs.constraints().len());
+                    println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
                     /*assert!(
                         prover_data.r1cs.constraints().len() as usize
                             <= costs::full_round_cost_model_nohash(

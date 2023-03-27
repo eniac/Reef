@@ -1,11 +1,11 @@
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 use crate::backend::costs::{JBatching, JCommit};
-use crate::backend::r1cs::*;
+use crate::backend::{nova::*, r1cs::*};
 use crate::dfa::DFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
-use circ::target::r1cs::{nova::*, ProverData};
+use circ::target::r1cs::ProverData;
 use generic_array::typenum;
 use neptune::{
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -38,13 +38,13 @@ pub fn run_backend(
     let commit_ms = c_time.elapsed().as_millis();
 
     let r_time = Instant::now();
-    let (prover_data, _verifier_data) = r1cs_converter.to_r1cs();
+    let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
     let r1cs_ms = r_time.elapsed().as_millis();
 
     let s_time = Instant::now();
     // use "empty" (witness-less) circuit to generate nova F
     let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
-        &prover_data.r1cs,
+        &prover_data,
         None,
         vec![<G1 as Group>::Scalar::from(0); 2],
         vec![<G1 as Group>::Scalar::from(0); 2],
@@ -94,7 +94,7 @@ pub fn run_backend(
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
     // PROVER fold up recursive proof and prove compressed snark
-    type C1 = DFAStepCircuit<<G1 as Group>::Scalar>;
+    type C1<'a> = DFAStepCircuit<'a, <G1 as Group>::Scalar>;
     type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
 
     // recursive SNARK
@@ -104,10 +104,6 @@ pub fn run_backend(
     let mut prev_hash = <G1 as Group>::Scalar::from(0);
 
     //let setup_ms = s_time.elapsed().as_millis();
-
-    let q_time = Instant::now();
-    let precomp = prover_data.clone().precompute;
-    let precomp_ms = q_time.elapsed().as_millis();
 
     // TODO deal with time bs
 
@@ -144,10 +140,11 @@ pub fn run_backend(
         );
         //println!("prover_data {:#?}", prover_data.clone());
         //println!("wits {:#?}", wits.clone());
-        let extended_wit = precomp.eval(&wits);
+        //let extended_wit = prover_data.precomp.eval(&wits);
         //println!("extended wit {:#?}", extended_wit);
 
-        prover_data.r1cs.check_all(&extended_wit);
+        //prover_data.check_all(&extended_wit);
+        prover_data.check_all(&wits);
 
         let current_char = doc[i * batch_size].clone();
         let mut next_char: String = String::from("");
@@ -188,8 +185,8 @@ pub fn run_backend(
         }
 
         let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
-            &prover_data.r1cs,
-            Some(extended_wit),
+            &prover_data,
+            Some(wits),
             vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
                 <G1 as Group>::Scalar::from(next_state as u64),
@@ -305,7 +302,7 @@ mod tests {
         }
     }
 
-    //#[test]
+    #[test]
     fn e2e_simple() {
         backend_test(
             "ab".to_string(),

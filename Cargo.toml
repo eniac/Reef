@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+gmp-mpfr-sys = { version = "1.4" }
 hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch = "phash"}
 clap = "4.1.8"
-#circ = { git = "https://github.com/jkwoods/circ", branch = "nova2", features = ["zok", "smt", "r1cs", "bellman"] }
-circ = { path = "nova-circ", features = ["zok", "smt", "r1cs", "bellman"] }
+circ = { git = "https://github.com/jkwoods/circ", branch = "r1cs_pub", features = ["r1cs", "bellman"] }
 regex-syntax = "0.6"
 itertools = "0.10"
 nova-snark ={ git = "https://github.com/sga001/Nova" }
@@ -22,9 +22,6 @@ generic-array = "0.14.4"
 bitvec = "1"
 dot = { git = "https://github.com/elefthei/dot-rust", branch = "utf8", optional = true }
 serial_test = "1.0.0"
-rand = "0.8" # todo del (only for troubleshooting)
-
-
 
 [features]
 default = [ "plot"]
