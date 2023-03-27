@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 #![allow(missing_docs)]
+use hashconsing::{consign, HConsed, HashConsign};
 use regex_syntax::hir::Hir;
 use regex_syntax::hir::HirKind::{Alternation, Class, Concat, Group, Literal, Repetition};
 use regex_syntax::hir::Literal::Unicode;
 use regex_syntax::hir::RepetitionKind::{OneOrMore, ZeroOrMore};
 use regex_syntax::Parser;
-use hashconsing::{consign, HConsed, HashConsign};
 
 /// Hash-consed regex terms
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -41,7 +41,7 @@ impl fmt::Display for Regex {
             RegexF::Not(c) => write!(f, "! {}", c),
             RegexF::App(x, y) => write!(f, "{}{}", x, y),
             RegexF::Alt(x, y) => write!(f, "({} | {})", x, y),
-            RegexF::Star(a) => write!(f, "{}*", a)
+            RegexF::Star(a) => write!(f, "{}*", a),
         }
     }
 }
@@ -112,7 +112,9 @@ impl Regex {
         match (&*a.0, &*b.0) {
             (x, y) if x == y => a,
             (RegexF::Alt(x, y), _) => Regex::alt(x.clone(), Regex::alt(y.clone(), b)),
-            (RegexF::Not(inner), _) if *inner.0 == RegexF::Empty => Regex(G.mk(RegexF::Not(Regex::empty()))),
+            (RegexF::Not(inner), _) if *inner.0 == RegexF::Empty => {
+                Regex(G.mk(RegexF::Not(Regex::empty())))
+            }
             (RegexF::Empty, _) => b,
             (RegexF::Dot, RegexF::Char(_)) => a,
             (RegexF::Char(_), RegexF::Dot) => b,
@@ -164,4 +166,3 @@ impl Regex {
         }
     }
 }
-

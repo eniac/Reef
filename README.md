@@ -1,4 +1,4 @@
-# rezk
+# reef
 
 ## Authors
 Lef Ioannidis `elefthei at seas.upenn.edu`
