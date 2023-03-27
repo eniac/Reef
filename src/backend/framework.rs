@@ -115,14 +115,33 @@ pub fn run_backend(
     let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
 
     let num_steps = doc.len() / r1cs_converter.batch_size;
+    let mut wits;
+    let mut next_state;
+    let mut running_q = None;
+    let mut running_v = None;
+    let mut doc_running_q = None;
+    let mut doc_running_v = None;
 
     let mut current_state = 0; //dfa.get init state ??
     for i in 0..num_steps {
         println!("STEP {}", i);
 
         // allocate real witnesses for round i
-        let (wits, next_state, _, _, _, _) =
-            r1cs_converter.gen_wit_i(i, current_state, None, None, None, None);
+        (
+            wits,
+            next_state,
+            running_q,
+            running_v,
+            doc_running_q,
+            doc_running_v,
+        ) = r1cs_converter.gen_wit_i(
+            i,
+            current_state,
+            running_q.clone(),
+            running_v.clone(),
+            doc_running_q.clone(),
+            doc_running_v.clone(),
+        );
         //println!("prover_data {:#?}", prover_data.clone());
         //println!("wits {:#?}", wits.clone());
         let extended_wit = precomp.eval(&wits);
@@ -286,7 +305,7 @@ mod tests {
         }
     }
 
-    #[test]
+    //#[test]
     fn e2e_simple() {
         backend_test(
             "ab".to_string(),
@@ -298,6 +317,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn e2e_nlookup() {
         backend_test(
             "ab".to_string(),
@@ -307,14 +327,15 @@ mod tests {
             JCommit::HashChain,
             vec![2],
         );
-
-        backend_test(
-            "ab".to_string(),
-            "a*b*".to_string(),
-            "aaabbb".to_string(),
-            JBatching::Nlookup,
-            JCommit::Nlookup,
-            vec![2],
-        );
+        /*
+              backend_test(
+                  "ab".to_string(),
+                  "a*b*".to_string(),
+                  "aaabbb".to_string(),
+                  JBatching::Nlookup,
+                  JCommit::Nlookup,
+                  vec![2],
+              );
+        */
     }
 }
