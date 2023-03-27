@@ -239,7 +239,7 @@ pub fn run_backend(
     );
     //println!("Recursive res: {:#?}", res);
 
-    assert!(res.is_ok());
+    assert!(res.is_ok()); // TODO delete
 
     // compressed SNARK
     type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
