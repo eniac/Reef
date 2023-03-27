@@ -42,7 +42,8 @@ fn main() {
     println!("Doc len is {}", num_steps);
 
     init();
-    run_backend(&dfa, &doc, None, None, 1); // auto select batching/commit
+
+    run_backend(&dfa, &doc, opt.eval_type, opt.commit_type, opt.batch_size); // auto select batching/commit
 
     //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }

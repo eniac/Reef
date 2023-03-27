@@ -1,15 +1,16 @@
 use crate::dfa::DFA;
+use clap::ValueEnum;
 
 static POSEIDON_NUM: usize = 238; // jess took literal measurement and 238 is the real diff
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ValueEnum)]
 pub enum JBatching {
     NaivePolys,
     Plookup,
     Nlookup,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ValueEnum)]
 pub enum JCommit {
     HashChain,
     Nlookup,
