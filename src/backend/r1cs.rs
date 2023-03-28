@@ -343,23 +343,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let is_match = dfa.is_match(doc);
         println!("Match? {:#?}", is_match);
 
-        let commit = match commit_override {
-            None => JCommit::HashChain,
-            Some(c) => c,
-        };
-
         // run cost model (with Poseidon) to decide batching
-        let batching = match batch_override {
-            None => opt_cost_model_select(
-                &dfa,
-                batch_size,
-                batch_size,
-                dfa.is_match(&doc),
-                doc.len(),
-                commit,
-            ),
-            Some(b) => b,
-        };
+        let (batching,commit) = opt_cost_model_select(
+            &dfa,
+            batch_size,
+            batch_size,
+            dfa.is_match(&doc),
+            doc.len(),
+            commit_override,
+            batch_override
+        );
 
         Self {
             dfa,
@@ -627,7 +620,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         match self.batching {
             JBatching::NaivePolys => self.to_polys(),
             JBatching::Nlookup => self.to_nlookup(),
-            JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
+            //JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
@@ -925,7 +918,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 prev_doc_running_claim_q,
                 prev_doc_running_claim_v,
             ),
-            JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
+            //JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
