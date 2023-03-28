@@ -343,17 +343,22 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let is_match = dfa.is_match(doc);
         println!("Match? {:#?}", is_match);
 
-        // run cost model (with Poseidon) to decide batching
-        let batching = match batch_override {
-            None => {
-                opt_cost_model_select(&dfa, batch_size, batch_size, dfa.is_match(&doc), doc.len())
-            }
-            Some(b) => b,
+        let commit = match commit_override {
+            None => JCommit::HashChain,
+            Some(c) => c,
         };
 
-        let commit = match commit_override {
-            None => JCommit::HashChain, //todo COST MODEL
-            Some(c) => c,
+        // run cost model (with Poseidon) to decide batching
+        let batching = match batch_override {
+            None => opt_cost_model_select(
+                &dfa,
+                batch_size,
+                batch_size,
+                dfa.is_match(&doc),
+                doc.len(),
+                commit,
+            ),
+            Some(b) => b,
         };
 
         Self {
@@ -1414,6 +1419,7 @@ mod tests {
             let num_steps = doc.len() / s;
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
+                    println!("\nNew");
                     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
                         Strength::Standard,
                     );
@@ -1447,7 +1453,8 @@ mod tests {
                         JBatching::Plookup => todo!(),
                     }
 
-                    println!("\nBatching {:#?}", r1cs_converter.batching);
+                    println!("Batching {:#?}", r1cs_converter.batching);
+                    println!("Commit {:#?}", r1cs_converter.commit_type);
                     let (prover_data, _) = r1cs_converter.to_circuit();
 
                     let mut current_state = dfa.get_init_state();
@@ -1489,15 +1496,15 @@ mod tests {
                         )
                     );
                     println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
-                    /*assert!(
-                        prover_data.r1cs.constraints().len() as usize
+                    assert!(
+                        prover_data.r1cs.constraints.len() as usize
                             <= costs::full_round_cost_model_nohash(
                                 &dfa,
                                 s,
                                 b.clone(),
                                 dfa.is_match(&chars)
                             )
-                    );*/ // needs to be redone again ugh
+                    );
                 }
             }
         }
