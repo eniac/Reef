@@ -1443,7 +1443,7 @@ mod tests {
                                 break;
                             }
                         }
-                        JBatching::Plookup => todo!(),
+                        //JBatching::Plookup => todo!(),
                     }
 
                     println!("Batching {:#?}", r1cs_converter.batching);
@@ -1485,7 +1485,9 @@ mod tests {
                             &dfa,
                             s,
                             b.clone(),
-                            dfa.is_match(&chars)
+                            dfa.is_match(&chars),
+                            doc.len(),
+                            c,
                         )
                     );
                     println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
@@ -1495,7 +1497,9 @@ mod tests {
                                 &dfa,
                                 s,
                                 b.clone(),
-                                dfa.is_match(&chars)
+                                dfa.is_match(&chars),
+                                doc.len(),
+                                c
                             )
                     );
                 }
