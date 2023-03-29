@@ -1508,7 +1508,7 @@ mod tests {
         init();
         test_func_no_hash(
             "a".to_string(),
-            "a".to_string(),
+            "^a$".to_string(),
             "aaaa".to_string(),
             vec![1, 2],
         );
@@ -1566,7 +1566,7 @@ mod tests {
         test_func_no_hash("ab".to_string(), "a".to_string(), "b".to_string(), vec![1]);
         test_func_no_hash(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaabaaaaaaaabbb".to_string(),
             vec![1, 2, 4],
         );

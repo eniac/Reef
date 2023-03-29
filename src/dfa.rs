@@ -13,6 +13,10 @@ pub struct DFA {
     pub states: HashMap<Regex, usize>,
     /// Transition relation from [state -> state] given an input
     pub trans: HashMap<(Regex, String), Regex>,
+    /// Must match from the begining of the document (default: false)
+    pub anchor_start: bool,
+    /// Must match until the end of the document (default: false)
+    pub anchor_end: bool
 }
 
 impl DFA {
@@ -46,7 +50,7 @@ impl DFA {
 
         // Recursively build transitions
         build_trans(&mut states, &mut trans, &ab, &re);
-        Self { ab, states, trans }
+        Self { ab, states, trans, anchor_start: re.is_start_anchored(), anchor_end: re.is_end_anchored() }
     }
 
     pub fn ab_to_num(&self, c: &String) -> usize {
@@ -67,6 +71,10 @@ impl DFA {
 
     pub fn nchars(&self) -> usize {
         self.ab.len()
+    }
+
+    pub fn is_exact_match(&self) -> bool {
+        self.anchor_start && self.anchor_end
     }
 
     pub fn contains_state(&self, state: &Regex) -> bool {
@@ -134,11 +142,41 @@ impl DFA {
 
     pub fn is_match(&self, doc: &Vec<String>) -> bool {
         let mut s = self.get_init_state();
-        for c in doc.into_iter() {
-            s = self.delta(&s, c).unwrap();
+        let mut start_idxs = Vec::new();
+        let mut j = 0;
+        let mut res = false;
+        let accepting = &self.get_final_states();
+
+        // Iterate over all postfixes of doc
+        if self.anchor_start {
+            start_idxs.push(0);
+        } else {
+            for i in 0..doc.len() {
+                start_idxs.push(i)
+            }
         }
-        // If it is in the final states, then success
-        self.get_final_states().contains(&s)
+
+        // For every postfix
+        for i in start_idxs {
+            res = false;
+            for j in i..doc.len() {
+                // Apply transition relation
+                s = self.delta(&s, &doc[j]).unwrap();
+                //
+                if accepting.contains(&s) {
+                    // If we found a substring (prefix) or exact match
+                    if !self.anchor_end || j == doc.len() - 1 {
+                        res = true;
+                        break;
+                    }
+                }
+            }
+            // Found an accepting state
+            if res {
+                break;
+            }
+        }
+        res
     }
 
     /// Double the stride of the DFA, can be nested k-times
@@ -160,7 +198,7 @@ impl DFA {
 
         // TODO: Accepting states
         let states = self.states.clone();
-        Self { ab, states, trans }
+        Self { ab, states, trans, anchor_start: self.anchor_start, anchor_end: self.anchor_end }
     }
 
     /// Compute equivalence classes from the DFA
