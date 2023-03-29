@@ -140,43 +140,34 @@ impl DFA {
             .collect()
     }
 
-    pub fn is_match(&self, doc: &Vec<String>) -> bool {
+    /// Returns (begin match index, end index) if a match is found in the doc
+    pub fn is_match(&self, doc: &Vec<String>) -> Option<(usize, usize)> {
         let mut s = self.get_init_state();
         let mut start_idxs = Vec::new();
-        let mut j = 0;
-        let mut res = false;
         let accepting = &self.get_final_states();
 
         // Iterate over all postfixes of doc
         if self.anchor_start {
             start_idxs.push(0);
         } else {
-            for i in 0..doc.len() {
+            for i in 0..doc.len()-1 {
                 start_idxs.push(i)
             }
         }
 
-        // For every postfix
+        // For every postfix of doc (O(n^2))
         for i in start_idxs {
-            res = false;
             for j in i..doc.len() {
                 // Apply transition relation
                 s = self.delta(&s, &doc[j]).unwrap();
-                //
-                if accepting.contains(&s) {
-                    // If we found a substring (prefix) or exact match
-                    if !self.anchor_end || j == doc.len() - 1 {
-                        res = true;
-                        break;
-                    }
+                // found a substring match or exact match
+                if accepting.contains(&s) &&
+                    (!self.anchor_end || j == doc.len() - 1) {
+                    return Some((i, j));
                 }
             }
-            // Found an accepting state
-            if res {
-                break;
-            }
         }
-        res
+        None
     }
 
     /// Double the stride of the DFA, can be nested k-times

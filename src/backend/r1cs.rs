@@ -340,13 +340,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         batch_override: Option<JBatching>,
         commit_override: Option<JCommit>,
     ) -> Self {
-        let is_match = dfa.is_match(doc);
+        let is_match = dfa.is_match(doc).is_some();
         println!("Match? {:#?}", is_match);
 
         // run cost model (with Poseidon) to decide batching
         let batching = match batch_override {
             None => {
-                opt_cost_model_select(&dfa, batch_size, batch_size, dfa.is_match(&doc), doc.len())
+                opt_cost_model_select(&dfa, batch_size, batch_size, is_match, doc.len())
             }
             Some(b) => b,
         };
@@ -358,7 +358,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         Self {
             dfa,
-            batching: batching, // TODO
+            batching, // TODO
             commit_type: commit,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
@@ -1485,7 +1485,7 @@ mod tests {
                             &dfa,
                             s,
                             b.clone(),
-                            dfa.is_match(&chars)
+                            dfa.is_match(&chars).is_some()
                         )
                     );
                     println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
