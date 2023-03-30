@@ -24,12 +24,18 @@ pub fn run_backend(
     doc: &Vec<String>,
     batching_type: Option<JBatching>,
     commit_type: Option<JCommit>,
-    batch_size: usize,
+    temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
 ) {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
 
-    let mut r1cs_converter =
-        R1CS::new(dfa, doc, batch_size, sc.clone(), batching_type, commit_type);
+    let mut r1cs_converter = R1CS::new(
+        dfa,
+        doc,
+        temp_batch_size,
+        sc.clone(),
+        batching_type,
+        commit_type,
+    );
     //let parse_ms = p_time.elapsed().as_millis();
 
     let c_time = Instant::now();
@@ -49,7 +55,7 @@ pub fn run_backend(
         vec![<G1 as Group>::Scalar::from(0); 2],
         vec![<G1 as Group>::Scalar::from(0); 2],
         vec![<G1 as Group>::Scalar::from(0); 2],
-        batch_size,
+        r1cs_converter.batch_size,
         sc.clone(),
         false,
     );
@@ -112,13 +118,12 @@ pub fn run_backend(
 
     let num_steps = doc.len() / r1cs_converter.batch_size;
     let mut wits;
-    let mut next_state;
     let mut running_q = None;
     let mut running_v = None;
     let mut doc_running_q = None;
     let mut doc_running_v = None;
 
-    let mut current_state = 0; //dfa.get init state ??
+    let mut next_state = 0; //dfa.get init state ??
     for i in 0..num_steps {
         println!("STEP {}", i);
 
@@ -132,7 +137,7 @@ pub fn run_backend(
             doc_running_v,
         ) = r1cs_converter.gen_wit_i(
             i,
-            current_state,
+            next_state,
             running_q.clone(),
             running_v.clone(),
             doc_running_q.clone(),
@@ -146,17 +151,17 @@ pub fn run_backend(
         //prover_data.check_all(&extended_wit);
         prover_data.check_all(&wits);
 
-        let current_char = doc[i * batch_size].clone();
+        let current_char = doc[i * r1cs_converter.batch_size].clone();
         let mut next_char: String = String::from("");
         if i + 1 < num_steps {
-            next_char = doc[(i + 1) * batch_size].clone();
+            next_char = doc[(i + 1) * r1cs_converter.batch_size].clone();
         };
         //println!("next char = {}", next_char);
 
         // todo put this in r1cs
         let mut next_hash = <G1 as Group>::Scalar::from(0);
         let mut intm_hash = prev_hash;
-        for b in 0..batch_size {
+        for b in 0..r1cs_converter.batch_size {
             // expected poseidon
             let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
             let acc = &mut ();
@@ -168,7 +173,7 @@ pub fn run_backend(
                 &[
                     intm_hash,
                     <G1 as Group>::Scalar::from(
-                        dfa.ab_to_num(&doc[i * batch_size + b].clone()) as u64
+                        dfa.ab_to_num(&doc[i * r1cs_converter.batch_size + b].clone()) as u64,
                     ),
                 ],
                 acc,
@@ -199,7 +204,7 @@ pub fn run_backend(
                 <G1 as Group>::Scalar::from(prev_hash),
                 <G1 as Group>::Scalar::from(next_hash),
             ],
-            batch_size,
+            r1cs_converter.batch_size,
             sc.clone(),
             false,
         );
@@ -306,7 +311,7 @@ mod tests {
     fn e2e_simple() {
         backend_test(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaabbb".to_string(),
             JBatching::NaivePolys,
             JCommit::HashChain,
@@ -318,21 +323,19 @@ mod tests {
     fn e2e_nlookup() {
         backend_test(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaabbb".to_string(),
             JBatching::Nlookup,
             JCommit::HashChain,
             vec![2],
         );
-        /*
-              backend_test(
-                  "ab".to_string(),
-                  "a*b*".to_string(),
-                  "aaabbb".to_string(),
-                  JBatching::Nlookup,
-                  JCommit::Nlookup,
-                  vec![2],
-              );
-        */
+        /*    backend_test(
+            "ab".to_string(),
+            "a*b*".to_string(),
+            "aaabbb".to_string(),
+            JBatching::Nlookup,
+            JCommit::Nlookup,
+            vec![2],
+        );*/
     }
 }

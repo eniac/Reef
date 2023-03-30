@@ -327,8 +327,9 @@ pub struct R1CS<'a, F: PrimeField> {
     pub batch_size: usize,
     doc: Vec<String>,
     is_match: bool,
+    substring: (usize, usize),
     pc: PoseidonConstants<F, typenum::U2>,
-    commitment: Option<F>,
+    commitment: Option<(F, F)>, // (start, end)
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
@@ -341,20 +342,60 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         commit_override: Option<JCommit>,
     ) -> Self {
         let is_match = dfa.is_match(doc).is_some();
+
         println!("Match? {:#?}", is_match);
 
         // run cost model (with Poseidon) to decide batching
-        let batching = match batch_override {
-            None => {
-                opt_cost_model_select(&dfa, batch_size, batch_size, is_match, doc.len())
-            }
-            Some(b) => b,
-        };
+        let (batching, commit) = opt_cost_model_select(
+            &dfa,
+            batch_size,
+            batch_size,
+            is_match,
+            doc.len(),
+            commit_override,
+            batch_override,
+        );
 
-        let commit = match commit_override {
-            None => JCommit::HashChain, //todo COST MODEL
-            Some(c) => c,
-        };
+        let mut sel_batch_size = 1;
+        // TODO ELI: handle substring costs, select batch size correctly
+        if batch_size < 1 {
+            // default to selecting the optimal
+            sel_batch_size = 1;
+        } else {
+            // CLI batch_size override
+            sel_batch_size = batch_size;
+        }
+
+        assert!(sel_batch_size >= 1);
+        println!(
+            "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}",
+            batching, commit, sel_batch_size
+        );
+
+        println!("substring pre {:#?}", dfa.is_match(doc));
+
+        let mut substring = (0, doc.len());
+        match dfa.is_match(doc) {
+            Some((start, end)) => {
+                match commit {
+                    JCommit::HashChain => {
+                        assert!(
+                            end + 1 == doc.len(), // deal with this +1 BS
+                            "for HashChain commitment, Regex must handle EOD, switch commit type or change Regex r to r$ or r.*$"
+                        );
+
+                        substring = (start, doc.len()); // ... right?
+                    }
+                    JCommit::Nlookup => {
+                        substring = (start, end + 1); // exact
+                    }
+                }
+            }
+            None => { // see above
+            }
+        }
+
+        println!("'substring': {:#?}", substring);
 
         Self {
             dfa,
@@ -362,9 +403,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             commit_type: commit,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
-            batch_size,
+            batch_size: sel_batch_size,
             doc: doc.clone(),
             is_match,
+            substring,
             pc: pcs,
             commitment: None,
         }
@@ -373,69 +415,49 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // IN THE CLEAR
 
     pub fn gen_commitment(&mut self) {
-        if !matches!(self.commit_type, JCommit::HashChain) {
-            panic!(
-                "Tried to generate a hash chain commit when different commit type was specified."
-            );
-        }
+        match self.commit_type {
+            JCommit::HashChain => {
+                let mut i = 0;
+                let mut start = F::from(0);
+                let mut hash = vec![start.clone()];
 
-        let mut hash = vec![F::from(0)];
-        for c in self.doc.clone().into_iter() {
-            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-            let acc = &mut ();
+                for c in self.doc.clone().into_iter() {
+                    if i == self.substring.0 {
+                        start = hash[0];
+                    }
+                    let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+                    let acc = &mut ();
 
-            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-            sponge.start(parameter, None, acc);
-            SpongeAPI::absorb(
-                &mut sponge,
-                2,
-                &[hash[0], F::from(self.dfa.ab_to_num(&c.to_string()) as u64)],
-                acc,
-            );
-            hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            sponge.finish(acc).unwrap();
-        }
-        println!("commitment = {:#?}", hash.clone());
-        self.commitment = Some(hash[0]);
-    }
-
-    // TODO in main
-    pub fn gen_substring_commitment_start(&mut self, start_at: usize) -> F {
-        let mut hash = vec![F::from(0)];
-        let mut i = 0;
-        for c in self.doc.clone().into_iter() {
-            if i == start_at {
-                break;
+                    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+                    sponge.start(parameter, None, acc);
+                    SpongeAPI::absorb(
+                        &mut sponge,
+                        2,
+                        &[hash[0], F::from(self.dfa.ab_to_num(&c.to_string()) as u64)],
+                        acc,
+                    );
+                    hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+                    sponge.finish(acc).unwrap();
+                }
+                println!("commitment = {:#?}", hash.clone());
+                self.commitment = Some((start, hash[0]));
             }
-            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-            let acc = &mut ();
-
-            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-            sponge.start(parameter, None, acc);
-            SpongeAPI::absorb(
-                &mut sponge,
-                2,
-                &[hash[0], F::from(self.dfa.ab_to_num(&c.to_string()) as u64)],
-                acc,
-            );
-            hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            sponge.finish(acc).unwrap();
-            i += 1;
+            JCommit::Nlookup => todo!(),
         }
-
-        hash[0]
     }
 
     pub fn verifier_final_checks(
         &self,
-        final_hash: F,
+        final_hash: Option<F>,
         accepting_state: F,
         final_q: Vec<F>,
         final_v: F,
     ) {
         // TODO
         // commitment matches?
-        assert_eq!(self.commitment.unwrap(), final_hash);
+        if matches!(self.commit_type, JCommit::HashChain) {
+            assert_eq!(self.commitment.unwrap().1, final_hash.unwrap());
+        }
 
         // state matches?
         assert_eq!(accepting_state, F::from(1));
@@ -480,6 +502,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 out = out || (state == xi);
             }
         }
+
+        println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
 
         // sanity
         if (batch_num + 1) * self.batch_size >= self.doc.len() {
@@ -622,16 +646,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         match self.batching {
             JBatching::NaivePolys => self.to_polys(),
             JBatching::Nlookup => self.to_nlookup(),
-            JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
+            //JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
     // TODO batch size (1 currently)
     fn to_polys(&mut self) -> (ProverData, VerifierData) {
-        if !matches!(self.commit_type, JCommit::HashChain) {
-            panic!("Tried to use non-hash commit with naive polys, illogical move");
-        }
-
         let l_time = Instant::now();
         let lookup = self.lookup_idxs();
 
@@ -664,6 +684,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         self.accepting_state_circuit();
 
+        if matches!(self.commit_type, JCommit::Nlookup) {
+            assert!(
+                self.batch_size > 1,
+                "don't use a doc commitment if you aren't going to batch"
+            );
+            self.nlookup_doc_commit();
+        }
+
         self.r1cs_conv()
     }
 
@@ -671,7 +699,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // eq([x0,x1,x2...],[e0,e1,e2...])
     fn bit_eq_circuit(&mut self, m: usize, q_bit: usize, id: &str) -> Term {
         let mut eq = new_const(1); // dummy, not used
-                                   // TODO ID HERE
         let q_name = format!("{}_eq{}", id, q_bit);
         for i in 0..m {
             let next = term(
@@ -909,8 +936,21 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     ) {
         match self.batching {
             JBatching::NaivePolys => {
-                let (wits, next_state) = self.gen_wit_i_polys(batch_num, current_state);
-                (wits, next_state, None, None, None, None)
+                let (wits, next_state, next_doc_running_claim_q, next_doc_running_claim_v) = self
+                    .gen_wit_i_polys(
+                        batch_num,
+                        current_state,
+                        prev_doc_running_claim_q,
+                        prev_doc_running_claim_v,
+                    );
+                (
+                    wits,
+                    next_state,
+                    None,
+                    None,
+                    next_doc_running_claim_q,
+                    next_doc_running_claim_v,
+                )
             }
             JBatching::Nlookup => self.gen_wit_i_nlookup(
                 batch_num,
@@ -920,7 +960,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 prev_doc_running_claim_q,
                 prev_doc_running_claim_v,
             ),
-            JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
+            //JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
@@ -1207,7 +1247,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         &self,
         batch_num: usize,
         current_state: usize,
-    ) -> (FxHashMap<String, Value>, usize) {
+        doc_running_q: Option<Vec<Integer>>,
+        doc_running_v: Option<Integer>,
+    ) -> (
+        FxHashMap<String, Value>,
+        usize,
+        Option<Vec<Integer>>,
+        Option<Integer>,
+    ) {
         let mut wits = FxHashMap::default();
         let mut state_i = current_state;
         let mut next_state = 0;
@@ -1223,20 +1270,28 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         wits.insert(format!("state_{}", self.batch_size), new_wit(state_i));
 
-        /*println!(
-            "batch num = {:#?}, batch size = {:#?}, doc len = {:#?}",
-            batch_num,
-            self.batch_size,
-            self.doc.len()
-        );*/
-
         wits.insert(
             format!("accepting"),
             new_bool_wit(self.prover_accepting_state(batch_num, next_state)),
         );
         //println!("wits {:#?}", wits);
 
-        (wits, next_state)
+        if matches!(self.commit_type, JCommit::Nlookup) {
+            assert!(doc_running_q.is_some() || batch_num == 0);
+            assert!(doc_running_v.is_some() || batch_num == 0);
+            let (w, next_doc_running_q, next_doc_running_v) =
+                self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
+            wits = w;
+            //println!("RUNNING DOC Q {:#?}", next_doc_running_q.clone());
+            (
+                wits,
+                next_state,
+                Some(next_doc_running_q),
+                Some(next_doc_running_v),
+            )
+        } else {
+            (wits, next_state, None, None)
+        }
     }
 }
 
@@ -1403,7 +1458,13 @@ mod tests {
         }
     }
 
-    fn test_func_no_hash(ab: String, rstr: String, doc: String, batch_sizes: Vec<usize>) {
+    fn test_func_no_hash(
+        ab: String,
+        rstr: String,
+        doc: String,
+        batch_sizes: Vec<usize>,
+        expected_match: bool,
+    ) {
         let r = Regex::new(&rstr);
         let dfa = DFA::new(&ab[..], r);
         //println!("{:#?}", dfa);
@@ -1414,6 +1475,7 @@ mod tests {
             let num_steps = doc.len() / s;
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
+                    println!("\nNew");
                     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
                         Strength::Standard,
                     );
@@ -1426,28 +1488,33 @@ mod tests {
                         Some(c.clone()),
                     );
 
+                    assert_eq!(expected_match, r1cs_converter.is_match);
+
                     let mut running_q = None;
                     let mut running_v = None;
                     let mut doc_running_q = None;
                     let mut doc_running_v = None;
                     match b {
-                        JBatching::NaivePolys => {
-                            if matches!(c, JCommit::Nlookup) {
-                                // don't use nlookup commit w/polys
-                                // (makes no sense)
-                                break;
-                            }
-                        }
+                        JBatching::NaivePolys => {}
                         JBatching::Nlookup => {
                             if s <= 1 {
                                 // don't use nlookup with batch of 1
                                 break;
                             }
-                        }
-                        JBatching::Plookup => todo!(),
+                        } //JBatching::Plookup => todo!(),
                     }
+                    match c {
+                        JCommit::HashChain => {}
+                        JCommit::Nlookup => {
+                            if s <= 1 {
+                                // don't use nlookup with batch of 1
+                                break;
+                            }
+                        } //JBatching::Plookup => todo!(),
+                    } // TODO make batch size 1 work at some point, you know for nice figs
 
-                    println!("\nBatching {:#?}", r1cs_converter.batching);
+                    println!("Batching {:#?}", r1cs_converter.batching);
+                    println!("Commit {:#?}", r1cs_converter.commit_type);
                     let (prover_data, _) = r1cs_converter.to_circuit();
 
                     let mut current_state = dfa.get_init_state();
@@ -1485,19 +1552,23 @@ mod tests {
                             &dfa,
                             s,
                             b.clone(),
-                            dfa.is_match(&chars).is_some()
+                            r1cs_converter.is_match,
+                            doc.len(),
+                            c,
                         )
                     );
                     println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
                     /*assert!(
-                        prover_data.r1cs.constraints().len() as usize
+                        prover_data.r1cs.constraints.len() as usize
                             <= costs::full_round_cost_model_nohash(
                                 &dfa,
                                 s,
                                 b.clone(),
-                                dfa.is_match(&chars)
+                                dfa.is_match(&chars),
+                                doc.len(),
+                                c
                             )
-                    );*/ // needs to be redone again ugh
+                    );*/ // deal with later TODO
                 }
             }
         }
@@ -1508,9 +1579,10 @@ mod tests {
         init();
         test_func_no_hash(
             "a".to_string(),
-            "^a$".to_string(),
+            "^a*$".to_string(),
             "aaaa".to_string(),
             vec![1, 2],
+            true,
         );
     }
 
@@ -1519,21 +1591,24 @@ mod tests {
         init();
         test_func_no_hash(
             "ab".to_string(),
-            "ab".to_string(),
+            "^ab$".to_string(),
             "ab".to_string(),
             vec![1],
+            true,
         );
         test_func_no_hash(
             "abc".to_string(),
-            "ab".to_string(),
+            "^ab$".to_string(),
             "ab".to_string(),
             vec![1],
+            true,
         );
         test_func_no_hash(
             "abcdef".to_string(),
-            "ab.*f".to_string(),
+            "^ab.*f$".to_string(),
             "abcdeffff".to_string(),
             vec![1, 3],
+            true,
         );
     }
 
@@ -1542,40 +1617,52 @@ mod tests {
         init();
         test_func_no_hash(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "ab".to_string(),
             vec![1],
+            true,
         );
         test_func_no_hash(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaaaaabbbbbbbbbbbbbb".to_string(),
             vec![1, 2, 4],
+            true,
         );
         test_func_no_hash(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaaaaaaaaaab".to_string(),
             vec![1, 2, 4],
+            true,
         );
     }
 
     #[test]
     fn dfa_non_match() {
         init();
-        test_func_no_hash("ab".to_string(), "a".to_string(), "b".to_string(), vec![1]);
+        // TODO make sure match/non match is expected
+        test_func_no_hash(
+            "ab".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            vec![1],
+            false,
+        );
         test_func_no_hash(
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaabaaaaaaaabbb".to_string(),
             vec![1, 2, 4],
+            false,
         );
 
         test_func_no_hash(
             "abcd".to_string(),
-            "a*b*cccb*".to_string(),
+            "^a*b*cccb*$".to_string(),
             "aaaaaaaaaabbbbbbbbbb".to_string(),
             vec![1, 2, 5, 10],
+            false,
         );
     }
 
@@ -1583,6 +1670,58 @@ mod tests {
     #[should_panic]
     fn dfa_bad_1() {
         init();
-        test_func_no_hash("ab".to_string(), "a".to_string(), "c".to_string(), vec![1]);
+        test_func_no_hash(
+            "ab".to_string(),
+            "^a$".to_string(),
+            "c".to_string(),
+            vec![1],
+            false,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn dfa_bad_substring() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "hello".to_string(),
+            "helloworld".to_string(),
+            vec![1],
+            true,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn dfa_bad_substring_2() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello".to_string(),
+            "helloworld".to_string(),
+            vec![1],
+            true,
+        );
+    }
+
+    #[test]
+    fn dfa_ok_substring() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello.*$".to_string(),
+            "helloworld".to_string(),
+            vec![1],
+            true,
+        );
+
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello$".to_string(),
+            "helloworld".to_string(),
+            vec![1, 5],
+            false,
+        );
     }
 }
