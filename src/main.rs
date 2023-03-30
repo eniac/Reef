@@ -11,7 +11,7 @@ pub mod regex;
 
 use crate::backend::{framework::*, r1cs::init};
 use crate::config::*;
-use crate::dfa::DFA;
+use crate::dfa::NFA;
 
 #[cfg(feature = "plot")]
 pub mod plot;
@@ -24,26 +24,21 @@ fn main() {
     let ab = String::from_iter(opt.config.alphabet());
 
     // Regular expresion parser and convert the Regex to a DFA
-    let dfa = opt.config.compile_dfa();
-    println!("dfa: {:#?}", dfa);
+    let nfa = opt.config.compile_nfa();
+    println!("dfa: {:#?}", nfa);
 
     // Input document
-    let doc: Vec<String> = opt
-        .config
-        .read_doc()
-        .into_iter()
-        .map(|c| c.to_string())
-        .collect();
+    let doc: Vec<String> = opt.config.read_doc().iter().map(|c|c.to_string()).collect();
 
     #[cfg(feature = "plot")]
-    plot::plot_dfa(&dfa).expect("Failed to plot DFA to a pdf file");
+    plot::plot_nfa(&nfa).expect("Failed to plot DFA to a pdf file");
 
     let num_steps = doc.len();
     println!("Doc len is {}", num_steps);
 
     init();
 
-    run_backend(&dfa, &doc, opt.eval_type, opt.commit_type, opt.batch_size); // auto select batching/commit
+    run_backend(&nfa, &doc, opt.eval_type, opt.commit_type, opt.batch_size); // auto select batching/commit
 
     //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }

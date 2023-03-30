@@ -1,4 +1,4 @@
-use crate::dfa::DFA;
+use crate::dfa::NFA;
 use clap::ValueEnum;
 
 static POSEIDON_NUM: usize = 238; // jess took literal measurement and 238 is the real diff
@@ -16,7 +16,7 @@ pub enum JCommit {
     Nlookup,
 }
 
-fn accepting_circuit<'a>(dfa: &'a DFA, is_match: bool) -> usize {
+fn accepting_circuit<'a>(dfa: &'a NFA, is_match: bool) -> usize {
     // vanishing selection for final check
     // poly of degree (# final states - 1)
     // (alt, # non final states - 1)
@@ -69,14 +69,14 @@ fn commit_circuit_hash(doc_len: usize, batch_size: usize, commit_type: JCommit) 
             cost += log_mn * POSEIDON_NUM;
 
             //R generation hashes
-            cost += POSEIDON_NUM; 
+            cost += POSEIDON_NUM;
             cost
         }
     }
 }
 
 pub fn naive_cost_model_nohash<'a>(
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batch_size: usize,
     is_match: bool,
     doc_len: usize,
@@ -93,7 +93,7 @@ pub fn naive_cost_model_nohash<'a>(
     cost
 }
 /*
-pub fn plookup_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
+pub fn plookup_cost_model_nohash<'a>(dfa: &'a NFA, batch_size: usize) -> usize {
     let mut cost = 0;
     // 2 prove sequence constructions
     cost += dfa.nstates() * dfa.nchars();
@@ -109,7 +109,7 @@ pub fn plookup_cost_model_nohash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
     cost
 }
 
-pub fn plookup_cost_model_hash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
+pub fn plookup_cost_model_hash<'a>(dfa: &'a NFA, batch_size: usize) -> usize {
     let mut cost: usize = plookup_cost_model_nohash(dfa, batch_size);
 
     //Randomized difference
@@ -122,7 +122,7 @@ pub fn plookup_cost_model_hash<'a>(dfa: &'a DFA, batch_size: usize) -> usize {
 }
 */
 pub fn nlookup_cost_model_nohash<'a>(
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batch_size: usize,
     is_match: bool,
     doc_len: usize,
@@ -158,7 +158,7 @@ pub fn nlookup_cost_model_nohash<'a>(
 }
 
 pub fn nlookup_cost_model_hash<'a>(
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batch_size: usize,
     is_match: bool,
     doc_len: usize,
@@ -178,7 +178,7 @@ pub fn nlookup_cost_model_hash<'a>(
 }
 
 pub fn full_round_cost_model_nohash<'a>(
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batch_size: usize,
     lookup_type: JBatching,
     is_match: bool,
@@ -197,7 +197,7 @@ pub fn full_round_cost_model_nohash<'a>(
 }
 
 pub fn full_round_cost_model<'a>(
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batch_size: usize,
     lookup_type: JBatching,
     is_match: bool,
@@ -218,7 +218,7 @@ pub fn full_round_cost_model<'a>(
 }
 
 pub fn opt_cost_model_select_with_commit<'a>(
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batch_size: usize,
     is_match: bool,
     doc_length: usize,
@@ -254,7 +254,7 @@ pub fn opt_cost_model_select_with_commit<'a>(
 
 }
 pub fn opt_cost_model_select_with_batch<'a>(
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batch_size: usize,
     is_match: bool,
     doc_length: usize,
@@ -338,7 +338,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
 }
 
 pub fn opt_commit_select_with_batch<'a>(
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batch_size: usize,
     is_match: bool,
     doc_length: usize,
@@ -376,7 +376,7 @@ pub fn opt_commit_select_with_batch<'a>(
 }
 
 pub fn opt_cost_model_select<'a>(
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batch_range_lower: usize,
     batch_range_upper: usize,
     is_match: bool,
@@ -388,7 +388,7 @@ pub fn opt_cost_model_select<'a>(
         None =>  JBatching::NaivePolys,
         Some(b) => b,
     };
-   
+
     let mut opt_commit: JCommit = match commit {
         None => JCommit::HashChain,
         Some(c) => c,
@@ -409,7 +409,7 @@ pub fn opt_cost_model_select<'a>(
            (None,Some(c)) => opt_cost_model_select_with_commit(dfa, 2<<n, is_match, doc_length, c),
            (Some(b),None) => opt_commit_select_with_batch(dfa, 2<<n, is_match, doc_length, b),
            (Some(b),Some(c))=> (b,c,full_round_cost_model(dfa, 2<<n, b, is_match, doc_length, c)),
-        };  
+        };
         if batching_and_cost.2 < cost {
             cost = batching_and_cost.2;
             opt_commit = batching_and_cost.1;

@@ -4,31 +4,31 @@ use std::fs::File;
 use std::io::Result;
 use std::process::{Command, ExitStatus};
 
-use crate::dfa::DFA;
+use crate::dfa::NFA;
 use crate::regex::Regex;
 
-type Ed = (Regex, String, Regex);
+type Ed = (usize, String, usize);
 
 #[cfg(feature = "plot")]
-impl<'a> dot::Labeller<'a, Regex, Ed> for DFA {
+impl<'a> dot::Labeller<'a, usize, Ed> for NFA {
     fn graph_id(&'a self) -> dot::Id<'a> {
         dot::Id::new("example").unwrap()
     }
-    fn node_id(&'a self, n: &Regex) -> dot::Id<'a> {
-        dot::Id::new(format!("N{}", self.states[n])).unwrap()
+    fn node_id(&'a self, n: &usize) -> dot::Id<'a> {
+        println!("EXPR: {:?}\n", self.expressions);
+        dot::Id::new(format!("N{}", n)).unwrap()
     }
-    fn node_label<'b>(&'b self, r: &Regex) -> dot::LabelText<'b> {
-        dot::LabelText::LabelStr(format!("{}", r).into())
+    fn node_label<'b>(&'b self, n: &usize) -> dot::LabelText<'b> {
+        dot::LabelText::LabelStr(format!("{}", self.expressions[n]).into())
     }
-    fn node_style(&'a self, n: &Regex) -> dot::Style {
+    fn node_style(&'a self, n: &usize) -> dot::Style {
         let init = self.get_init_state();
         let finals = self.get_final_states();
-        let s = self.get_state_num(&n).unwrap();
-        if s == init && finals.contains(&s) {
+        if n == &init && finals.contains(&n) {
             dot::Style::Filled
-        } else if finals.contains(&s) {
+        } else if finals.contains(&n) {
             dot::Style::Bold
-        } else if s == init {
+        } else if n == &init {
             dot::Style::Dashed
         } else {
             dot::Style::None
@@ -41,9 +41,9 @@ impl<'a> dot::Labeller<'a, Regex, Ed> for DFA {
 }
 
 #[cfg(feature = "plot")]
-impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA {
-    fn nodes(&'a self) -> dot::Nodes<'a, Regex> {
-        self.states.clone().into_keys().collect()
+impl<'a> dot::GraphWalk<'a, usize, Ed> for NFA {
+    fn nodes(&'a self) -> dot::Nodes<'a, usize> {
+        (0..self.n).collect()
     }
     fn edges(&'a self) -> dot::Edges<'a, Ed> {
         self.trans
@@ -55,30 +55,34 @@ impl<'a> dot::GraphWalk<'a, Regex, Ed> for DFA {
             .map(|((a, b), c)| {
                 (
                     a,
-                    if c.len() > self.ab.len()/4 { "*".to_string() } else { c.join(", ").trim().to_string() },
+                    if c.len() > 6 && c.len() > self.ab.len()/4 {
+                        "*".to_string()
+                    } else {
+                        c.join(", ").trim().to_string()
+                    },
                     b,
                 )
             })
             .collect()
     }
 
-    fn source(&self, e: &Ed) -> Regex {
-        e.0.clone()
+    fn source(&self, e: &Ed) -> usize {
+        e.0
     }
-    fn target(&self, e: &Ed) -> Regex {
-        e.2.clone()
+    fn target(&self, e: &Ed) -> usize {
+        e.2
     }
 }
 
 #[cfg(feature = "plot")]
-pub fn plot_dfa<'a>(dfa: &'a DFA) -> Result<ExitStatus> {
-    let dotfile = "dfa.dot";
+pub fn plot_nfa<'a>(nfa: &'a NFA) -> Result<ExitStatus> {
+    let dotfile = "nfa.dot";
 
     // Output file
     let mut buffer = File::create(dotfile).unwrap();
 
     // render .dot file
-    dot::render(dfa, &mut buffer).unwrap();
+    dot::render(nfa, &mut buffer).unwrap();
     println!("Wrote DOT file {}.", dotfile);
 
     // Convert to pdf
@@ -86,7 +90,7 @@ pub fn plot_dfa<'a>(dfa: &'a DFA) -> Result<ExitStatus> {
         .arg("-Tpdf")
         .arg(dotfile)
         .arg("-o")
-        .arg("dfa.pdf")
+        .arg("nfa.pdf")
         .spawn()
         .expect("[dot] CLI failed to convert dfa to [pdf] file");
     child.wait()

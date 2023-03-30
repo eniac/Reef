@@ -109,7 +109,7 @@ fn get_modulus<F: Field + PrimeField>() -> Integer {
 }
 
 #[derive(Clone, Debug)]
-pub struct DFAStepCircuit<'a, F: PrimeField> {
+pub struct NFAStepCircuit<'a, F: PrimeField> {
     r1cs: &'a R1csFinal, // TODO later ref
     values: Option<Vec<Value>>,
     //prover_data: &'a ProverData,
@@ -124,7 +124,7 @@ pub struct DFAStepCircuit<'a, F: PrimeField> {
 
 // note that this will generate a single round, and no witnesses, unlike nova example code
 // witness and loops will happen at higher level as to put as little as possible deep in circ
-impl<'a, F: PrimeField> DFAStepCircuit<'a, F> {
+impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
     pub fn new(
         prover_data: &'a ProverData,
         wits: Option<FxHashMap<String, Value>>, //Option<&'a FxHashMap<String, Value>>,
@@ -158,7 +158,7 @@ impl<'a, F: PrimeField> DFAStepCircuit<'a, F> {
             ffs
         });
 
-        DFAStepCircuit {
+        NFAStepCircuit {
             r1cs: &prover_data.r1cs, // def get rid of this crap
             values: values,
             batch_size: batch_size,
@@ -171,7 +171,7 @@ impl<'a, F: PrimeField> DFAStepCircuit<'a, F> {
     }
 }
 
-impl<'a, F> StepCircuit<F> for DFAStepCircuit<'a, F>
+impl<'a, F> StepCircuit<F> for NFAStepCircuit<'a, F>
 where
     F: PrimeField,
 {
