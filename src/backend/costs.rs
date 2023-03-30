@@ -32,7 +32,7 @@ fn commit_circuit_nohash(doc_len: usize, batch_size: usize, commit_type: JCommit
     match commit_type {
         JCommit::HashChain => match is_match {
             None => 0,
-            Some((start,end)) => match end {
+            Some((start,end)) => match end+1 {
                 doc_len  => 0,
                 _ => panic!("Cant do hashchain with substring"),
             },
@@ -70,7 +70,7 @@ fn commit_circuit_hash(doc_len: usize, batch_size: usize, commit_type: JCommit,i
         JCommit::HashChain => {
             match is_match {
                 None => batch_size * POSEIDON_NUM,
-                Some((start,end)) => match end {
+                Some((start,end)) => match end +1  {
                     doc_len => batch_size * POSEIDON_NUM,
                     _ => panic!("Cant do hashchain with substring"),
                 }
@@ -286,7 +286,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
         None => {
             true
         }
-        Some((start,end)) => match end {
+        Some((start,end)) => match end + 1 {
             doc_lenght => true,
             _ => false,
         }
@@ -365,7 +365,7 @@ pub fn opt_commit_select_with_batch<'a>(
         None => {
             true
         }
-        Some((start,end)) => match end {
+        Some((start,end)) => match end + 1 {
             doc_lenght => true,
             _ => false,
         }
@@ -429,7 +429,7 @@ pub fn opt_cost_model_select<'a>(
         None => {
             true
         }
-        Some((start,end)) => match end {
+        Some((start,end)) => match end + 1 {
             doc_lenght => true,
             _ => false,
         }

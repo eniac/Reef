@@ -1552,7 +1552,7 @@ mod tests {
                             &dfa,
                             s,
                             b.clone(),
-                            r1cs_converter.is_match,
+                            dfa.is_match(&chars),
                             doc.len(),
                             c,
                         )
