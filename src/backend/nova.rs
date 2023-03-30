@@ -229,6 +229,7 @@ where
         // for nova passing (new inputs from prover, not provided by circ prover, so to speak)
         let last_char = AllocatedNum::alloc(cs.namespace(|| "last_char"), || Ok(self.chars[1]))?;
 
+        //println!("BATCH SIZE IN NOVA {:#?}", self.batch_size);
         // intms
         let mut char_vars = vec![None; self.batch_size];
 
@@ -265,7 +266,7 @@ where
                     ff_val
                 })
             };
-            println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+            //println!("Var (name?) {:#?}", self.r1cs.names[&var]);
             let s = self.r1cs.names[&var].clone();
             /*let v = cs.alloc(name_f, val_f)?
                 vars.insert(var, v);

@@ -327,8 +327,9 @@ pub struct R1CS<'a, F: PrimeField> {
     pub batch_size: usize,
     doc: Vec<String>,
     is_match: bool,
+    substring: (usize, usize),
     pc: PoseidonConstants<F, typenum::U2>,
-    commitment: Option<F>,
+    commitment: Option<(F, F)>, // (start, end)
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
@@ -340,7 +341,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         batch_override: Option<JBatching>,
         commit_override: Option<JCommit>,
     ) -> Self {
-        let is_match = dfa.is_match(doc);
+        let is_match = dfa.is_match(doc).is_some();
+
         println!("Match? {:#?}", is_match);
 
         // run cost model (with Poseidon) to decide batching
@@ -348,21 +350,56 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             &dfa,
             batch_size,
             batch_size,
-            dfa.is_match(&doc),
+            is_match,
             doc.len(),
             commit_override,
             batch_override,
         );
 
+        let mut sel_batch_size = 1;
+        // TODO ELI: handle substring costs, select batch size correctly
+        if batch_size < 1 {
+            // default to selecting the optimal
+            sel_batch_size = 1;
+        } else {
+            // CLI batch_size override
+            sel_batch_size = batch_size;
+        }
+
+        assert!(sel_batch_size >= 1);
+        println!(
+            "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}",
+            batching, commit, sel_batch_size
+        );
+
+        let mut substring = (0, doc.len());
+        match dfa.is_match(doc) {
+            Some((start, end)) => {
+                match commit {
+                    JCommit::HashChain => {
+                        substring = (start, doc.len()); // ... right?
+                    }
+                    JCommit::Nlookup => {
+                        substring = (start, end); // exact
+                    }
+                }
+            }
+            None => { // see above
+            }
+        }
+
+        println!("'substring': {:#?}", substring);
+
         Self {
             dfa,
-            batching: batching, // TODO
+            batching, // TODO
             commit_type: commit,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
-            batch_size,
+            batch_size: sel_batch_size,
             doc: doc.clone(),
             is_match,
+            substring,
             pc: pcs,
             commitment: None,
         }
@@ -373,8 +410,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     pub fn gen_commitment(&mut self) {
         match self.commit_type {
             JCommit::HashChain => {
-                let mut hash = vec![F::from(0)];
+                let mut i = 0;
+                let mut start = F::from(0);
+                let mut hash = vec![start.clone()];
+
                 for c in self.doc.clone().into_iter() {
+                    if i == self.substring.0 {
+                        start = hash[0];
+                    }
                     let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
                     let acc = &mut ();
 
@@ -390,37 +433,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     sponge.finish(acc).unwrap();
                 }
                 println!("commitment = {:#?}", hash.clone());
-                self.commitment = Some(hash[0]);
+                self.commitment = Some((start, hash[0]));
             }
             JCommit::Nlookup => todo!(),
         }
-    }
-
-    // TODO in main
-    pub fn gen_substring_commitment_start(&mut self, start_at: usize) -> F {
-        let mut hash = vec![F::from(0)];
-        let mut i = 0;
-        for c in self.doc.clone().into_iter() {
-            if i == start_at {
-                break;
-            }
-            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-            let acc = &mut ();
-
-            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-            sponge.start(parameter, None, acc);
-            SpongeAPI::absorb(
-                &mut sponge,
-                2,
-                &[hash[0], F::from(self.dfa.ab_to_num(&c.to_string()) as u64)],
-                acc,
-            );
-            hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            sponge.finish(acc).unwrap();
-            i += 1;
-        }
-
-        hash[0]
     }
 
     pub fn verifier_final_checks(
@@ -433,7 +449,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // TODO
         // commitment matches?
         if matches!(self.commit_type, JCommit::HashChain) {
-            assert_eq!(self.commitment.unwrap(), final_hash.unwrap());
+            assert_eq!(self.commitment.unwrap().1, final_hash.unwrap());
         }
 
         // state matches?
@@ -479,6 +495,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 out = out || (state == xi);
             }
         }
+
+        println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
 
         // sanity
         if (batch_num + 1) * self.batch_size >= self.doc.len() {
@@ -1519,7 +1537,7 @@ mod tests {
                             &dfa,
                             s,
                             b.clone(),
-                            dfa.is_match(&chars),
+                            r1cs_converter.is_match,
                             doc.len(),
                             c,
                         )
@@ -1546,7 +1564,7 @@ mod tests {
         init();
         test_func_no_hash(
             "a".to_string(),
-            "a".to_string(),
+            "^a$".to_string(),
             "aaaa".to_string(),
             vec![1, 2],
         );
@@ -1604,7 +1622,7 @@ mod tests {
         test_func_no_hash("ab".to_string(), "a".to_string(), "b".to_string(), vec![1]);
         test_func_no_hash(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaabaaaaaaaabbb".to_string(),
             vec![1, 2, 4],
         );
