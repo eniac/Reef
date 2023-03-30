@@ -32,10 +32,8 @@ fn commit_circuit_nohash(doc_len: usize, batch_size: usize, commit_type: JCommit
     match commit_type {
         JCommit::HashChain => match is_match {
             None => 0,
-            Some((start,end)) => match end+1 {
-                doc_len  => 0,
-                _ => panic!("Cant do hashchain with substring"),
-            },
+            Some((_,end)) if end+1==doc_len  => 0,
+            _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
             let mn: usize = match is_match {
@@ -70,10 +68,8 @@ fn commit_circuit_hash(doc_len: usize, batch_size: usize, commit_type: JCommit,i
         JCommit::HashChain => {
             match is_match {
                 None => batch_size * POSEIDON_NUM,
-                Some((start,end)) => match end +1  {
-                    doc_len => batch_size * POSEIDON_NUM,
-                    _ => panic!("Cant do hashchain with substring"),
-                }
+                Some((_,end)) if  end +1 == doc_len => batch_size * POSEIDON_NUM,
+                _ => panic!("Cant do hashchain with substring"),
             }
         }
         JCommit::Nlookup => {
@@ -286,10 +282,8 @@ pub fn opt_cost_model_select_with_batch<'a>(
         None => {
             true
         }
-        Some((start,end)) => match end + 1 {
-            doc_lenght => true,
-            _ => false,
-        }
+        Some((_,end)) if end + 1 == doc_length => true,
+        _ => false,
     };
     
     let mut cost: usize = full_round_cost_model(
@@ -365,10 +359,8 @@ pub fn opt_commit_select_with_batch<'a>(
         None => {
             true
         }
-        Some((start,end)) => match end + 1 {
-            doc_lenght => true,
-            _ => false,
-        }
+        Some((_,end)) if end + 1 == doc_length => true,
+        _ => false,
     };
 
     let opt_batching: JBatching = batching;
@@ -429,13 +421,11 @@ pub fn opt_cost_model_select<'a>(
         None => {
             true
         }
-        Some((start,end)) => match end + 1 {
-            doc_lenght => true,
-            _ => false,
-        }
+        Some((_,end)) if end + 1 == doc_length => true,
+        _ => false,
     };
 
-    let mut opt_batch_size = 0;
+    let mut opt_batch_size;
     let mut cost = full_round_cost_model(
         dfa,
         2 << batch_range_lower,
