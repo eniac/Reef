@@ -372,15 +372,22 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             batching, commit, sel_batch_size
         );
 
+        println!("substring pre {:#?}", dfa.is_match(doc));
+
         let mut substring = (0, doc.len());
         match dfa.is_match(doc) {
             Some((start, end)) => {
                 match commit {
                     JCommit::HashChain => {
+                        assert!(
+                            end + 1 == doc.len(), // deal with this +1 BS
+                            "for HashChain commitment, Regex must handle EOD, switch commit type or change Regex r to r$ or r.*$"
+                        );
+
                         substring = (start, doc.len()); // ... right?
                     }
                     JCommit::Nlookup => {
-                        substring = (start, end); // exact
+                        substring = (start, end + 1); // exact
                     }
                 }
             }
@@ -1451,7 +1458,13 @@ mod tests {
         }
     }
 
-    fn test_func_no_hash(ab: String, rstr: String, doc: String, batch_sizes: Vec<usize>) {
+    fn test_func_no_hash(
+        ab: String,
+        rstr: String,
+        doc: String,
+        batch_sizes: Vec<usize>,
+        expected_match: bool,
+    ) {
         let r = Regex::new(&rstr);
         let dfa = DFA::new(&ab[..], r);
         //println!("{:#?}", dfa);
@@ -1474,6 +1487,8 @@ mod tests {
                         Some(b.clone()),
                         Some(c.clone()),
                     );
+
+                    assert_eq!(expected_match, r1cs_converter.is_match);
 
                     let mut running_q = None;
                     let mut running_v = None;
@@ -1564,9 +1579,10 @@ mod tests {
         init();
         test_func_no_hash(
             "a".to_string(),
-            "^a$".to_string(),
+            "^a*$".to_string(),
             "aaaa".to_string(),
             vec![1, 2],
+            true,
         );
     }
 
@@ -1575,21 +1591,24 @@ mod tests {
         init();
         test_func_no_hash(
             "ab".to_string(),
-            "ab".to_string(),
+            "^ab$".to_string(),
             "ab".to_string(),
             vec![1],
+            true,
         );
         test_func_no_hash(
             "abc".to_string(),
-            "ab".to_string(),
+            "^ab$".to_string(),
             "ab".to_string(),
             vec![1],
+            true,
         );
         test_func_no_hash(
             "abcdef".to_string(),
-            "ab.*f".to_string(),
+            "^ab.*f$".to_string(),
             "abcdeffff".to_string(),
             vec![1, 3],
+            true,
         );
     }
 
@@ -1598,40 +1617,52 @@ mod tests {
         init();
         test_func_no_hash(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "ab".to_string(),
             vec![1],
+            true,
         );
         test_func_no_hash(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaaaaabbbbbbbbbbbbbb".to_string(),
             vec![1, 2, 4],
+            true,
         );
         test_func_no_hash(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaaaaaaaaaab".to_string(),
             vec![1, 2, 4],
+            true,
         );
     }
 
     #[test]
     fn dfa_non_match() {
         init();
-        test_func_no_hash("ab".to_string(), "a".to_string(), "b".to_string(), vec![1]);
+        // TODO make sure match/non match is expected
+        test_func_no_hash(
+            "ab".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            vec![1],
+            false,
+        );
         test_func_no_hash(
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaabaaaaaaaabbb".to_string(),
             vec![1, 2, 4],
+            false,
         );
 
         test_func_no_hash(
             "abcd".to_string(),
-            "a*b*cccb*".to_string(),
+            "^a*b*cccb*$".to_string(),
             "aaaaaaaaaabbbbbbbbbb".to_string(),
             vec![1, 2, 5, 10],
+            false,
         );
     }
 
@@ -1639,6 +1670,58 @@ mod tests {
     #[should_panic]
     fn dfa_bad_1() {
         init();
-        test_func_no_hash("ab".to_string(), "a".to_string(), "c".to_string(), vec![1]);
+        test_func_no_hash(
+            "ab".to_string(),
+            "^a$".to_string(),
+            "c".to_string(),
+            vec![1],
+            false,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn dfa_bad_substring() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "hello".to_string(),
+            "helloworld".to_string(),
+            vec![1],
+            true,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn dfa_bad_substring_2() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello".to_string(),
+            "helloworld".to_string(),
+            vec![1],
+            true,
+        );
+    }
+
+    #[test]
+    fn dfa_ok_substring() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello.*$".to_string(),
+            "helloworld".to_string(),
+            vec![1],
+            true,
+        );
+
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello$".to_string(),
+            "helloworld".to_string(),
+            vec![1, 5],
+            false,
+        );
     }
 }

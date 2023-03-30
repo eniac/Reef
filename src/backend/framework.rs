@@ -311,7 +311,7 @@ mod tests {
     fn e2e_simple() {
         backend_test(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaabbb".to_string(),
             JBatching::NaivePolys,
             JCommit::HashChain,
@@ -323,7 +323,7 @@ mod tests {
     fn e2e_nlookup() {
         backend_test(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaabbb".to_string(),
             JBatching::Nlookup,
             JCommit::HashChain,
