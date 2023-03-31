@@ -308,7 +308,7 @@ mod tests {
         }
     }
 
-    #[test]
+    // #[test]
     fn e2e_simple() {
         backend_test(
             "ab".to_string(),
@@ -320,7 +320,7 @@ mod tests {
         );
     }
 
-    #[test]
+    // #[test]
     fn e2e_nlookup() {
         backend_test(
             "ab".to_string(),

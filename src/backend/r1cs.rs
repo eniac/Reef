@@ -350,7 +350,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             &dfa,
             batch_size,
             batch_size,
-            is_match,
+            dfa.is_match(doc),
             doc.len(),
             commit_override,
             batch_override,
@@ -1553,13 +1553,13 @@ mod tests {
                             &dfa,
                             s,
                             b.clone(),
-                            r1cs_converter.is_match,
+                            dfa.is_match(&chars),
                             doc.len(),
                             c,
                         )
                     );
                     println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
-                    /*assert!(
+                    assert!(
                         prover_data.r1cs.constraints.len() as usize
                             <= costs::full_round_cost_model_nohash(
                                 &dfa,
@@ -1569,7 +1569,7 @@ mod tests {
                                 doc.len(),
                                 c
                             )
-                    );*/ // deal with later TODO
+                    ); // deal with later TODO
                 }
             }
         }
