@@ -327,7 +327,7 @@ pub struct R1CS<'a, F: PrimeField> {
     pub batch_size: usize,
     doc: Vec<String>,
     is_match: bool,
-    substring: (usize, usize),
+    pub substring: (usize, usize), // todo getters
     pc: PoseidonConstants<F, typenum::U2>,
     commitment: Option<(F, F)>, // (start, end)
 }
@@ -1472,7 +1472,6 @@ mod tests {
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
         for s in batch_sizes {
-            let num_steps = doc.len() / s;
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
                     println!("\nNew");
@@ -1521,6 +1520,8 @@ mod tests {
 
                     let mut values;
                     let mut next_state;
+
+                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0) / s;
                     for i in 0..num_steps {
                         (
                             values,
