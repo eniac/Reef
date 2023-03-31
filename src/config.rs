@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 
 use crate::backend::costs::{JBatching, JCommit};
-use crate::dfa::DFA;
+use crate::dfa::NFA;
 use crate::regex::Regex;
 
 #[derive(Parser)]
@@ -120,16 +120,17 @@ impl Config {
         }
     }
 
-    pub fn compile_dfa(&self) -> DFA {
+    pub fn compile_nfa(&self) -> NFA {
         let ab = String::from_iter(self.alphabet());
-        let re = match self {
-            Config::Ascii { re, .. } => Regex::new(re),
-            Config::Utf8 { re, .. } => Regex::new(re),
-            Config::Dna { re, .. } => Regex::new(re),
-            Config::Auto { re, .. } => Regex::new(re),
-            Config::Snort { .. } => Regex::empty(), // TODO
-        };
-        DFA::new(&ab, re)
+        NFA::new(&ab,
+            match self {
+                Config::Ascii { re, .. } => Regex::new(re),
+                Config::Utf8 { re, .. } => Regex::new(re),
+                Config::Dna { re, .. } => Regex::new(re),
+                Config::Auto { re, .. } => Regex::new(re),
+                Config::Snort { .. } => Regex::empty(), // TODO
+            }
+        )
     }
 }
 
@@ -246,7 +247,7 @@ impl BaseParser<char> for AsciiParser {
         let mut reader = BufReader::new(f);
         let mut buffer: Vec<u8> = Vec::new();
         // Read file into vector.
-        reader.read_to_end(&mut buffer);
+        reader.read_to_end(&mut buffer).expect("Could not parse document");
         buffer.into_iter().map(|i| i as char).collect()
     }
 }
@@ -293,7 +294,7 @@ impl AutoParser {
     fn new(inp: &PathBuf, re: &String) -> Self {
         let docab = std::fs::read_to_string(inp)
             .expect("Could not read document")
-            .trim()
+            .replace("\n","")
             .chars()
             .collect::<HashSet<char>>();
 
@@ -313,12 +314,16 @@ impl BaseParser<char> for AutoParser {
         self.ab.clone()
     }
     fn read_file(&self, file: &PathBuf) -> Vec<char> {
-        let doc = Utf8Parser.read_file(file);
+        let doc:Vec<char> = Utf8Parser.read_file(file)
+                    .into_iter()
+                    .filter(|&s| s != '\n')
+                    .collect();
+
         for c in doc.iter() {
             assert!(
                 self.ab.contains(&c),
-                "{} not in the alphabet {:?}",
-                c,
+                "{:#04x} not in the alphabet {:?}",
+                *c as u8,
                 self.ab
             );
         }

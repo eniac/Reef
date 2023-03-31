@@ -2,7 +2,7 @@ type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 use crate::backend::costs::{JBatching, JCommit};
 use crate::backend::{nova::*, r1cs::*};
-use crate::dfa::DFA;
+use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::target::r1cs::ProverData;
@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(
-    dfa: &DFA,
+    dfa: &NFA,
     doc: &Vec<String>,
     batching_type: Option<JBatching>,
     commit_type: Option<JCommit>,
@@ -49,7 +49,7 @@ pub fn run_backend(
 
     let s_time = Instant::now();
     // use "empty" (witness-less) circuit to generate nova F
-    let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
+    let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
         &prover_data,
         None,
         vec![<G1 as Group>::Scalar::from(0); 2],
@@ -68,7 +68,7 @@ pub fn run_backend(
     let pp = PublicParams::<
         G1,
         G2,
-        DFAStepCircuit<<G1 as Group>::Scalar>,
+        NFAStepCircuit<<G1 as Group>::Scalar>,
         TrivialTestCircuit<<G2 as Group>::Scalar>,
     >::setup(circuit_primary.clone(), circuit_secondary.clone())
     .unwrap();
@@ -100,7 +100,7 @@ pub fn run_backend(
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
     // PROVER fold up recursive proof and prove compressed snark
-    type C1<'a> = DFAStepCircuit<'a, <G1 as Group>::Scalar>;
+    type C1<'a> = NFAStepCircuit<'a, <G1 as Group>::Scalar>;
     type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
 
     // recursive SNARK
@@ -190,7 +190,7 @@ pub fn run_backend(
             intm_hash = next_hash;
         }
 
-        let circuit_primary: DFAStepCircuit<<G1 as Group>::Scalar> = DFAStepCircuit::new(
+        let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             &prover_data,
             Some(wits),
             vec![
@@ -277,7 +277,7 @@ mod tests {
     use crate::backend::costs;
     use crate::backend::framework::*;
     use crate::backend::r1cs::*;
-    use crate::dfa::DFA;
+    use crate::dfa::NFA;
     use crate::regex::Regex;
     use circ::cfg;
     use circ::cfg::CircOpt;
@@ -293,7 +293,7 @@ mod tests {
         batch_sizes: Vec<usize>,
     ) {
         let r = Regex::new(&rstr);
-        let dfa = DFA::new(&ab[..], r);
+        let dfa = NFA::new(&ab[..], r);
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
         init();

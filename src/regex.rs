@@ -15,7 +15,7 @@ pub enum RegexF {
     Dot,
     LineStart,
     LineEnd,
-    Char(String),
+    Char(char),
     Not(Regex),
     App(Regex, Regex),
     Alt(Regex, Regex),
@@ -72,21 +72,24 @@ impl Regex {
                 HirKind::Anchor(Anchor::StartText) => Regex(G.mk(RegexF::LineStart)),
                 HirKind::Anchor(Anchor::EndText) => Regex(G.mk(RegexF::LineEnd)),
                 HirKind::Group(g) => to_regex(&g.hir),
-                HirKind::Class(Class::Unicode(ranges)) =>
-                    match ranges.iter().next() {
-                        Some(r) if r.start() == '\0' => Regex::dot(),
-                        Some(_) => {
-                            println!("Ranges: {:?}", ranges);
-                            ranges
+                HirKind::Class(Class::Unicode(ranges)) => {
+                    let size = ranges
+                                 .iter()
+                                 .fold(0, |a, r| a + (r.end() as u32 - r.start() as u32));
+                    if size > 100 {
+                        Regex::dot()
+                    } else if size == 0 {
+                        Regex::empty()
+                    } else {
+                        ranges
                             .iter()
                             .flat_map(|a| (a.start()..= a.end()))
-                            .map(|a| Regex::character(a.to_string()))
+                            .map(|a| Regex::character(a))
                             .reduce(Regex::alt)
                             .unwrap_or(Regex::empty())
-                        },
-                        None => Regex::empty()
-                    },
-                HirKind::Literal(Literal::Unicode(c)) => Regex::character(c.to_string()),
+                    }
+                },
+                HirKind::Literal(Literal::Unicode(c)) => Regex::character(*c),
                 _ => panic!("Unsupported regex {:?}", h),
             }
         }
@@ -105,8 +108,8 @@ impl Regex {
         Regex(G.mk(RegexF::Empty))
     }
 
-    pub fn character(c: String) -> Regex {
-        Regex(G.mk(RegexF::Char(c.clone())))
+    pub fn character(c: char) -> Regex {
+        Regex(G.mk(RegexF::Char(c)))
     }
 
     pub fn dot() -> Regex {
@@ -192,44 +195,37 @@ impl Regex {
         }
     }
 
-    pub fn deriv(&self, c: &String) -> Regex {
-        if c.is_empty() { self.clone() } // deriv_\epsilon(r) = r
-        else {
-          match *self.0 {
-              RegexF::Nil => Regex::empty(),
-              RegexF::Empty => Regex::empty(),
-              RegexF::Dot => Regex::nil(),
-              RegexF::Char(ref x) if x == c => Regex::nil(),
-              RegexF::Char(_) => Regex::empty(),
-              RegexF::Not(ref r) => Regex::not(r.deriv(c)),
-              RegexF::App(ref a, ref b) if *a.0 == RegexF::LineStart => b.deriv(c),
-              RegexF::App(ref a, ref b) if *b.0 == RegexF::LineEnd => a.deriv(c),
-              RegexF::LineStart | RegexF::LineEnd => Regex::empty(),
-              RegexF::App(ref a, ref b) if a.nullable() =>
-                  Regex::alt(Regex::app(a.deriv(c), b.clone()), b.deriv(c)),
-              RegexF::App(ref a, ref b) => Regex::app(a.deriv(c), b.clone()),
-              RegexF::Alt(ref a, ref b) => Regex::alt(a.deriv(c), b.deriv(c)),
-              RegexF::Star(ref a) => Regex::app(a.deriv(c), Regex::star(a.clone())),
-          }
+    pub fn deriv(&self, c: &char) -> Regex {
+        match *self.0 {
+            RegexF::Nil => Regex::empty(),
+            RegexF::Empty => Regex::empty(),
+            RegexF::Dot => Regex::nil(),
+            RegexF::Char(ref x) if x == c => Regex::nil(),
+            RegexF::Char(_) => Regex::empty(),
+            RegexF::Not(ref r) => Regex::not(r.deriv(c)),
+            RegexF::App(ref a, ref b) if *a.0 == RegexF::LineStart => b.deriv(c),
+            RegexF::App(ref a, ref b) if *b.0 == RegexF::LineEnd => a.deriv(c),
+            RegexF::App(ref a, ref b) if a.nullable() =>
+                Regex::alt(Regex::app(a.deriv(c), b.clone()), b.deriv(c)),
+            RegexF::App(ref a, ref b) => Regex::app(a.deriv(c), b.clone()),
+            RegexF::Alt(ref a, ref b) => Regex::alt(a.deriv(c), b.deriv(c)),
+            RegexF::Star(ref a) => Regex::app(a.deriv(c), Regex::star(a.clone())),
+            RegexF::LineStart | RegexF::LineEnd => panic!("No derivatives for ^, $")
         }
     }
 }
 
-fn ch(c: char) -> Regex {
-    Regex::character(c.to_string())
-}
-
 #[test]
 fn regex_parser_test_zero_length() {
-    assert_eq!(Regex::app(Regex::app(Regex::app(Regex::app(Regex::line_start(), ch('F')), ch('o')), ch('o')), Regex::line_end()), Regex::new("^Foo$"));
+    assert_eq!(Regex::app(Regex::app(Regex::app(Regex::app(Regex::line_start(), Regex::character('F')), Regex::character('o')), Regex::character('o')), Regex::line_end()), Regex::new("^Foo$"));
 }
 
 #[test]
 fn regex_parser_test_ranges() {
-    assert_eq!(Regex::app(Regex::app(Regex::line_start(), Regex::alt(ch('a'), ch('b'))), Regex::line_end()), Regex::new("^[a-b]$"));
+    assert_eq!(Regex::app(Regex::app(Regex::line_start(), Regex::alt(Regex::character('a'), Regex::character('b'))), Regex::line_end()), Regex::new("^[a-b]$"));
 }
 
 #[test]
 fn regex_parser_test_dot() {
-    assert_eq!(Regex::app(Regex::app(Regex::line_start(), Regex::star(Regex::dot())), ch('c')), Regex::new("^.*c"));
+    assert_eq!(Regex::app(Regex::app(Regex::line_start(), Regex::star(Regex::dot())), Regex::character('c')), Regex::new("^.*c"));
 }

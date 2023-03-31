@@ -1,5 +1,5 @@
 use crate::backend::costs::{opt_cost_model_select, JBatching, JCommit};
-use crate::dfa::DFA;
+use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::cfg::*;
@@ -315,7 +315,7 @@ fn poly_eval_circuit(points: Vec<Integer>, x_lookup: Term) -> Term {
 }
 
 pub struct R1CS<'a, F: PrimeField> {
-    dfa: &'a DFA,
+    dfa: &'a NFA,
     batching: JBatching,
     commit_type: JCommit,
     assertions: Vec<Term>,
@@ -334,7 +334,7 @@ pub struct R1CS<'a, F: PrimeField> {
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
     pub fn new(
-        dfa: &'a DFA,
+        dfa: &'a NFA,
         doc: &Vec<String>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U2>,
@@ -380,14 +380,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 match commit {
                     JCommit::HashChain => {
                         assert!(
-                            end + 1 == doc.len(), // deal with this +1 BS
+                            end == doc.len(),
                             "for HashChain commitment, Regex must handle EOD, switch commit type or change Regex r to r$ or r.*$"
                         );
-
                         substring = (start, doc.len()); // ... right?
                     }
                     JCommit::Nlookup => {
-                        substring = (start, end + 1); // exact
+                        substring = (start, end); // exact
                     }
                 }
             }
@@ -1004,7 +1003,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut q = vec![];
         for i in 1..=self.batch_size {
             let c = self.doc[batch_num * self.batch_size + i - 1].clone();
-            next_state = self.dfa.delta(&state_i, &c.to_string()).unwrap();
+            next_state = self.dfa.delta(state_i, &c.to_string()).unwrap();
 
             wits.insert(format!("state_{}", i - 1), new_wit(state_i));
             wits.insert(
@@ -1261,7 +1260,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         for i in 0..self.batch_size {
             let doc_i = self.doc[batch_num * self.batch_size + i].clone();
-            next_state = self.dfa.delta(&state_i, &doc_i.clone()).unwrap();
+            next_state = self.dfa.delta(state_i, &doc_i.clone()).unwrap();
 
             wits.insert(format!("state_{}", i), new_wit(state_i));
             wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(&doc_i)));
@@ -1300,7 +1299,7 @@ mod tests {
 
     use crate::backend::costs;
     use crate::backend::r1cs::*;
-    use crate::dfa::DFA;
+    use crate::dfa::NFA;
     use crate::regex::Regex;
     use circ::cfg;
     use circ::cfg::CircOpt;
@@ -1466,7 +1465,7 @@ mod tests {
         expected_match: bool,
     ) {
         let r = Regex::new(&rstr);
-        let dfa = DFA::new(&ab[..], r);
+        let dfa = NFA::new(&ab[..], r);
         //println!("{:#?}", dfa);
 
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
