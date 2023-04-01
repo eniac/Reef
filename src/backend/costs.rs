@@ -41,10 +41,7 @@ fn commit_circuit_nohash(
             _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
-            let mn: usize = match is_match {
-                None => doc_len,
-                Some((start, end)) => end - start,
-            };
+            let mn: usize = doc_len;
             let log_mn: usize = (mn as f32).log2().ceil() as usize;
             let mut cost: usize = 0;
 
@@ -81,10 +78,7 @@ fn commit_circuit_hash(
             _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
-            let mn: usize = match is_match {
-                None => doc_len,
-                Some((start, end)) => end - start,
-            };
+            let mn: usize = doc_len;
             let log_mn: usize = (mn as f32).log2().ceil() as usize;
             let mut cost = 0;
 

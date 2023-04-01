@@ -356,11 +356,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             batch_override,
         );
 
-        let mut sel_batch_size = opt_batch_size;
+        let mut sel_batch_size;
         // TODO ELI: handle substring costs, select batch size correctly
         if batch_size < 1 {
             // default to selecting the optimal
-            sel_batch_size = 1;
+            sel_batch_size  = opt_batch_size;
         } else {
             // CLI batch_size override
             sel_batch_size = batch_size;
