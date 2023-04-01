@@ -35,7 +35,7 @@ fn main() {
 
     let num_steps = doc.len();
     println!("Doc len is {}", num_steps);
-
+    println!("Match: {}", nfa.is_match(&doc).map(|c| format!("{:?}", c)).unwrap_or(String::from("NONE")));
     init();
 
     run_backend(&nfa, &doc, opt.eval_type, opt.commit_type, opt.batch_size); // auto select batching/commit
