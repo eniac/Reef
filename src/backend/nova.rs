@@ -266,7 +266,7 @@ where
                     ff_val
                 })
             };
-            //println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+            println!("Var (name?) {:#?}", self.r1cs.names[&var]);
             let s = self.r1cs.names[&var].clone();
             /*let v = cs.alloc(name_f, val_f)?
                 vars.insert(var, v);
@@ -351,9 +351,11 @@ where
                 vars.insert(var, alloc_v.get_variable());
 
                 // isn't hit if no sc round var
-                // add hash circuit
-                let r = s.chars().nth(8).unwrap().to_digit(10).unwrap() as u64; // BS!
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let r: u64 = s_sub[3].parse().unwrap();
+                //let r = s.chars().nth(8).unwrap().to_digit(10).unwrap() as u64; // BS!
                 let mut ns = cs.namespace(|| format!("sumcheck round ns {}", r));
+
                 let new_pos = {
                     let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
                     let acc = &mut ns;
@@ -452,7 +454,9 @@ where
 
                 // isn't hit if no sc round var
                 // add hash circuit
-                let r = s.chars().nth(8).unwrap().to_digit(10).unwrap() as u64; // BS!
+                //let r = s.chars().nth(8).unwrap().to_digit(10).unwrap() as u64; // BS!
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let r: u64 = s_sub[4].parse().unwrap();
                 let mut ns = cs.namespace(|| format!("doc sumcheck round ns {}", r));
                 let new_pos = {
                     let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
@@ -501,7 +505,10 @@ where
                 let char_j = Some(alloc_v); //.get_variable();
                 vars.insert(var, char_j.clone().unwrap().get_variable()); // messy TODO
 
-                let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
+                //let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let j: usize = s_sub[1].parse().unwrap();
+
                 if j < self.batch_size {
                     char_vars[j] = char_j;
                 } // don't add the last one
