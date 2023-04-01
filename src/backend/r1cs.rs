@@ -346,7 +346,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         println!("Match? {:#?}", is_match);
 
         // run cost model (with Poseidon) to decide batching
-        let (batching, commit) = opt_cost_model_select(
+        let (batching, commit, opt_batch_size) = opt_cost_model_select(
             &dfa,
             batch_size,
             batch_size,
@@ -356,7 +356,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             batch_override,
         );
 
-        let mut sel_batch_size = 1;
+        let mut sel_batch_size = opt_batch_size;
         // TODO ELI: handle substring costs, select batch size correctly
         if batch_size < 1 {
             // default to selecting the optimal

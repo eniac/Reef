@@ -408,7 +408,7 @@ pub fn opt_cost_model_select<'a>(
     doc_length: usize,
     commit: Option<JCommit>,
     batching: Option<JBatching>,
-) -> (JBatching, JCommit) {
+) -> (JBatching, JCommit,usize) {
     let mut opt_batching: JBatching = match batching {
         None => JBatching::NaivePolys,
         Some(b) => b,
@@ -425,7 +425,7 @@ pub fn opt_cost_model_select<'a>(
         _ => false,
     };
 
-    let mut opt_batch_size;
+    let mut opt_batch_size: usize = 1;
     let mut cost = full_round_cost_model(
         dfa,
         2 << batch_range_lower,
@@ -463,5 +463,5 @@ pub fn opt_cost_model_select<'a>(
             opt_batch_size = 2 << n;
         }
     }
-    (opt_batching.clone(), opt_commit.clone())
+    (opt_batching.clone(), opt_commit.clone(), opt_batch_size)
 }
