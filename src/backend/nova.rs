@@ -290,7 +290,7 @@ where
 
             // sumcheck hashes
             } else if s.starts_with("nl_claim_r") {
-                println!("NL CLAIM R hook");
+                //println!("NL CLAIM R hook");
                 //let mut ns = cs.namespace(name_f);
                 // original var
                 let alloc_v = AllocatedNum::alloc(cs.namespace(name_f), val_f)?; //Ok(new_pos.get_value().unwrap()))?;
@@ -336,8 +336,8 @@ where
                 //println!("sc hash {:#?}", new_pos);
                 //let alloc_v = AllocatedNum::alloc(ns, || Ok(new_pos.get_value().unwrap()))?;
 
-                println!("new pos: {:#?}", new_pos.clone().get_value());
-                println!("alloc v: {:#?}", alloc_v.clone().get_value());
+                //println!("new pos: {:#?}", new_pos.clone().get_value());
+                //println!("alloc v: {:#?}", alloc_v.clone().get_value());
 
                 ns.enforce(
                     || format!("eq con for claim_r"),
@@ -351,9 +351,11 @@ where
                 vars.insert(var, alloc_v.get_variable());
 
                 // isn't hit if no sc round var
-                // add hash circuit
-                let r = s.chars().nth(8).unwrap().to_digit(10).unwrap() as u64; // BS!
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let r: u64 = s_sub[3].parse().unwrap();
+                //let r = s.chars().nth(8).unwrap().to_digit(10).unwrap() as u64; // BS!
                 let mut ns = cs.namespace(|| format!("sumcheck round ns {}", r));
+
                 let new_pos = {
                     let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
                     let acc = &mut ns;
@@ -392,7 +394,7 @@ where
                     |z| z + new_pos.get_variable(),
                 );
             } else if s.starts_with("nl_doc_claim_r") {
-                println!("NL CLAIM R hook");
+                //println!("NL CLAIM R hook");
                 //let mut ns = cs.namespace(name_f);x
                 // original var
                 let alloc_v = AllocatedNum::alloc(cs.namespace(name_f), val_f)?; //Ok(new_pos.get_value().unwrap()))?;
@@ -437,7 +439,7 @@ where
                 //println!("sc hash {:#?}", new_pos);
                 //let alloc_v = AllocatedNum::alloc(ns, || Ok(new_pos.get_value().unwrap()))?;
 
-                println!("new pos: {:#?}", new_pos.clone().get_value());
+                //println!("new pos: {:#?}", new_pos.clone().get_value());
 
                 ns.enforce(
                     || format!("eq con for doc_claim_r"),
@@ -452,7 +454,9 @@ where
 
                 // isn't hit if no sc round var
                 // add hash circuit
-                let r = s.chars().nth(8).unwrap().to_digit(10).unwrap() as u64; // BS!
+                //let r = s.chars().nth(8).unwrap().to_digit(10).unwrap() as u64; // BS!
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let r: u64 = s_sub[4].parse().unwrap();
                 let mut ns = cs.namespace(|| format!("doc sumcheck round ns {}", r));
                 let new_pos = {
                     let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
@@ -501,7 +505,10 @@ where
                 let char_j = Some(alloc_v); //.get_variable();
                 vars.insert(var, char_j.clone().unwrap().get_variable()); // messy TODO
 
-                let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
+                //let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let j: usize = s_sub[1].parse().unwrap();
+
                 if j < self.batch_size {
                     char_vars[j] = char_j;
                 } // don't add the last one
@@ -547,7 +554,7 @@ where
 
         for i in 0..(self.batch_size) {
             let mut ns = cs.namespace(|| format!("poseidon hash ns batch {}", i));
-            println!("i {:#?}", i);
+            //println!("i {:#?}", i);
             next_hash = {
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
                 let acc = &mut ns;
@@ -558,11 +565,11 @@ where
                     acc,
                 );
 
-                println!(
+                /*println!(
                     "Hashing {:#?} {:#?}",
                     next_hash.clone().get_value(),
                     char_vars[i].clone().unwrap().get_value()
-                );
+                );*/
                 SpongeAPI::absorb(
                     &mut sponge,
                     2,
@@ -588,7 +595,7 @@ where
             Ok(self.hashes.as_ref().unwrap()[self.batch_size])
         })?;*/
 
-        println!("hash out: {:#?}", next_hash.clone().get_value());
+        //println!("hash out: {:#?}", next_hash.clone().get_value());
 
         //assert_eq!(expected, out.get_value().unwrap()); //get_value().unwrap());
 

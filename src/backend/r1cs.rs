@@ -327,7 +327,7 @@ pub struct R1CS<'a, F: PrimeField> {
     pub batch_size: usize,
     doc: Vec<String>,
     is_match: bool,
-    substring: (usize, usize),
+    pub substring: (usize, usize), // todo getters
     pc: PoseidonConstants<F, typenum::U2>,
     commitment: Option<(F, F)>, // (start, end)
 }
@@ -346,21 +346,21 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         println!("Match? {:#?}", is_match);
 
         // run cost model (with Poseidon) to decide batching
-        let (batching, commit) = opt_cost_model_select(
+        let (batching, commit, opt_batch_size) = opt_cost_model_select(
             &dfa,
             batch_size,
             batch_size,
-            is_match,
+            dfa.is_match(doc),
             doc.len(),
             commit_override,
             batch_override,
         );
 
-        let mut sel_batch_size = 1;
+        let mut sel_batch_size;
         // TODO ELI: handle substring costs, select batch size correctly
         if batch_size < 1 {
             // default to selecting the optimal
-            sel_batch_size = 1;
+            sel_batch_size  = opt_batch_size;
         } else {
             // CLI batch_size override
             sel_batch_size = batch_size;
@@ -668,6 +668,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         //println!("eval form poly {:#?}", evals);
 
+        //Makes big polynomial 
         for i in 0..self.batch_size {
             let eq = term(
                 Op::Eq,
@@ -1471,7 +1472,6 @@ mod tests {
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
         for s in batch_sizes {
-            let num_steps = doc.len() / s;
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
                     println!("\nNew");
@@ -1520,6 +1520,8 @@ mod tests {
 
                     let mut values;
                     let mut next_state;
+
+                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0) / s;
                     for i in 0..num_steps {
                         (
                             values,
@@ -1551,13 +1553,13 @@ mod tests {
                             &dfa,
                             s,
                             b.clone(),
-                            r1cs_converter.is_match,
+                            dfa.is_match(&chars),
                             doc.len(),
                             c,
                         )
                     );
                     println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
-                    /*assert!(
+                    assert!(
                         prover_data.r1cs.constraints.len() as usize
                             <= costs::full_round_cost_model_nohash(
                                 &dfa,
@@ -1567,7 +1569,7 @@ mod tests {
                                 doc.len(),
                                 c
                             )
-                    );*/ // deal with later TODO
+                    ); // deal with later TODO
                 }
             }
         }
