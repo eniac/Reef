@@ -1980,6 +1980,7 @@ dependencies = [
  "neptune",
  "nova-snark",
  "prettyprint",
+ "rayon",
  "regex-syntax",
  "rug",
  "serial_test",

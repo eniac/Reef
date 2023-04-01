@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::{HashSet, BTreeSet};
+use rayon::prelude::*;
 
 use crate::regex::Regex;
 
@@ -150,20 +151,22 @@ impl NFA {
             return Some((0, 0));
         }
         // For every postfix of doc (O(n^2))
-        for i in start_idxs {
-            let mut s = self.get_init_state();
-            for j in i..doc.len() {
-                // Apply transition relation
-                s = self.delta(s, &doc[j]).unwrap();
+        start_idxs
+            .into_par_iter()
+            .find_map_any(|i| {
+              let mut s = self.get_init_state();
+              for j in i..doc.len() {
+                  // Apply transition relation
+                  s = self.delta(s, &doc[j]).unwrap();
 
-                // found a substring match or exact match
-                if accepting.contains(&s) &&
-                    (!self.anchor_end || j == doc.len() - 1) {
-                    return Some((i, j+1)); // Return an interval [i, j)
-                }
-            }
-        }
-        None
+                  // found a substring match or exact match
+                  if accepting.contains(&s) &&
+                      (!self.anchor_end || j == doc.len() - 1) {
+                      return Some((i, j+1)); // Return an interval [i, j)
+                  }
+              }
+              None
+            })
     }
 
     /// Double the stride of the DFA
