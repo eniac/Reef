@@ -266,7 +266,7 @@ where
                     ff_val
                 })
             };
-            println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+            //println!("Var (name?) {:#?}", self.r1cs.names[&var]);
             let s = self.r1cs.names[&var].clone();
             /*let v = cs.alloc(name_f, val_f)?
                 vars.insert(var, v);
@@ -290,7 +290,7 @@ where
 
             // sumcheck hashes
             } else if s.starts_with("nl_claim_r") {
-                println!("NL CLAIM R hook");
+                //println!("NL CLAIM R hook");
                 //let mut ns = cs.namespace(name_f);
                 // original var
                 let alloc_v = AllocatedNum::alloc(cs.namespace(name_f), val_f)?; //Ok(new_pos.get_value().unwrap()))?;
@@ -336,8 +336,8 @@ where
                 //println!("sc hash {:#?}", new_pos);
                 //let alloc_v = AllocatedNum::alloc(ns, || Ok(new_pos.get_value().unwrap()))?;
 
-                println!("new pos: {:#?}", new_pos.clone().get_value());
-                println!("alloc v: {:#?}", alloc_v.clone().get_value());
+                //println!("new pos: {:#?}", new_pos.clone().get_value());
+                //println!("alloc v: {:#?}", alloc_v.clone().get_value());
 
                 ns.enforce(
                     || format!("eq con for claim_r"),
@@ -394,7 +394,7 @@ where
                     |z| z + new_pos.get_variable(),
                 );
             } else if s.starts_with("nl_doc_claim_r") {
-                println!("NL CLAIM R hook");
+                //println!("NL CLAIM R hook");
                 //let mut ns = cs.namespace(name_f);x
                 // original var
                 let alloc_v = AllocatedNum::alloc(cs.namespace(name_f), val_f)?; //Ok(new_pos.get_value().unwrap()))?;
@@ -439,7 +439,7 @@ where
                 //println!("sc hash {:#?}", new_pos);
                 //let alloc_v = AllocatedNum::alloc(ns, || Ok(new_pos.get_value().unwrap()))?;
 
-                println!("new pos: {:#?}", new_pos.clone().get_value());
+                //println!("new pos: {:#?}", new_pos.clone().get_value());
 
                 ns.enforce(
                     || format!("eq con for doc_claim_r"),
@@ -554,7 +554,7 @@ where
 
         for i in 0..(self.batch_size) {
             let mut ns = cs.namespace(|| format!("poseidon hash ns batch {}", i));
-            println!("i {:#?}", i);
+            //println!("i {:#?}", i);
             next_hash = {
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
                 let acc = &mut ns;
@@ -565,11 +565,11 @@ where
                     acc,
                 );
 
-                println!(
+                /*println!(
                     "Hashing {:#?} {:#?}",
                     next_hash.clone().get_value(),
                     char_vars[i].clone().unwrap().get_value()
-                );
+                );*/
                 SpongeAPI::absorb(
                     &mut sponge,
                     2,
@@ -595,7 +595,7 @@ where
             Ok(self.hashes.as_ref().unwrap()[self.batch_size])
         })?;*/
 
-        println!("hash out: {:#?}", next_hash.clone().get_value());
+        //println!("hash out: {:#?}", next_hash.clone().get_value());
 
         //assert_eq!(expected, out.get_value().unwrap()); //get_value().unwrap());
 
