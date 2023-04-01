@@ -49,7 +49,7 @@ fn commit_circuit_nohash(
             cost += batch_size + 1;
 
             //Sum-check additions
-            cost += log_mn * 5;
+            cost += log_mn * 4;
 
             //eq calc
             cost += (batch_size + 1) * (4 * log_mn); //2 actual multiplication and 2 for the subtraction
@@ -153,7 +153,7 @@ pub fn nlookup_cost_model_nohash<'a>(
     cost += batch_size + 1;
 
     //Sum-check additions
-    cost += log_mn * 5;
+    cost += log_mn * 4;
 
     //eq calc
     cost += (batch_size + 1) * (4 * log_mn);

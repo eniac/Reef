@@ -668,6 +668,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         //println!("eval form poly {:#?}", evals);
 
+        //Makes big polynomial 
         for i in 0..self.batch_size {
             let eq = term(
                 Op::Eq,
