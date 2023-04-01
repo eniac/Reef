@@ -52,7 +52,7 @@ fn commit_circuit_nohash(
             cost += log_mn * 5;
 
             //eq calc
-            cost += (batch_size + 1) * (2 * log_mn);
+            cost += (batch_size + 1) * (4 * log_mn); //2 actual multiplication and 2 for the subtraction
 
             //horners
             cost += batch_size + 1;
@@ -100,7 +100,7 @@ pub fn naive_cost_model_nohash<'a>(
     commit_type: JCommit,
 ) -> usize {
     // vanishing poly - m * n multiplications + 2 for lookup
-    let mut cost = dfa.nstates() * dfa.nchars() + 2;
+    let mut cost = dfa.trans.len() + 2;
     cost *= batch_size;
 
     cost += accepting_circuit(dfa, is_match);
@@ -145,7 +145,7 @@ pub fn nlookup_cost_model_nohash<'a>(
     doc_len: usize,
     commit_type: JCommit,
 ) -> usize {
-    let mn: usize = dfa.nstates() * dfa.ab.len();
+    let mn: usize = dfa.trans.len();
     let log_mn: usize = (mn as f32).log2().ceil() as usize;
     let mut cost: usize = 0;
 
@@ -156,7 +156,7 @@ pub fn nlookup_cost_model_nohash<'a>(
     cost += log_mn * 5;
 
     //eq calc
-    cost += (batch_size + 1) * (2 * log_mn);
+    cost += (batch_size + 1) * (4 * log_mn);
 
     //horners
     cost += batch_size + 1;
@@ -165,7 +165,7 @@ pub fn nlookup_cost_model_nohash<'a>(
     cost += 1;
 
     //v_i creation
-    cost += batch_size * 2; // * 3???
+    cost += (batch_size * 3)+1; // * 3???
 
     cost += accepting_circuit(dfa, is_match);
 
@@ -181,7 +181,7 @@ pub fn nlookup_cost_model_hash<'a>(
     doc_len: usize,
     commit_type: JCommit,
 ) -> usize {
-    let mn: usize = dfa.nstates() * dfa.ab.len();
+    let mn: usize = dfa.trans.len();
     let log_mn: usize = (mn as f32).log2().ceil() as usize;
     let mut cost = nlookup_cost_model_nohash(dfa, batch_size, is_match, doc_len, commit_type);
 
