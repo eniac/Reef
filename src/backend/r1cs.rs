@@ -1,4 +1,4 @@
-use crate::backend::costs::{opt_cost_model_select, JBatching, JCommit};
+use crate::backend::costs::{opt_cost_model_select, JBatching, JCommit, opt_cost_model_select_with_batch, opt_commit_select_with_batch, full_round_cost_model, opt_cost_model_select_with_commit};
 use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
@@ -344,27 +344,29 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let is_match = dfa.is_match(doc).is_some();
 
         println!("Match? {:#?}", is_match);
-
-        // run cost model (with Poseidon) to decide batching
-        let (batching, commit, opt_batch_size) = opt_cost_model_select(
+        let batching;
+        let commit;
+        let opt_batch_size;
+        if batch_size > 1 {
+            (batching, commit, opt_batch_size) = match (batch_override, commit_override) {
+                (Some(b),Some(c)) => (b,c,batch_size),
+                (Some(b),_) => opt_commit_select_with_batch(dfa, batch_size, dfa.is_match(doc), doc.len(), b),
+                (None,Some(c)) => opt_cost_model_select_with_commit(&dfa,batch_size,dfa.is_match(doc),doc.len(),c),
+                (None, None) => opt_cost_model_select_with_batch(&dfa,batch_size,dfa.is_match(doc),doc.len()),
+            };
+        } else {
+            (batching, commit, opt_batch_size) = opt_cost_model_select(
             &dfa,
-            batch_size,
-            batch_size,
+            1,
+            doc.len(),
             dfa.is_match(doc),
             doc.len(),
             commit_override,
             batch_override,
         );
+    }
 
-        let mut sel_batch_size;
-        // TODO ELI: handle substring costs, select batch size correctly
-        if batch_size < 1 {
-            // default to selecting the optimal
-            sel_batch_size  = opt_batch_size;
-        } else {
-            // CLI batch_size override
-            sel_batch_size = batch_size;
-        }
+        let sel_batch_size = opt_batch_size;
 
         assert!(sel_batch_size >= 1);
         println!(
