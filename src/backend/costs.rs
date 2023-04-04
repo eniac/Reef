@@ -18,17 +18,18 @@ pub enum JCommit {
     Nlookup,
 }
 
-fn accepting_circuit<'a>(dfa: &'a NFA, is_match: Option<(usize, usize)>) -> usize {
+pub fn accepting_circuit<'a>(dfa: &'a NFA, is_match: Option<(usize, usize)>) -> usize {
     // vanishing selection for final check
     // poly of degree (# final states - 1)
     // (alt, # non final states - 1)
+    let cost: usize = 2; //constrain to boolean costs
     match is_match {
-        None => dfa.get_non_final_states().len() as usize - 1,
-        _ => dfa.get_final_states().len() as usize - 1,
+        None => cost + dfa.get_non_final_states().len() as usize - 1,
+        _ => cost + dfa.get_final_states().len() as usize - 1,
     }
 }
 
-fn commit_circuit_nohash(
+pub fn commit_circuit_nohash(
     doc_len: usize,
     batch_size: usize,
     commit_type: JCommit,
@@ -100,7 +101,7 @@ pub fn naive_cost_model_nohash<'a>(
     commit_type: JCommit,
 ) -> usize {
     // vanishing poly - m * n multiplications + 2 for lookup
-    let mut cost = dfa.trans.len() + 2;
+    let mut cost = dfa.trans.len() -1;
     cost *= batch_size;
 
     cost += accepting_circuit(dfa, is_match);
