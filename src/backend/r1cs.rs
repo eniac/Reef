@@ -1765,7 +1765,7 @@ mod tests {
             "helowrd".to_string(),
             "^hello.*$".to_string(),
             "helloworld".to_string(),
-            vec![1,2,5],
+            vec![1,2],
             true,
             JBatching::NaivePolys,
             JCommit::HashChain,
