@@ -1,4 +1,4 @@
-use crate::backend::costs::{opt_cost_model_select, JBatching, JCommit, opt_cost_model_select_with_batch, opt_commit_select_with_batch, full_round_cost_model, opt_cost_model_select_with_commit};
+use crate::backend::costs::*;
 use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
@@ -208,7 +208,7 @@ fn prover_mle_sum_eval(
     let mut sum_x = Integer::from(0);
     let mut sum_con = Integer::from(0);
     let hole = rands.len();
-    let total = (table.len() as f32).log2().ceil() as usize;
+    let total = logmn(table.len());
 
     assert!(hole + 1 <= total, "batch size too small for nlookup");
     let num_x = total - hole - 1;
@@ -889,7 +889,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.pub_inputs.push(new_var(format!("{}_claim_r", id)));
 
         // size of table (T -> mle)
-        let sc_l = (t_size as f64).log2().ceil() as usize;
+        let sc_l = logmn(t_size);
         //println!("table size: {}", t_size);
         //println!("sum check rounds: {}", sc_l);
 
@@ -1141,7 +1141,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         // TODO - what needs to be public?
 
-        let sc_l = (table.len() as f64).log2().ceil() as usize; // sum check rounds
+        let sc_l = logmn(table.len()); // sum check rounds
 
         // generate claim r
         let claim_r = self.prover_random_from_seed(1, &[F::from(5 as u64)]); // TODO make general
@@ -1469,7 +1469,7 @@ mod tests {
     ) {
         let r = Regex::new(&rstr);
         let dfa = NFA::new(&ab[..], r);
-        //println!("{:#?}", dfa);
+        println!("DFA Size: {:#?}", dfa.trans.len());
 
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
@@ -1480,6 +1480,7 @@ mod tests {
                     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
                         Strength::Standard,
                     );
+                    println!("Doc:{:#?}",doc);
                     let mut r1cs_converter = R1CS::new(
                         &dfa,
                         &doc.chars().map(|c| c.to_string()).collect(),
