@@ -1,4 +1,4 @@
-use crate::backend::costs::{opt_cost_model_select, JBatching, JCommit, opt_cost_model_select_with_batch, opt_commit_select_with_batch, full_round_cost_model, opt_cost_model_select_with_commit};
+use crate::backend::costs::*;
 use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
@@ -208,7 +208,7 @@ fn prover_mle_sum_eval(
     let mut sum_x = Integer::from(0);
     let mut sum_con = Integer::from(0);
     let hole = rands.len();
-    let total = (table.len() as f32).log2().ceil() as usize;
+    let total = logmn(table.len());
 
     assert!(hole + 1 <= total, "batch size too small for nlookup");
     let num_x = total - hole - 1;
@@ -629,7 +629,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             "Pre-opt R1cs size (no hashes): {}",
             circ_r1cs.constraints().len()
         );
-        // // println!("Prover data {:#?}", prover_data);
+        // println!("Prover data {:#?}", prover_data);
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
         //println!("Prover data {:#?}", prover_data);
@@ -638,12 +638,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             "Final R1cs size (no hashes): {}",
             circ_r1cs.constraints().len()
         );
-        // println!(
-        //     "R1CS:\n");
-        // for cons in circ_r1cs.constraints().iter() {
-        //    println!("{:#?}\n",circ_r1cs.format_qeq(cons)); 
-        // }
-        // println!("r1cs conv: {:#?}", ms);
+        println!("r1cs conv: {:#?}", ms);
 
         circ_r1cs.finalize(&final_cs)
     }
@@ -687,17 +682,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
             self.assertions.push(eq);
         }
-
-        println!("Post Polynomial Creation in To Polys");
-        self.r1cs_conv();
-        // println!("Assertions: {:#?}",self.assertions.clone());
-
         let lag_ms = l_time.elapsed().as_millis();
 
         self.accepting_state_circuit();
-        println!("Post Accepting State Circuit in To Polys");
-        self.r1cs_conv();
-        // println!("Assertions: {:#?}",self.assertions.clone());
 
         if matches!(self.commit_type, JCommit::Nlookup) {
             assert!(
@@ -705,7 +692,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 "don't use a doc commitment if you aren't going to batch"
             );
             self.nlookup_doc_commit();
-            println!("Post NLookUp Commitment in To Polys");
         }
 
         self.r1cs_conv()
@@ -903,7 +889,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.pub_inputs.push(new_var(format!("{}_claim_r", id)));
 
         // size of table (T -> mle)
-        let sc_l = (t_size as f64).log2().ceil() as usize;
+        let sc_l = logmn(t_size);
         //println!("table size: {}", t_size);
         //println!("sum check rounds: {}", sc_l);
 
@@ -1155,7 +1141,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         // TODO - what needs to be public?
 
-        let sc_l = (table.len() as f64).log2().ceil() as usize; // sum check rounds
+        let sc_l = logmn(table.len()); // sum check rounds
 
         // generate claim r
         let claim_r = self.prover_random_from_seed(1, &[F::from(5 as u64)]); // TODO make general
@@ -1480,89 +1466,89 @@ mod tests {
         doc: String,
         batch_sizes: Vec<usize>,
         expected_match: bool,
-        b: JBatching, 
-        c: JCommit,
     ) {
         let r = Regex::new(&rstr);
         let dfa = NFA::new(&ab[..], r);
-        // println!("{:#?}", dfa);
+        println!("DFA Size: {:#?}", dfa.trans.len());
 
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
         for s in batch_sizes {
-            println!("\nNew");
-            println!("Batch size: {:#?}",s);
-            let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
-                Strength::Standard,
-            );
-            let mut r1cs_converter = R1CS::new(
-                &dfa,
-                &doc.chars().map(|c| c.to_string()).collect(),
-                s,
-                sc,
-                Some(b.clone()),
-                Some(c.clone()),
-            );
+            for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
+                for c in vec![JCommit::HashChain, JCommit::Nlookup] {
+                    println!("\nNew");
+                    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
+                        Strength::Standard,
+                    );
+                    println!("Doc:{:#?}",doc);
+                    let mut r1cs_converter = R1CS::new(
+                        &dfa,
+                        &doc.chars().map(|c| c.to_string()).collect(),
+                        s,
+                        sc,
+                        Some(b.clone()),
+                        Some(c.clone()),
+                    );
 
-            assert_eq!(expected_match, r1cs_converter.is_match);
+                    assert_eq!(expected_match, r1cs_converter.is_match);
 
-            // let mut running_q = None;
-            // let mut running_v = None;
-            // let mut doc_running_q = None;
-            // let mut doc_running_v = None;
-            match b {
-                JBatching::NaivePolys => {}
-                JBatching::Nlookup => {
-                    if s <= 1 {
-                        // don't use nlookup with batch of 1
+                    let mut running_q = None;
+                    let mut running_v = None;
+                    let mut doc_running_q = None;
+                    let mut doc_running_v = None;
+                    match b {
+                        JBatching::NaivePolys => {}
+                        JBatching::Nlookup => {
+                            if s <= 1 {
+                                // don't use nlookup with batch of 1
                                 break;
+                            }
+                        } //JBatching::Plookup => todo!(),
                     }
-                } //JBatching::Plookup => todo!(),
-            }
-            match c {
-                JCommit::HashChain => {}
-                JCommit::Nlookup => {
-                    if s <= 1 {
-                        // don't use nlookup with batch of 1
-                            break;
-                        }
-                    } //JBatching::Plookup => todo!(),
-                } // TODO make batch size 1 work at some point, you know for nice figs
+                    match c {
+                        JCommit::HashChain => {}
+                        JCommit::Nlookup => {
+                            if s <= 1 {
+                                // don't use nlookup with batch of 1
+                                break;
+                            }
+                        } //JBatching::Plookup => todo!(),
+                    } // TODO make batch size 1 work at some point, you know for nice figs
 
-            println!("Batching {:#?}", r1cs_converter.batching);
-            println!("Commit {:#?}", r1cs_converter.commit_type);
-            let (prover_data, _) = r1cs_converter.to_circuit();
+                    println!("Batching {:#?}", r1cs_converter.batching);
+                    println!("Commit {:#?}", r1cs_converter.commit_type);
+                    let (prover_data, _) = r1cs_converter.to_circuit();
 
-            // let mut current_state = dfa.get_init_state();
+                    let mut current_state = dfa.get_init_state();
 
-            // let mut values;
-            // let mut next_state;
+                    let mut values;
+                    let mut next_state;
 
-            // let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0) / s;
-            // for i in 0..num_steps {
-            //     (
-            //                 values,
-            //                 next_state,
-            //                 running_q,
-            //                 running_v,
-            //                 doc_running_q,
-            //                 doc_running_v,
-            //             ) = r1cs_converter.gen_wit_i(
-            //                 i,
-            //                 current_state,
-            //                 running_q.clone(),
-            //                 running_v.clone(),
-            //                 doc_running_q.clone(),
-            //                 doc_running_v.clone(),
-            //             );
+                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0) / s;
+                    for i in 0..num_steps {
+                        (
+                            values,
+                            next_state,
+                            running_q,
+                            running_v,
+                            doc_running_q,
+                            doc_running_v,
+                        ) = r1cs_converter.gen_wit_i(
+                            i,
+                            current_state,
+                            running_q.clone(),
+                            running_v.clone(),
+                            doc_running_q.clone(),
+                            doc_running_v.clone(),
+                        );
 
-            //             //println!("VALUES ROUND {:#?}: {:#?}", i, values);
-            //             //println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
+                        //println!("VALUES ROUND {:#?}: {:#?}", i, values);
+                        //println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
 
-            //             prover_data.check_all(&values);
-            //             // for next i+1 round
-            //             current_state = next_state;
-            //         }
+                        prover_data.check_all(&values);
+                        // for next i+1 round
+                        current_state = next_state;
+                    }
                     println!("b? {:#?}", b.clone());
                     println!(
                         "cost model: {:#?}",
@@ -1575,23 +1561,6 @@ mod tests {
                             c,
                         )
                     );
-                    println!(
-                        "cost model - accepting circuit: {:#?}",
-                        costs::accepting_circuit(
-                            &dfa,
-                            dfa.is_match(&chars),
-                        )
-                    );
-                    println!(
-                        "cost model - commit circuit: {:#?}",
-                        costs::commit_circuit_nohash(
-                            doc.len(),
-                            s,
-                            c,
-                            dfa.is_match(&chars),
-                        )
-                    );
-
                     println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
                     assert!(
                         prover_data.r1cs.constraints.len() as usize
@@ -1606,8 +1575,10 @@ mod tests {
                     ); // deal with later TODO
                 }
             }
+        }
+    }
 
-      #[test]
+    #[test]
     fn naive_test() {
         init();
         test_func_no_hash(
@@ -1616,48 +1587,34 @@ mod tests {
             "aaaa".to_string(),
             vec![1, 2],
             true,
-            JBatching::NaivePolys,
-            JCommit::HashChain,
         );
-    }  
+    }
 
-//     #[test]
-//     fn naive_test() {
-//         init();
-//         test_func_no_hash(
-//             "a".to_string(),
-//             "^a*$".to_string(),
-//             "aaaa".to_string(),
-//             vec![1, 2],
-//             true,
-//         );
-//     }
-
-//     #[test]
-//     fn dfa_2() {
-//         init();
-//         test_func_no_hash(
-//             "ab".to_string(),
-//             "^ab$".to_string(),
-//             "ab".to_string(),
-//             vec![1],
-//             true,
-//         );
-//         test_func_no_hash(
-//             "abc".to_string(),
-//             "^ab$".to_string(),
-//             "ab".to_string(),
-//             vec![1],
-//             true,
-//         );
-//         test_func_no_hash(
-//             "abcdef".to_string(),
-//             "^ab.*f$".to_string(),
-//             "abcdeffff".to_string(),
-//             vec![1, 3],
-//             true,
-//         );
-//     }
+    #[test]
+    fn dfa_2() {
+        init();
+        test_func_no_hash(
+            "ab".to_string(),
+            "^ab$".to_string(),
+            "ab".to_string(),
+            vec![1],
+            true,
+        );
+        test_func_no_hash(
+            "abc".to_string(),
+            "^ab$".to_string(),
+            "ab".to_string(),
+            vec![1],
+            true,
+        );
+        test_func_no_hash(
+            "abcdef".to_string(),
+            "^ab.*f$".to_string(),
+            "abcdeffff".to_string(),
+            vec![1, 3],
+            true,
+        );
+    }
 
     #[test]
     fn dfa_star() {
@@ -1668,8 +1625,6 @@ mod tests {
             "ab".to_string(),
             vec![1],
             true,
-            JBatching::NaivePolys,
-            JCommit::HashChain,
         );
         test_func_no_hash(
             "ab".to_string(),
@@ -1677,8 +1632,6 @@ mod tests {
             "aaaaaabbbbbbbbbbbbbb".to_string(),
             vec![1, 2, 4],
             true,
-            JBatching::NaivePolys,
-            JCommit::HashChain,
         );
         test_func_no_hash(
             "ab".to_string(),
@@ -1686,77 +1639,75 @@ mod tests {
             "aaaaaaaaaaab".to_string(),
             vec![1, 2, 4],
             true,
-            JBatching::NaivePolys,
-            JCommit::HashChain,
         );
     }
 
-//     #[test]
-//     fn dfa_non_match() {
-//         init();
-//         // TODO make sure match/non match is expected
-//         test_func_no_hash(
-//             "ab".to_string(),
-//             "a".to_string(),
-//             "b".to_string(),
-//             vec![1],
-//             false,
-//         );
-//         test_func_no_hash(
-//             "ab".to_string(),
-//             "^a*b*$".to_string(),
-//             "aaabaaaaaaaabbb".to_string(),
-//             vec![1, 2, 4],
-//             false,
-//         );
+    #[test]
+    fn dfa_non_match() {
+        init();
+        // TODO make sure match/non match is expected
+        test_func_no_hash(
+            "ab".to_string(),
+            "a".to_string(),
+            "b".to_string(),
+            vec![1],
+            false,
+        );
+        test_func_no_hash(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            "aaabaaaaaaaabbb".to_string(),
+            vec![1, 2, 4],
+            false,
+        );
 
-//         test_func_no_hash(
-//             "abcd".to_string(),
-//             "^a*b*cccb*$".to_string(),
-//             "aaaaaaaaaabbbbbbbbbb".to_string(),
-//             vec![1, 2, 5, 10],
-//             false,
-//         );
-//     }
+        test_func_no_hash(
+            "abcd".to_string(),
+            "^a*b*cccb*$".to_string(),
+            "aaaaaaaaaabbbbbbbbbb".to_string(),
+            vec![1, 2, 5, 10],
+            false,
+        );
+    }
 
-//     #[test]
-//     #[should_panic]
-//     fn dfa_bad_1() {
-//         init();
-//         test_func_no_hash(
-//             "ab".to_string(),
-//             "^a$".to_string(),
-//             "c".to_string(),
-//             vec![1],
-//             false,
-//         );
-//     }
+    #[test]
+    #[should_panic]
+    fn dfa_bad_1() {
+        init();
+        test_func_no_hash(
+            "ab".to_string(),
+            "^a$".to_string(),
+            "c".to_string(),
+            vec![1],
+            false,
+        );
+    }
 
-//     #[test]
-//     #[should_panic]
-//     fn dfa_bad_substring() {
-//         init();
-//         test_func_no_hash(
-//             "helowrd".to_string(),
-//             "hello".to_string(),
-//             "helloworld".to_string(),
-//             vec![1],
-//             true,
-//         );
-//     }
+    #[test]
+    #[should_panic]
+    fn dfa_bad_substring() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "hello".to_string(),
+            "helloworld".to_string(),
+            vec![1],
+            true,
+        );
+    }
 
-//     #[test]
-//     #[should_panic]
-//     fn dfa_bad_substring_2() {
-//         init();
-//         test_func_no_hash(
-//             "helowrd".to_string(),
-//             "^hello".to_string(),
-//             "helloworld".to_string(),
-//             vec![1],
-//             true,
-//         );
-//     }
+    #[test]
+    #[should_panic]
+    fn dfa_bad_substring_2() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello".to_string(),
+            "helloworld".to_string(),
+            vec![1],
+            true,
+        );
+    }
 
     #[test]
     fn dfa_ok_substring() {
@@ -1765,18 +1716,16 @@ mod tests {
             "helowrd".to_string(),
             "^hello.*$".to_string(),
             "helloworld".to_string(),
-            vec![1,2],
+            vec![1],
             true,
-            JBatching::NaivePolys,
-            JCommit::HashChain,
         );
 
-//         test_func_no_hash(
-//             "helowrd".to_string(),
-//             "^hello$".to_string(),
-//             "helloworld".to_string(),
-//             vec![1, 5],
-//             false,
-//         );
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello$".to_string(),
+            "helloworld".to_string(),
+            vec![1, 5],
+            false,
+        );
     }
 }
