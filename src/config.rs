@@ -38,6 +38,14 @@ pub struct Options {
         default_value_t = 0, // auto select
     )]
     pub batch_size: usize,
+    #[arg(
+        short = 'k',
+        long = "k-stride length",
+        value_name = "K STRIDE LENGTH",
+        help = "Take 2^k steps at one NFA step"
+    )]
+    pub k_stride: Option<usize>,
+
 }
 
 #[derive(Debug, Subcommand)]
