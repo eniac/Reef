@@ -407,6 +407,8 @@ where
     // z = [state, char, hash, round_num, bool_out]
     fn output(&self, z: &[F]) -> Vec<F> {
         // sanity check
+        assert_eq!(z.len(), self.arity());
+
         assert_eq!(z[0], self.states[0]); // "current state"
         assert_eq!(z[1], self.chars[0]);
 

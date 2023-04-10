@@ -125,11 +125,31 @@ pub fn run_backend(
     );
 
     let mut current_state = dfa.get_init_state();
-    let z0_primary = vec![
-        <G1 as Group>::Scalar::from(current_state as u64),
-        <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
-        <G1 as Group>::Scalar::from(0),
-    ];
+    let z0_primary = match (r1cs_converter.batching, r1cs_converter.commit_type) {
+        (JBatching::NaivePolys, JCommit::HashChain) => {
+            vec![
+                <G1 as Group>::Scalar::from(current_state as u64),
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+                <G1 as Group>::Scalar::from(0),
+                /*            <G1 as Group>::Scalar::from(
+                    r1cs_converter.prover_accepting_state(0, current_state),
+                ),*/
+            ]
+        }
+        (JBatching::Nlookup, JCommit::HashChain) => {
+            let mut z = vec![
+                <G1 as Group>::Scalar::from(current_state as u64),
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+                <G1 as Group>::Scalar::from(0),
+            ];
+            z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len + 1]);
+            /*  z.push(<G1 as Group>::Scalar::from(
+                r1cs_converter.prover_accepting_state(0, current_state),
+            ));*/
+            z
+        }
+        _ => todo!(),
+    };
 
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
