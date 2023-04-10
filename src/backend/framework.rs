@@ -55,9 +55,9 @@ pub fn run_backend(
         vec![<G1 as Group>::Scalar::from(0); 2],
         vec![<G1 as Group>::Scalar::from(0); 2],
         vec![<G1 as Group>::Scalar::from(0); 2],
+        vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         sc.clone(),
-        false,
     );
 
     // trivial circuit
@@ -182,7 +182,7 @@ pub fn run_backend(
             let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
             println!(
                 "prev, expected next hash in main {:#?} {:#?}",
-                prev_hash, expected_next_hash
+                intm_hash, expected_next_hash
             );
             sponge.finish(acc).unwrap(); // assert expected hash finished correctly
 
@@ -205,9 +205,14 @@ pub fn run_backend(
                 <G1 as Group>::Scalar::from(prev_hash),
                 <G1 as Group>::Scalar::from(next_hash),
             ],
+            vec![
+                <G1 as Group>::Scalar::from(
+                    r1cs_converter.prover_accepting_state(i, current_state),
+                ),
+                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(i, next_state)),
+            ],
             r1cs_converter.batch_size,
             sc.clone(),
-            false,
         );
         // trivial circuit
         let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
@@ -308,8 +313,8 @@ mod tests {
         }
     }
 
-    // #[test]
-    fn e2e_simple() {
+    #[test]
+    fn e2e_poly_hash() {
         backend_test(
             "ab".to_string(),
             "^a*b*$".to_string(),
@@ -320,8 +325,20 @@ mod tests {
         );
     }
 
-    // #[test]
-    fn e2e_nlookup() {
+    #[test]
+    fn e2e_poly_nl() {
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            "aaabbb".to_string(),
+            JBatching::NaivePolys,
+            JCommit::Nlookup,
+            vec![2],
+        );
+    }
+
+    #[test]
+    fn e2e_nl_hash() {
         backend_test(
             "ab".to_string(),
             "^a*b*$".to_string(),
@@ -330,13 +347,17 @@ mod tests {
             JCommit::HashChain,
             vec![2],
         );
-        /*    backend_test(
+    }
+
+    #[test]
+    fn e2e_nl_nl() {
+        backend_test(
             "ab".to_string(),
-            "a*b*".to_string(),
+            "^a*b*$".to_string(),
             "aaabbb".to_string(),
             JBatching::Nlookup,
             JCommit::Nlookup,
             vec![2],
-        );*/
+        );
     }
 }

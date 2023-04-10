@@ -1617,7 +1617,7 @@ dependencies = [
 [[package]]
 name = "nova-snark"
 version = "0.14.0"
-source = "git+https://github.com/sga001/Nova#f2eaeff01429b0442fdbd8712c2b7a7ec59ac968"
+source = "git+https://github.com/sga001/Nova?rev=e06cea1#e06cea196d2ba7e3ba3c980af22677fb95d5f1e3"
 dependencies = [
  "bellperson",
  "bincode",
@@ -1635,6 +1635,7 @@ dependencies = [
  "num-bigint 0.4.3",
  "num-integer",
  "num-traits",
+ "rand",
  "rand_chacha",
  "rand_core",
  "rayon",

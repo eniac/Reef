@@ -10,7 +10,8 @@ clap = "4.1.8"
 circ = { git = "https://github.com/jkwoods/circ", branch = "r1cs_pub", features = ["r1cs", "bellman"] }
 regex-syntax = "0.6"
 itertools = "0.10"
-nova-snark ={ git = "https://github.com/sga001/Nova" }
+# sga partial zk
+nova-snark ={ git = "https://github.com/sga001/Nova", rev = "e06cea1" }
 bellperson = { version = "0.24", default-features = false }
 pasta_curves = { version = "0.5.2", features = ["repr-c", "serde"], package = "fil_pasta_curves" }
 ff = "0.12.0"

@@ -360,7 +360,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // TODO ELI: handle substring costs, select batch size correctly
         if batch_size < 1 {
             // default to selecting the optimal
-            sel_batch_size  = opt_batch_size;
+            sel_batch_size = opt_batch_size;
         } else {
             // CLI batch_size override
             sel_batch_size = batch_size;
@@ -488,7 +488,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf)
     }
 
-    fn prover_accepting_state(&self, batch_num: usize, state: usize) -> bool {
+    pub fn prover_accepting_state(&self, batch_num: usize, state: usize) -> bool {
         let mut out = false;
 
         if self.is_match {
@@ -668,7 +668,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         //println!("eval form poly {:#?}", evals);
 
-        //Makes big polynomial 
+        //Makes big polynomial
         for i in 0..self.batch_size {
             let eq = term(
                 Op::Eq,
