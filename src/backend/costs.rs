@@ -18,6 +18,13 @@ pub enum JCommit {
     Nlookup,
 }
 
+pub fn logmn(mn: usize) -> usize {
+    match mn {
+        1 => 1,
+        _ => (mn as f32).log2().ceil() as usize,
+    }
+}
+
 fn accepting_circuit<'a>(dfa: &'a NFA, is_match: Option<(usize, usize)>) -> usize {
     // vanishing selection for final check
     // poly of degree (# final states - 1)
@@ -165,7 +172,7 @@ pub fn nlookup_cost_model_nohash<'a>(
     cost += 1;
 
     //v_i creation
-    cost += (batch_size * 3)+1; // * 3???
+    cost += (batch_size * 3) + 1; // * 3???
 
     cost += accepting_circuit(dfa, is_match);
 
@@ -402,7 +409,7 @@ pub fn opt_cost_model_select<'a>(
     doc_length: usize,
     commit: Option<JCommit>,
     batching: Option<JBatching>,
-) -> (JBatching, JCommit,usize) {
+) -> (JBatching, JCommit, usize) {
     let mut opt_batching: JBatching = match batching {
         None => JBatching::NaivePolys,
         Some(b) => b,

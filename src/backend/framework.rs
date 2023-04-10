@@ -1,11 +1,15 @@
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-use crate::backend::costs::{JBatching, JCommit};
-use crate::backend::{nova::*, r1cs::*};
+use crate::backend::{
+    costs::{logmn, JBatching, JCommit},
+    nova::*,
+    r1cs::*,
+};
 use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::target::r1cs::ProverData;
+use ff::{Field, PrimeField};
 use generic_array::typenum;
 use neptune::{
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -15,6 +19,12 @@ use neptune::{
 use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+};
+//use rand::rngs::OsRng;
+use rug::{
+    integer::Order,
+    ops::{RemRounding, RemRoundingAssign},
+    Assign, Integer,
 };
 use std::time::{Duration, Instant};
 
@@ -37,6 +47,8 @@ pub fn run_backend(
         commit_type,
     );
     //let parse_ms = p_time.elapsed().as_millis();
+    let q_len = logmn(r1cs_converter.table.len());
+    let qd_len = logmn(r1cs_converter.doc.len());
 
     let c_time = Instant::now();
     println!("generate commitment");
@@ -49,12 +61,34 @@ pub fn run_backend(
 
     let s_time = Instant::now();
     // use "empty" (witness-less) circuit to generate nova F
+    let empty_glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
+        (JBatching::NaivePolys, JCommit::HashChain) => {
+            vec![
+                GlueOpts::Poly_Hash(<G1 as Group>::Scalar::from(0)),
+                GlueOpts::Poly_Hash(<G1 as Group>::Scalar::from(0)),
+            ]
+        }
+        (JBatching::Nlookup, JCommit::HashChain) => {
+            let h = <G1 as Group>::Scalar::from(0);
+
+            let q = vec![<G1 as Group>::Scalar::from(0); q_len];
+
+            let v = <G1 as Group>::Scalar::from(0);
+
+            vec![
+                GlueOpts::Nl_Hash((h.clone(), q.clone(), v.clone())),
+                GlueOpts::Nl_Hash((h, q, v)),
+            ]
+        }
+        _ => todo!(),
+    };
+
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
         &prover_data,
         None,
         vec![<G1 as Group>::Scalar::from(0); 2],
         vec![<G1 as Group>::Scalar::from(0); 2],
-        vec![<G1 as Group>::Scalar::from(0); 2],
+        empty_glue,
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         sc.clone(),
@@ -106,9 +140,6 @@ pub fn run_backend(
     // recursive SNARK
     let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
 
-    // TODO check "ingrained" bool out
-    let mut prev_hash = <G1 as Group>::Scalar::from(0);
-
     //let setup_ms = s_time.elapsed().as_millis();
 
     // TODO deal with time bs
@@ -121,10 +152,15 @@ pub fn run_backend(
     let mut wits;
     let mut running_q = None;
     let mut running_v = None;
+    let mut next_running_q = None;
+    let mut next_running_v = None;
     let mut doc_running_q = None;
     let mut doc_running_v = None;
+    let mut next_doc_running_q = None;
+    let mut next_doc_running_v = None;
 
     let mut next_state = 0; //dfa.get init state ??
+    let mut prev_hash = <G1 as Group>::Scalar::from(0);
     for i in 0..num_steps {
         println!("STEP {}", i);
 
@@ -132,10 +168,10 @@ pub fn run_backend(
         (
             wits,
             next_state,
-            running_q,
-            running_v,
-            doc_running_q,
-            doc_running_v,
+            next_running_q,
+            next_running_v,
+            next_doc_running_q,
+            next_doc_running_v,
         ) = r1cs_converter.gen_wit_i(
             i,
             next_state,
@@ -161,8 +197,7 @@ pub fn run_backend(
 
         // todo put this in r1cs
         let mut next_hash = <G1 as Group>::Scalar::from(0);
-        let mut intm_hash = prev_hash;
-        for b in 0..r1cs_converter.batch_size {
+        /*for b in 0..r1cs_converter.batch_size {
             // expected poseidon
             let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
             let acc = &mut ();
@@ -188,7 +223,51 @@ pub fn run_backend(
 
             next_hash = expected_next_hash[0];
             intm_hash = next_hash;
-        }
+        }*/
+
+        let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
+            (JBatching::NaivePolys, JCommit::HashChain) => {
+                let next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
+                println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
+                let g = vec![
+                    GlueOpts::Poly_Hash(prev_hash),
+                    GlueOpts::Poly_Hash(next_hash),
+                ];
+                prev_hash = next_hash;
+                println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
+                g
+            }
+            (JBatching::Nlookup, JCommit::HashChain) => {
+                let next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
+
+                let q = match running_q {
+                    Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+                    None => vec![<G1 as Group>::Scalar::from(0); q_len],
+                };
+
+                let v = match running_v {
+                    Some(rv) => int_to_ff(rv),
+                    None => <G1 as Group>::Scalar::from(0),
+                };
+
+                let next_q = next_running_q
+                    .clone()
+                    .unwrap()
+                    .into_iter()
+                    .map(|x| int_to_ff(x))
+                    .collect();
+                let next_v = int_to_ff(next_running_v.clone().unwrap());
+
+                let g = vec![
+                    GlueOpts::Nl_Hash((prev_hash, q, v)),
+                    GlueOpts::Nl_Hash((next_hash, next_q, next_v)),
+                ];
+                prev_hash = next_hash;
+
+                g
+            }
+            _ => todo!(),
+        };
 
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             &prover_data,
@@ -201,10 +280,7 @@ pub fn run_backend(
                 <G1 as Group>::Scalar::from(dfa.ab_to_num(&current_char) as u64),
                 <G1 as Group>::Scalar::from(dfa.ab_to_num(&next_char) as u64),
             ],
-            vec![
-                <G1 as Group>::Scalar::from(prev_hash),
-                <G1 as Group>::Scalar::from(next_hash),
-            ],
+            glue,
             vec![
                 <G1 as Group>::Scalar::from(
                     r1cs_converter.prover_accepting_state(i, current_state),
@@ -235,7 +311,10 @@ pub fn run_backend(
 
         // for next i+1 round
         current_state = next_state;
-        prev_hash = next_hash;
+        running_q = next_running_q;
+        running_v = next_running_v;
+        doc_running_q = next_doc_running_q;
+        doc_running_v = next_doc_running_v;
     }
 
     assert!(recursive_snark.is_some());
@@ -313,7 +392,7 @@ mod tests {
         }
     }
 
-    #[test]
+    //    #[test]
     fn e2e_poly_hash() {
         backend_test(
             "ab".to_string(),

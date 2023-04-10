@@ -316,8 +316,9 @@ fn poly_eval_circuit(points: Vec<Integer>, x_lookup: Term) -> Term {
 
 pub struct R1CS<'a, F: PrimeField> {
     dfa: &'a NFA,
-    batching: JBatching,
-    commit_type: JCommit,
+    pub table: Vec<Integer>,
+    pub batching: JBatching,
+    pub commit_type: JCommit,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -325,7 +326,7 @@ pub struct R1CS<'a, F: PrimeField> {
     // sticking out here
     pub_inputs: Vec<Term>,
     pub batch_size: usize,
-    doc: Vec<String>,
+    pub doc: Vec<String>,
     is_match: bool,
     pub substring: (usize, usize), // todo getters
     pc: PoseidonConstants<F, typenum::U2>,
@@ -396,8 +397,22 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         println!("'substring': {:#?}", substring);
 
+        // generate T
+        let mut table = vec![];
+        for (ins, c, out) in dfa.deltas() {
+            table.push(
+                Integer::from(
+                    (ins * dfa.nstates() * dfa.nchars())
+                        + (out * dfa.nchars())
+                        + dfa.ab_to_num(&c.to_string()),
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
+        }
+
         Self {
             dfa,
+            table,    // TODO fix else
             batching, // TODO
             commit_type: commit,
             assertions: Vec::new(),
@@ -443,6 +458,42 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
             JCommit::Nlookup => todo!(),
         }
+    }
+
+    pub fn prover_calc_hash(&self, start_hash: F, i: usize) -> F {
+        let mut next_hash = start_hash;
+        let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+        for b in 0..self.batch_size {
+            // expected poseidon
+            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+            let acc = &mut ();
+
+            sponge.start(parameter.clone(), None, acc);
+            SpongeAPI::absorb(
+                &mut sponge,
+                2,
+                &[
+                    next_hash,
+                    F::from(
+                        self.dfa
+                            .ab_to_num(&self.doc[i * self.batch_size + b].clone())
+                            as u64,
+                    ),
+                ],
+                acc,
+            );
+            let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            /*println!(
+                "prev, expected next hash in main {:#?} {:#?}",
+                prev_hash, expected_next_hash
+            );
+            */
+            sponge.finish(acc).unwrap(); // assert expected hash finished correctly
+
+            next_hash = expected_next_hash[0];
+        }
+
+        next_hash
     }
 
     pub fn verifier_final_checks(
@@ -699,7 +750,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // eq([x0,x1,x2...],[e0,e1,e2...])
     fn bit_eq_circuit(&mut self, m: usize, q_bit: usize, id: &str) -> Term {
         let mut eq = new_const(1); // dummy, not used
-        let q_name = format!("{}_eq{}", id, q_bit);
+        let q_name = format!("{}_eq_{}", id, q_bit);
         for i in 0..m {
             let next = term(
                 Op::PfNaryOp(PfNaryOp::Add),
@@ -1200,7 +1251,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // generate last round eqs
         for i in 0..self.batch_size {
             // regular
-            let q_name = format!("{}_eq{}", id, i);
+            let q_name = format!("{}_eq_{}", id, i);
             for j in 0..sc_l {
                 let qj = (q[i] >> j) & 1;
                 wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
@@ -1208,7 +1259,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         for j in 0..sc_l {
             // running
-            let q_name = format!("{}_eq{}", id, q.len()); //v.len() - 1);
+            let q_name = format!("{}_eq_{}", id, q.len()); //v.len() - 1);
             wits.insert(
                 format!("{}_q_{}", q_name, j),
                 new_wit(prev_running_q[j].clone()),
