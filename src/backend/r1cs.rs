@@ -1,4 +1,4 @@
-use crate::backend::costs::{opt_cost_model_select, JBatching, JCommit};
+use crate::backend::costs::*;
 use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
@@ -208,7 +208,7 @@ fn prover_mle_sum_eval(
     let mut sum_x = Integer::from(0);
     let mut sum_con = Integer::from(0);
     let hole = rands.len();
-    let total = (table.len() as f32).log2().ceil() as usize;
+    let total = logmn(table.len());
 
     assert!(hole + 1 <= total, "batch size too small for nlookup");
     let num_x = total - hole - 1;
@@ -345,27 +345,39 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let is_match = dfa.is_match(doc).is_some();
 
         println!("Match? {:#?}", is_match);
-
-        // run cost model (with Poseidon) to decide batching
-        let (batching, commit, opt_batch_size) = opt_cost_model_select(
-            &dfa,
-            batch_size,
-            batch_size,
-            dfa.is_match(doc),
-            doc.len(),
-            commit_override,
-            batch_override,
-        );
-
-        let mut sel_batch_size;
-        // TODO ELI: handle substring costs, select batch size correctly
-        if batch_size < 1 {
-            // default to selecting the optimal
-            sel_batch_size = opt_batch_size;
+        let batching;
+        let commit;
+        let opt_batch_size;
+        if batch_size > 1 {
+            (batching, commit, opt_batch_size) = match (batch_override, commit_override) {
+                (Some(b), Some(c)) => (b, c, batch_size),
+                (Some(b), _) => {
+                    opt_commit_select_with_batch(dfa, batch_size, dfa.is_match(doc), doc.len(), b)
+                }
+                (None, Some(c)) => opt_cost_model_select_with_commit(
+                    &dfa,
+                    batch_size,
+                    dfa.is_match(doc),
+                    doc.len(),
+                    c,
+                ),
+                (None, None) => {
+                    opt_cost_model_select_with_batch(&dfa, batch_size, dfa.is_match(doc), doc.len())
+                }
+            };
         } else {
-            // CLI batch_size override
-            sel_batch_size = batch_size;
+            (batching, commit, opt_batch_size) = opt_cost_model_select(
+                &dfa,
+                1,
+                doc.len(),
+                dfa.is_match(doc),
+                doc.len(),
+                commit_override,
+                batch_override,
+            );
         }
+
+        let sel_batch_size = opt_batch_size;
 
         assert!(sel_batch_size >= 1);
         println!(
@@ -881,7 +893,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.pub_inputs.push(new_var(format!("{}_claim_r", id)));
 
         // size of table (T -> mle)
-        let sc_l = (t_size as f64).log2().ceil() as usize;
+        let sc_l = logmn(t_size);
         //println!("table size: {}", t_size);
         //println!("sum check rounds: {}", sc_l);
 
@@ -1133,7 +1145,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         // TODO - what needs to be public?
 
-        let sc_l = (table.len() as f64).log2().ceil() as usize; // sum check rounds
+        let sc_l = logmn(table.len()); // sum check rounds
 
         // generate claim r
         let claim_r = self.prover_random_from_seed(1, &[F::from(5 as u64)]); // TODO make general
@@ -1461,7 +1473,7 @@ mod tests {
     ) {
         let r = Regex::new(&rstr);
         let dfa = NFA::new(&ab[..], r);
-        //println!("{:#?}", dfa);
+        println!("DFA Size: {:#?}", dfa.trans.len());
 
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
@@ -1472,6 +1484,7 @@ mod tests {
                     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
                         Strength::Standard,
                     );
+                    println!("Doc:{:#?}", doc);
                     let mut r1cs_converter = R1CS::new(
                         &dfa,
                         &doc.chars().map(|c| c.to_string()).collect(),

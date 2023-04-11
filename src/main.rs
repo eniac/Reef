@@ -24,18 +24,29 @@ fn main() {
     let ab = String::from_iter(opt.config.alphabet());
 
     // Regular expresion parser and convert the Regex to a DFA
-    let nfa = opt.config.compile_nfa();
-    println!("dfa: {:#?}", nfa);
+    let mut nfa = opt.config.compile_nfa();
 
     // Input document
-    let doc: Vec<String> = opt.config.read_doc().iter().map(|c|c.to_string()).collect();
+    let mut doc: Vec<String> = opt.config.read_doc().iter().map(|c|c.to_string()).collect();
+
+    match opt.k_stride {
+        Some(k) => {
+            for i in 0..k {
+                doc = nfa.double_stride(&doc);
+            }
+        },
+        None => ()
+    }
+
+    println!("dfa: {:#?}", nfa);
+
 
     #[cfg(feature = "plot")]
     plot::plot_nfa(&nfa).expect("Failed to plot DFA to a pdf file");
 
     let num_steps = doc.len();
     println!("Doc len is {}", num_steps);
-
+    println!("Match: {}", nfa.is_match(&doc).map(|c| format!("{:?}", c)).unwrap_or(String::from("NONE")));
     init();
 
     run_backend(&nfa, &doc, opt.eval_type, opt.commit_type, opt.batch_size); // auto select batching/commit

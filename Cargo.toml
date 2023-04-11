@@ -26,6 +26,7 @@ serial_test = "1.0.0"
 cached = "0.42.0"
 rand = "0.8.4"
 merlin = {version = "3.0.0", default-features = false }
+rayon = "1.7.0"
 
 [features]
 default = ["plot"]

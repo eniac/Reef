@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::{HashSet, BTreeSet};
+use rayon::prelude::*;
 
 use crate::regex::Regex;
 
@@ -132,7 +133,6 @@ impl NFA {
 
     /// Returns (begin match index, end index) if a match is found in the doc
     pub fn is_match(&self, doc: &Vec<String>) -> Option<(usize, usize)> {
-        let mut s = self.get_init_state();
         let mut start_idxs = Vec::new();
         let accepting = &self.get_final_states();
 
@@ -146,25 +146,27 @@ impl NFA {
         }
 
         // Initial state is also accepting
-        if accepting.contains(&s) &&
+        if accepting.contains(&self.get_init_state()) &&
             (!self.anchor_end || doc.len() == 0) {
             return Some((0, 0));
         }
-
         // For every postfix of doc (O(n^2))
-        for i in start_idxs {
-            for j in i..doc.len() {
-                // Apply transition relation
-                s = self.delta(s, &doc[j]).unwrap();
+        start_idxs
+            .into_par_iter()
+            .find_map_any(|i| {
+              let mut s = self.get_init_state();
+              for j in i..doc.len() {
+                  // Apply transition relation
+                  s = self.delta(s, &doc[j]).unwrap();
 
-                // found a substring match or exact match
-                if accepting.contains(&s) &&
-                    (!self.anchor_end || j == doc.len() - 1) {
-                    return Some((i, j+1)); // Return an interval [i, j)
-                }
-            }
-        }
-        None
+                  // found a substring match or exact match
+                  if accepting.contains(&s) &&
+                      (!self.anchor_end || j == doc.len() - 1) {
+                      return Some((i, j+1)); // Return an interval [i, j)
+                  }
+              }
+              None
+            })
     }
 
     /// Double the stride of the DFA
@@ -310,6 +312,12 @@ mod tests {
     }
 
     #[test]
+    fn test_nfa_delta_middle_match() {
+        check(&setup_nfa("abba", "ab"), &vs("aaaaaaaaaabbaaaaaaa"), Some((9, 13)))
+    }
+
+
+    #[test]
     fn test_nfa_double_stride() {
         let mut nfa = setup_nfa("a.*a", "ab");
         let doc = nfa.double_stride(&vs("abbbba"));
@@ -322,5 +330,7 @@ mod tests {
         let doc = nfa.double_stride(&vs("aabbaaa"));
         check(&nfa, &doc, Some((0,4)))
     }
+
+
 
 }
