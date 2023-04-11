@@ -6,27 +6,216 @@ use crate::backend::{
     r1cs::*,
 };
 use crate::dfa::NFA;
-use circ::cfg;
-use circ::cfg::CircOpt;
+use circ::cfg::{cfg, CircOpt};
 use circ::target::r1cs::ProverData;
 use ff::{Field, PrimeField};
 use generic_array::typenum;
+use merlin::Transcript;
 use neptune::{
+    poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
 use nova_snark::{
-    traits::{circuit::TrivialTestCircuit, Group},
+    errors::NovaError,
+    provider::{
+        ipa_pc::{EvaluationEngine, EvaluationGens},
+        pedersen::{Commitment, CommitmentGens},
+    },
+    traits::{
+        circuit::TrivialTestCircuit, commitment::*, evaluation::EvaluationEngineTrait, Group,
+    },
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
-//use rand::rngs::OsRng;
+use rand::rngs::OsRng;
 use rug::{
     integer::Order,
     ops::{RemRounding, RemRoundingAssign},
     Assign, Integer,
 };
 use std::time::{Duration, Instant};
+
+pub enum ReefCommitment {
+    HashChain(<G1 as Group>::Scalar),
+    Nlookup(DocCommitmentStruct),
+}
+
+pub struct DocCommitmentStruct {
+    gens: CommitmentGens<G1>,
+    commit_t: Commitment<G1>, // todo compress
+    vec_t: Vec<<G1 as Group>::Scalar>,
+    decommit_t: <G1 as Group>::Scalar,
+}
+
+// todo move substring hash crap
+pub fn gen_commitment(
+    commit_type: JCommit,
+    doc: Vec<usize>,
+    pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U2>,
+) -> ReefCommitment {
+    type F = <G1 as Group>::Scalar;
+    match commit_type {
+        JCommit::HashChain => {
+            let mut i = 0;
+            let mut start = F::from(0);
+            let mut hash = vec![start.clone()];
+
+            for c in doc.into_iter() {
+                /* if i == self.substring.0 {
+                    start = hash[0];
+                }*/
+                let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
+                let acc = &mut ();
+
+                let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+                sponge.start(parameter, None, acc);
+                SpongeAPI::absorb(&mut sponge, 2, &[hash[0], F::from(c as u64)], acc);
+                hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+                sponge.finish(acc).unwrap();
+            }
+            println!("commitment = {:#?}", hash.clone());
+            //self.hash_commitment = Some((start, hash[0]));
+
+            return ReefCommitment::HashChain(hash[0]);
+        }
+        JCommit::Nlookup => {
+            let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", doc.len()); // n is dimension
+            let blind = <G1 as Group>::Scalar::random(&mut OsRng);
+
+            let mle = mle_from_pts(doc.into_iter().map(|x| Integer::from(x)).collect()); // potentially rev q?
+
+            let scalars: Vec<<G1 as Group>::Scalar> =
+                mle.into_iter().map(|x| int_to_ff(x)).collect();
+
+            let commit_t =
+                <G1 as Group>::CE::commit(&gens_t, &scalars.clone().into_boxed_slice(), &blind);
+            // TODO compress ?
+            //self.doc_commitement = Some(commitment);
+
+            let doc_commit = DocCommitmentStruct {
+                gens: gens_t,
+                commit_t: commit_t,
+                vec_t: scalars,
+                decommit_t: blind,
+            };
+
+            return ReefCommitment::Nlookup(doc_commit);
+        }
+    }
+}
+// this crap will need to be seperated out
+pub fn proof_dot_prod(
+    dc: DocCommitmentStruct,
+    running_q: Vec<<G1 as Group>::Scalar>,
+    running_v: <G1 as Group>::Scalar,
+) -> Result<(), NovaError> {
+    let mut transcript = Transcript::new(b"dot_prod_proof");
+
+    let ee: EvaluationGens<G1> = EvaluationEngine::setup(&dc.gens);
+
+    let eval_arg = EvaluationEngine::prove_batch(
+        &ee,
+        &mut transcript,
+        &[dc.commit_t],
+        &[dc.vec_t],
+        &[dc.decommit_t],
+        &[running_q.clone()],
+        &[running_v],
+    )?;
+
+    EvaluationEngine::verify_batch(
+        &ee,
+        &mut transcript,
+        &[dc.commit_t],
+        &[running_q],
+        &eval_arg,
+    )
+}
+
+pub fn final_clear_checks(
+    eval_type: JBatching,
+    reef_commitment: ReefCommitment,
+    accepting_state: <G1 as Group>::Scalar,
+    table: &Vec<Integer>,
+    final_q: Option<Vec<<G1 as Group>::Scalar>>,
+    final_v: Option<<G1 as Group>::Scalar>,
+    final_hash: Option<<G1 as Group>::Scalar>,
+    final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
+    final_doc_v: Option<<G1 as Group>::Scalar>,
+) {
+    type F = <G1 as Group>::Scalar;
+
+    // state matches?
+    assert_eq!(accepting_state, F::from(1));
+
+    // nlookup eval T check
+    match (final_q, final_v) {
+        (Some(q), Some(v)) => {
+            // T is in the clear for this case
+            match eval_type {
+                JBatching::NaivePolys => {
+                    panic!(
+                        "naive poly evaluation used, but running claim provided for verification"
+                    );
+                }
+                JBatching::Nlookup => {
+                    let mut q_i = vec![];
+                    for f in q {
+                        q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
+                    }
+                    // TODO mle eval over F
+                    /*assert_eq!(
+                        verifier_mle_eval(table, &q_i),
+                        (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
+                    );*/
+                }
+            }
+        }
+        (Some(_), None) => {
+            panic!("only half of running claim recieved");
+        }
+        (None, Some(_)) => {
+            panic!("only half of running claim recieved");
+        }
+        (None, None) => {
+            if matches!(eval_type, JBatching::Nlookup) {
+                panic!("nlookup evaluation used, but no running claim provided for verification");
+            }
+        }
+    }
+
+    // todo vals align
+    // hash chain commitment check
+    match reef_commitment {
+        ReefCommitment::HashChain(h) => {
+            // todo substring
+            assert_eq!(h, final_hash.unwrap());
+        }
+        ReefCommitment::Nlookup(dc) => {
+            // or - nlookup commitment check
+            match (final_doc_q, final_doc_v) {
+                (Some(q), Some(v)) => {
+                    // Doc is commited to in this case
+                    assert!(proof_dot_prod(dc, q, v).is_ok());
+                }
+                (Some(_), None) => {
+                    panic!("only half of running claim recieved");
+                }
+                (None, Some(_)) => {
+                    panic!("only half of running claim recieved");
+                }
+                (None, None) => {
+                    panic!(
+                    "nlookup doc commitment used, but no running claim provided for verification"
+                );
+                }
+            }
+        }
+    }
+
+    println!("Final values confirmed in the clear!");
+}
 
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(
@@ -50,9 +239,15 @@ pub fn run_backend(
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.doc.len());
 
+    // doc to usizes - can I use this elsewhere too? TODO
+    let mut usize_doc = vec![];
+    for c in doc.clone().into_iter() {
+        usize_doc.push(dfa.ab_to_num(&c.to_string()));
+    }
+
     let c_time = Instant::now();
     println!("generate commitment");
-    r1cs_converter.gen_commitment();
+    let reef_commit = gen_commitment(r1cs_converter.commit_type, usize_doc, &sc);
     let commit_ms = c_time.elapsed().as_millis();
 
     let r_time = Instant::now();
@@ -80,7 +275,28 @@ pub fn run_backend(
                 GlueOpts::Nl_Hash((h, q, v)),
             ]
         }
-        _ => todo!(),
+        (JBatching::NaivePolys, JCommit::Nlookup) => {
+            let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
+
+            let doc_v = <G1 as Group>::Scalar::from(0);
+
+            vec![
+                GlueOpts::Poly_Nl((doc_q.clone(), doc_v.clone())),
+                GlueOpts::Poly_Nl((doc_q, doc_v)),
+            ]
+        }
+        (JBatching::Nlookup, JCommit::Nlookup) => {
+            let q = vec![<G1 as Group>::Scalar::from(0); q_len];
+
+            let v = <G1 as Group>::Scalar::from(0);
+            let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
+
+            let doc_v = <G1 as Group>::Scalar::from(0);
+            vec![
+                GlueOpts::Nl_Nl((q.clone(), v.clone(), doc_q.clone(), doc_v.clone())),
+                GlueOpts::Nl_Nl((q, v, doc_q, doc_v)),
+            ]
+        }
     };
 
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
@@ -148,7 +364,31 @@ pub fn run_backend(
             ));*/
             z
         }
-        _ => todo!(),
+        (JBatching::NaivePolys, JCommit::Nlookup) => {
+            let mut z = vec![
+                <G1 as Group>::Scalar::from(current_state as u64),
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+            ];
+
+            z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len + 1]);
+            /* z.push(<G1 as Group>::Scalar::from(
+                r1cs_converter.prover_accepting_state(0, current_state),
+            ));*/
+            z
+        }
+        (JBatching::Nlookup, JCommit::Nlookup) => {
+            let mut z = vec![
+                <G1 as Group>::Scalar::from(current_state as u64),
+                <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+            ];
+
+            z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len + 1]);
+            z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len + 1]);
+            /*z.push(<G1 as Group>::Scalar::from(
+                r1cs_converter.prover_accepting_state(0, current_state),
+            ));*/
+            z
+        }
     };
 
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
@@ -286,7 +526,71 @@ pub fn run_backend(
 
                 g
             }
-            _ => todo!(),
+            (JBatching::NaivePolys, JCommit::Nlookup) => {
+                let doc_q = match doc_running_q {
+                    Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+                    None => vec![<G1 as Group>::Scalar::from(0); q_len],
+                };
+
+                let doc_v = match doc_running_v {
+                    Some(rv) => int_to_ff(rv),
+                    None => <G1 as Group>::Scalar::from(0),
+                };
+
+                let next_doc_q = next_doc_running_q
+                    .clone()
+                    .unwrap()
+                    .into_iter()
+                    .map(|x| int_to_ff(x))
+                    .collect();
+                let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
+
+                vec![
+                    GlueOpts::Poly_Nl((doc_q, doc_v)),
+                    GlueOpts::Poly_Nl((next_doc_q, next_doc_v)),
+                ]
+            }
+            (JBatching::Nlookup, JCommit::Nlookup) => {
+                let q = match running_q {
+                    Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+                    None => vec![<G1 as Group>::Scalar::from(0); q_len],
+                };
+
+                let v = match running_v {
+                    Some(rv) => int_to_ff(rv),
+                    None => <G1 as Group>::Scalar::from(0),
+                };
+
+                let next_q = next_running_q
+                    .clone()
+                    .unwrap()
+                    .into_iter()
+                    .map(|x| int_to_ff(x))
+                    .collect();
+                let next_v = int_to_ff(next_running_v.clone().unwrap());
+
+                let doc_q = match doc_running_q {
+                    Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+                    None => vec![<G1 as Group>::Scalar::from(0); q_len],
+                };
+
+                let doc_v = match doc_running_v {
+                    Some(rv) => int_to_ff(rv),
+                    None => <G1 as Group>::Scalar::from(0),
+                };
+                let next_doc_q = next_doc_running_q
+                    .clone()
+                    .unwrap()
+                    .into_iter()
+                    .map(|x| int_to_ff(x))
+                    .collect();
+                let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
+
+                vec![
+                    GlueOpts::Nl_Nl((q, v, doc_q, doc_v)),
+                    GlueOpts::Nl_Nl((next_q, next_v, next_doc_q, next_doc_v)),
+                ]
+            }
         };
 
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
@@ -374,6 +678,27 @@ pub fn run_backend(
 }
 
 // tests that need setup
+// TODO test, TODO over ff, not Integers
+// calculate multilinear extension from evals of univariate
+fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
+    let num_pts = pts.len();
+    if num_pts == 1 {
+        return vec![pts[0].clone()];
+    }
+
+    let h = num_pts / 2;
+    //println!("num_pts {}, h {}", num_pts, h);
+
+    let mut l = mle_from_pts(pts[..h].to_vec());
+    let mut r = mle_from_pts(pts[h..].to_vec());
+
+    for i in 0..r.len() {
+        r[i] -= &l[i];
+        l.push(r[i].clone().rem_floor(cfg().field().modulus()));
+    }
+
+    l
+}
 
 #[cfg(test)]
 mod tests {
@@ -412,7 +737,7 @@ mod tests {
         }
     }
 
-    //    #[test]
+    #[test]
     fn e2e_poly_hash() {
         backend_test(
             "ab".to_string(),

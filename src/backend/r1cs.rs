@@ -428,38 +428,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // IN THE CLEAR
 
-    pub fn gen_commitment(&mut self) {
-        match self.commit_type {
-            JCommit::HashChain => {
-                let mut i = 0;
-                let mut start = F::from(0);
-                let mut hash = vec![start.clone()];
-
-                for c in self.doc.clone().into_iter() {
-                    if i == self.substring.0 {
-                        start = hash[0];
-                    }
-                    let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-                    let acc = &mut ();
-
-                    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-                    sponge.start(parameter, None, acc);
-                    SpongeAPI::absorb(
-                        &mut sponge,
-                        2,
-                        &[hash[0], F::from(self.dfa.ab_to_num(&c.to_string()) as u64)],
-                        acc,
-                    );
-                    hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-                    sponge.finish(acc).unwrap();
-                }
-                println!("commitment = {:#?}", hash.clone());
-                self.commitment = Some((start, hash[0]));
-            }
-            JCommit::Nlookup => todo!(),
-        }
-    }
-
     pub fn prover_calc_hash(&self, start_hash: F, i: usize) -> F {
         let mut next_hash = start_hash;
         let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
@@ -494,31 +462,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
 
         next_hash
-    }
-
-    pub fn verifier_final_checks(
-        &self,
-        final_hash: Option<F>,
-        accepting_state: F,
-        final_q: Vec<F>,
-        final_v: F,
-    ) {
-        // TODO
-        // commitment matches?
-        if matches!(self.commit_type, JCommit::HashChain) {
-            assert_eq!(self.commitment.unwrap().1, final_hash.unwrap());
-        }
-
-        // state matches?
-        assert_eq!(accepting_state, F::from(1));
-
-        // T claim
-        // generate table TODO - actually, store the table somewhere
-        /*
-        let (_, running_v) =
-            prover_mle_partial_eval(&table, &final_q, &(0..table.len()).collect(), true, None);
-        assert_eq!(final_v, running_v);
-        */
     }
 
     // PROVER
