@@ -195,6 +195,13 @@ fn prover_mle_partial_eval(
     )
 }
 
+// external full "partial" eval for table check
+pub fn verifier_mle_eval(table: &Vec<Integer>, q: &Vec<Integer>) -> Integer {
+    let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
+
+    con
+}
+
 // for sum check, computes the sum of many mle univar slices
 // takes raw table (pre mle'd), and rands = [r_0, r_1,...], leaving off the hole and x_i's
 fn prover_mle_sum_eval(
@@ -330,7 +337,6 @@ pub struct R1CS<'a, F: PrimeField> {
     is_match: bool,
     pub substring: (usize, usize), // todo getters
     pc: PoseidonConstants<F, typenum::U2>,
-    commitment: Option<(F, F)>, // (start, end)
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
@@ -434,7 +440,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             is_match,
             substring,
             pc: pcs,
-            commitment: None,
         }
     }
 
