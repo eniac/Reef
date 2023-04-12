@@ -18,10 +18,10 @@ pub enum JCommit {
     Nlookup,
 }
 
-pub fn logmn(mn: usize)->usize {
+pub fn logmn(mn: usize) -> usize {
     match mn {
         1 => 1,
-        _ => (mn as f32).log2().ceil() as usize
+        _ => (mn as f32).log2().ceil() as usize,
     }
 }
 
@@ -50,9 +50,9 @@ pub fn commit_circuit_nohash(
         },
         JCommit::Nlookup => {
             let mn: usize = doc_len;
-            println!("Doc Len: {:#?}",mn);
+            println!("Doc Len: {:#?}", mn);
             let log_mn: usize = logmn(mn);
-            println!("Log mn: {:#?}",log_mn);
+            println!("Log mn: {:#?}", log_mn);
             let mut cost: usize = 0;
 
             //Multiplications
@@ -65,7 +65,7 @@ pub fn commit_circuit_nohash(
             cost += (batch_size + 1) * (2 * log_mn); //2 actual multiplication and 2 for the subtraction
 
             //combine eqs
-            cost += (batch_size+1) * (log_mn-1);
+            cost += (batch_size + 1) * (log_mn - 1);
 
             //horners
             cost += batch_size + 1;
@@ -113,7 +113,7 @@ pub fn naive_cost_model_nohash<'a>(
     commit_type: JCommit,
 ) -> usize {
     // vanishing poly - m * n multiplications + 2 for lookup
-    let mut cost = dfa.trans.len() -1;
+    let mut cost = dfa.trans.len() - 1;
     cost *= batch_size;
 
     cost += accepting_circuit(dfa, is_match);
@@ -166,13 +166,13 @@ pub fn nlookup_cost_model_nohash<'a>(
     cost += batch_size + 1;
 
     //Sum-check additions
-    cost += log_mn*2;
+    cost += log_mn * 2;
 
     //eq calc
     cost += (batch_size + 1) * (2 * log_mn);
 
     //combine eqs
-    cost += (batch_size+1) * (log_mn-1);
+    cost += (batch_size + 1) * (log_mn - 1);
 
     //horners
     cost += batch_size + 1;
@@ -419,7 +419,7 @@ pub fn opt_cost_model_select<'a>(
     doc_length: usize,
     commit: Option<JCommit>,
     batching: Option<JBatching>,
-) -> (JBatching, JCommit,usize) {
+) -> (JBatching, JCommit, usize) {
     let mut opt_batching: JBatching = match batching {
         None => JBatching::NaivePolys,
         Some(b) => b,

@@ -322,3 +322,19 @@ fn mle_sums() {
     assert_eq!(g_coeff, Integer::from(0));
     assert_eq!(g_const, Integer::from(355));
 }
+
+// seed Questions todo
+fn prover_random_from_seed(&self, absorbs: u32, s: &[F]) -> Integer {
+    assert_eq!(absorbs, s.len() as u32);
+
+    let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+    let acc = &mut ();
+    let parameter = IOPattern(vec![SpongeOp::Absorb(absorbs), SpongeOp::Squeeze(1)]);
+
+    sponge.start(parameter, None, acc);
+    SpongeAPI::absorb(&mut sponge, absorbs, s, acc);
+    let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
+    sponge.finish(acc).unwrap();
+
+    Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf)
+}

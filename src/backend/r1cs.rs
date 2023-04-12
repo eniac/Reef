@@ -195,6 +195,13 @@ fn prover_mle_partial_eval(
     )
 }
 
+// external full "partial" eval for table check
+pub fn verifier_mle_eval(table: &Vec<Integer>, q: &Vec<Integer>) -> Integer {
+    let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
+
+    con
+}
+
 // for sum check, computes the sum of many mle univar slices
 // takes raw table (pre mle'd), and rands = [r_0, r_1,...], leaving off the hole and x_i's
 fn prover_mle_sum_eval(
@@ -316,8 +323,9 @@ fn poly_eval_circuit(points: Vec<Integer>, x_lookup: Term) -> Term {
 
 pub struct R1CS<'a, F: PrimeField> {
     dfa: &'a NFA,
-    batching: JBatching,
-    commit_type: JCommit,
+    pub table: Vec<Integer>,
+    pub batching: JBatching,
+    pub commit_type: JCommit,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -325,11 +333,10 @@ pub struct R1CS<'a, F: PrimeField> {
     // sticking out here
     pub_inputs: Vec<Term>,
     pub batch_size: usize,
-    doc: Vec<String>,
+    pub doc: Vec<String>,
     is_match: bool,
     pub substring: (usize, usize), // todo getters
     pc: PoseidonConstants<F, typenum::U2>,
-    commitment: Option<(F, F)>, // (start, end)
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
@@ -349,22 +356,32 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let opt_batch_size;
         if batch_size > 1 {
             (batching, commit, opt_batch_size) = match (batch_override, commit_override) {
-                (Some(b),Some(c)) => (b,c,batch_size),
-                (Some(b),_) => opt_commit_select_with_batch(dfa, batch_size, dfa.is_match(doc), doc.len(), b),
-                (None,Some(c)) => opt_cost_model_select_with_commit(&dfa,batch_size,dfa.is_match(doc),doc.len(),c),
-                (None, None) => opt_cost_model_select_with_batch(&dfa,batch_size,dfa.is_match(doc),doc.len()),
+                (Some(b), Some(c)) => (b, c, batch_size),
+                (Some(b), _) => {
+                    opt_commit_select_with_batch(dfa, batch_size, dfa.is_match(doc), doc.len(), b)
+                }
+                (None, Some(c)) => opt_cost_model_select_with_commit(
+                    &dfa,
+                    batch_size,
+                    dfa.is_match(doc),
+                    doc.len(),
+                    c,
+                ),
+                (None, None) => {
+                    opt_cost_model_select_with_batch(&dfa, batch_size, dfa.is_match(doc), doc.len())
+                }
             };
         } else {
             (batching, commit, opt_batch_size) = opt_cost_model_select(
-            &dfa,
-            1,
-            doc.len(),
-            dfa.is_match(doc),
-            doc.len(),
-            commit_override,
-            batch_override,
-        );
-    }
+                &dfa,
+                1,
+                doc.len(),
+                dfa.is_match(doc),
+                doc.len(),
+                commit_override,
+                batch_override,
+            );
+        }
 
         let sel_batch_size = opt_batch_size;
 
@@ -398,8 +415,22 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         println!("'substring': {:#?}", substring);
 
+        // generate T
+        let mut table = vec![];
+        for (ins, c, out) in dfa.deltas() {
+            table.push(
+                Integer::from(
+                    (ins * dfa.nstates() * dfa.nchars())
+                        + (out * dfa.nchars())
+                        + dfa.ab_to_num(&c.to_string()),
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
+        }
+
         Self {
             dfa,
+            table,    // TODO fix else
             batching, // TODO
             commit_type: commit,
             assertions: Vec::new(),
@@ -409,67 +440,45 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             is_match,
             substring,
             pc: pcs,
-            commitment: None,
         }
     }
 
     // IN THE CLEAR
 
-    pub fn gen_commitment(&mut self) {
-        match self.commit_type {
-            JCommit::HashChain => {
-                let mut i = 0;
-                let mut start = F::from(0);
-                let mut hash = vec![start.clone()];
+    pub fn prover_calc_hash(&self, start_hash: F, i: usize) -> F {
+        let mut next_hash = start_hash;
+        let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+        for b in 0..self.batch_size {
+            // expected poseidon
+            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+            let acc = &mut ();
 
-                for c in self.doc.clone().into_iter() {
-                    if i == self.substring.0 {
-                        start = hash[0];
-                    }
-                    let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-                    let acc = &mut ();
+            sponge.start(parameter.clone(), None, acc);
+            SpongeAPI::absorb(
+                &mut sponge,
+                2,
+                &[
+                    next_hash,
+                    F::from(
+                        self.dfa
+                            .ab_to_num(&self.doc[i * self.batch_size + b].clone())
+                            as u64,
+                    ),
+                ],
+                acc,
+            );
+            let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            /*println!(
+                "prev, expected next hash in main {:#?} {:#?}",
+                prev_hash, expected_next_hash
+            );
+            */
+            sponge.finish(acc).unwrap(); // assert expected hash finished correctly
 
-                    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-                    sponge.start(parameter, None, acc);
-                    SpongeAPI::absorb(
-                        &mut sponge,
-                        2,
-                        &[hash[0], F::from(self.dfa.ab_to_num(&c.to_string()) as u64)],
-                        acc,
-                    );
-                    hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-                    sponge.finish(acc).unwrap();
-                }
-                println!("commitment = {:#?}", hash.clone());
-                self.commitment = Some((start, hash[0]));
-            }
-            JCommit::Nlookup => todo!(),
-        }
-    }
-
-    pub fn verifier_final_checks(
-        &self,
-        final_hash: Option<F>,
-        accepting_state: F,
-        final_q: Vec<F>,
-        final_v: F,
-    ) {
-        // TODO
-        // commitment matches?
-        if matches!(self.commit_type, JCommit::HashChain) {
-            assert_eq!(self.commitment.unwrap().1, final_hash.unwrap());
+            next_hash = expected_next_hash[0];
         }
 
-        // state matches?
-        assert_eq!(accepting_state, F::from(1));
-
-        // T claim
-        // generate table TODO - actually, store the table somewhere
-        /*
-        let (_, running_v) =
-            prover_mle_partial_eval(&table, &final_q, &(0..table.len()).collect(), true, None);
-        assert_eq!(final_v, running_v);
-        */
+        next_hash
     }
 
     // PROVER
@@ -490,7 +499,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf)
     }
 
-    fn prover_accepting_state(&self, batch_num: usize, state: usize) -> bool {
+    pub fn prover_accepting_state(&self, batch_num: usize, state: usize) -> bool {
         let mut out = false;
 
         if self.is_match {
@@ -670,7 +679,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         //println!("eval form poly {:#?}", evals);
 
-        //Makes big polynomial 
+        //Makes big polynomial
         for i in 0..self.batch_size {
             let eq = term(
                 Op::Eq,
@@ -701,7 +710,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // eq([x0,x1,x2...],[e0,e1,e2...])
     fn bit_eq_circuit(&mut self, m: usize, q_bit: usize, id: &str) -> Term {
         let mut eq = new_const(1); // dummy, not used
-        let q_name = format!("{}_eq{}", id, q_bit);
+        let q_name = format!("{}_eq_{}", id, q_bit);
         for i in 0..m {
             let next = term(
                 Op::PfNaryOp(PfNaryOp::Add),
@@ -1202,7 +1211,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // generate last round eqs
         for i in 0..self.batch_size {
             // regular
-            let q_name = format!("{}_eq{}", id, i);
+            let q_name = format!("{}_eq_{}", id, i);
             for j in 0..sc_l {
                 let qj = (q[i] >> j) & 1;
                 wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
@@ -1210,7 +1219,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
         for j in 0..sc_l {
             // running
-            let q_name = format!("{}_eq{}", id, q.len()); //v.len() - 1);
+            let q_name = format!("{}_eq_{}", id, q.len()); //v.len() - 1);
             wits.insert(
                 format!("{}_q_{}", q_name, j),
                 new_wit(prev_running_q[j].clone()),
@@ -1480,7 +1489,7 @@ mod tests {
                     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
                         Strength::Standard,
                     );
-                    println!("Doc:{:#?}",doc);
+                    println!("Doc:{:#?}", doc);
                     let mut r1cs_converter = R1CS::new(
                         &dfa,
                         &doc.chars().map(|c| c.to_string()).collect(),
