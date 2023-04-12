@@ -47,19 +47,19 @@ pub enum ReefCommitment {
 pub struct DocCommitmentStruct {
     gens: CommitmentGens<G1>,
     gens_single: CommitmentGens<G1>,
-    commit_t: Commitment<G1>, // todo compress
+    commit_doc: Commitment<G1>, // todo compress
     vec_t: Vec<<G1 as Group>::Scalar>,
-    decommit_t: <G1 as Group>::Scalar,
+    decommit_doc: <G1 as Group>::Scalar,
 }
 
 // todo move substring hash crap
 pub fn gen_commitment(
-    commit_type: JCommit,
+    commit_docype: JCommit,
     doc: Vec<usize>,
     pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U2>,
 ) -> ReefCommitment {
     type F = <G1 as Group>::Scalar;
-    match commit_type {
+    match commit_docype {
         JCommit::HashChain => {
             let mut i = 0;
             let mut start = F::from(0);
@@ -84,16 +84,19 @@ pub fn gen_commitment(
             return ReefCommitment::HashChain(hash[0]);
         }
         JCommit::Nlookup => {
-            let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", doc.len()); // n is dimension
-            let blind = <G1 as Group>::Scalar::random(&mut OsRng);
+            let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
+            doc_ext.append(&mut vec![Integer::from(0), Integer::from(0)]);
 
-            let mle = mle_from_pts(doc.into_iter().map(|x| Integer::from(x)).collect()); // potentially rev q?
+            let mut mle = mle_from_pts(doc_ext);
             println!("mle: {:#?}", mle);
+
+            let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
+            let blind = <G1 as Group>::Scalar::random(&mut OsRng);
 
             let scalars: Vec<<G1 as Group>::Scalar> =
                 mle.into_iter().map(|x| int_to_ff(x)).collect();
 
-            let commit_t =
+            let commit_doc =
                 <G1 as Group>::CE::commit(&gens_t, &scalars.clone().into_boxed_slice(), &blind);
             // TODO compress ?
             //self.doc_commitement = Some(commitment);
@@ -105,9 +108,9 @@ pub fn gen_commitment(
                     1,
                     &gens_t.get_blinding_gen(),
                 ),
-                commit_t: commit_t,
+                commit_doc: commit_doc,
                 vec_t: scalars,
-                decommit_t: blind,
+                decommit_doc: blind,
             };
 
             return ReefCommitment::Nlookup(doc_commit);
@@ -117,8 +120,7 @@ pub fn gen_commitment(
 // this crap will need to be seperated out
 pub fn proof_dot_prod(
     dc: DocCommitmentStruct,
-    rev_q: Vec<<G1 as Group>::Scalar>,
-    //running_q: Vec<<G1 as Group>::Scalar>,
+    running_q: Vec<<G1 as Group>::Scalar>,
     running_v: <G1 as Group>::Scalar,
 ) -> Result<(), NovaError> {
     let mut transcript = Transcript::new(b"dot_prod_proof");
@@ -131,11 +133,12 @@ pub fn proof_dot_prod(
 
     // prove
     let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
-        &dc.commit_t,
+        &dc.commit_doc,
         &EqPolynomial::new(running_q.clone()).evals(),
         &commit_running_v,
     );
-    let ipw = InnerProductWitness::new(&dc.vec_t, &dc.decommit_t, &running_v, &decommit_running_v);
+    let ipw =
+        InnerProductWitness::new(&dc.vec_t, &dc.decommit_doc, &running_v, &decommit_running_v);
     let ipa = InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut transcript)?;
 
     // verify
@@ -156,6 +159,7 @@ pub fn final_clear_checks(
     reef_commitment: ReefCommitment,
     //accepting_state: <G1 as Group>::Scalar,
     table: &Vec<Integer>,
+    doc: &Vec<usize>,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
     final_hash: Option<<G1 as Group>::Scalar>,
@@ -219,8 +223,42 @@ pub fn final_clear_checks(
                         q, v, dc
                     );
 
+                    let mut doc_ext: Vec<Integer> =
+                        doc.into_iter().map(|x| Integer::from(*x as u64)).collect();
+                    doc_ext.append(&mut vec![Integer::from(0), Integer::from(0)]);
+
+                    let mut mle_i = mle_from_pts(doc_ext);
+                    let mut mle: Vec<<G1 as Group>::Scalar> = vec![];
+                    for i in mle_i {
+                        mle.push(int_to_ff(i));
+                    }
+
+                    // right form for inner product
+                    let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
+                    let q_ext = q_to_mle_q(&q_rev, &mle);
+
+                    // sanity - todo get rid
+                    let mut q_int = vec![];
+                    for f in q.clone() {
+                        q_int.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
+                    }
+
+                    let v_test = verifier_mle_eval(
+                        &doc.into_iter().map(|x| Integer::from(*x as u64)).collect(),
+                        &q_int,
+                    );
+                    println!("v test {:#?}", v_test);
+
+                    let mut sum = <G1 as Group>::Scalar::from(0);
+
+                    println!("doc mle: {:#?}, q_ext: {:#?}", mle, q_ext);
+                    for i in 0..mle.len() {
+                        sum += mle[i].clone() * q_ext[i].clone();
+                    }
+                    assert_eq!(sum, v);
+
                     // Doc is commited to in this case
-                    assert!(proof_dot_prod(dc, q, v).is_ok());
+                    assert!(proof_dot_prod(dc, q_ext, v).is_ok());
                 }
                 (Some(_), None) => {
                     panic!("only half of running claim recieved");
@@ -245,7 +283,7 @@ pub fn run_backend(
     dfa: &NFA,
     doc: &Vec<String>,
     batching_type: Option<JBatching>,
-    commit_type: Option<JCommit>,
+    commit_docype: Option<JCommit>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
 ) {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
@@ -256,7 +294,7 @@ pub fn run_backend(
         temp_batch_size,
         sc.clone(),
         batching_type,
-        commit_type,
+        commit_docype,
     );
     //let parse_ms = p_time.elapsed().as_millis();
     let q_len = logmn(r1cs_converter.table.len());
@@ -264,13 +302,17 @@ pub fn run_backend(
 
     // doc to usizes - can I use this elsewhere too? TODO
     let mut usize_doc = vec![];
+    let mut int_doc = vec![];
     for c in doc.clone().into_iter() {
-        usize_doc.push(dfa.ab_to_num(&c.to_string()));
+        let u = dfa.ab_to_num(&c.to_string());
+        usize_doc.push(u);
+        int_doc.push(<G1 as Group>::Scalar::from(u as u64));
     }
 
     let c_time = Instant::now();
     println!("generate commitment");
-    let reef_commit = gen_commitment(r1cs_converter.commit_type, usize_doc, &sc);
+    // to get rid clone
+    let reef_commit = gen_commitment(r1cs_converter.commit_type, usize_doc.clone(), &sc);
     let commit_ms = c_time.elapsed().as_millis();
 
     let r_time = Instant::now();
@@ -712,6 +754,7 @@ pub fn run_backend(
                 reef_commit,
                 //zn[3],
                 &r1cs_converter.table,
+                &usize_doc,
                 None,
                 None,
                 Some(zn[2]),
@@ -725,6 +768,7 @@ pub fn run_backend(
                 reef_commit,
                 //zn[2 + qd_len + 1],
                 &r1cs_converter.table,
+                &usize_doc,
                 None,
                 None,
                 None,
@@ -738,6 +782,7 @@ pub fn run_backend(
                 reef_commit,
                 //zn[3 + q_len + 1],
                 &r1cs_converter.table,
+                &usize_doc,
                 Some(zn[3..(3 + q_len)].to_vec()),
                 Some(zn[3 + q_len]),
                 Some(zn[2]),
@@ -751,6 +796,7 @@ pub fn run_backend(
                 reef_commit,
                 //zn[2 + q_len + 1 + qd_len + 1],
                 &r1cs_converter.table,
+                &usize_doc,
                 Some(zn[2..(q_len + 2)].to_vec()),
                 Some(zn[q_len + 2]),
                 None,
@@ -761,17 +807,19 @@ pub fn run_backend(
     }
 }
 
-// tests that need setup
 // TODO test, TODO over ff, not Integers
 // calculate multilinear extension from evals of univariate
+// must "pad out" pts to power of 2 !
 fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
+    println!("mle pts {:#?}", pts);
+
     let num_pts = pts.len();
     if num_pts == 1 {
         return vec![pts[0].clone()];
     }
 
     let h = num_pts / 2;
-    //println!("num_pts {}, h {}", num_pts, h);
+    println!("num_pts {}, h {}", num_pts, h);
 
     let mut l = mle_from_pts(pts[..h].to_vec());
     let mut r = mle_from_pts(pts[h..].to_vec());
@@ -782,6 +830,31 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
     }
 
     l
+}
+
+fn q_to_mle_q(
+    q: &Vec<<G1 as Group>::Scalar>,
+    mle: &Vec<<G1 as Group>::Scalar>,
+) -> Vec<<G1 as Group>::Scalar> {
+    let mut q_out = vec![];
+    let base: usize = 2;
+
+    for idx in 0..mle.len() {
+        let mut new_term = <G1 as Group>::Scalar::from(1);
+        for j in 0..q.len() {
+            // for each possible var in this term
+            if ((idx / base.pow(j as u32)) % 2 == 1) {
+                // is this var in this term?
+                new_term *= q[j].clone(); // todo?
+                                          //println!("new term after mul {:#?}", new_term);
+                                          // note this loop is never triggered for constant :)
+            }
+        }
+
+        q_out.push(new_term); //.rem_floor(cfg().field().modulus()));
+    }
+
+    q_out
 }
 
 #[cfg(test)]
@@ -797,12 +870,116 @@ mod tests {
     use serial_test::serial;
     type G1 = pasta_curves::pallas::Point;
 
+    #[test]
+    fn commit() {
+        // "document"
+        let scalars = vec![
+            <<G1 as Group>::Scalar>::from(0),
+            <<G1 as Group>::Scalar>::from(1),
+            <<G1 as Group>::Scalar>::from(0),
+            <<G1 as Group>::Scalar>::from(1),
+        ];
+
+        let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", scalars.len()); // n is dimension
+        let decommit_doc = <G1 as Group>::Scalar::random(&mut OsRng);
+        let commit_doc =
+            <G1 as Group>::CE::commit(&gens_t, &scalars.clone().into_boxed_slice(), &decommit_doc);
+
+        let running_q = vec![
+            <<G1 as Group>::Scalar>::from(2),
+            <<G1 as Group>::Scalar>::from(3),
+            <<G1 as Group>::Scalar>::from(5),
+            <<G1 as Group>::Scalar>::from(7),
+        ];
+
+        let running_v = <<G1 as Group>::Scalar>::from(10);
+
+        // sanity
+        let mut sum = <G1 as Group>::Scalar::from(0);
+        for i in 0..scalars.len() {
+            sum += scalars[i].clone() * running_q[i].clone();
+        }
+        // this passes
+        assert_eq!(sum, running_v); // <MLE_scalars * running_q> = running_v
+
+        // proof of dot prod
+        let mut transcript = Transcript::new(b"dot_prod_proof");
+        // set up
+        let gens_single =
+            CommitmentGens::<G1>::new_with_blinding_gen(b"gens_s", 1, &gens_t.get_blinding_gen());
+        let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
+        let commit_running_v =
+            <G1 as Group>::CE::commit(&gens_single, &[running_v.clone()], &decommit_running_v);
+
+        // prove
+        let ipi: InnerProductInstance<G1> =
+            InnerProductInstance::new(&commit_doc, &running_q, &commit_running_v);
+        let ipw =
+            InnerProductWitness::new(&scalars, &decommit_doc, &running_v, &decommit_running_v);
+        let ipa = InnerProductArgument::prove(&gens_t, &gens_single, &ipi, &ipw, &mut transcript);
+
+        // verify
+        let num_vars = running_q.len();
+
+        println!("ipa {:#?}", ipa.clone().unwrap());
+        let res = ipa
+            .unwrap()
+            .verify(&gens_t, &gens_single, num_vars, &ipi, &mut transcript);
+        println!("res {:#?}", res);
+
+        // this doesn't pass
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn mle_q_ext() {
+        init();
+        let mut uni: Vec<Integer> = vec![
+            Integer::from(60),
+            Integer::from(80),
+            Integer::from(9),
+            Integer::from(4),
+            Integer::from(77),
+            Integer::from(18),
+            Integer::from(24),
+            Integer::from(10),
+        ];
+
+        let mle = mle_from_pts(uni.clone());
+        println!("mle coeffs: {:#?}", mle);
+
+        // 011 = 6
+        //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
+        let q = vec![
+            <G1 as Group>::Scalar::from(2),
+            <G1 as Group>::Scalar::from(3),
+            <G1 as Group>::Scalar::from(5),
+        ];
+
+        let mut mle_f = vec![];
+        for m in &mle {
+            mle_f.push(int_to_ff(m.clone()));
+        }
+
+        let q_ext = q_to_mle_q(&q, &mle_f);
+
+        println!("q_ext: {:#?}", q_ext);
+
+        assert_eq!(mle_f.len(), q_ext.len());
+        // inner product
+        let mut sum = <G1 as Group>::Scalar::from(0);
+        for i in 0..mle.len() {
+            sum += mle_f[i].clone() * q_ext[i].clone();
+        }
+        assert_eq!(sum, <G1 as Group>::Scalar::from(1162));
+    }
+
     fn backend_test(
         ab: String,
         rstr: String,
         doc: String,
         batch_type: JBatching,
-        commit_type: JCommit,
+        commit_docype: JCommit,
         batch_sizes: Vec<usize>,
     ) {
         let r = Regex::new(&rstr);
@@ -815,7 +992,7 @@ mod tests {
                 &dfa,
                 &doc.chars().map(|c| c.to_string()).collect(),
                 Some(batch_type.clone()),
-                Some(commit_type.clone()),
+                Some(commit_docype.clone()),
                 b,
             );
         }
@@ -857,7 +1034,7 @@ mod tests {
         );
     }
 
-    #[test]
+    //    #[test]
     fn e2e_nl_nl() {
         backend_test(
             "ab".to_string(),

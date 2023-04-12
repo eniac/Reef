@@ -354,7 +354,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
             alloc_rc[sc_l] = Some(alloc_v.clone());
 
-            println!("ALLOC_RC: {:#?}", alloc_v.get_value());
+            //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
             return Ok(true);
         } else if s.starts_with(&format!("nl_sc_r_")) {
             // q
@@ -362,7 +362,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             let q: usize = s_sub[3].parse().unwrap();
 
             alloc_rc[q - 1] = Some(alloc_v.clone());
-            println!("ALLOC_RC: {:#?}", alloc_v.get_value());
+            //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
             return Ok(true);
         } else if s.starts_with("nl_claim_r") {
             println!("adding nlookup eval hashes in nova");
@@ -397,7 +397,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
             alloc_doc_rc[sc_l] = Some(alloc_v.clone());
 
-            println!("ALLOC_RC: {:#?}", alloc_v.get_value());
+            //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
             return Ok(true);
         } else if s.starts_with(&format!("nl_doc_sc_r_")) {
             // q
@@ -405,7 +405,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             let q: usize = s_sub[4].parse().unwrap();
 
             alloc_doc_rc[q - 1] = Some(alloc_v.clone());
-            println!("ALLOC_RC: {:#?}", alloc_v.get_value());
+            //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
             return Ok(true);
         } else if s.starts_with("nl_doc_claim_r") {
             println!("adding nlookup doc hashes in nova");
