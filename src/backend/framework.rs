@@ -84,8 +84,10 @@ pub fn gen_commitment(
             return ReefCommitment::HashChain(hash[0]);
         }
         JCommit::Nlookup => {
+            let doc_ext_len = doc.len().next_power_of_two();
+
             let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
-            doc_ext.append(&mut vec![Integer::from(0), Integer::from(0)]);
+            doc_ext.append(&mut vec![Integer::from(0); doc_ext_len]);
 
             let mut mle = mle_from_pts(doc_ext);
             println!("mle: {:#?}", mle);
@@ -96,8 +98,7 @@ pub fn gen_commitment(
             let scalars: Vec<<G1 as Group>::Scalar> =
                 mle.into_iter().map(|x| int_to_ff(x)).collect();
 
-            let commit_doc =
-                <G1 as Group>::CE::commit(&gens_t, &scalars.clone().into_boxed_slice(), &blind);
+            let commit_doc = <G1 as Group>::CE::commit(&gens_t, &scalars, &blind);
             // TODO compress ?
             //self.doc_commitement = Some(commitment);
 
@@ -123,8 +124,8 @@ pub fn proof_dot_prod(
     running_q: Vec<<G1 as Group>::Scalar>,
     running_v: <G1 as Group>::Scalar,
 ) -> Result<(), NovaError> {
-    let mut transcript = Transcript::new(b"dot_prod_proof");
-    // todo dc.gens_single
+    let mut p_transcript = Transcript::new(b"dot_prod_proof");
+    let mut v_transcript = Transcript::new(b"dot_prod_proof");
 
     // set up
     let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
@@ -132,24 +133,16 @@ pub fn proof_dot_prod(
         <G1 as Group>::CE::commit(&dc.gens_single, &[running_v.clone()], &decommit_running_v);
 
     // prove
-    let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
-        &dc.commit_doc,
-        &EqPolynomial::new(running_q.clone()).evals(),
-        &commit_running_v,
-    );
+    let ipi: InnerProductInstance<G1> =
+        InnerProductInstance::new(&dc.commit_doc, &running_q, &commit_running_v);
     let ipw =
         InnerProductWitness::new(&dc.vec_t, &dc.decommit_doc, &running_v, &decommit_running_v);
-    let ipa = InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut transcript)?;
+    let ipa =
+        InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut p_transcript)?;
 
     // verify
     let num_vars = running_q.len();
-    ipa.verify(
-        &dc.gens,
-        &dc.gens_single,
-        (2_usize).pow(num_vars as u32),
-        &ipi,
-        &mut transcript,
-    )?;
+    ipa.verify(&dc.gens, &dc.gens_single, num_vars, &ipi, &mut v_transcript)?;
 
     Ok(())
 }
@@ -223,39 +216,11 @@ pub fn final_clear_checks(
                         q, v, dc
                     );
 
-                    let mut doc_ext: Vec<Integer> =
-                        doc.into_iter().map(|x| Integer::from(*x as u64)).collect();
-                    doc_ext.append(&mut vec![Integer::from(0), Integer::from(0)]);
-
-                    let mut mle_i = mle_from_pts(doc_ext);
-                    let mut mle: Vec<<G1 as Group>::Scalar> = vec![];
-                    for i in mle_i {
-                        mle.push(int_to_ff(i));
-                    }
+                    let doc_ext_len = doc.len().next_power_of_two();
 
                     // right form for inner product
                     let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
-                    let q_ext = q_to_mle_q(&q_rev, &mle);
-
-                    // sanity - todo get rid
-                    let mut q_int = vec![];
-                    for f in q.clone() {
-                        q_int.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
-                    }
-
-                    let v_test = verifier_mle_eval(
-                        &doc.into_iter().map(|x| Integer::from(*x as u64)).collect(),
-                        &q_int,
-                    );
-                    println!("v test {:#?}", v_test);
-
-                    let mut sum = <G1 as Group>::Scalar::from(0);
-
-                    println!("doc mle: {:#?}, q_ext: {:#?}", mle, q_ext);
-                    for i in 0..mle.len() {
-                        sum += mle[i].clone() * q_ext[i].clone();
-                    }
-                    assert_eq!(sum, v);
+                    let q_ext = q_to_mle_q(&q_rev, doc_ext_len);
 
                     // Doc is commited to in this case
                     assert!(proof_dot_prod(dc, q_ext, v).is_ok());
@@ -832,14 +797,11 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
     l
 }
 
-fn q_to_mle_q(
-    q: &Vec<<G1 as Group>::Scalar>,
-    mle: &Vec<<G1 as Group>::Scalar>,
-) -> Vec<<G1 as Group>::Scalar> {
+fn q_to_mle_q(q: &Vec<<G1 as Group>::Scalar>, mle_len: usize) -> Vec<<G1 as Group>::Scalar> {
     let mut q_out = vec![];
     let base: usize = 2;
 
-    for idx in 0..mle.len() {
+    for idx in 0..mle_len {
         let mut new_term = <G1 as Group>::Scalar::from(1);
         for j in 0..q.len() {
             // for each possible var in this term
@@ -882,8 +844,7 @@ mod tests {
 
         let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", scalars.len()); // n is dimension
         let decommit_doc = <G1 as Group>::Scalar::random(&mut OsRng);
-        let commit_doc =
-            <G1 as Group>::CE::commit(&gens_t, &scalars.clone().into_boxed_slice(), &decommit_doc);
+        let commit_doc = <G1 as Group>::CE::commit(&gens_t, &scalars, &decommit_doc);
 
         let running_q = vec![
             <<G1 as Group>::Scalar>::from(2),
@@ -903,7 +864,9 @@ mod tests {
         assert_eq!(sum, running_v); // <MLE_scalars * running_q> = running_v
 
         // proof of dot prod
-        let mut transcript = Transcript::new(b"dot_prod_proof");
+        let mut p_transcript = Transcript::new(b"dot_prod_proof");
+        let mut v_transcript = Transcript::new(b"dot_prod_proof");
+
         // set up
         let gens_single =
             CommitmentGens::<G1>::new_with_blinding_gen(b"gens_s", 1, &gens_t.get_blinding_gen());
@@ -916,7 +879,7 @@ mod tests {
             InnerProductInstance::new(&commit_doc, &running_q, &commit_running_v);
         let ipw =
             InnerProductWitness::new(&scalars, &decommit_doc, &running_v, &decommit_running_v);
-        let ipa = InnerProductArgument::prove(&gens_t, &gens_single, &ipi, &ipw, &mut transcript);
+        let ipa = InnerProductArgument::prove(&gens_t, &gens_single, &ipi, &ipw, &mut p_transcript);
 
         // verify
         let num_vars = running_q.len();
@@ -924,7 +887,7 @@ mod tests {
         println!("ipa {:#?}", ipa.clone().unwrap());
         let res = ipa
             .unwrap()
-            .verify(&gens_t, &gens_single, num_vars, &ipi, &mut transcript);
+            .verify(&gens_t, &gens_single, num_vars, &ipi, &mut v_transcript);
         println!("res {:#?}", res);
 
         // this doesn't pass
@@ -956,12 +919,12 @@ mod tests {
             <G1 as Group>::Scalar::from(5),
         ];
 
-        let mut mle_f = vec![];
+        let mut mle_f: Vec<<G1 as Group>::Scalar> = vec![];
         for m in &mle {
             mle_f.push(int_to_ff(m.clone()));
         }
 
-        let q_ext = q_to_mle_q(&q, &mle_f);
+        let q_ext = q_to_mle_q(&q, mle_f.len());
 
         println!("q_ext: {:#?}", q_ext);
 
@@ -998,7 +961,7 @@ mod tests {
         }
     }
 
-    // #[test]
+    #[test]
     fn e2e_poly_hash() {
         backend_test(
             "ab".to_string(),
@@ -1010,7 +973,7 @@ mod tests {
         );
     }
 
-    // #[test]
+    #[test]
     fn e2e_poly_nl() {
         backend_test(
             "ab".to_string(),
@@ -1022,7 +985,7 @@ mod tests {
         );
     }
 
-    // #[test]
+    #[test]
     fn e2e_nl_hash() {
         backend_test(
             "ab".to_string(),
@@ -1034,7 +997,7 @@ mod tests {
         );
     }
 
-    //    #[test]
+    #[test]
     fn e2e_nl_nl() {
         backend_test(
             "ab".to_string(),
