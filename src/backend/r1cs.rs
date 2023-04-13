@@ -1,4 +1,5 @@
 use crate::backend::costs::*;
+use crate::backend::nova::int_to_ff;
 use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
@@ -1153,7 +1154,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let sc_l = logmn(table.len()); // sum check rounds
 
         // generate claim r
-        let claim_r = self.prover_random_from_seed(1, &[F::from(5 as u64)]); // TODO make general
+        let claim_r = self.prover_random_from_seed(1, &[F::from(5 as u64)]); // TOD0
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
         // running claim about T (optimization)
@@ -1193,7 +1194,20 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             // new sumcheck rand for the round
             // generate rands
-            let rand = self.prover_random_from_seed(1, &[F::from(i as u64)]); // TODO make gen
+            let prev_rand = match i {
+                1 => Integer::from(0),
+                _ => sc_rs[i - 2].clone(),
+            };
+            // let query = vec![]; //vs TODO?
+            let query = [
+                int_to_ff(claim_r.clone()), // insanity must fix TODO
+                ((i) as u64).into(),
+                int_to_ff(prev_rand.clone()),
+                int_to_ff(g_xsq.clone()),
+                int_to_ff(g_x.clone()),
+                int_to_ff(g_const.clone()),
+            ];
+            let rand = self.prover_random_from_seed(6, &query); // TODO fiat shamir
             sc_rs.push(rand.clone());
             wits.insert(format!("{}_sc_r_{}", id, i), new_wit(rand.clone()));
         }

@@ -23,7 +23,6 @@ use nova_snark::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
         pedersen::{Commitment, CommitmentGens},
     },
-    spartan::polynomial::EqPolynomial,
     traits::{
         circuit::TrivialTestCircuit, commitment::*, evaluation::EvaluationEngineTrait, Group,
     },

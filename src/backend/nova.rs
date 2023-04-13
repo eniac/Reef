@@ -252,11 +252,6 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                     acc,
                 );
 
-                /*println!(
-                    "Hashing {:#?} {:#?}",
-                    next_hash.clone().get_value(),
-                    char_vars[i].clone().unwrap().get_value()
-                );*/
                 SpongeAPI::absorb(
                     &mut sponge,
                     2,
@@ -284,7 +279,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         cs: &mut CS,
         alloc_v: &AllocatedNum<F>,
         namespace: String,
-        temp_starter: F,
+        query: &[Elt<F>],
         //start_hash: AllocatedNum<F>,
     ) -> Result<(), SynthesisError>
     where
@@ -298,18 +293,18 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             let acc = &mut ns;
 
             sponge.start(
-                IOPattern(vec![SpongeOp::Absorb(1), SpongeOp::Squeeze(1)]),
+                IOPattern(vec![
+                    SpongeOp::Absorb(query.len() as u32),
+                    SpongeOp::Squeeze(1),
+                ]),
                 None,
                 acc,
             );
 
-            //let temp_input = AllocatedNum::alloc(acc, || Ok(F::from(5 as u64)))?; // TODO!!
-
-            //SpongeAPI::absorb(&mut sponge, 1, &[Elt::Allocated(temp_input)], acc);
             SpongeAPI::absorb(
                 &mut sponge,
-                1,
-                &[Elt::num_from_fr::<CS>(temp_starter)], // this is some shit
+                query.len() as u32,
+                query, //&[Elt::num_from_fr::<CS>(temp_starter)], // this is some shit
                 acc,
             );
 
@@ -366,19 +361,47 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             return Ok(true);
         } else if s.starts_with("nl_claim_r") {
             println!("adding nlookup eval hashes in nova");
-            self.poseidon_circuit(cs, alloc_v, format!("sumcheck hash ns"), F::from(5 as u64))?; // TODO
-
-            return Ok(true);
-        } else if s.starts_with("nl_sc_r_") {
-            println!("adding nlookup eval hashes in nova");
-            let s_sub: Vec<&str> = s.split("_").collect();
-            let r: u64 = s_sub[3].parse().unwrap();
-
-            self.poseidon_circuit(cs, alloc_v, format!("sumcheck round ns {}", r), F::from(r))?; // TODO
+            self.poseidon_circuit(
+                cs,
+                alloc_v,
+                format!("sumcheck hash ns"),
+                &[Elt::num_from_fr::<CS>(F::from(5 as u64))],
+            )?; // TODO
 
             return Ok(true);
         }
         return Ok(false);
+    }
+
+    fn nl_fiatshamir<CS>(
+        &self,
+        cs: &mut CS,
+        sc_l: usize,
+        alloc_rc: Vec<Option<AllocatedNum<F>>>,
+    ) -> Result<(), SynthesisError>
+    // todo?
+    where
+        CS: ConstraintSystem<F>,
+    {
+        for i in 1..=sc_l {
+            // num of sc_r's
+            // fiat shamir
+            // H(vs?, claim_r, j, prev_rand, g_xsq, g_x, g_const)
+            let prev_rand = match i {
+                1 => Elt::num_from_fr::<CS>(F::from(0)),
+                _ => Elt::Allocated(alloc_rc[i - 2].clone().unwrap()),
+                // TODO - this is just cloned anyway - maybe "finding" this crap is overkill
+            };
+            let query = vec![Elt::num_from_fr::<CS>(F::from(i as u64)), prev_rand];
+
+            self.poseidon_circuit(
+                cs,
+                alloc_rc[i - 1].as_ref().unwrap(),
+                format!("sumcheck round ns {}", i),
+                &query,
+            )?;
+        }
+        Ok(())
     }
 
     fn nl_doc_parsing<CS>(
@@ -413,23 +436,25 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                 cs,
                 alloc_v,
                 format!("doc sumcheck hash ns"),
-                F::from(5 as u64),
+                &[Elt::num_from_fr::<CS>(F::from(5 as u64))], // TODO
             )?; // TODO
 
             return Ok(true);
-        } else if s.starts_with("doc_nl_sc_r_") {
-            println!("adding nlookup doc hashes in nova");
-            let s_sub: Vec<&str> = s.split("_").collect();
-            let r: u64 = s_sub[3].parse().unwrap();
+            /* } else if s.starts_with("doc_nl_sc_r_") {
+                println!("adding nlookup doc hashes in nova");
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let r: u64 = s_sub[3].parse().unwrap();
 
-            self.poseidon_circuit(
-                cs,
-                alloc_v,
-                format!("doc sumcheck round ns {}", r),
-                F::from(r),
-            )?; // TODO
+                self.poseidon_circuit(
+                    cs,
+                    alloc_v,
+                    format!("doc sumcheck round ns {}", r),
+                    F::from(r),
+                )?; // TODO
 
-            return Ok(true);
+                return Ok(true);
+            */
+            // TODO
         }
         return Ok(false);
     }
