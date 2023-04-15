@@ -1,4 +1,4 @@
-# reef
+# Reef
 
 ## Authors
 Lef Ioannidis `elefthei at seas.upenn.edu`
