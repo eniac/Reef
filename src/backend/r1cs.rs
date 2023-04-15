@@ -346,12 +346,15 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     pub fn new(
         dfa: &'a NFA,
         doc: &Vec<String>,
+        start_at: usize,
+        length_at: usize,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U2>,
         batch_override: Option<JBatching>,
         commit_override: Option<JCommit>,
     ) -> Self {
-        let is_match = dfa.is_match(doc).is_some();
+        let dfa_match = dfa.is_match(doc, start_at, length_at);
+        let is_match = dfa_match.is_some();
 
         println!("Match? {:#?}", is_match);
         let batching;
@@ -361,17 +364,17 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             (batching, commit, opt_batch_size) = match (batch_override, commit_override) {
                 (Some(b), Some(c)) => (b, c, batch_size),
                 (Some(b), _) => {
-                    opt_commit_select_with_batch(dfa, batch_size, dfa.is_match(doc), doc.len(), b)
+                    opt_commit_select_with_batch(dfa, batch_size, dfa_match, length_at, b)
                 }
                 (None, Some(c)) => opt_cost_model_select_with_commit(
                     &dfa,
                     batch_size,
-                    dfa.is_match(doc),
-                    doc.len(),
+                    dfa.is_match(doc, start_at, length_at),
+                    length_at,
                     c,
                 ),
                 (None, None) => {
-                    opt_cost_model_select_with_batch(&dfa, batch_size, dfa.is_match(doc), doc.len())
+                    opt_cost_model_select_with_batch(&dfa, batch_size, dfa_match, length_at)
                 }
             };
         } else {
@@ -379,7 +382,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 &dfa,
                 0,
                 logmn(doc.len()),
-                dfa.is_match(doc),
+                dfa_match,
                 doc.len(),
                 commit_override,
                 batch_override,
@@ -394,10 +397,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             batching, commit, sel_batch_size
         );
 
-        println!("substring pre {:#?}", dfa.is_match(doc));
+        println!("substring pre {:#?}", dfa_match);
 
         let mut substring = (0, doc.len());
-        match dfa.is_match(doc) {
+        match dfa_match {
             Some((start, end)) => {
                 match commit {
                     JCommit::HashChain => {
@@ -1598,6 +1601,8 @@ mod tests {
                     let mut r1cs_converter = R1CS::new(
                         &dfa,
                         &doc.chars().map(|c| c.to_string()).collect(),
+                        0,
+                        doc.len(),
                         s,
                         sc,
                         Some(b.clone()),
@@ -1670,7 +1675,7 @@ mod tests {
                             &dfa,
                             s,
                             b.clone(),
-                            dfa.is_match(&chars),
+                            dfa.is_whole_match(&chars),
                             doc.len(),
                             c,
                         )
@@ -1682,7 +1687,7 @@ mod tests {
                                 &dfa,
                                 s,
                                 b.clone(),
-                                dfa.is_match(&chars),
+                                dfa.is_whole_match(&chars),
                                 doc.len(),
                                 c
                             )

@@ -141,23 +141,30 @@ impl NFA {
             .collect()
     }
 
+    pub fn is_whole_match(&self, doc: &Vec<String>) -> Option<(usize, usize)> {
+        self.is_match(doc, 0, doc.len())
+    }
+
     /// Returns (begin match index, end index) if a match is found in the doc
-    pub fn is_match(&self, doc: &Vec<String>) -> Option<(usize, usize)> {
+    pub fn is_match(&self, doc: &Vec<String>, start_at: usize, length_at: usize) -> Option<(usize, usize)> {
         let mut start_idxs = Vec::new();
         let accepting = &self.get_final_states();
+
+        // Document might be substring of original
+        let cut_doc = &doc[start_at..(start_at + length_at)];
 
         // Iterate over all postfixes of doc
         if self.anchor_start {
             start_idxs.push(0);
         } else {
-            for i in 0..doc.len() {
+            for i in 0..cut_doc.len() {
                 start_idxs.push(i)
             }
         }
 
         // Initial state is also accepting
         if accepting.contains(&self.get_init_state()) &&
-            (!self.anchor_end || doc.len() == 0) {
+            (!self.anchor_end || cut_doc.len() == 0) {
             return Some((0, 0));
         }
         // For every postfix of doc (O(n^2))
@@ -165,13 +172,13 @@ impl NFA {
             .into_par_iter()
             .find_map_any(|i| {
               let mut s = self.get_init_state();
-              for j in i..doc.len() {
+              for j in i..cut_doc.len() {
                   // Apply transition relation
-                  s = self.delta(s, &doc[j]).unwrap();
+                  s = self.delta(s, &cut_doc[j]).unwrap();
 
                   // found a substring match or exact match
                   if accepting.contains(&s) &&
-                      (!self.anchor_end || j == doc.len() - 1) {
+                      (!self.anchor_end || j == cut_doc.len() - 1) {
                       return Some((i, j+1)); // Return an interval [i, j)
                   }
               }
@@ -282,7 +289,7 @@ mod tests {
     }
 
     fn check(nfa: &NFA, doc: &Vec<String>, res: Option<(usize, usize)>) {
-        assert_eq!(nfa.is_match(doc), res)
+        assert_eq!(nfa.is_whole_match(doc), res)
     }
 
     #[test]

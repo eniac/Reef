@@ -29,14 +29,17 @@ fn main() {
     // Input document
     let mut doc: Vec<String> = opt.config.read_doc().iter().map(|c|c.to_string()).collect();
 
-    match opt.k_stride {
-        Some(k) => {
-            for i in 0..k {
-                doc = nfa.double_stride(&doc);
-            }
-        },
-        None => ()
-    }
+    // Start matching at
+    let start_at = opt.start_at.unwrap_or(0);
+
+    // Match length
+    let length_at = opt.length_at.unwrap_or(doc.len());
+
+    opt.k_stride.map(|k| {
+        for _ in 0..k {
+            doc = nfa.double_stride(&doc);
+        }
+    });
     // Is document well-formed
     nfa.well_formed(&doc);
 
@@ -48,10 +51,10 @@ fn main() {
 
     let num_steps = doc.len();
     println!("Doc len is {}", num_steps);
-    println!("Match: {}", nfa.is_match(&doc).map(|c| format!("{:?}", c)).unwrap_or(String::from("NONE")));
+    println!("Match: {}", nfa.is_match(&doc, start_at, length_at).map(|c| format!("{:?}", c)).unwrap_or(String::from("NONE")));
     init();
 
-    run_backend(&nfa, &doc, opt.eval_type, opt.commit_type, opt.batch_size); // auto select batching/commit
+    run_backend(&nfa, &doc, start_at, length_at, opt.eval_type, opt.commit_type, opt.batch_size); // auto select batching/commit
 
     //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }
