@@ -1,9 +1,9 @@
 # Reef
 
 ## Authors
-Lef Ioannidis `elefthei at seas.upenn.edu`
-Jess Woods `jkwoods at seas.upenn.edu`
-Eli Margolin `ecmargo at seas.upenn.edu`
+- Lef Ioannidis `elefthei at seas.upenn.edu`
+- Eli Margolin `ecmargo at seas.upenn.edu`
+- Jess Woods `jkwoods at seas.upenn.edu`
 
 ## Description
 
