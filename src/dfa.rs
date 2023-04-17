@@ -169,6 +169,15 @@ impl NFA {
             })
     }
 
+    /// Get the 2^k stride DFA
+    pub fn k_stride(&mut self, k: usize, doc: &Vec<String>) -> Vec<String> {
+        let mut d = doc.clone();
+        for _ in 0..k {
+            d = self.double_stride(&d);
+        }
+        d
+    }
+
     /// Double the stride of the DFA
     pub fn double_stride(&mut self, doc: &Vec<String>) -> Vec<String> {
         let mut ab: HashSet<(String, String)> = HashSet::new();
