@@ -1,6 +1,11 @@
-on: [push, pull_request]
-
-name: Continuous integration
+name: Reef CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   check:
