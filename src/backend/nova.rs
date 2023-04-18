@@ -128,14 +128,10 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         assert_eq!(accepting_bool.len(), 2);
 
         match (&glue[0], &glue[1]) {
-            (GlueOpts::Poly_Hash(_), GlueOpts::Poly_Hash(_)) => {
-            }
-            (GlueOpts::Nl_Hash(_), GlueOpts::Nl_Hash(_)) => {
-            }
-            (GlueOpts::Poly_Nl(_), GlueOpts::Poly_Nl(_)) => {
-            }
-            (GlueOpts::Nl_Nl(_), GlueOpts::Nl_Nl(_)) => {
-            }
+            (GlueOpts::Poly_Hash(_), GlueOpts::Poly_Hash(_)) => {}
+            (GlueOpts::Nl_Hash(_), GlueOpts::Nl_Hash(_)) => {}
+            (GlueOpts::Poly_Nl(_), GlueOpts::Poly_Nl(_)) => {}
+            (GlueOpts::Nl_Nl(_), GlueOpts::Nl_Nl(_)) => {}
             (_, _) => {
                 panic!("glue I/O does not match");
             }
@@ -305,7 +301,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[2].parse().unwrap();
 
-            alloc_qv[j+1] = v_j; // TODO check
+            alloc_qv[j + 1] = v_j; // TODO check
 
             return Ok(true);
         } else if is_doc_nl && s.starts_with("char_") {
@@ -316,7 +312,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             let j: usize = s_sub[1].parse().unwrap();
 
             if j < self.batch_size {
-                alloc_qv[j+1] = v_j;
+                alloc_qv[j + 1] = v_j;
             } // don't add the last one
 
             return Ok(true);
@@ -330,19 +326,19 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         //alloc_v: &AllocatedNum<F>,
         //namespace: String,
         query: &[Elt<F>],
-        sponge: &mut SpongeCircuit<F, A, CS>,
-        sponge_ns: &mut CS,
+        sponge: &mut SpongeCircuit<F, typenum::U2, CS>,
+        sponge_ns: &mut Namespace,
     ) -> Result<AllocatedNum<F>, SynthesisError>
     where
-        A: Arity<F>,
+        //A: Arity<F>,
         CS: ConstraintSystem<F>,
     {
         // original var alloc'd before
 
         let new_pos = {
-            SpongeAPI::absorb(&mut sponge, query.len() as u32, query, sponge_ns);
+            SpongeAPI::absorb(sponge, query.len() as u32, query, sponge_ns);
 
-            let output = SpongeAPI::squeeze(&mut sponge, 1, sponge_ns);
+            let output = SpongeAPI::squeeze(sponge, 1, sponge_ns);
 
             Elt::ensure_allocated(
                 &output[0],
@@ -356,47 +352,43 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
     fn nl_eval_fiatshamir<CS>(
         &self,
-        sponge: &mut SpongeCircuit<F, A, CS>,
+        sponge: &mut SpongeCircuit<F, typenum::U2, CS>,
         sponge_ns: &mut CS,
         sc_l: usize,
-        alloc_qv: Vec<Option<AllocatedNum<F>>>,
-        alloc_rc: Vec<Option<AllocatedNum<F>>>,
-        alloc_claim_r: Option<AllocatedNum<F>>,
-        alloc_sc_r: Option<AllocatedNum<F>>,
-        alloc_gs: Vec<Vec<Option<AllocatedNum<F>>>>,
+        alloc_qv: &Vec<Option<AllocatedNum<F>>>,
+        alloc_rc: &Vec<Option<AllocatedNum<F>>>,
+        alloc_claim_r: &Option<AllocatedNum<F>>,
+        alloc_sc_r: &Option<AllocatedNum<F>>,
+        alloc_gs: &Vec<Vec<Option<AllocatedNum<F>>>>,
     ) -> Result<(), SynthesisError>
     where
-        A: Arity<F>,
+        //A: Arity<F>,
         CS: ConstraintSystem<F>,
     {
         // (combined_q, vs, running_q, running_v)
-        lets etls = alloc_qv.clone().extend(&alloc_rc);
+        let elts = alloc_qv.clone().extend(alloc_rc);
 
         let claim_r = self.fiatshamir_circuit(&elts, sponge, sponge_ns)?; // TODO
-ns.enforce(
-                    || format!("eq claim_r"),
-                    |z| z + alloc_claim_r.unwrap().get_variable(),
-                    |z| z + CS::one(),
-                    |z| z + claim_r.get_variable(),
-                );
-
+        sponge_ns.enforce(
+            || format!("eq claim_r"),
+            |z| z + alloc_claim_r.unwrap().get_variable(),
+            |z| z + CS::one(),
+            |z| z + claim_r.get_variable(),
+        );
 
         for j in 0..sc_l {
             let elts = alloc_gs[j].unwrap().clone();
 
-        let rj = self.fiatshamir_circuit(&elts, sponge, sponge_ns)?;
+            let rj = self.fiatshamir_circuit(&elts, sponge, sponge_ns)?;
+
+            sponge_ns.enforce(
+                || format!("eq sumcheck_r_{}", j),
+                |z| z + alloc_sc_r[j].unwrap().get_variable(),
+                |z| z + CS::one(),
+                |z| z + rj.get_variable(),
+            );
         }
-        
-ns.enforce(
-                    || format!("eq sumcheck_r_{}",j),
-                    |z| z + alloc_sc_r[j].unwrap().get_variable(),
-                    |z| z + CS::one(),
-                    |z| z + rj.get_variable(),
-                );
-
-
-
-        return Ok(())
+        return Ok(());
     }
 
     fn nl_eval_parsing<CS>(
@@ -593,10 +585,11 @@ where
         // intms
         let mut alloc_chars = vec![None; self.batch_size];
         alloc_chars[0] = Some(char_0.clone());
-        let mut alloc_rc = vec![];
-        let mut alloc_doc_rc = vec![];
         let mut alloc_qv = vec![None; self.batch_size + 1];
         let mut alloc_doc_qv = vec![None; self.batch_size + 1];
+
+        let mut alloc_claim_r = None;
+        let mut alloc_doc_claim_r = None;
 
         // convert
         let f_mod = get_modulus::<F>(); // TODO
@@ -674,12 +667,14 @@ where
                 ];
                 for i in 0..sc_l {
                     // sum check rounds
-                    pattern.append(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+                    pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
                 }
 
                 sponge.start(IOPattern(pattern), None, &mut fs_eval_ns);
 
-                alloc_rc = vec![None; sc_l + 1];
+                let mut alloc_rc = vec![None; sc_l + 1];
+                let mut alloc_gs = vec![vec![None; 3]; sc_l];
+                let mut alloc_sc_r = vec![None; sc_l];
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
@@ -712,7 +707,9 @@ where
                             .unwrap();
 
                         if !matched {
-                            matched = self.intm_qv_parsing(cs, &alloc_v, &s, 0, &mut alloc_qv);
+                            matched = self
+                                .intm_qv_parsing(cs, &alloc_v, &s, false, &mut alloc_qv)
+                                .unwrap();
 
                             if !matched {
                                 matched = self
@@ -731,6 +728,16 @@ where
                         }
                     }
                 }
+                self.nl_eval_fiatshamir(
+                    &mut sponge,
+                    &mut fs_eval_ns,
+                    sc_l,
+                    &alloc_qv,
+                    &alloc_rc,
+                    &alloc_claim_r,
+                    &alloc_sc_r,
+                    &alloc_gs,
+                );
 
                 out.push(last_state.unwrap());
                 out.push(last_char);
@@ -739,8 +746,6 @@ where
                 for qv in alloc_rc {
                     out.push(qv.unwrap()); // better way to do this?
                 }
-
-                
 
                 sponge.finish(&mut fs_eval_ns).unwrap();
             }
@@ -758,12 +763,14 @@ where
                 ];
                 for i in 0..doc_l {
                     // sum check rounds
-                    doc_pattern.append(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+                    doc_pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
                 }
 
                 doc_sponge.start(IOPattern(doc_pattern), None, &mut fs_doc_ns);
 
-                alloc_doc_rc = vec![None; doc_l + 1];
+                let mut alloc_doc_rc = vec![None; doc_l + 1];
+                let mut alloc_doc_gs = vec![vec![None; 3]; doc_l];
+                let mut alloc_doc_sc_r = vec![None; doc_l];
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
@@ -789,7 +796,9 @@ where
                     if !matched {
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
-                        matched = self.intm_qv_parsing(cs, &alloc_v, &s, 1, &mut doc_alloc_qv);
+                        matched = self
+                            .intm_qv_parsing(cs, &alloc_v, &s, true, &mut alloc_doc_qv)
+                            .unwrap();
 
                         // todo get rn of _ in nl_doc
                         if !matched {
@@ -807,6 +816,17 @@ where
                         }
                     }
                 }
+                self.nl_eval_fiatshamir(
+                    &mut doc_sponge,
+                    &mut fs_doc_ns,
+                    doc_l,
+                    &alloc_doc_qv,
+                    &alloc_doc_rc,
+                    &alloc_doc_claim_r,
+                    &alloc_doc_sc_r,
+                    &alloc_doc_gs,
+                );
+
                 out.push(last_state.unwrap());
                 out.push(last_char);
                 for qv in alloc_doc_rc {
@@ -830,7 +850,7 @@ where
                 ];
                 for i in 0..sc_l {
                     // sum check rounds
-                    pattern.append(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+                    pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
                 }
 
                 sponge.start(IOPattern(pattern), None, &mut fs_eval_ns);
@@ -846,13 +866,18 @@ where
                 ];
                 for i in 0..doc_l {
                     // sum check rounds
-                    doc_pattern.append(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+                    doc_pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
                 }
 
                 doc_sponge.start(IOPattern(doc_pattern), None, &mut fs_doc_ns);
 
-                alloc_rc = vec![None; sc_l + 1];
-                alloc_doc_rc = vec![None; doc_l + 1];
+                let mut alloc_rc = vec![None; sc_l + 1];
+                let mut alloc_gs = vec![vec![None; 3]; sc_l];
+                let mut alloc_sc_r = vec![None; sc_l];
+
+                let mut alloc_doc_rc = vec![None; doc_l + 1];
+                let mut alloc_doc_gs = vec![vec![None; 3]; doc_l];
+                let mut alloc_doc_sc_r = vec![None; doc_l];
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
@@ -879,10 +904,14 @@ where
                     if !matched {
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
-                        matched = self.intm_qv_parsing(cs, &alloc_v, &s, 0, &mut alloc_qv);
+                        matched = self
+                            .intm_qv_parsing(cs, &alloc_v, &s, false, &mut alloc_qv)
+                            .unwrap();
 
                         if !matched {
-                            matched = self.intm_qv_parsing(cs, &alloc_v, &s, 1, &mut doc_alloc_qv);
+                            matched = self
+                                .intm_qv_parsing(cs, &alloc_v, &s, true, &mut alloc_doc_qv)
+                                .unwrap();
                             if !matched {
                                 matched = self
                                     .nl_eval_parsing(cs, &alloc_v, &s, sc_l, &mut alloc_rc)
@@ -904,6 +933,28 @@ where
                         }
                     }
                 }
+
+                self.nl_eval_fiatshamir(
+                    &mut sponge,
+                    &mut fs_eval_ns,
+                    sc_l,
+                    &alloc_qv,
+                    &alloc_rc,
+                    &alloc_claim_r,
+                    &alloc_sc_r,
+                    &alloc_gs,
+                );
+                self.nl_eval_fiatshamir(
+                    &mut doc_sponge,
+                    &mut fs_doc_ns,
+                    doc_l,
+                    &alloc_doc_qv,
+                    &alloc_doc_rc,
+                    &alloc_doc_claim_r,
+                    &alloc_doc_sc_r,
+                    &alloc_doc_gs,
+                );
+
                 out.push(last_state.unwrap());
                 out.push(last_char);
                 println!("full alloc len {:#?}", alloc_rc.len());
