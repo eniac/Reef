@@ -28,6 +28,7 @@ use rug::integer::{IsPrime, Order};
 use rug::Integer;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
+use std::time::{Duration, Instant};
 
 fn type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
@@ -35,6 +36,7 @@ fn type_of<T>(_: &T) {
 
 /// Convert a (rug) integer to a prime field element.
 pub fn int_to_ff<F: PrimeField>(i: Integer) -> F {
+    let time = Instant::now();
     let mut accumulator = F::from(0);
     let limb_bits = (std::mem::size_of::<limb_t>() as u64) << 3;
     let limb_base = F::from(2).pow_vartime([limb_bits]);
@@ -43,6 +45,7 @@ pub fn int_to_ff<F: PrimeField>(i: Integer) -> F {
         accumulator *= limb_base;
         accumulator += F::from(*digit);
     }
+    println!("INT TO FF TIME {:#?}", time.elapsed().as_millis());
     accumulator
 }
 
@@ -125,10 +128,14 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         assert_eq!(accepting_bool.len(), 2);
 
         match (&glue[0], &glue[1]) {
-            (GlueOpts::Poly_Hash(_), GlueOpts::Poly_Hash(_)) => {}
-            (GlueOpts::Nl_Hash(_), GlueOpts::Nl_Hash(_)) => {}
-            (GlueOpts::Poly_Nl(_), GlueOpts::Poly_Nl(_)) => (),
-            (GlueOpts::Nl_Nl(_), GlueOpts::Nl_Nl(_)) => {}
+            (GlueOpts::Poly_Hash(_), GlueOpts::Poly_Hash(_)) => {
+            }
+            (GlueOpts::Nl_Hash(_), GlueOpts::Nl_Hash(_)) => {
+            }
+            (GlueOpts::Poly_Nl(_), GlueOpts::Poly_Nl(_)) => {
+            }
+            (GlueOpts::Nl_Nl(_), GlueOpts::Nl_Nl(_)) => {
+            }
             (_, _) => {
                 panic!("glue I/O does not match");
             }
@@ -199,7 +206,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         return Ok(false);
     }
 
-    fn hash_parsing<CS>(
+    fn char_parsing<CS>(
         &self,
         cs: &mut CS,
         alloc_v: &AllocatedNum<F>,
@@ -274,63 +281,122 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         return Ok(next_hash); //last hash
     }
 
-    fn poseidon_circuit<CS>(
+    fn intm_qv_parsing<CS>(
         &self,
         cs: &mut CS,
         alloc_v: &AllocatedNum<F>,
-        namespace: String,
-        query: &[Elt<F>],
-        //start_hash: AllocatedNum<F>,
-    ) -> Result<(), SynthesisError>
+        s: &String,
+        is_doc_nl: bool,
+        alloc_qv: &mut Vec<Option<AllocatedNum<F>>>,
+    ) -> Result<bool, SynthesisError>
     where
+        CS: ConstraintSystem<F>,
+    {
+        // intermediate (in circ) wits
+        if (!is_doc_nl && s.starts_with("nl_combined_q"))
+            || (is_doc_nl && s.starts_with("doc_nl_combined_q"))
+        {
+            alloc_qv[0] = Some(alloc_v.clone());
+
+            return Ok(true);
+        } else if !is_doc_nl && s.starts_with("nl_v_") {
+            let v_j = Some(alloc_v.clone()); //.get_variable();
+
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[2].parse().unwrap();
+
+            alloc_qv[j+1] = v_j; // TODO check
+
+            return Ok(true);
+        } else if is_doc_nl && s.starts_with("char_") {
+            let v_j = Some(alloc_v.clone()); //.get_variable();
+
+            //let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[1].parse().unwrap();
+
+            if j < self.batch_size {
+                alloc_qv[j+1] = v_j;
+            } // don't add the last one
+
+            return Ok(true);
+        }
+        return Ok(false);
+    }
+
+    fn fiatshamir_circuit<CS>(
+        &self,
+        //cs: &mut CS,
+        //alloc_v: &AllocatedNum<F>,
+        //namespace: String,
+        query: &[Elt<F>],
+        sponge: &mut SpongeCircuit<F, A, CS>,
+        sponge_ns: &mut CS,
+    ) -> Result<AllocatedNum<F>, SynthesisError>
+    where
+        A: Arity<F>,
         CS: ConstraintSystem<F>,
     {
         // original var alloc'd before
 
-        let mut ns = cs.namespace(|| namespace);
         let new_pos = {
-            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
-            let acc = &mut ns;
+            SpongeAPI::absorb(&mut sponge, query.len() as u32, query, sponge_ns);
 
-            sponge.start(
-                IOPattern(vec![
-                    SpongeOp::Absorb(query.len() as u32),
-                    SpongeOp::Squeeze(1),
-                ]),
-                None,
-                acc,
-            );
-
-            SpongeAPI::absorb(
-                &mut sponge,
-                query.len() as u32,
-                query, //&[Elt::num_from_fr::<CS>(temp_starter)], // this is some shit
-                acc,
-            );
-
-            let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
-
-            sponge.finish(acc).unwrap();
+            let output = SpongeAPI::squeeze(&mut sponge, 1, sponge_ns);
 
             Elt::ensure_allocated(
                 &output[0],
-                &mut ns.namespace(|| "ensure allocated"), // name must be the same
+                &mut sponge_ns.namespace(|| "ensure allocated"), // name must be the same
                 // (??)
                 true,
             )?
         };
+        Ok((new_pos))
+    }
 
-        //println!("new pos: {:#?}", new_pos.clone().get_value());
-        //println!("alloc v: {:#?}", alloc_v.clone().get_value());
+    fn nl_eval_fiatshamir<CS>(
+        &self,
+        sponge: &mut SpongeCircuit<F, A, CS>,
+        sponge_ns: &mut CS,
+        sc_l: usize,
+        alloc_qv: Vec<Option<AllocatedNum<F>>>,
+        alloc_rc: Vec<Option<AllocatedNum<F>>>,
+        alloc_claim_r: Option<AllocatedNum<F>>,
+        alloc_sc_r: Option<AllocatedNum<F>>,
+        alloc_gs: Vec<Vec<Option<AllocatedNum<F>>>>,
+    ) -> Result<(), SynthesisError>
+    where
+        A: Arity<F>,
+        CS: ConstraintSystem<F>,
+    {
+        // (combined_q, vs, running_q, running_v)
+        lets etls = alloc_qv.clone().extend(&alloc_rc);
 
-        ns.enforce(
-            || format!("eq con for claim_r"),
-            |z| z + alloc_v.get_variable(),
-            |z| z + CS::one(),
-            |z| z + new_pos.get_variable(),
-        );
+        let claim_r = self.fiatshamir_circuit(&elts, sponge, sponge_ns)?; // TODO
+ns.enforce(
+                    || format!("eq claim_r"),
+                    |z| z + alloc_claim_r.unwrap().get_variable(),
+                    |z| z + CS::one(),
+                    |z| z + claim_r.get_variable(),
+                );
 
-        Ok(())
+
+        for j in 0..sc_l {
+            let elts = alloc_gs[j].unwrap().clone();
+
+        let rj = self.fiatshamir_circuit(&elts, sponge, sponge_ns)?;
+        }
+        
+ns.enforce(
+                    || format!("eq sumcheck_r_{}",j),
+                    |z| z + alloc_sc_r[j].unwrap().get_variable(),
+                    |z| z + CS::one(),
+                    |z| z + rj.get_variable(),
+                );
+
+
+
+        return Ok(())
     }
 
     fn nl_eval_parsing<CS>(
@@ -352,56 +418,17 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
             return Ok(true);
         } else if s.starts_with(&format!("nl_sc_r_")) {
+            // TODO move, do this in order
             // q
             let s_sub: Vec<&str> = s.split("_").collect();
             let q: usize = s_sub[3].parse().unwrap();
 
             alloc_rc[q - 1] = Some(alloc_v.clone());
             //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
-            return Ok(true);
-        } else if s.starts_with("nl_claim_r") {
-            println!("adding nlookup eval hashes in nova");
-            self.poseidon_circuit(
-                cs,
-                alloc_v,
-                format!("sumcheck hash ns"),
-                &[Elt::num_from_fr::<CS>(F::from(5 as u64))],
-            )?; // TODO
 
             return Ok(true);
         }
         return Ok(false);
-    }
-
-    fn nl_fiatshamir<CS>(
-        &self,
-        cs: &mut CS,
-        sc_l: usize,
-        alloc_rc: Vec<Option<AllocatedNum<F>>>,
-    ) -> Result<(), SynthesisError>
-    // todo?
-    where
-        CS: ConstraintSystem<F>,
-    {
-        for i in 1..=sc_l {
-            // num of sc_r's
-            // fiat shamir
-            // H(vs?, claim_r, j, prev_rand, g_xsq, g_x, g_const)
-            let prev_rand = match i {
-                1 => Elt::num_from_fr::<CS>(F::from(0)),
-                _ => Elt::Allocated(alloc_rc[i - 2].clone().unwrap()),
-                // TODO - this is just cloned anyway - maybe "finding" this crap is overkill
-            };
-            let query = vec![Elt::num_from_fr::<CS>(F::from(i as u64)), prev_rand];
-
-            self.poseidon_circuit(
-                cs,
-                alloc_rc[i - 1].as_ref().unwrap(),
-                format!("sumcheck round ns {}", i),
-                &query,
-            )?;
-        }
-        Ok(())
     }
 
     fn nl_doc_parsing<CS>(
@@ -429,32 +456,8 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
             alloc_doc_rc[q - 1] = Some(alloc_v.clone());
             //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
-            return Ok(true);
-        } else if s.starts_with("nl_doc_claim_r") {
-            println!("adding nlookup doc hashes in nova");
-            self.poseidon_circuit(
-                cs,
-                alloc_v,
-                format!("doc sumcheck hash ns"),
-                &[Elt::num_from_fr::<CS>(F::from(5 as u64))], // TODO
-            )?; // TODO
 
             return Ok(true);
-            /* } else if s.starts_with("doc_nl_sc_r_") {
-                println!("adding nlookup doc hashes in nova");
-                let s_sub: Vec<&str> = s.split("_").collect();
-                let r: u64 = s_sub[3].parse().unwrap();
-
-                self.poseidon_circuit(
-                    cs,
-                    alloc_v,
-                    format!("doc sumcheck round ns {}", r),
-                    F::from(r),
-                )?; // TODO
-
-                return Ok(true);
-            */
-            // TODO
         }
         return Ok(false);
     }
@@ -573,6 +576,7 @@ where
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,
     {
+        let time = Instant::now();
         // inputs
         let state_0 = z[0].clone();
         let char_0 = z[1].clone();
@@ -591,6 +595,8 @@ where
         alloc_chars[0] = Some(char_0.clone());
         let mut alloc_rc = vec![];
         let mut alloc_doc_rc = vec![];
+        let mut alloc_qv = vec![None; self.batch_size + 1];
+        let mut alloc_doc_qv = vec![None; self.batch_size + 1];
 
         // convert
         let f_mod = get_modulus::<F>(); // TODO
@@ -634,7 +640,7 @@ where
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
-                            .hash_parsing(cs, &alloc_v, &s, &mut alloc_chars)
+                            .char_parsing(cs, &alloc_v, &s, &mut alloc_chars)
                             .unwrap();
 
                         if !matched {
@@ -656,6 +662,23 @@ where
             GlueOpts::Nl_Hash((h, q, v)) => {
                 let sc_l = q.len();
                 println!("glue1 q, v: {:#?}, {:#?}", q, v);
+
+                let mut fs_eval_ns = cs.namespace(|| "eval sponge");
+                let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+
+                let pattern = vec![
+                    SpongeOp::Absorb((self.batch_size + 3) as u32), // vs,
+                    // combined_q,
+                    // running q,v
+                    SpongeOp::Squeeze(1),
+                ];
+                for i in 0..sc_l {
+                    // sum check rounds
+                    pattern.append(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+                }
+
+                sponge.start(IOPattern(pattern), None, &mut fs_eval_ns);
+
                 alloc_rc = vec![None; sc_l + 1];
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
@@ -685,20 +708,24 @@ where
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
-                            .hash_parsing(cs, &alloc_v, &s, &mut alloc_chars)
+                            .char_parsing(cs, &alloc_v, &s, &mut alloc_chars)
                             .unwrap();
 
                         if !matched {
-                            matched = self
-                                .nl_eval_parsing(cs, &alloc_v, &s, sc_l, &mut alloc_rc)
-                                .unwrap();
+                            matched = self.intm_qv_parsing(cs, &alloc_v, &s, 0, &mut alloc_qv);
+
                             if !matched {
-                                if s.starts_with(&format!("state_{}", self.batch_size)) {
-                                    last_state = Some(alloc_v.clone()); //.get_variable();
-                                                                        /* } else if s.starts_with(&format!("accepting")) {
-                                                                                                accepting = Some(alloc_v.clone());
-                                                                                                println!("get alloc v accepting {:#?}", alloc_v.clone().get_value());
-                                                                        */
+                                matched = self
+                                    .nl_eval_parsing(cs, &alloc_v, &s, sc_l, &mut alloc_rc)
+                                    .unwrap();
+                                if !matched {
+                                    if s.starts_with(&format!("state_{}", self.batch_size)) {
+                                        last_state = Some(alloc_v.clone()); //.get_variable();
+                                                                            /* } else if s.starts_with(&format!("accepting")) {
+                                                                                                    accepting = Some(alloc_v.clone());
+                                                                                                    println!("get alloc v accepting {:#?}", alloc_v.clone().get_value());
+                                                                            */
+                                    }
                                 }
                             }
                         }
@@ -712,9 +739,30 @@ where
                 for qv in alloc_rc {
                     out.push(qv.unwrap()); // better way to do this?
                 }
+
+                
+
+                sponge.finish(&mut fs_eval_ns).unwrap();
             }
             GlueOpts::Poly_Nl((dq, dv)) => {
                 let doc_l = dq.len();
+
+                let mut fs_doc_ns = cs.namespace(|| "eval sponge");
+                let mut doc_sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+
+                let doc_pattern = vec![
+                    SpongeOp::Absorb((self.chars.len() - 1 + 4) as u32), // commit, vs,
+                    // combined_q,
+                    // running q,v
+                    SpongeOp::Squeeze(1),
+                ];
+                for i in 0..doc_l {
+                    // sum check rounds
+                    doc_pattern.append(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+                }
+
+                doc_sponge.start(IOPattern(doc_pattern), None, &mut fs_doc_ns);
+
                 alloc_doc_rc = vec![None; doc_l + 1];
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
@@ -741,62 +789,9 @@ where
                     if !matched {
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
+                        matched = self.intm_qv_parsing(cs, &alloc_v, &s, 1, &mut doc_alloc_qv);
 
-                        matched = self
-                            .nl_doc_parsing(cs, &alloc_v, &s, doc_l, &mut alloc_doc_rc)
-                            .unwrap();
-                        if !matched {
-                            if s.starts_with(&format!("state_{}", self.batch_size)) {
-                                last_state = Some(alloc_v.clone());
-                                /*} else if s.starts_with(&format!("accepting")) {
-                                     accepting = Some(alloc_v.clone());
-                                */
-                            }
-                        }
-                    }
-                }
-                out.push(last_state.unwrap());
-                out.push(last_char);
-                for qv in alloc_doc_rc {
-                    out.push(qv.unwrap()); // better way to do this?
-                }
-            }
-            GlueOpts::Nl_Nl((q, v, dq, dv)) => {
-                let sc_l = q.len();
-                alloc_rc = vec![None; sc_l + 1];
-
-                let doc_l = dq.len();
-                alloc_doc_rc = vec![None; doc_l + 1];
-
-                for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
-                    let (name_f, s) = self.generate_variable_info(var);
-
-                    let val_f = || {
-                        Ok({
-                            let i_val = &self.values.as_ref().expect("missing values")[i];
-                            let ff_val = int_to_ff(i_val.as_pf().into());
-                            //debug!("value : {var:?} -> {ff_val:?} ({i_val})");
-                            ff_val
-                        })
-                    };
-                    let mut matched = self
-                        .input_variable_parsing(
-                            cs,
-                            &mut vars,
-                            &s,
-                            var,
-                            state_0.clone(),
-                            char_0.clone(),
-                        )
-                        .unwrap();
-
-                    if !matched {
-                        let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
-                        vars.insert(var, alloc_v.get_variable());
-
-                        matched = self
-                            .nl_eval_parsing(cs, &alloc_v, &s, sc_l, &mut alloc_rc)
-                            .unwrap();
+                        // todo get rn of _ in nl_doc
                         if !matched {
                             matched = self
                                 .nl_doc_parsing(cs, &alloc_v, &s, doc_l, &mut alloc_doc_rc)
@@ -804,8 +799,8 @@ where
                             if !matched {
                                 if s.starts_with(&format!("state_{}", self.batch_size)) {
                                     last_state = Some(alloc_v.clone());
-                                    /* } else if s.starts_with(&format!("accepting")) {
-                                            accepting = Some(alloc_v.clone());
+                                    /*} else if s.starts_with(&format!("accepting")) {
+                                         accepting = Some(alloc_v.clone());
                                     */
                                 }
                             }
@@ -814,13 +809,114 @@ where
                 }
                 out.push(last_state.unwrap());
                 out.push(last_char);
+                for qv in alloc_doc_rc {
+                    out.push(qv.unwrap()); // better way to do this?
+                }
+
+                doc_sponge.finish(&mut fs_doc_ns).unwrap();
+            }
+            GlueOpts::Nl_Nl((q, v, dq, dv)) => {
+                let sc_l = q.len();
+                let doc_l = dq.len();
+
+                let mut fs_eval_ns = cs.namespace(|| "eval sponge");
+                let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+
+                let pattern = vec![
+                    SpongeOp::Absorb((self.batch_size + 3) as u32), // vs,
+                    // combined_q,
+                    // running q,v
+                    SpongeOp::Squeeze(1),
+                ];
+                for i in 0..sc_l {
+                    // sum check rounds
+                    pattern.append(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+                }
+
+                sponge.start(IOPattern(pattern), None, &mut fs_eval_ns);
+
+                let mut fs_doc_ns = cs.namespace(|| "eval sponge");
+                let mut doc_sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+
+                let doc_pattern = vec![
+                    SpongeOp::Absorb((self.chars.len() - 1 + 4) as u32), // commit, vs,
+                    // combined_q,
+                    // running q,v
+                    SpongeOp::Squeeze(1),
+                ];
+                for i in 0..doc_l {
+                    // sum check rounds
+                    doc_pattern.append(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+                }
+
+                doc_sponge.start(IOPattern(doc_pattern), None, &mut fs_doc_ns);
+
+                alloc_rc = vec![None; sc_l + 1];
+                alloc_doc_rc = vec![None; doc_l + 1];
+
+                for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
+                    let (name_f, s) = self.generate_variable_info(var);
+
+                    let val_f = || {
+                        Ok({
+                            let i_val = &self.values.as_ref().expect("missing values")[i];
+                            let ff_val = int_to_ff(i_val.as_pf().into());
+                            //debug!("value : {var:?} -> {ff_val:?} ({i_val})");
+                            ff_val
+                        })
+                    };
+                    let mut matched = self
+                        .input_variable_parsing(
+                            cs,
+                            &mut vars,
+                            &s,
+                            var,
+                            state_0.clone(),
+                            char_0.clone(),
+                        )
+                        .unwrap();
+
+                    if !matched {
+                        let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
+                        vars.insert(var, alloc_v.get_variable());
+                        matched = self.intm_qv_parsing(cs, &alloc_v, &s, 0, &mut alloc_qv);
+
+                        if !matched {
+                            matched = self.intm_qv_parsing(cs, &alloc_v, &s, 1, &mut doc_alloc_qv);
+                            if !matched {
+                                matched = self
+                                    .nl_eval_parsing(cs, &alloc_v, &s, sc_l, &mut alloc_rc)
+                                    .unwrap();
+                                if !matched {
+                                    matched = self
+                                        .nl_doc_parsing(cs, &alloc_v, &s, doc_l, &mut alloc_doc_rc)
+                                        .unwrap();
+                                    if !matched {
+                                        if s.starts_with(&format!("state_{}", self.batch_size)) {
+                                            last_state = Some(alloc_v.clone());
+                                            /* } else if s.starts_with(&format!("accepting")) {
+                                                    accepting = Some(alloc_v.clone());
+                                            */
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                out.push(last_state.unwrap());
+                out.push(last_char);
                 println!("full alloc len {:#?}", alloc_rc.len());
+
                 for qv in alloc_rc {
                     out.push(qv.unwrap()); // better way to do this?
                 }
                 for qv in alloc_doc_rc {
                     out.push(qv.unwrap()); // better way to do this?
                 }
+
+                sponge.finish(&mut fs_eval_ns).unwrap();
+                doc_sponge.finish(&mut fs_doc_ns).unwrap();
             }
         }
 
@@ -838,6 +934,8 @@ where
             vars.len(),
             self.r1cs.constraints.len()
         );
+
+        println!("SYNTHESIZE TIME {:#?}", time.elapsed().as_millis());
 
         Ok(out)
         //Ok(vec![last_state.unwrap(), last_char, last_hash.unwrap()])

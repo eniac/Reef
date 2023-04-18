@@ -1207,7 +1207,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 int_to_ff(g_x.clone()),
                 int_to_ff(g_const.clone()),
             ];
-            let rand = self.prover_random_from_seed(6, &query); // TODO fiat shamir
+            let rand = self.prover_random_from_seed(6, query); // TODO fiat shamir
             sc_rs.push(rand.clone());
             wits.insert(format!("{}_sc_r_{}", id, i), new_wit(rand.clone()));
         }

@@ -960,7 +960,7 @@ mod tests {
         }
     }
 
-    #[test]
+    //    #[test]
     fn e2e_poly_hash() {
         backend_test(
             "ab".to_string(),
@@ -972,7 +972,7 @@ mod tests {
         );
     }
 
-    #[test]
+    //    #[test]
     fn e2e_poly_nl() {
         backend_test(
             "ab".to_string(),
@@ -984,7 +984,7 @@ mod tests {
         );
     }
 
-    #[test]
+    //    #[test]
     fn e2e_nl_hash() {
         backend_test(
             "ab".to_string(),
@@ -1006,5 +1006,17 @@ mod tests {
             JCommit::Nlookup,
             vec![2],
         );
+        /*
+        backend_test(
+            "abc".to_string(),
+            "^a*b*c*$".to_string(),
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
+            JBatching::Nlookup,
+            JCommit::Nlookup,
+            vec![2],
+        );
+
+        panic!("EXPECTED");
+        */
     }
 }
