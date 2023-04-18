@@ -2,6 +2,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::{HashSet, BTreeSet};
 use rayon::prelude::*;
+use std::io::Result;
 
 use crate::regex::Regex;
 
@@ -69,6 +70,15 @@ impl NFA {
             trans,
             anchor_start: re.is_start_anchored(),
             anchor_end: re.is_end_anchored()
+        }
+    }
+
+    /// Fails when document not well-formed
+    pub fn well_formed(&self, doc: &Vec<String>) -> () {
+        for d in doc {
+            if !self.ab.contains(d) {
+                panic!("Found {} in the document but not in the alphabet {:?}", d, self.ab)
+            }
         }
     }
 

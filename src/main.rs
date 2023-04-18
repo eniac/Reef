@@ -37,6 +37,8 @@ fn main() {
         },
         None => ()
     }
+    // Is document well-formed
+    nfa.well_formed(&doc);
 
     println!("dfa: {:#?}", nfa);
 
