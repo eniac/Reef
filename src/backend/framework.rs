@@ -559,7 +559,7 @@ pub fn run_backend(
             (JBatching::NaivePolys, JCommit::Nlookup) => {
                 let doc_q = match doc_running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                    None => vec![<G1 as Group>::Scalar::from(0); q_len],
+                    None => vec![<G1 as Group>::Scalar::from(0); qd_len],
                 };
 
                 let doc_v = match doc_running_v {
@@ -601,7 +601,7 @@ pub fn run_backend(
 
                 let doc_q = match doc_running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                    None => vec![<G1 as Group>::Scalar::from(0); q_len],
+                    None => vec![<G1 as Group>::Scalar::from(0); qd_len],
                 };
 
                 let doc_v = match doc_running_v {
