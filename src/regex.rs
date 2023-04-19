@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![allow(missing_docs)]
 use hashconsing::{consign, HConsed, HashConsign};
-use regex_syntax::hir::{Hir, HirKind, Anchor, Class, RepetitionKind, Literal};
+use regex_syntax::hir::{Hir, HirKind, Anchor, Class, RepetitionKind, RepetitionRange, Literal};
 use regex_syntax::Parser;
 
 /// Hash-consed regex terms
@@ -19,6 +19,7 @@ pub enum RegexF {
     Not(Regex),
     App(Regex, Regex),
     Alt(Regex, Regex),
+    Range(Regex, usize, usize),
     Star(Regex),
 }
 
@@ -43,6 +44,7 @@ impl fmt::Display for Regex {
             RegexF::App(x, y) => write!(f, "{}{}", x, y),
             RegexF::Alt(x, y) => write!(f, "({} | {})", x, y),
             RegexF::Star(a) => write!(f, "{}*", a),
+            RegexF::Range(a, i, j) => write!(f, "{}{{{}, {}}}", a, i, j)
         }
     }
 }
@@ -66,7 +68,9 @@ impl Regex {
                     match r.kind {
                         RepetitionKind::OneOrMore => Regex::app(inner.clone(), Regex::star(inner)),
                         RepetitionKind::ZeroOrMore => Regex::star(inner),
-                        _ => panic!("Supported repetition operators [+,*]: {:?}", r),
+                        RepetitionKind::Range(RepetitionRange::Bounded(i, j)) => Regex::range(inner, i as usize, j as usize),
+                        RepetitionKind::Range(RepetitionRange::Exactly(i)) => Regex::range(inner, i as usize, i as usize),
+                        _ => panic!("Supported repetition operators [+,*, {{i}}, {{i, j}}]: {:?}", r),
                     }
                 },
                 HirKind::Anchor(Anchor::StartText) => Regex(G.mk(RegexF::LineStart)),
@@ -162,6 +166,15 @@ impl Regex {
         }
     }
 
+    pub fn range(a: Regex, i: usize, j: usize) -> Regex {
+        assert!(0 < i && i < j, "Range indices {{{}, {}}} must be 0 < {} < {}", i, j, i, j);
+        match &*a.0 {
+            RegexF::Star(_) | RegexF::Nil => a,
+            RegexF::Empty => Regex::empty(),
+            _ => Regex(G.mk(RegexF::Range(a, i, j)))
+        }
+    }
+
     pub fn not(a: Regex) -> Regex {
         match &*a.0 {
             RegexF::Not(a) => a.clone(),
@@ -172,7 +185,7 @@ impl Regex {
     pub fn nullable(&self) -> bool {
         match *self.0 {
             RegexF::Nil | RegexF::LineEnd | RegexF::LineStart | RegexF::Star(_) => true,
-            RegexF::Empty | RegexF::Char(_) | RegexF::Dot => false,
+            RegexF::Empty | RegexF::Char(_) | RegexF::Dot | RegexF::Range(_, _, _) => false,
             RegexF::Not(ref r) => !r.nullable(),
             RegexF::App(ref a, ref b) => a.nullable() && b.nullable(),
             RegexF::Alt(ref a, ref b) => a.nullable() || b.nullable(),
@@ -210,6 +223,9 @@ impl Regex {
             RegexF::App(ref a, ref b) => Regex::app(a.deriv(c), b.clone()),
             RegexF::Alt(ref a, ref b) => Regex::alt(a.deriv(c), b.deriv(c)),
             RegexF::Star(ref a) => Regex::app(a.deriv(c), Regex::star(a.clone())),
+            RegexF::Range(ref a, i, j) if i == 1 && j == 1 => a.deriv(c),
+            RegexF::Range(ref a, i, j) if i == j => Regex::app(a.deriv(c), Regex::range(a.clone(), i-1, j-1)),
+            RegexF::Range(ref a, i, j) => Regex::app(a.deriv(c), Regex::range(a.clone(), i+1, j)),
             RegexF::LineStart | RegexF::LineEnd => panic!("No derivatives for ^, $")
         }
     }
@@ -221,11 +237,16 @@ fn regex_parser_test_zero_length() {
 }
 
 #[test]
-fn regex_parser_test_ranges() {
+fn regex_parser_test_char_ranges() {
     assert_eq!(Regex::app(Regex::app(Regex::line_start(), Regex::alt(Regex::character('a'), Regex::character('b'))), Regex::line_end()), Regex::new("^[a-b]$"));
 }
 
 #[test]
 fn regex_parser_test_dot() {
     assert_eq!(Regex::app(Regex::app(Regex::line_start(), Regex::star(Regex::dot())), Regex::character('c')), Regex::new("^.*c"));
+}
+
+#[test]
+fn regex_parser_test_repetition_range() {
+    assert_eq!(Regex::range(Regex::character('a'), 1, 3), Regex::new("a{1,3}"));
 }
