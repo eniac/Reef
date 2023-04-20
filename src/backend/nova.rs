@@ -46,7 +46,6 @@ pub fn int_to_ff<F: PrimeField>(i: Integer) -> F {
         accumulator *= limb_base;
         accumulator += F::from(*digit);
     }
-    println!("INT TO FF TIME {:#?}", time.elapsed().as_millis());
     accumulator
 }
 
@@ -298,7 +297,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             alloc_qv[0] = Some(alloc_v.clone());
 
             return Ok(true);
-        } else if !is_doc_nl && s.starts_with("nl_v_") {
+        } else if !is_doc_nl && s.starts_with("v_") {
             let v_j = Some(alloc_v.clone()); //.get_variable();
 
             let s_sub: Vec<&str> = s.split("_").collect();

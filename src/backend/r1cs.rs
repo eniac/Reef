@@ -526,7 +526,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // CIRCUIT
 
-    fn lookup_idxs(&mut self) -> Vec<Term> {
+    // check if we need vs as vars
+    fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
         let mut v = vec![];
         for i in 1..=self.batch_size {
             let v_i = term(
@@ -554,9 +555,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     new_var(format!("char_{}", i - 1)),
                 ],
             );
-            v.push(v_i);
+            v.push(v_i.clone());
             self.pub_inputs.push(new_var(format!("state_{}", i - 1)));
             self.pub_inputs.push(new_var(format!("char_{}", i - 1)));
+
+            if include_vs {
+                let match_v = term(Op::Eq, vec![new_var(format!("v_{}", i)), v_i]);
+
+                self.assertions.push(match_v);
+                self.pub_inputs.push(new_var(format!("v_{}", i)));
+            }
         }
         self.pub_inputs
             .push(new_var(format!("state_{}", self.batch_size)));
@@ -664,7 +672,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // TODO batch size (1 currently)
     fn to_polys(&mut self) -> (ProverData, VerifierData) {
         let l_time = Instant::now();
-        let lookup = self.lookup_idxs();
+        let lookup = self.lookup_idxs(false);
 
         let mut evals = vec![];
         for (si, c, so) in self.dfa.deltas() {
@@ -753,12 +761,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             self.pub_inputs.push(new_var(format!("{}_q_{}", q_name, i)));
 
-            /* we add elsewhere
-             * if q_bit == 0 {
-                self.pub_inputs.push(new_var(format!("sc_r_{}", i))); // eq_j_i = rc_r_i
-            }
-            */
-
             if i == 0 {
                 eq = next;
             } else {
@@ -767,6 +769,43 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
 
         eq
+    }
+
+    // note that the running claim q is not included
+    fn combined_q_circuit(&mut self, num_eqs: usize, num_q_bits: usize, id: &str) {
+        assert!(
+            num_eqs * num_q_bits < 256,
+            "may have field overflow when combining q bits for fiat shamir"
+        );
+
+        let mut combined_q = new_const(0); // dummy, not used
+        let mut next_slot = Integer::from(1);
+        for i in 0..num_eqs {
+            for j in 0..num_q_bits {
+                combined_q = term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        combined_q,
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Mul),
+                            vec![
+                                new_const(next_slot.clone()),
+                                new_var(format!("{}_eq_{}_q_{}", id, i, j)),
+                            ],
+                        ),
+                    ],
+                );
+                next_slot *= Integer::from(2);
+            }
+        }
+
+        let combined_q_eq = term(
+            Op::Eq,
+            vec![combined_q, new_var(format!("{}_combined_q", id))],
+        );
+
+        self.assertions.push(combined_q_eq);
+        self.pub_inputs.push(new_var(format!("{}_combined_q", id)));
     }
 
     // C_1 = LHS/"claim"
@@ -856,7 +895,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
-        let lookups = self.lookup_idxs();
+        let lookups = self.lookup_idxs(true);
         self.nlookup_gadget(lookups, self.dfa.trans.len(), "nl");
 
         self.accepting_state_circuit(); // TODO
@@ -913,6 +952,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             eq_evals.push(self.bit_eq_circuit(sc_l, i, id));
         }
         let eq_eval = horners_circuit_vars(&eq_evals, new_var(format!("{}_claim_r", id)));
+
+        // make combined_q
+        let combined_q = self.combined_q_circuit(self.batch_size, sc_l, id); // running claim q not
+                                                                             // included
 
         // last_claim = eq_eval * next_running_claim
         let sum_check_domino = term(
@@ -1025,14 +1068,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
 
             // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
-
-            //v.push(
             let v_i = Integer::from(
                 (state_i * self.dfa.nstates() * self.dfa.nchars())
                     + (next_state * self.dfa.nchars())
                     + self.dfa.ab_to_num(&c.to_string()),
             )
             .rem_floor(cfg().field().modulus());
+
+            wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
             q.push(table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1223,14 +1266,26 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
 
         // generate last round eqs
+        let mut combined_q = Integer::from(0);
+        let mut next_slot = Integer::from(1);
         for i in 0..self.batch_size {
             // regular
+            let mut qjs = vec![];
             let q_name = format!("{}_eq_{}", id, i);
             for j in 0..sc_l {
                 let qj = (q[i] >> j) & 1;
                 wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
+                qjs.push(qj);
+            }
+
+            for qj in qjs.into_iter().rev() {
+                combined_q += (Integer::from(qj) * &next_slot);
+                next_slot *= Integer::from(2);
             }
         }
+
+        wits.insert(format!("{}_combined_q", id), new_wit(combined_q));
+
         for j in 0..sc_l {
             // running
             let q_name = format!("{}_eq_{}", id, q.len()); //v.len() - 1);
