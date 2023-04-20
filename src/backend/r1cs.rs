@@ -1187,18 +1187,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         mut wits: FxHashMap<String, Value>,
         table: Vec<Integer>,
         q: Vec<usize>,
-        //v: Vec<Integer>,
+        v: Vec<Integer>,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
-        // TODO - what needs to be public?
-
         let sc_l = logmn(table.len()); // sum check rounds
-
-        // generate claim r
-        let claim_r = self.prover_random_from_seed(1, &[F::from(5 as u64)]); // TOD0
-        wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
         // running claim about T (optimization)
         // if first (not yet generated)
@@ -1210,62 +1204,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             Some(v) => v,
             None => table[0].clone(),
         };
-        //println!("prev running v {:#?}", prev_running_v.clone());
-
-        //v.push(prev_running_v.clone()); // todo get rid of v?
-
         wits.insert(
             format!("{}_prev_running_claim", id),
             new_wit(prev_running_v.clone()),
         );
         // q.push(prev_running_q);
 
-        // println!("v: {:#?}", v.clone());
-
-        // generate polynomial g's for sum check
-        let mut sc_rs = vec![];
-        let mut g_xsq = Integer::from(0);
-        let mut g_x = Integer::from(0);
-        let mut g_const = Integer::from(0);
-        for i in 1..=sc_l {
-            (g_xsq, g_x, g_const) =
-                prover_mle_sum_eval(&table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
-
-            wits.insert(format!("{}_sc_g_{}_xsq", id, i), new_wit(g_xsq.clone()));
-            wits.insert(format!("{}_sc_g_{}_x", id, i), new_wit(g_x.clone()));
-            wits.insert(format!("{}_sc_g_{}_const", id, i), new_wit(g_const.clone()));
-
-            // new sumcheck rand for the round
-            // generate rands
-            let prev_rand = match i {
-                1 => Integer::from(0),
-                _ => sc_rs[i - 2].clone(),
-            };
-            // let query = vec![]; //vs TODO?
-            let query = [
-                int_to_ff(claim_r.clone()), // insanity must fix TODO
-                ((i) as u64).into(),
-                int_to_ff(prev_rand.clone()),
-                int_to_ff(g_xsq.clone()),
-                int_to_ff(g_x.clone()),
-                int_to_ff(g_const.clone()),
-            ];
-            let rand = self.prover_random_from_seed(6, &query); // TODO fiat shamir
-            sc_rs.push(rand.clone());
-            wits.insert(format!("{}_sc_r_{}", id, i), new_wit(rand.clone()));
-        }
-        // last claim = g_v(r_v)
-        //println!("sc rs {:#?}", sc_rs.clone());
-        g_xsq *= &sc_rs[sc_rs.len() - 1];
-        g_xsq *= &sc_rs[sc_rs.len() - 1];
-        g_x *= &sc_rs[sc_rs.len() - 1];
-        g_const += &g_x;
-        g_const += &g_xsq;
-
-        let last_claim = g_const.rem_floor(cfg().field().modulus());
-        wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
-
-        // generate last round eqs
+        // q processing
         let mut combined_q = Integer::from(0);
         let mut next_slot = Integer::from(1);
         for i in 0..self.batch_size {
@@ -1294,6 +1239,86 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 new_wit(prev_running_q[j].clone()),
             );
         }
+
+        // sponge
+
+        let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+        let acc = &mut ();
+
+        let mut pattern = vec![
+            SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs, combined_q, running q,v
+            SpongeOp::Squeeze(1),
+        ];
+        for i in 0..sc_l {
+            // sum check rounds
+            pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+        }
+
+        sponge.start(IOPattern(pattern), None, acc);
+
+        let query = vec![combined_q]; // q_comb, v1,..., vm, running q, running v
+        query.extend(v);
+        query.append(&mut prev_running_q.clone());
+        query.append(&mut vec![prev_running_v.clone()]);
+        let query_f = query.map(|i| int_to_ff(i)).collect()
+        SpongeAPI::absorb(
+            &mut sponge,
+            (self.batch_size + sc_l + 2) as u32,
+            &query_f,
+            acc,
+        );
+
+        // TODO - what needs to be public?
+
+        // generate claim r
+        let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
+        let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+        wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
+
+        // generate polynomial g's for sum check
+        let mut sc_rs = vec![];
+        let mut g_xsq = Integer::from(0);
+        let mut g_x = Integer::from(0);
+        let mut g_const = Integer::from(0);
+        for i in 1..=sc_l {
+            (g_xsq, g_x, g_const) =
+                prover_mle_sum_eval(&table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
+
+            wits.insert(format!("{}_sc_g_{}_xsq", id, i), new_wit(g_xsq.clone()));
+            wits.insert(format!("{}_sc_g_{}_x", id, i), new_wit(g_x.clone()));
+            wits.insert(format!("{}_sc_g_{}_const", id, i), new_wit(g_const.clone()));
+
+            // new sumcheck rand for the round
+            // generate rands
+            let prev_rand = match i {
+                1 => Integer::from(0),
+                _ => sc_rs[i - 2].clone(),
+            };
+            // let query = vec![]; //vs TODO?
+            let query = vec![
+                int_to_ff(g_xsq.clone()),
+                int_to_ff(g_x.clone()),
+                int_to_ff(g_const.clone()),
+            ];
+            SpongeAPI::absorb(&mut sponge, 3, &query, acc);
+            let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            let sc_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+
+            sc_rs.push(sc_r.clone());
+            wits.insert(format!("{}_sc_r_{}", id, i), new_wit(sc_r.clone()));
+        }
+        sponge.finish(acc).unwrap();
+
+        // last claim = g_v(r_v)
+        //println!("sc rs {:#?}", sc_rs.clone());
+        g_xsq *= &sc_rs[sc_rs.len() - 1];
+        g_xsq *= &sc_rs[sc_rs.len() - 1];
+        g_x *= &sc_rs[sc_rs.len() - 1];
+        g_const += &g_x;
+        g_const += &g_xsq;
+
+        let last_claim = g_const.rem_floor(cfg().field().modulus());
+        wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
 
         // update running claim
         let (_, next_running_v) =

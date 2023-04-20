@@ -303,7 +303,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[2].parse().unwrap();
 
-            alloc_qv[j + 1] = v_j; // TODO check
+            alloc_qv[j] = v_j; // TODO check
 
             return Ok(true);
         } else if is_doc_nl && s.starts_with("char_") {
@@ -397,8 +397,10 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
         let mut sponge_ns = cs.namespace(|| "eval sponge");
 
+        // TODO if doc, add commit
+
         let mut pattern = vec![
-            SpongeOp::Absorb((self.batch_size + 3) as u32), // vs,
+            SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs,
             // combined_q,
             // running q,v
             SpongeOp::Squeeze(1),
