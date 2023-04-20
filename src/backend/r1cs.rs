@@ -877,7 +877,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             //self.pub_inputs.push(new_var(format!("char_{}", c))); <- done elsewhere
         }
 
-        self.nlookup_gadget(char_lookups, self.doc.len(), "nl_doc");
+        self.nlookup_gadget(char_lookups, self.doc.len(), "nldoc");
     }
 
     fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
@@ -1133,7 +1133,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
 
         let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, doc, q, running_q, running_v, "nl_doc");
+            self.wit_nlookup_gadget(wits, doc, q, running_q, running_v, "nldoc");
         wits = w;
 
         (wits, next_running_q, next_running_v)
@@ -1207,7 +1207,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 int_to_ff(g_x.clone()),
                 int_to_ff(g_const.clone()),
             ];
-            let rand = self.prover_random_from_seed(6, query); // TODO fiat shamir
+            let rand = self.prover_random_from_seed(6, &query); // TODO fiat shamir
             sc_rs.push(rand.clone());
             wits.insert(format!("{}_sc_r_{}", id, i), new_wit(rand.clone()));
         }
