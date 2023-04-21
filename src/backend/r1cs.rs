@@ -3,6 +3,7 @@ use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::cfg::*;
+use crate::config::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use ff::PrimeField;
@@ -14,6 +15,7 @@ use neptune::{
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
+use std::fs;
 use nova_snark::traits::Group;
 use rug::{
     integer::Order,
@@ -513,7 +515,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
         }
 
-        println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
+        // println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
 
         // sanity
         if (batch_num + 1) * self.batch_size >= self.doc.len() {
@@ -1738,23 +1740,14 @@ mod tests {
         );
     }
 
-    // #[test]
+    #[test]
     fn big() {
         init();
+        let ASCIIchars: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
         test_func_no_hash(
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,".to_string(),
-            "ourtechnology.*$".to_string(),
-            "ThisappliesbothwhenthedataisinmotionoverelectronicnetworksoratrestonanelectronicdeviceIfthecommunicationsproviderisservedwithawarrantseekingthosecommunications,theprovidercannotprovidethedatabecauseithasdesignedthe
-            technologysuchthatitcannotbeaccessedbyanythirdparty.
-            Wedon'thaveanysilverbullet,andthediscussionswithinthe
-            ExecutiveBrancharestillongoing.Whiletherehasnotyetbeena
-            decisionwhethertoseeklegislation,wemustworkwithCongress,
-            industry,academics,privacygroupsandotherstocraftanapproach
-            thataddressesallofthemultiple,competinglegitimateconcernsthat
-            havebeenthefocusofsomuchdebateinrecentmonths.Butwecanall
-            agreethatwewillneedongoinghonestandinformedpublicdebate
-            abouthowbesttoprotectlibertyandsecurityinbothourlawsand
-            ourtechnology.".to_string(),
+            ASCIIchars.into_iter().collect::<String>(),
+            "^.*our technology.*$".to_string(),
+            fs::read_to_string("gov_text.txt").unwrap(),
             vec![1],
             true,
         );
