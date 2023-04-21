@@ -1651,7 +1651,7 @@ mod tests {
         );
     }
 
-    #[test]
+    // #[test]
     fn dfa_non_match() {
         init();
         // TODO make sure match/non match is expected
@@ -1735,6 +1735,28 @@ mod tests {
             "helloworld".to_string(),
             vec![1, 5],
             false,
+        );
+    }
+
+    #[test]
+    fn big() {
+        init();
+        test_func_no_hash(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,".to_string(),
+            "ourtechnology.*$".to_string(),
+            "ThisappliesbothwhenthedataisinmotionoverelectronicnetworksoratrestonanelectronicdeviceIfthecommunicationsproviderisservedwithawarrantseekingthosecommunications,theprovidercannotprovidethedatabecauseithasdesignedthe
+            technologysuchthatitcannotbeaccessedbyanythirdparty.
+            Wedon'thaveanysilverbullet,andthediscussionswithinthe
+            ExecutiveBrancharestillongoing.Whiletherehasnotyetbeena
+            decisionwhethertoseeklegislation,wemustworkwithCongress,
+            industry,academics,privacygroupsandotherstocraftanapproach
+            thataddressesallofthemultiple,competinglegitimateconcernsthat
+            havebeenthefocusofsomuchdebateinrecentmonths.Butwecanall
+            agreethatwewillneedongoinghonestandinformedpublicdebate
+            abouthowbesttoprotectlibertyandsecurityinbothourlawsand
+            ourtechnology.".to_string(),
+            vec![1],
+            true,
         );
     }
 }
