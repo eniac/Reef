@@ -1055,7 +1055,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
         let mut state_i = current_state;
         let mut next_state = 0;
-        //      let mut v = vec![];
+
+        let mut v = vec![];
         let mut q = vec![];
         for i in 1..=self.batch_size {
             let c = self.doc[batch_num * self.batch_size + i - 1].clone();
@@ -1074,7 +1075,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     + self.dfa.ab_to_num(&c.to_string()),
             )
             .rem_floor(cfg().field().modulus());
-
+            v.push(v_i.clone());
             wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
             q.push(table.iter().position(|val| val == &v_i).unwrap());
@@ -1115,7 +1116,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         assert!(running_q.is_some() || batch_num == 0);
         assert!(running_v.is_some() || batch_num == 0);
         let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, table, q, running_q, running_v, "nl");
+            self.wit_nlookup_gadget(wits, table, q, v, running_q, running_v, "nl");
         wits = w;
         //println!("next running q out of main {:#?}", next_running_q.clone());
 
@@ -1166,17 +1167,18 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             // .rem_floor(cfg().field().modulus()), // thoughts?
         }
 
+        let mut v = vec![];
         let mut q = vec![];
         for i in 0..self.batch_size {
-            // let c = self.doc[batch_num * self.batch_size + i].clone();
-            // "char val" witnesses already made
+            let c = doc[batch_num * self.batch_size + i].clone();
+            v.push(c); // todo check
 
             // position in doc
             q.push(batch_num * self.batch_size + i);
         }
 
         let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, doc, q, running_q, running_v, "nldoc");
+            self.wit_nlookup_gadget(wits, doc, q, v, running_q, running_v, "nldoc");
         wits = w;
 
         (wits, next_running_q, next_running_v)
@@ -1229,7 +1231,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
         }
 
-        wits.insert(format!("{}_combined_q", id), new_wit(combined_q));
+        wits.insert(format!("{}_combined_q", id), new_wit(combined_q.clone()));
 
         for j in 0..sc_l {
             // running
@@ -1256,11 +1258,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         sponge.start(IOPattern(pattern), None, acc);
 
-        let query = vec![combined_q]; // q_comb, v1,..., vm, running q, running v
+        let mut query = vec![combined_q]; // q_comb, v1,..., vm, running q, running v
         query.extend(v);
         query.append(&mut prev_running_q.clone());
         query.append(&mut vec![prev_running_v.clone()]);
-        let query_f = query.map(|i| int_to_ff(i)).collect()
+        let query_f: Vec<F> = query.into_iter().map(|i| int_to_ff(i)).collect();
+
+        println!("R1CS sponge absorbs {:#?}", query_f);
+
         SpongeAPI::absorb(
             &mut sponge,
             (self.batch_size + sc_l + 2) as u32,
@@ -1272,6 +1277,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // generate claim r
         let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
+        println!("R1CS sponge squeezes {:#?}", rand);
         let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
@@ -1296,12 +1302,15 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             };
             // let query = vec![]; //vs TODO?
             let query = vec![
-                int_to_ff(g_xsq.clone()),
-                int_to_ff(g_x.clone()),
                 int_to_ff(g_const.clone()),
+                int_to_ff(g_x.clone()),
+                int_to_ff(g_xsq.clone()),
             ];
+
+            println!("R1CS sponge absorbs {:#?}", query);
             SpongeAPI::absorb(&mut sponge, 3, &query, acc);
             let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            println!("R1CS sponge squeezes {:#?}", rand);
             let sc_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
 
             sc_rs.push(sc_r.clone());

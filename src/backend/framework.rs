@@ -680,7 +680,7 @@ pub fn run_backend(
         z0_primary.clone(),
         z0_secondary.clone(),
     );
-    //println!("Recursive res: {:#?}", res);
+    println!("Recursive res: {:#?}", res);
 
     assert!(res.is_ok()); // TODO delete
 
@@ -775,7 +775,7 @@ pub fn run_backend(
 // calculate multilinear extension from evals of univariate
 // must "pad out" pts to power of 2 !
 fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
-    println!("mle pts {:#?}", pts);
+    //println!("mle pts {:#?}", pts);
 
     let num_pts = pts.len();
     if num_pts == 1 {
@@ -960,7 +960,7 @@ mod tests {
         }
     }
 
-    //    #[test]
+    #[test]
     fn e2e_poly_hash() {
         backend_test(
             "ab".to_string(),
@@ -972,7 +972,7 @@ mod tests {
         );
     }
 
-    //    #[test]
+    #[test]
     fn e2e_poly_nl() {
         backend_test(
             "ab".to_string(),
@@ -984,7 +984,7 @@ mod tests {
         );
     }
 
-    //    #[test]
+    #[test]
     fn e2e_nl_hash() {
         backend_test(
             "ab".to_string(),
@@ -996,7 +996,7 @@ mod tests {
         );
     }
 
-    //    #[test]
+    #[test]
     fn e2e_nl_nl() {
         backend_test(
             "ab".to_string(),
