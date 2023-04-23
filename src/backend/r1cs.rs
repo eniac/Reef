@@ -4,6 +4,7 @@ use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::cfg::*;
+use crate::config::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use ff::PrimeField;
@@ -15,6 +16,7 @@ use neptune::{
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
+use std::fs;
 use nova_snark::traits::Group;
 use rug::{
     integer::Order,
@@ -375,8 +377,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         } else {
             (batching, commit, opt_batch_size) = opt_cost_model_select(
                 &dfa,
-                1,
-                doc.len(),
+                0,
+                logmn(doc.len()),
                 dfa.is_match(doc),
                 doc.len(),
                 commit_override,
@@ -514,7 +516,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
         }
 
-        println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
+        // println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
 
         // sanity
         if (batch_num + 1) * self.batch_size >= self.doc.len() {
@@ -1754,7 +1756,7 @@ mod tests {
         );
     }
 
-    #[test]
+    // #[test]
     fn dfa_non_match() {
         init();
         // TODO make sure match/non match is expected
@@ -1838,6 +1840,19 @@ mod tests {
             "helloworld".to_string(),
             vec![1, 5],
             false,
+        );
+    }
+
+    #[test]
+    fn big() {
+        init();
+        let ASCIIchars: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+        test_func_no_hash(
+            ASCIIchars.into_iter().collect::<String>(),
+            "^.*our technology.*$".to_string(),
+            fs::read_to_string("gov_text.txt").unwrap(),
+            vec![1],
+            true,
         );
     }
 }

@@ -32,3 +32,6 @@ rayon = "1.7.0"
 default = ["plot"]
 plot = ["dep:dot"]
 
+[profile.release]
+debug = true
+

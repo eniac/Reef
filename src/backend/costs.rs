@@ -444,7 +444,7 @@ pub fn opt_cost_model_select<'a>(
     let mut opt_batch_size: usize = 1;
     let mut cost = full_round_cost_model(
         dfa,
-        2 << batch_range_lower,
+        opt_batch_size,
         opt_batching,
         is_match,
         doc_length,
