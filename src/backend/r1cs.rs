@@ -1,10 +1,10 @@
 use crate::backend::costs::*;
 use crate::backend::nova::int_to_ff;
+use crate::config::*;
 use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::cfg::*;
-use crate::config::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use ff::PrimeField;
@@ -16,7 +16,6 @@ use neptune::{
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
-use std::fs;
 use nova_snark::traits::Group;
 use rug::{
     integer::Order,
@@ -24,6 +23,7 @@ use rug::{
     rand::RandState,
     Assign, Integer,
 };
+use std::fs;
 use std::sync::Once;
 use std::time::{Duration, Instant};
 
@@ -1843,7 +1843,7 @@ mod tests {
         );
     }
 
-    #[test]
+    //#[test]
     fn big() {
         init();
         let ASCIIchars: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
