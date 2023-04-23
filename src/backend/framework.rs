@@ -23,7 +23,6 @@ use nova_snark::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
         pedersen::{Commitment, CommitmentGens},
     },
-    spartan::polynomial::EqPolynomial,
     traits::{
         circuit::TrivialTestCircuit, commitment::*, evaluation::EvaluationEngineTrait, Group,
     },
@@ -681,7 +680,7 @@ pub fn run_backend(
         z0_primary.clone(),
         z0_secondary.clone(),
     );
-    //println!("Recursive res: {:#?}", res);
+    println!("Recursive res: {:#?}", res);
 
     assert!(res.is_ok()); // TODO delete
 
@@ -776,7 +775,7 @@ pub fn run_backend(
 // calculate multilinear extension from evals of univariate
 // must "pad out" pts to power of 2 !
 fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
-    println!("mle pts {:#?}", pts);
+    //println!("mle pts {:#?}", pts);
 
     let num_pts = pts.len();
     if num_pts == 1 {
@@ -1007,5 +1006,17 @@ mod tests {
             JCommit::Nlookup,
             vec![2],
         );
+        /*
+        backend_test(
+            "abc".to_string(),
+            "^a*b*c*$".to_string(),
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
+            JBatching::Nlookup,
+            JCommit::Nlookup,
+            vec![2],
+        );
+
+        panic!("EXPECTED");
+        */
     }
 }

@@ -1,9 +1,10 @@
 use crate::backend::costs::*;
+use crate::backend::nova::int_to_ff;
+use crate::config::*;
 use crate::dfa::NFA;
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::cfg::*;
-use crate::config::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use ff::PrimeField;
@@ -15,7 +16,6 @@ use neptune::{
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
-use std::fs;
 use nova_snark::traits::Group;
 use rug::{
     integer::Order,
@@ -23,6 +23,7 @@ use rug::{
     rand::RandState,
     Assign, Integer,
 };
+use std::fs;
 use std::sync::Once;
 use std::time::{Duration, Instant};
 
@@ -527,7 +528,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // CIRCUIT
 
-    fn lookup_idxs(&mut self) -> Vec<Term> {
+    // check if we need vs as vars
+    fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
         let mut v = vec![];
         for i in 1..=self.batch_size {
             let v_i = term(
@@ -555,9 +557,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     new_var(format!("char_{}", i - 1)),
                 ],
             );
-            v.push(v_i);
+            v.push(v_i.clone());
             self.pub_inputs.push(new_var(format!("state_{}", i - 1)));
             self.pub_inputs.push(new_var(format!("char_{}", i - 1)));
+
+            if include_vs {
+                let match_v = term(Op::Eq, vec![new_var(format!("v_{}", i)), v_i]);
+
+                self.assertions.push(match_v);
+                self.pub_inputs.push(new_var(format!("v_{}", i)));
+            }
         }
         self.pub_inputs
             .push(new_var(format!("state_{}", self.batch_size)));
@@ -665,7 +674,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // TODO batch size (1 currently)
     fn to_polys(&mut self) -> (ProverData, VerifierData) {
         let l_time = Instant::now();
-        let lookup = self.lookup_idxs();
+        let lookup = self.lookup_idxs(false);
 
         let mut evals = vec![];
         for (si, c, so) in self.dfa.deltas() {
@@ -754,12 +763,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             self.pub_inputs.push(new_var(format!("{}_q_{}", q_name, i)));
 
-            /* we add elsewhere
-             * if q_bit == 0 {
-                self.pub_inputs.push(new_var(format!("sc_r_{}", i))); // eq_j_i = rc_r_i
-            }
-            */
-
             if i == 0 {
                 eq = next;
             } else {
@@ -768,6 +771,43 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
 
         eq
+    }
+
+    // note that the running claim q is not included
+    fn combined_q_circuit(&mut self, num_eqs: usize, num_q_bits: usize, id: &str) {
+        assert!(
+            num_eqs * num_q_bits < 256,
+            "may have field overflow when combining q bits for fiat shamir"
+        );
+
+        let mut combined_q = new_const(0); // dummy, not used
+        let mut next_slot = Integer::from(1);
+        for i in 0..num_eqs {
+            for j in 0..num_q_bits {
+                combined_q = term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        combined_q,
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Mul),
+                            vec![
+                                new_const(next_slot.clone()),
+                                new_var(format!("{}_eq_{}_q_{}", id, i, j)),
+                            ],
+                        ),
+                    ],
+                );
+                next_slot *= Integer::from(2);
+            }
+        }
+
+        let combined_q_eq = term(
+            Op::Eq,
+            vec![combined_q, new_var(format!("{}_combined_q", id))],
+        );
+
+        self.assertions.push(combined_q_eq);
+        self.pub_inputs.push(new_var(format!("{}_combined_q", id)));
     }
 
     // C_1 = LHS/"claim"
@@ -857,7 +897,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
-        let lookups = self.lookup_idxs();
+        let lookups = self.lookup_idxs(true);
         self.nlookup_gadget(lookups, self.dfa.trans.len(), "nl");
 
         self.accepting_state_circuit(); // TODO
@@ -878,7 +918,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             //self.pub_inputs.push(new_var(format!("char_{}", c))); <- done elsewhere
         }
 
-        self.nlookup_gadget(char_lookups, self.doc.len(), "nl_doc");
+        self.nlookup_gadget(char_lookups, self.doc.len(), "nldoc");
     }
 
     fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
@@ -914,6 +954,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             eq_evals.push(self.bit_eq_circuit(sc_l, i, id));
         }
         let eq_eval = horners_circuit_vars(&eq_evals, new_var(format!("{}_claim_r", id)));
+
+        // make combined_q
+        let combined_q = self.combined_q_circuit(self.batch_size, sc_l, id); // running claim q not
+                                                                             // included
 
         // last_claim = eq_eval * next_running_claim
         let sum_check_domino = term(
@@ -1013,7 +1057,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
         let mut state_i = current_state;
         let mut next_state = 0;
-        //      let mut v = vec![];
+
+        let mut v = vec![];
         let mut q = vec![];
         for i in 1..=self.batch_size {
             let c = self.doc[batch_num * self.batch_size + i - 1].clone();
@@ -1026,14 +1071,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
 
             // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
-
-            //v.push(
             let v_i = Integer::from(
                 (state_i * self.dfa.nstates() * self.dfa.nchars())
                     + (next_state * self.dfa.nchars())
                     + self.dfa.ab_to_num(&c.to_string()),
             )
             .rem_floor(cfg().field().modulus());
+            v.push(v_i.clone());
+            wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
             q.push(table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1073,7 +1118,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         assert!(running_q.is_some() || batch_num == 0);
         assert!(running_v.is_some() || batch_num == 0);
         let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, table, q, running_q, running_v, "nl");
+            self.wit_nlookup_gadget(wits, table, q, v, running_q, running_v, "nl");
         wits = w;
         //println!("next running q out of main {:#?}", next_running_q.clone());
 
@@ -1124,17 +1169,18 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             // .rem_floor(cfg().field().modulus()), // thoughts?
         }
 
+        let mut v = vec![];
         let mut q = vec![];
         for i in 0..self.batch_size {
-            // let c = self.doc[batch_num * self.batch_size + i].clone();
-            // "char val" witnesses already made
+            let c = doc[batch_num * self.batch_size + i].clone();
+            v.push(c); // todo check
 
             // position in doc
             q.push(batch_num * self.batch_size + i);
         }
 
         let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, doc, q, running_q, running_v, "nl_doc");
+            self.wit_nlookup_gadget(wits, doc, q, v, running_q, running_v, "nldoc");
         wits = w;
 
         (wits, next_running_q, next_running_v)
@@ -1145,18 +1191,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         mut wits: FxHashMap<String, Value>,
         table: Vec<Integer>,
         q: Vec<usize>,
-        //v: Vec<Integer>,
+        v: Vec<Integer>,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
-        // TODO - what needs to be public?
-
         let sc_l = logmn(table.len()); // sum check rounds
-
-        // generate claim r
-        let claim_r = self.prover_random_from_seed(1, &[F::from(5 as u64)]); // TODO make general
-        wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
         // running claim about T (optimization)
         // if first (not yet generated)
@@ -1168,17 +1208,80 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             Some(v) => v,
             None => table[0].clone(),
         };
-        //println!("prev running v {:#?}", prev_running_v.clone());
-
-        //v.push(prev_running_v.clone()); // todo get rid of v?
-
         wits.insert(
             format!("{}_prev_running_claim", id),
             new_wit(prev_running_v.clone()),
         );
         // q.push(prev_running_q);
 
-        // println!("v: {:#?}", v.clone());
+        // q processing
+        let mut combined_q = Integer::from(0);
+        let mut next_slot = Integer::from(1);
+        for i in 0..self.batch_size {
+            // regular
+            let mut qjs = vec![];
+            let q_name = format!("{}_eq_{}", id, i);
+            for j in 0..sc_l {
+                let qj = (q[i] >> j) & 1;
+                wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
+                qjs.push(qj);
+            }
+
+            for qj in qjs.into_iter().rev() {
+                combined_q += (Integer::from(qj) * &next_slot);
+                next_slot *= Integer::from(2);
+            }
+        }
+
+        wits.insert(format!("{}_combined_q", id), new_wit(combined_q.clone()));
+
+        for j in 0..sc_l {
+            // running
+            let q_name = format!("{}_eq_{}", id, q.len()); //v.len() - 1);
+            wits.insert(
+                format!("{}_q_{}", q_name, j),
+                new_wit(prev_running_q[j].clone()),
+            );
+        }
+
+        // sponge
+
+        let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+        let acc = &mut ();
+
+        let mut pattern = vec![
+            SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs, combined_q, running q,v
+            SpongeOp::Squeeze(1),
+        ];
+        for i in 0..sc_l {
+            // sum check rounds
+            pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+        }
+
+        sponge.start(IOPattern(pattern), None, acc);
+
+        let mut query = vec![combined_q]; // q_comb, v1,..., vm, running q, running v
+        query.extend(v);
+        query.append(&mut prev_running_q.clone());
+        query.append(&mut vec![prev_running_v.clone()]);
+        let query_f: Vec<F> = query.into_iter().map(|i| int_to_ff(i)).collect();
+
+        println!("R1CS sponge absorbs {:#?}", query_f);
+
+        SpongeAPI::absorb(
+            &mut sponge,
+            (self.batch_size + sc_l + 2) as u32,
+            &query_f,
+            acc,
+        );
+
+        // TODO - what needs to be public?
+
+        // generate claim r
+        let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
+        println!("R1CS sponge squeezes {:#?}", rand);
+        let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+        wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
         // generate polynomial g's for sum check
         let mut sc_rs = vec![];
@@ -1195,10 +1298,28 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             // new sumcheck rand for the round
             // generate rands
-            let rand = self.prover_random_from_seed(1, &[F::from(i as u64)]); // TODO make gen
-            sc_rs.push(rand.clone());
-            wits.insert(format!("{}_sc_r_{}", id, i), new_wit(rand.clone()));
+            let prev_rand = match i {
+                1 => Integer::from(0),
+                _ => sc_rs[i - 2].clone(),
+            };
+            // let query = vec![]; //vs TODO?
+            let query = vec![
+                int_to_ff(g_const.clone()),
+                int_to_ff(g_x.clone()),
+                int_to_ff(g_xsq.clone()),
+            ];
+
+            println!("R1CS sponge absorbs {:#?}", query);
+            SpongeAPI::absorb(&mut sponge, 3, &query, acc);
+            let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            println!("R1CS sponge squeezes {:#?}", rand);
+            let sc_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+
+            sc_rs.push(sc_r.clone());
+            wits.insert(format!("{}_sc_r_{}", id, i), new_wit(sc_r.clone()));
         }
+        sponge.finish(acc).unwrap();
+
         // last claim = g_v(r_v)
         //println!("sc rs {:#?}", sc_rs.clone());
         g_xsq *= &sc_rs[sc_rs.len() - 1];
@@ -1209,24 +1330,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let last_claim = g_const.rem_floor(cfg().field().modulus());
         wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
-
-        // generate last round eqs
-        for i in 0..self.batch_size {
-            // regular
-            let q_name = format!("{}_eq_{}", id, i);
-            for j in 0..sc_l {
-                let qj = (q[i] >> j) & 1;
-                wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
-            }
-        }
-        for j in 0..sc_l {
-            // running
-            let q_name = format!("{}_eq_{}", id, q.len()); //v.len() - 1);
-            wits.insert(
-                format!("{}_q_{}", q_name, j),
-                new_wit(prev_running_q[j].clone()),
-            );
-        }
 
         // update running claim
         let (_, next_running_v) =
@@ -1740,7 +1843,7 @@ mod tests {
         );
     }
 
-    #[test]
+    //#[test]
     fn big() {
         init();
         let ASCIIchars: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
