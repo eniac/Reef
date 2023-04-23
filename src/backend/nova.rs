@@ -318,7 +318,11 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             //let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
-
+            println!(
+                "ALLOC QV PARSING CHAR {:#?}: {:#?}",
+                j,
+                v_j.clone().unwrap().get_value()
+            );
             if j < self.batch_size {
                 alloc_qv[j + 1] = v_j;
             } // don't add the last one
@@ -705,6 +709,7 @@ where
         alloc_chars[0] = Some(char_0.clone());
         let mut alloc_qv = vec![None; self.batch_size + 1];
         let mut alloc_doc_qv = vec![None; self.batch_size + 1];
+        alloc_doc_qv[1] = Some(char_0.clone());
 
         let mut alloc_claim_r = None;
         let mut alloc_doc_claim_r = None;
@@ -884,6 +889,9 @@ where
                             ff_val
                         })
                     };
+
+                    println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+
                     let mut matched = self
                         .input_variable_parsing(
                             cs,
@@ -974,6 +982,7 @@ where
                             ff_val
                         })
                     };
+                    println!("Var (name?) {:#?}", self.r1cs.names[&var]);
                     let mut matched = self
                         .input_variable_parsing(
                             cs,
