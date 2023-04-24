@@ -45,20 +45,6 @@ pub struct Options {
         help = "Take 2^k steps at one NFA step"
     )]
     pub k_stride: Option<usize>,
-    #[arg(
-        short = 'i',
-        long = "start matching at index",
-        value_name = "USIZE",
-        help = "Start matching at index"
-    )]
-    pub start_at: Option<usize>,
-    #[arg(
-        short = 'n',
-        long = "Match only length",
-        value_name = "USIZE",
-        help = "Match only [n] characters"
-    )]
-    pub length_at: Option<usize>
 }
 
 #[derive(Debug, Subcommand)]

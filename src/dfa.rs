@@ -141,44 +141,39 @@ impl NFA {
             .collect()
     }
 
-    pub fn is_whole_match(&self, doc: &Vec<String>) -> Option<(usize, usize)> {
-        self.is_match(doc, 0, doc.len())
-    }
-
     /// Returns (begin match index, end index) if a match is found in the doc
-    pub fn is_match(&self, doc: &Vec<String>, start_at: usize, length_at: usize) -> Option<(usize, usize)> {
+    pub fn is_match(&self, doc: &Vec<String>) -> Option<(usize, usize)> {
         let mut start_idxs = Vec::new();
         let accepting = &self.get_final_states();
-
-        // Document might be substring of original
-        let cut_doc = &doc[start_at..(start_at + length_at)];
 
         // Iterate over all postfixes of doc
         if self.anchor_start {
             start_idxs.push(0);
         } else {
-            for i in 0..cut_doc.len() {
+            for i in 0..doc.len() {
                 start_idxs.push(i)
             }
         }
 
         // Initial state is also accepting
         if accepting.contains(&self.get_init_state()) &&
-            (!self.anchor_end || cut_doc.len() == 0) {
+            (!self.anchor_end || doc.len() == 0) {
             return Some((0, 0));
         }
         // For every postfix of doc (O(n^2))
         start_idxs
-            .into_par_iter()
-            .find_map_any(|i| {
+            .into_iter()
+            .find_map(|i| {
+            // .into_par_iter()
+            // .find_map_any(|i| {
               let mut s = self.get_init_state();
-              for j in i..cut_doc.len() {
+              for j in i..doc.len() {
                   // Apply transition relation
-                  s = self.delta(s, &cut_doc[j]).unwrap();
+                  s = self.delta(s, &doc[j]).unwrap();
 
                   // found a substring match or exact match
                   if accepting.contains(&s) &&
-                      (!self.anchor_end || j == cut_doc.len() - 1) {
+                      (!self.anchor_end || j == doc.len() - 1) {
                       return Some((i, j+1)); // Return an interval [i, j)
                   }
               }
@@ -199,7 +194,6 @@ impl NFA {
     pub fn double_stride(&mut self, doc: &Vec<String>) -> Vec<String> {
         let mut ab: HashSet<(String, String)> = HashSet::new();
         let mut classes : HashMap<BTreeSet<(usize, usize)>, BTreeSet<String>> = HashMap::new();
-
         // S' := S + S*S (cartesian product)
         for c0 in self.ab.iter() {
             ab.insert((c0.clone(), EPSILON.clone()));
@@ -208,13 +202,13 @@ impl NFA {
             }
         }
 
-        // Clear the old alphabet
-        self.ab = Vec::new();
-
         // Result transition will be t1 -[a+b]-> t3
         for (a,b) in ab {
+            // All the pairs (t1, t3) such that t1 -[a+b]-> t3
             let mut trans_clos: BTreeSet<(usize, usize)> = BTreeSet::new();
             for t1 in self.get_states() {
+                let tttt: Vec<(String, usize)> = self.trans.clone().into_iter()
+                        .filter_map(|((a,b), c)| if a == t1 { Some((b, c)) } else {None}).collect();
                 let t2 = self.delta(t1, &a).unwrap();
                 // Epsilon does not transition
                 let t3 = self.delta(t2, &b).unwrap();
@@ -222,7 +216,6 @@ impl NFA {
                 trans_clos.insert((t1, t3));
             }
 
-            // New alphabet
             let s = a + &b;
 
             // Equivalence classes have the same transitive closure
@@ -230,12 +223,13 @@ impl NFA {
                 Some(class) => { class.insert(s.clone()); },
                 None => { classes.insert(trans_clos, BTreeSet::from([s.clone()])); },
             }
-            self.ab.push(s)
         }
 
         // Find a representative string from an eqivalence class
         fn find_representative(class: &BTreeSet<String>) -> String {
-            class.iter().next()
+            let size = class.iter().max_by(|a,b| a.len().cmp(&b.len())).unwrap().len();
+            class.iter()
+                 .find(|c| c.len() >= size)
                  .map(|c|c.clone())
                  .expect("No equivalence classes found")
         }
@@ -254,13 +248,18 @@ impl NFA {
         // Translate doc into equivalent doc
         let equiv_classes = classes.clone().into_values().collect();
 
+        // Clear the old alphabet
+        let mut abset = HashSet::new();
+
         // Build transition relation from classes
         self.trans = HashMap::new();
         for (set, class) in classes {
             for (t, u) in set {
                 self.trans.insert((t, find_representative(&class)), u);
+                abset.insert(find_representative(&class));
             }
         }
+        self.ab = abset.into_iter().collect();
 
         // Return new document (modulo equiv classes)
         doc.chunks(2)
@@ -289,7 +288,7 @@ mod tests {
     }
 
     fn check(nfa: &NFA, doc: &Vec<String>, res: Option<(usize, usize)>) {
-        assert_eq!(nfa.is_whole_match(doc), res)
+        assert_eq!(nfa.is_match(doc), res)
     }
 
     #[test]

@@ -246,8 +246,6 @@ pub fn final_clear_checks(
 pub fn run_backend(
     dfa: &NFA,
     doc: &Vec<String>,
-    start_at: usize,
-    length_at: usize,
     batching_type: Option<JBatching>,
     commit_docype: Option<JCommit>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
@@ -257,8 +255,6 @@ pub fn run_backend(
     let mut r1cs_converter = R1CS::new(
         dfa,
         doc,
-        start_at,
-        length_at,
         temp_batch_size,
         sc.clone(),
         batching_type,
@@ -957,8 +953,6 @@ mod tests {
             run_backend(
                 &dfa,
                 &doc.chars().map(|c| c.to_string()).collect(),
-                0,
-                doc.len(),
                 Some(batch_type.clone()),
                 Some(commit_docype.clone()),
                 b,
