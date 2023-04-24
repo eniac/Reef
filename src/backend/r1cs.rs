@@ -25,7 +25,6 @@ use rug::{
     rand::RandState,
     Assign, Integer,
 };
-use std::fs;
 use std::sync::Once;
 use std::time::{Duration, Instant};
 
@@ -353,7 +352,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         batch_override: Option<JBatching>,
         commit_override: Option<JCommit>,
     ) -> Self {
-        let is_match = dfa.is_match(doc).is_some();
+        let dfa_match = dfa.is_match(doc);
+        let is_match = dfa_match.is_some();
 
         println!("Match? {:#?}", is_match);
         let batching;
@@ -1929,5 +1929,4 @@ mod tests {
             );
         }
     }
->>>>>>> 20caac2... K-stride tests pass
 }
