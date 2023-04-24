@@ -1,4 +1,4 @@
-use crate::backend::{config::*, costs::*};
+use crate::backend::costs::*;
 use circ::cfg;
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};

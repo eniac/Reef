@@ -1,4 +1,4 @@
-use crate::backend::{commitment::ReefCommitment, costs::*, nova::int_to_ff, r1cs_helper::*};
+use crate::backend::{commitment::*, costs::*, nova::int_to_ff, r1cs_helper::*};
 use crate::config::*;
 use crate::dfa::NFA;
 use circ::cfg::cfg;
@@ -29,7 +29,7 @@ pub struct R1CS<'a, F: PrimeField> {
     pub table: Vec<Integer>,
     pub batching: JBatching,
     pub commit_type: JCommit,
-    pub reef_commit: Option<ReefCommitment>,
+    reef_commit: Option<ReefCommitment>,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -145,6 +145,20 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             is_match,
             substring,
             pc: pcs,
+        }
+    }
+
+    pub fn set_commitment(&mut self, rc: ReefCommitment) {
+        match (&rc, self.commit_type) {
+            (ReefCommitment::HashChain(_), JCommit::HashChain) => {
+                self.reef_commit = Some(rc);
+            }
+            (ReefCommitment::Nlookup(_), JCommit::Nlookup) => {
+                self.reef_commit = Some(rc);
+            }
+            _ => {
+                panic!("Commitment does not match selected type");
+            }
         }
     }
 
@@ -387,7 +401,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         //println!("eval form poly {:#?}", evals);
 
         //Makes big polynomial
-        let mut poly_0;
+        let mut poly_0 = new_bool_const(true); // dummy
         for i in 0..self.batch_size {
             let eq = term(
                 Op::Eq,
@@ -1126,10 +1140,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         for i in 0..self.batch_size {
             match (batch_num, i, self.commit_type) {
                 (0, 0, JCommit::HashChain) => {
+                    let doc_blind = match &self.reef_commit {
+                        Some(ReefCommitment::HashChain(hcs)) => hcs.blind,
+                        _ => panic!("Prover couldn't find document commitment blind"),
+                    };
                     wits.insert(
                         format!("char_{}", i),
                         new_wit(Integer::from_digits(
-                            self.doc_blind.unwrap().to_repr().as_ref(),
+                            doc_blind.to_repr().as_ref(),
                             Order::Lsf,
                         )),
                     );

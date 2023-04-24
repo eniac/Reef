@@ -68,7 +68,7 @@ pub fn run_backend(
     println!("generate commitment");
     // to get rid clone
     let reef_commit = gen_commitment(r1cs_converter.commit_type, usize_doc.clone(), &sc);
-    r1cs_converter.reef_commit = Some(reef_commit);
+    r1cs_converter.set_commitment(reef_commit.clone());
     let commit_ms = c_time.elapsed().as_millis();
 
     //let parse_ms = p_time.elapsed().as_millis();

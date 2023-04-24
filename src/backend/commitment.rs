@@ -40,7 +40,7 @@ pub enum ReefCommitment {
 #[derive(Debug, Clone)]
 pub struct HashCommitmentStruct {
     commit: <G1 as Group>::Scalar,
-    blind: <G1 as Group>::Scalar,
+    pub blind: <G1 as Group>::Scalar,
 }
 
 #[derive(Debug, Clone)]

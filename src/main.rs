@@ -9,7 +9,7 @@ pub mod config;
 pub mod dfa;
 pub mod regex;
 
-use crate::backend::{framework::*, r1cs::init};
+use crate::backend::{framework::*, r1cs_helper::init};
 use crate::config::*;
 use crate::dfa::NFA;
 
