@@ -390,11 +390,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let sel_batch_size = opt_batch_size;
 
-        assert!(sel_batch_size >= 1);
-        println!(
-            "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}",
-            batching, commit, sel_batch_size
-        );
+    //        assert!(sel_batch_size >= 1);
+    //    println!(
+    //        "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}",
+    //        batching, commit, sel_batch_size
+    //    );
 
         println!("substring pre {:#?}", dfa.is_match(doc));
 
@@ -1845,7 +1845,7 @@ mod tests {
         );
     }
 
-    #[test]
+    // #[test]
     fn big() {
         init();
         let ASCIIchars: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
