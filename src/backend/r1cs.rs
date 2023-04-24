@@ -1869,8 +1869,9 @@ mod tests {
         let mut dfa = NFA::new(&ab[..], r);
         let mut d = doc.chars().map(|c| c.to_string()).collect();
         d = dfa.k_stride(k, &d);
-        println!("#### DFA Size: {:#?}", dfa.trans.len());
-        println!("#### New doc: {:#?}", d);
+        let dfa_match = dfa.is_match(&d);
+        println!("DFA Size: {:#?}, |doc| : {}, |ab| : {}, match: {:?}",
+            dfa.trans.len(), d.len(), dfa.ab.len(), dfa_match);
 
         //let chars: Vec<String> = d.clone();
         //.chars().map(|c| c.to_string()).collect();
@@ -1882,11 +1883,11 @@ mod tests {
                     println!("Commit {:#?}",c);
                     println!(
                         "cost model: {:#?}",
-                        costs::full_round_cost_model_nohash(
+                        costs::full_round_cost_model(
                             &dfa,
                             s,
                             b.clone(),
-                            dfa.is_match(&d),
+                            dfa_match,
                             d.len(),
                             c,
                         )
