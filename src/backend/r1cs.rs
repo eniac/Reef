@@ -3,6 +3,7 @@ use crate::config::*;
 use crate::dfa::NFA;
 use circ::cfg::cfg;
 use circ::ir::{opt::*, proof::Constraints, term::*};
+use circ::target::r1cs::*;
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use ff::PrimeField;
 use fxhash::FxHashMap;
@@ -149,6 +150,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     pub fn set_commitment(&mut self, rc: ReefCommitment) {
+        println!("SETTING COMMITMENT");
         match (&rc, self.commit_type) {
             (ReefCommitment::HashChain(_), JCommit::HashChain) => {
                 self.reef_commit = Some(rc);
@@ -235,7 +237,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
 
         // sanity
-        if (batch_num + 1) * self.batch_size >= self.doc.len() {
+        if (batch_num + 1) * self.batch_size - 1 >= self.doc.len() {
+            // todo check
             assert!(out);
         }
 
@@ -354,6 +357,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             ],
         );
         let final_cs = css.get("main");
+        //println!("{:#?}", final_cs.clone());
+
         let mut circ_r1cs = to_r1cs(final_cs, cfg());
 
         println!(
@@ -363,7 +368,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // println!("Prover data {:#?}", prover_data);
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
-        //println!("Prover data {:#?}", prover_data);
+        for r in circ_r1cs.constraints().clone() {
+            println!("{:#?}", circ_r1cs.format_qeq(&r));
+        }
+
+        //println!("Prover data {:#?}", circ_r1cs);
         let ms = time.elapsed().as_millis();
         println!(
             "Final R1cs size (no hashes): {}",
@@ -401,7 +410,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         //println!("eval form poly {:#?}", evals);
 
         //Makes big polynomial
-        let mut poly_0 = new_bool_const(true); // dummy
         for i in 0..self.batch_size {
             let eq = term(
                 Op::Eq,
@@ -411,36 +419,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                                                                          // takes care of; TODO also clones
                 ],
             );
-            if i == 0 {
-                poly_0 = eq;
-            } else {
-                self.assertions.push(eq);
-            }
+            self.assertions.push(eq);
         }
 
         self.accepting_state_circuit();
 
         match self.commit_type {
             JCommit::HashChain => {
-                // TODO cost model
-                let ite = term(
-                    Op::Ite,
-                    vec![
-                        term(
-                            Op::Not,
-                            vec![term(Op::Eq, vec![new_var(format!("i_0")), new_const(0)])],
-                        ),
-                        poly_0,
-                        new_bool_const(true),
-                    ],
-                );
-                self.assertions.push(ite);
-
                 self.hashchain_commit();
             }
             JCommit::Nlookup => {
-                self.assertions.push(poly_0);
-
                 self.nlookup_doc_commit();
             }
         }
@@ -465,6 +453,31 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.assertions.push(i_plus);
             self.pub_inputs.push(new_var(format!("i_{}", idx)));
         }
+
+        let ite = term(
+            Op::Ite,
+            vec![
+                term(Op::Eq, vec![new_var(format!("i_0")), new_const(0)]),
+                term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("first_hash_input")),
+                        new_var(format!("random_hash_result")),
+                    ],
+                ),
+                term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("first_hash_input")),
+                        new_var(format!("z_hash_input")),
+                    ],
+                ),
+            ],
+        );
+        self.assertions.push(ite);
+        self.pub_inputs.push(new_var(format!("first_hash_input")));
+        self.pub_inputs.push(new_var(format!("random_hash_result")));
+        self.pub_inputs.push(new_var(format!("z_hash_input")));
     }
 
     // for use at the end of sum check
@@ -886,7 +899,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 for i in 0..=self.batch_size {
                     wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
                 }
-
+                // values not actually checked or used
+                wits.insert(format!("first_hash_input"), new_wit(0));
+                wits.insert(format!("random_hash_result"), new_wit(0));
+                wits.insert(format!("z_hash_input"), new_wit(0));
                 (
                     wits,
                     next_state,
@@ -1138,33 +1154,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut next_state = 0;
 
         for i in 0..self.batch_size {
-            match (batch_num, i, self.commit_type) {
-                (0, 0, JCommit::HashChain) => {
-                    let doc_blind = match &self.reef_commit {
-                        Some(ReefCommitment::HashChain(hcs)) => hcs.blind,
-                        _ => panic!("Prover couldn't find document commitment blind"),
-                    };
-                    wits.insert(
-                        format!("char_{}", i),
-                        new_wit(Integer::from_digits(
-                            doc_blind.to_repr().as_ref(),
-                            Order::Lsf,
-                        )),
-                    );
-                    next_state = state_i; // dummy (when we need to do one non eval run of hash)
-                }
-                (_, _, JCommit::HashChain) => {
-                    let doc_i = self.doc[batch_num * self.batch_size + i - 1].clone();
-                    wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(&doc_i)));
-                    next_state = self.dfa.delta(state_i, &doc_i.clone()).unwrap();
-                }
-                _ => {
-                    let doc_i = self.doc[batch_num * self.batch_size + i].clone();
-                    wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(&doc_i)));
-                    next_state = self.dfa.delta(state_i, &doc_i.clone()).unwrap();
-                }
-            }
-
+            let doc_i = self.doc[batch_num * self.batch_size + i].clone();
+            wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(&doc_i)));
+            next_state = self.dfa.delta(state_i, &doc_i.clone()).unwrap();
             wits.insert(format!("state_{}", i), new_wit(state_i));
 
             state_i = next_state;
@@ -1182,6 +1174,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 for i in 0..=self.batch_size {
                     wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
                 }
+                // values not actually checked or used
+                wits.insert(format!("first_hash_input"), new_wit(0));
+                wits.insert(format!("random_hash_result"), new_wit(0));
+                wits.insert(format!("z_hash_input"), new_wit(0));
                 (wits, next_state, None, None)
             }
             JCommit::Nlookup => {
@@ -1378,6 +1374,15 @@ mod tests {
 
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
+        // doc to usizes - can I use this elsewhere too? TODO
+        let mut usize_doc = vec![];
+        let mut int_doc = vec![];
+        for c in chars.clone().into_iter() {
+            let u = dfa.ab_to_num(&c.to_string());
+            usize_doc.push(u);
+            int_doc.push(<G1 as Group>::Scalar::from(u as u64));
+        }
+
         for s in batch_sizes {
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
@@ -1390,10 +1395,14 @@ mod tests {
                         &dfa,
                         &doc.chars().map(|c| c.to_string()).collect(),
                         s,
-                        sc,
+                        sc.clone(),
                         Some(b.clone()),
                         Some(c.clone()),
                     );
+
+                    let reef_commit =
+                        gen_commitment(r1cs_converter.commit_type, usize_doc.clone(), &sc);
+                    r1cs_converter.set_commitment(reef_commit.clone());
 
                     assert_eq!(expected_match, r1cs_converter.is_match);
 
@@ -1469,7 +1478,7 @@ mod tests {
                     println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
                     assert!(
                         prover_data.r1cs.constraints.len() as usize
-                            <= costs::full_round_cost_model_nohash(
+                            == costs::full_round_cost_model_nohash(
                                 &dfa,
                                 s,
                                 b.clone(),

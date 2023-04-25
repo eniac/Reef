@@ -2,7 +2,7 @@ type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 use crate::backend::costs::{JBatching, JCommit};
 use crate::backend::nova::int_to_ff;
-use crate::backend::r1cs_helper::verifier_mle_eval;
+use crate::backend::r1cs_helper::{init, verifier_mle_eval};
 use circ::cfg::cfg;
 use ff::{Field, PrimeField};
 use generic_array::typenum;
@@ -313,12 +313,15 @@ fn q_to_mle_q(q: &Vec<<G1 as Group>::Scalar>, mle_len: usize) -> Vec<<G1 as Grou
 #[cfg(test)]
 mod tests {
 
+    use crate::backend::commitment::*;
     use crate::backend::costs;
+    use crate::backend::nova::int_to_ff;
     use crate::backend::r1cs::*;
     use crate::dfa::NFA;
     use crate::regex::Regex;
     use circ::cfg;
     use circ::cfg::CircOpt;
+    use rug::Integer;
     use serial_test::serial;
     type G1 = pasta_curves::pallas::Point;
 

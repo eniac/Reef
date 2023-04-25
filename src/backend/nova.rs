@@ -250,10 +250,12 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         return Ok(false);
     }
 
+    // todo find and set random Has res, z hash input
     fn hash_circuit<CS>(
         &self,
         cs: &mut CS,
-        start_hash: AllocatedNum<F>,
+        start_hash: AllocatedNum<F>, // this is "first_hash_input"
+        blind: Option<AllocatedNum<F>>,
         alloc_chars: Vec<Option<AllocatedNum<F>>>,
         doc_idxs: Vec<Option<AllocatedNum<F>>>,
     ) -> Result<AllocatedNum<F>, SynthesisError>
@@ -261,14 +263,45 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         CS: ConstraintSystem<F>,
     {
         println!("adding hash chain hashes in nova");
-        let mut next_hash = start_hash;
+        let mut ns = cs.namespace(|| format!("poseidon hash ns batch"));
+        let acc = &mut ns;
 
+        let random_hash = {
+            // "random_hash_result"
+            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+            let acc = &mut ns;
+
+            sponge.start(
+                IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
+                None,
+                acc,
+            );
+
+            SpongeAPI::absorb(
+                &mut sponge,
+                3,
+                &[
+                    Elt::Allocated(blind.unwrap()),
+                    Elt::num_from_fr::<CS>(F::from(0)),
+                ],
+                // TODO "connected"? get rid clones
+                acc,
+            );
+
+            let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
+
+            sponge.finish(acc).unwrap();
+
+            Elt::ensure_allocated(&output[0], &mut ns.namespace(|| "ensure allocated"), true)?
+        };
+
+        // set random_hash_result var
+
+        let mut next_hash = start_hash;
         for i in 0..(self.batch_size) {
-            let mut ns = cs.namespace(|| format!("poseidon hash ns batch {}", i));
             //println!("i {:#?}", i);
             next_hash = {
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
-                let acc = &mut ns;
 
                 sponge.start(
                     IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]),
@@ -280,8 +313,8 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                     &mut sponge,
                     3,
                     &[
-                        Elt::Allocated(next_hash.clone()),               // or 0
-                        Elt::Allocated(alloc_chars[i].clone().unwrap()), // or the blind
+                        Elt::Allocated(next_hash.clone()),
+                        Elt::Allocated(alloc_chars[i].clone().unwrap()),
                         Elt::Allocated(doc_idxs[i].clone().unwrap()),
                     ],
                     // TODO "connected"? get rid clones

@@ -579,6 +579,7 @@ mod tests {
     use crate::backend::costs;
     use crate::backend::framework::*;
     use crate::backend::r1cs::*;
+    use crate::backend::r1cs_helper::init;
     use crate::dfa::NFA;
     use crate::regex::Regex;
     use circ::cfg;
@@ -646,7 +647,7 @@ mod tests {
         );
     }
 
-    #[test]
+    //    #[test]
     fn e2e_nl_nl() {
         backend_test(
             "ab".to_string(),

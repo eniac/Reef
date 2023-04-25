@@ -44,8 +44,9 @@ pub fn commit_circuit_nohash(
 ) -> usize {
     match commit_type {
         JCommit::HashChain => match is_match {
-            None => 0,
-            Some((_, end)) if end == doc_len => 0,
+            None => batch_size + 7, // i's for hashes: i++ (batch_size),
+            // enforce i_0 != 0 bool (2), TODO?? (5)
+            Some((_, end)) if end == doc_len => batch_size + 7,
             _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
@@ -230,7 +231,7 @@ pub fn full_round_cost_model_nohash<'a>(
         }
         JBatching::Nlookup => {
             nlookup_cost_model_nohash(dfa, batch_size, is_match, doc_len, commit_type)
-        } //        JBatching::Plookup => plookup_cost_model_nohash(dfa, batch_size),
+        }
     };
     cost
 }
