@@ -24,10 +24,10 @@ fn main() {
     let ab = String::from_iter(opt.config.alphabet());
 
     // Regular expresion parser and convert the Regex to a DFA
-    let mut nfa = opt.config.compile_nfa();
+    let mut doc = opt.config.read_file(&opt.input).iter().map(|c|c.to_string()).collect();
 
     // Input document
-    let mut doc: Vec<String> = opt.config.read_doc().iter().map(|c|c.to_string()).collect();
+    let mut nfa = NFA::new(&ab, opt.re);
 
     // Try to use k-stride
     opt.k_stride.map(|k| { doc = nfa.k_stride(k, &doc); });
@@ -49,3 +49,4 @@ fn main() {
 
     //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }
+

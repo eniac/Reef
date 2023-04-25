@@ -4,6 +4,8 @@ use hashconsing::{consign, HConsed, HashConsign};
 use regex_syntax::hir::{Hir, HirKind, Anchor, Class, RepetitionKind, RepetitionRange, Literal};
 use regex_syntax::Parser;
 
+use std::str::FromStr;
+
 /// Hash-consed regex terms
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Regex(HConsed<RegexF>);
@@ -46,6 +48,13 @@ impl fmt::Display for Regex {
             RegexF::Star(a) => write!(f, "{}*", a),
             RegexF::Range(a, i, j) => write!(f, "{}{{{}, {}}}", a, i, j)
         }
+    }
+}
+
+impl FromStr for Regex {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Regex::new(s))
     }
 }
 

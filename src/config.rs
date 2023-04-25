@@ -6,9 +6,8 @@ use std::io::{BufReader, Read};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
-use crate::backend::costs::{JBatching, JCommit};
-use crate::dfa::NFA;
 use crate::regex::Regex;
+use crate::backend::costs::{JBatching, JCommit};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -16,6 +15,10 @@ pub struct Options {
     /// Configuration options, charset ["ascii", "utf8", "dna"]
     #[command(subcommand)]
     pub config: Config,
+    #[arg(short = 'i', long, value_name = "FILE")]
+    pub input: PathBuf,
+    #[arg(short = 'r', long, help = "Perl-style regular expression", value_parser = clap::value_parser!(Regex))]
+    pub re: Regex,
     #[arg(
         short = 'e',
         long = "eval-type",
@@ -58,10 +61,6 @@ pub enum Config {
             help = "Transformations to apply to the input, in order"
         )]
         trs: Vec<CharTransform>,
-        #[arg(short = 'r', long)]
-        re: String,
-        #[arg(short = 'i', long, value_name = "FILE")]
-        inp: PathBuf,
     },
     #[clap(about = "Accepts UTF8 regular-expressions and documents")]
     Utf8 {
@@ -72,10 +71,6 @@ pub enum Config {
             help = "Transformations to apply to the input, in order"
         )]
         trs: Vec<CharTransform>,
-        #[arg(short = 'r', long)]
-        re: String,
-        #[arg(short = 'i', long, value_name = "FILE")]
-        inp: PathBuf,
     },
     #[clap(about = "Accepts .pcap files and Snort rules")]
     Snort {
@@ -86,8 +81,6 @@ pub enum Config {
             help = "Snort rule file"
         )]
         rulesfile: PathBuf,
-        #[arg(short = 'i', long = "input", value_name = "FILE", help = "Pcap file")]
-        pcapfile: PathBuf,
     },
     #[clap(about = "Accepts DNA base ASCII files")]
     Dna {
@@ -95,16 +88,7 @@ pub enum Config {
         re: String,
         #[arg(short = 'i', long, value_name = "FILE")]
         inp: PathBuf,
-    },
-    #[clap(
-        about = "Infer the smallest alphabet that works from the regular expression and document"
-    )]
-    Auto {
-        #[arg(short = 'r', long)]
-        re: String,
-        #[arg(short = 'i', long, value_name = "FILE")]
-        inp: PathBuf,
-    },
+    }
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -113,32 +97,6 @@ pub enum CharTransform {
     BasicEnglish,
     IgnoreWhitespace,
     CaseInsensitive,
-}
-
-/// Top level
-impl Config {
-    pub fn read_doc(&self) -> Vec<char> {
-        match self {
-            Config::Ascii { inp, .. } => self.read_file(inp),
-            Config::Utf8 { inp, .. } => self.read_file(inp),
-            Config::Dna { inp, .. } => self.read_file(inp),
-            Config::Auto { inp, .. } => self.read_file(inp),
-            Config::Snort { .. } => Vec::new(), // TODO
-        }
-    }
-
-    pub fn compile_nfa(&self) -> NFA {
-        let ab = String::from_iter(self.alphabet());
-        NFA::new(&ab,
-            match self {
-                Config::Ascii { re, .. } => Regex::new(re),
-                Config::Utf8 { re, .. } => Regex::new(re),
-                Config::Dna { re, .. } => Regex::new(re),
-                Config::Auto { re, .. } => Regex::new(re),
-                Config::Snort { .. } => Regex::empty(), // TODO
-            }
-        )
-    }
 }
 
 /// Define how to encode a Datatype
@@ -293,51 +251,6 @@ impl BaseParser<char> for DnaParser {
     }
 }
 
-/// Automatically infer the alphabet from the alphanumeric chars of the regex
-struct AutoParser {
-    ab: Vec<char>,
-}
-impl AutoParser {
-    fn new(inp: &PathBuf, re: &String) -> Self {
-        let docab = std::fs::read_to_string(inp)
-            .expect("Could not read document")
-            .replace("\n","")
-            .chars()
-            .collect::<HashSet<char>>();
-
-        let reab = re
-            .chars()
-            .filter(|c| c.is_alphanumeric())
-            .collect::<HashSet<char>>();
-
-        Self {
-            ab: docab.union(&reab).map(|c| c.clone()).collect(),
-        }
-    }
-}
-
-impl BaseParser<char> for AutoParser {
-    fn alphabet(&self) -> Vec<char> {
-        self.ab.clone()
-    }
-    fn read_file(&self, file: &PathBuf) -> Vec<char> {
-        let doc:Vec<char> = Utf8Parser.read_file(file)
-                    .into_iter()
-                    .filter(|&s| s != '\n')
-                    .collect();
-
-        for c in doc.iter() {
-            assert!(
-                self.ab.contains(&c),
-                "{:#04x} not in the alphabet {:?}",
-                *c as u8,
-                self.ab
-            );
-        }
-        doc
-    }
-}
-
 ////////////////////////////////////////////////////////////
 ////////////////////// TRANSFORMATIONS /////////////////////
 ////////////////////////////////////////////////////////////
@@ -481,7 +394,6 @@ impl BaseParser<char> for Config {
             Config::Ascii { trs, .. } => ComposeBase::new(&AsciiParser, &trs).alphabet(),
             Config::Utf8 { trs, .. } => ComposeBase::new(&Utf8Parser, &trs).alphabet(),
             Config::Dna { .. } => DnaParser.alphabet(),
-            Config::Auto { re, inp, .. } => AutoParser::new(inp, re).alphabet(),
             Config::Snort { .. } => Vec::new(), // TODO
         }
     }
@@ -491,7 +403,6 @@ impl BaseParser<char> for Config {
             Config::Ascii { trs, .. } => ComposeBase::new(&AsciiParser, &trs).read_file(file),
             Config::Utf8 { trs, .. } => ComposeBase::new(&Utf8Parser, &trs).read_file(file),
             Config::Dna { .. } => DnaParser.read_file(file),
-            Config::Auto { re, inp, .. } => AutoParser::new(inp, re).read_file(file),
             Config::Snort { .. } => Vec::new(), // TODO
         }
     }
