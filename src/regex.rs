@@ -176,7 +176,7 @@ impl Regex {
     }
 
     pub fn range(a: Regex, i: usize, j: usize) -> Regex {
-        assert!(0 < i && i < j, "Range indices {{{}, {}}} must be 0 < {} < {}", i, j, i, j);
+        assert!(0 < i && i <= j, "Range indices {{{}, {}}} must be 0 < {} <= {}", i, j, i, j);
         match &*a.0 {
             RegexF::Star(_) | RegexF::Nil => a,
             RegexF::Empty => Regex::empty(),

@@ -1,20 +1,16 @@
 #![allow(missing_docs, non_snake_case)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser};
 use std::time::{Duration, Instant};
 
-pub mod backend;
-pub mod config;
-pub mod dfa;
-pub mod regex;
-
-use crate::backend::{framework::*, r1cs::init};
-use crate::config::*;
-use crate::dfa::NFA;
+use reef::backend::{framework::*, r1cs::init};
+use reef::config::*;
 
 #[cfg(feature = "plot")]
-pub mod plot;
+use reef::plot;
+
+use reef::dfa::NFA;
 
 fn main() {
     let p_time = Instant::now();
@@ -38,7 +34,7 @@ fn main() {
     println!("NFA: {:#?}", nfa);
 
     #[cfg(feature = "plot")]
-    plot::plot_nfa(&nfa).expect("Failed to plot DFA to a pdf file");
+    plot::plot_nfa(&nfa).expect("Failed to plot NFA to a pdf file");
 
     let num_steps = doc.len();
     println!("Doc len is {}", num_steps);
