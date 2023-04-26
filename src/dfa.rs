@@ -1,7 +1,7 @@
 use itertools::Itertools;
-use std::collections::HashMap;
-use std::collections::{HashSet, BTreeSet};
 use rayon::prelude::*;
+use std::collections::HashMap;
+use std::collections::{BTreeSet, HashSet};
 use std::io::Result;
 
 use crate::regex::Regex;
@@ -21,11 +21,11 @@ pub struct NFA {
     /// Must match from the begining of the document (default: false)
     pub anchor_start: bool,
     /// Must match until the end of the document (default: false)
-    pub anchor_end: bool
+    pub anchor_end: bool,
 }
 
 // Null transition character
-const EPSILON: &String = &String::new();
+pub const EPSILON: &String = &String::new();
 
 impl NFA {
     pub fn new<'a>(alphabet: &'a str, re: Regex) -> Self {
@@ -39,7 +39,8 @@ impl NFA {
             trans: &mut HashMap<(usize, String), usize>,
             ab: &Vec<char>,
             q: &Regex,
-            n: usize) {
+            n: usize,
+        ) {
             // Add to DFA if not already there
             states.insert(q.clone(), n);
 
@@ -61,15 +62,17 @@ impl NFA {
 
         // Return DFA
         Self {
-            ab: ab.into_iter().map(|c|c.to_string()).collect(),
+            ab: ab.into_iter().map(|c| c.to_string()).collect(),
             n: states.len(),
-            accepting: states.clone().into_iter()
-                             .filter_map(|(k,v)| if k.nullable() { Some(v)} else { None })
-                             .collect(),
-            expressions: states.into_iter().map(|(k,v)| (v,k)).collect(),
+            accepting: states
+                .clone()
+                .into_iter()
+                .filter_map(|(k, v)| if k.nullable() { Some(v) } else { None })
+                .collect(),
+            expressions: states.into_iter().map(|(k, v)| (v, k)).collect(),
             trans,
             anchor_start: re.is_start_anchored(),
-            anchor_end: re.is_end_anchored()
+            anchor_end: re.is_end_anchored(),
         }
     }
 
@@ -77,7 +80,10 @@ impl NFA {
     pub fn well_formed(&self, doc: &Vec<String>) -> () {
         for d in doc {
             if !self.ab.contains(d) {
-                panic!("Found {} in the document but not in the alphabet {:?}", d, self.ab)
+                panic!(
+                    "Found {} in the document but not in the alphabet {:?}",
+                    d, self.ab
+                )
             }
         }
     }
@@ -119,14 +125,17 @@ impl NFA {
 
     /// Non final states
     pub fn get_non_final_states(&self) -> HashSet<usize> {
-        self.get_states().difference(&self.accepting).map(|c|c.clone()).collect()
+        self.get_states()
+            .difference(&self.accepting)
+            .map(|c| c.clone())
+            .collect()
     }
 
     pub fn delta(&self, state: usize, c: &String) -> Option<usize> {
         let res = if c.is_empty() {
             Some(state)
         } else {
-            self.trans.get(&(state, c.clone())).map(|c|c.clone())
+            self.trans.get(&(state, c.clone())).map(|c| c.clone())
         };
         // println!("{} --[ {} ]--> {}", state, c, res.map(|c|c.to_string()).unwrap_or(String::from("NONE")));
         res
@@ -137,7 +146,7 @@ impl NFA {
         self.trans
             .clone()
             .into_iter()
-            .map(|((a, b), c)| (a,b,c))
+            .map(|((a, b), c)| (a, b, c))
             .collect()
     }
 
@@ -156,27 +165,23 @@ impl NFA {
         }
 
         // Initial state is also accepting
-        if accepting.contains(&self.get_init_state()) &&
-            (!self.anchor_end || doc.len() == 0) {
+        if accepting.contains(&self.get_init_state()) && (!self.anchor_end || doc.len() == 0) {
             return Some((0, 0));
         }
         // For every postfix of doc (O(n^2))
-        start_idxs
-            .into_par_iter()
-            .find_map_any(|i| {
-              let mut s = self.get_init_state();
-              for j in i..doc.len() {
-                  // Apply transition relation
-                  s = self.delta(s, &doc[j]).unwrap();
+        start_idxs.into_par_iter().find_map_any(|i| {
+            let mut s = self.get_init_state();
+            for j in i..doc.len() {
+                // Apply transition relation
+                s = self.delta(s, &doc[j]).unwrap();
 
-                  // found a substring match or exact match
-                  if accepting.contains(&s) &&
-                      (!self.anchor_end || j == doc.len() - 1) {
-                      return Some((i, j+1)); // Return an interval [i, j)
-                  }
-              }
-              None
-            })
+                // found a substring match or exact match
+                if accepting.contains(&s) && (!self.anchor_end || j == doc.len() - 1) {
+                    return Some((i, j + 1)); // Return an interval [i, j)
+                }
+            }
+            None
+        })
     }
 
     /// Get the 2^k stride DFA
@@ -191,7 +196,7 @@ impl NFA {
     /// Double the stride of the DFA
     pub fn double_stride(&mut self, doc: &Vec<String>) -> Vec<String> {
         let mut ab: HashSet<(String, String)> = HashSet::new();
-        let mut classes : HashMap<BTreeSet<(usize, usize)>, BTreeSet<String>> = HashMap::new();
+        let mut classes: HashMap<BTreeSet<(usize, usize)>, BTreeSet<String>> = HashMap::new();
 
         // S' := S + S*S (cartesian product)
         for c0 in self.ab.iter() {
@@ -205,7 +210,7 @@ impl NFA {
         self.ab = Vec::new();
 
         // Result transition will be t1 -[a+b]-> t3
-        for (a,b) in ab {
+        for (a, b) in ab {
             let mut trans_clos: BTreeSet<(usize, usize)> = BTreeSet::new();
             for t1 in self.get_states() {
                 let t2 = self.delta(t1, &a).unwrap();
@@ -220,17 +225,23 @@ impl NFA {
 
             // Equivalence classes have the same transitive closure
             match classes.get_mut(&trans_clos) {
-                Some(class) => { class.insert(s.clone()); },
-                None => { classes.insert(trans_clos, BTreeSet::from([s.clone()])); },
+                Some(class) => {
+                    class.insert(s.clone());
+                }
+                None => {
+                    classes.insert(trans_clos, BTreeSet::from([s.clone()]));
+                }
             }
             self.ab.push(s)
         }
 
         // Find a representative string from an eqivalence class
         fn find_representative(class: &BTreeSet<String>) -> String {
-            class.iter().next()
-                 .map(|c|c.clone())
-                 .expect("No equivalence classes found")
+            class
+                .iter()
+                .next()
+                .map(|c| c.clone())
+                .expect("No equivalence classes found")
         }
 
         // Find a equivalent string from an eqivalence class
@@ -257,11 +268,12 @@ impl NFA {
 
         // Return new document (modulo equiv classes)
         doc.chunks(2)
-           .filter_map(|c| match c {
-                    [a,b] => Some(find_equivalent(a.clone() + b, &equiv_classes)),
-                    [a] => Some(find_equivalent(a.clone() + &EPSILON, &equiv_classes)),
-                    _ => None
-            }).collect()
+            .filter_map(|c| match c {
+                [a, b] => Some(find_equivalent(a.clone() + b, &equiv_classes)),
+                [a] => Some(find_equivalent(a.clone() + &EPSILON, &equiv_classes)),
+                _ => None,
+            })
+            .collect()
     }
 }
 
@@ -287,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_nfa_delta_circuit_basic() {
-        check(&setup_nfa("a", "ab"), &vs("a"), Some((0,1)))
+        check(&setup_nfa("a", "ab"), &vs("a"), Some((0, 1)))
     }
 
     #[test]
@@ -297,7 +309,7 @@ mod tests {
 
     #[test]
     fn test_nfa_delta_circuit() {
-        check(&setup_nfa("aba", "ab"), &vs("aba"), Some((0,3)))
+        check(&setup_nfa("aba", "ab"), &vs("aba"), Some((0, 3)))
     }
 
     #[test]
@@ -307,17 +319,17 @@ mod tests {
 
     #[test]
     fn test_nfa_delta_circuit_star() {
-        check(&setup_nfa("a.*a", "ab"), &vs("abba"), Some((0,4)))
+        check(&setup_nfa("a.*a", "ab"), &vs("abba"), Some((0, 4)))
     }
 
     #[test]
     fn test_nfa_delta_empty_match() {
-        check(&setup_nfa(".*", "ab"), &vs(""), Some((0,0)))
+        check(&setup_nfa(".*", "ab"), &vs(""), Some((0, 0)))
     }
 
     #[test]
     fn test_nfa_delta_circuit_star_anchor() {
-        check(&setup_nfa("^a.*a$", "ab"), &vs("abba"), Some((0,4)))
+        check(&setup_nfa("^a.*a$", "ab"), &vs("abba"), Some((0, 4)))
     }
 
     #[test]
@@ -332,24 +344,24 @@ mod tests {
 
     #[test]
     fn test_nfa_delta_middle_match() {
-        check(&setup_nfa("abba", "ab"), &vs("aaaaaaaaaabbaaaaaaa"), Some((9, 13)))
+        check(
+            &setup_nfa("abba", "ab"),
+            &vs("aaaaaaaaaabbaaaaaaa"),
+            Some((9, 13)),
+        )
     }
-
 
     #[test]
     fn test_nfa_double_stride() {
         let mut nfa = setup_nfa("a.*a", "ab");
         let doc = nfa.double_stride(&vs("abbbba"));
-        check(&nfa, &doc, Some((0,3)))
+        check(&nfa, &doc, Some((0, 3)))
     }
 
     #[test]
     fn test_nfa_double_stride_2() {
         let mut nfa = setup_nfa("^.*a$", "ab");
         let doc = nfa.double_stride(&vs("aabbaaa"));
-        check(&nfa, &doc, Some((0,4)))
+        check(&nfa, &doc, Some((0, 4)))
     }
-
-
-
 }

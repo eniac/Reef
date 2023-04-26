@@ -45,7 +45,6 @@ pub struct Options {
         help = "Take 2^k steps at one NFA step"
     )]
     pub k_stride: Option<usize>,
-
 }
 
 #[derive(Debug, Subcommand)]
@@ -130,14 +129,15 @@ impl Config {
 
     pub fn compile_nfa(&self) -> NFA {
         let ab = String::from_iter(self.alphabet());
-        NFA::new(&ab,
+        NFA::new(
+            &ab,
             match self {
                 Config::Ascii { re, .. } => Regex::new(re),
                 Config::Utf8 { re, .. } => Regex::new(re),
                 Config::Dna { re, .. } => Regex::new(re),
                 Config::Auto { re, .. } => Regex::new(re),
                 Config::Snort { .. } => Regex::empty(), // TODO
-            }
+            },
         )
     }
 }
@@ -255,7 +255,9 @@ impl BaseParser<char> for AsciiParser {
         let mut reader = BufReader::new(f);
         let mut buffer: Vec<u8> = Vec::new();
         // Read file into vector.
-        reader.read_to_end(&mut buffer).expect("Could not parse document");
+        reader
+            .read_to_end(&mut buffer)
+            .expect("Could not parse document");
         buffer.into_iter().map(|i| i as char).collect()
     }
 }
@@ -302,7 +304,7 @@ impl AutoParser {
     fn new(inp: &PathBuf, re: &String) -> Self {
         let docab = std::fs::read_to_string(inp)
             .expect("Could not read document")
-            .replace("\n","")
+            .replace("\n", "")
             .chars()
             .collect::<HashSet<char>>();
 
@@ -322,10 +324,11 @@ impl BaseParser<char> for AutoParser {
         self.ab.clone()
     }
     fn read_file(&self, file: &PathBuf) -> Vec<char> {
-        let doc:Vec<char> = Utf8Parser.read_file(file)
-                    .into_iter()
-                    .filter(|&s| s != '\n')
-                    .collect();
+        let doc: Vec<char> = Utf8Parser
+            .read_file(file)
+            .into_iter()
+            .filter(|&s| s != '\n')
+            .collect();
 
         for c in doc.iter() {
             assert!(

@@ -210,7 +210,9 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         alloc_chars: &mut Vec<Option<AllocatedNum<F>>>,
         alloc_idxs: &mut Vec<Option<AllocatedNum<F>>>,
         i_0: AllocatedNum<F>,
+        z_hash_input: AllocatedNum<F>,
         last_i: &mut Option<AllocatedNum<F>>,
+        first_hash_blind: &mut Option<AllocatedNum<F>>,
     ) -> Result<bool, SynthesisError>
     where
         CS: ConstraintSystem<F>,
@@ -244,6 +246,9 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
             alloc_idxs[j] = i_j;
 
+            return Ok(true);
+        } else if s.starts_with("blind_TODO") {
+            *first_hash_blind = Some(alloc_v.clone());
             return Ok(true);
         }
 
@@ -279,7 +284,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
             SpongeAPI::absorb(
                 &mut sponge,
-                3,
+                2,
                 &[
                     Elt::Allocated(blind.unwrap()),
                     Elt::num_from_fr::<CS>(F::from(0)),
@@ -295,8 +300,35 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             Elt::ensure_allocated(&output[0], &mut ns.namespace(|| "ensure allocated"), true)?
         };
 
-        // set random_hash_result var
+        // if FIRST_SEL then START_HASH = RANDOM_HASH else START_HASH = Z_INPUT_HASH
+        // FIRST_SEL = (i_0 == 0)
+        // -> r1cs:
+        // START_HASH = Z_INPUT_HASH + FIRST_SEL(RANDOM_HASH - Z_INPUT_HASH) <- ite
+        // i_0 * WIT = FIRST_SEL <- wit here is inv(i_0)
+        // (1 - FIRST_SEL) * i_0 = 0
 
+        sponge_ns.enforce(
+            || format!("ite {}", tag),
+            |z| z + start_hash.get_variable() - z_input_hash.get_variable(),
+            |z| z + first_sel.get_variable(),
+            |z| z + random_hash.get_variable() - z_input_hash.get_variable(),
+        );
+
+        sponge_ns.enforce(
+            || format!("sel {}", tag),
+            |z| z + i_0.get_variable(),
+            |z| z + i_0_inv.get_variable(),
+            |z| z + first_sel.get_variable(),
+        );
+
+        sponge_ns.enforce(
+            || format!("sel {}", tag),
+            |z| z + CS::one() - first_sel.get_variable(),
+            |z| z + i_0.get_variable(),
+            |z| z + CS::zero(),
+        );
+
+        // regular hashing
         let mut next_hash = start_hash;
         for i in 0..(self.batch_size) {
             //println!("i {:#?}", i);
