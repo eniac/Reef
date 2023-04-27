@@ -1650,7 +1650,7 @@ mod tests {
                     let mut values;
                     let mut next_state;
 
-                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0) / s;
+                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0) / r1cs_converter.batch_size;
                     for i in 0..num_steps {
                         (
                             values,
@@ -1680,7 +1680,7 @@ mod tests {
                         "cost model: {:#?}",
                         costs::full_round_cost_model_nohash(
                             &dfa,
-                            s,
+                            r1cs_converter.batch_size,
                             b.clone(),
                             dfa.is_match(&chars),
                             doc.len(),
@@ -1692,7 +1692,7 @@ mod tests {
                         prover_data.r1cs.constraints.len() as usize
                             <= costs::full_round_cost_model_nohash(
                                 &dfa,
-                                s,
+                                r1cs_converter.batch_size,
                                 b.clone(),
                                 dfa.is_match(&chars),
                                 doc.len(),
@@ -1723,7 +1723,7 @@ mod tests {
             "ab".to_string(),
             "^ab$".to_string(),
             "ab".to_string(),
-            vec![1],
+            vec![0,1],
             true,
         );
         test_func_no_hash(
@@ -1756,7 +1756,7 @@ mod tests {
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaaaaabbbbbbbbbbbbbb".to_string(),
-            vec![1, 2, 4],
+            vec![0,1, 2, 4],
             true,
         );
         test_func_no_hash(
