@@ -398,7 +398,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     
         let mut batch_doc = doc.clone();
 
-        let epsilon_to_add = doc.len() % sel_batch_size;
+        let epsilon_to_add = sel_batch_size - (doc.len() % sel_batch_size);
+
+        println!("Doc len: {:#?}, Epsilon to Add: {:#?}", doc.len(), epsilon_to_add);
 
         if epsilon_to_add != 0 {
             for i in 0..epsilon_to_add {
@@ -1860,7 +1862,7 @@ mod tests {
             "helowrd".to_string(),
             "^hello.*$".to_string(),
             "helloworld".to_string(),
-            vec![3,4,6],
+            vec![3,4,6,7],
             true,
         );
 
@@ -1868,7 +1870,7 @@ mod tests {
             "helowrd".to_string(),
             "^hello$".to_string(),
             "helloworld".to_string(),
-            vec![3,4,6],
+            vec![3,4,6,7],
             false,
         );
     }

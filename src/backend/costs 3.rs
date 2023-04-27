@@ -123,7 +123,35 @@ pub fn naive_cost_model_nohash<'a>(
 
     cost
 }
+/*
+pub fn plookup_cost_model_nohash<'a>(dfa: &'a NFA, batch_size: usize) -> usize {
+    let mut cost = 0;
+    // 2 prove sequence constructions
+    cost += dfa.nstates() * dfa.nchars();
+    cost += batch_size;
+    cost = cost * 2;
 
+    //Batchsize creating v_i
+    cost += 3 * batch_size;
+
+    //Schwarz Zippel evals of sequence
+    cost += 2 * ((dfa.nstates() * dfa.nchars()) + batch_size);
+
+    cost
+}
+
+pub fn plookup_cost_model_hash<'a>(dfa: &'a NFA, batch_size: usize) -> usize {
+    let mut cost: usize = plookup_cost_model_nohash(dfa, batch_size);
+
+    //Randomized difference
+    cost += 2 * POSEIDON_NUM;
+
+    //Poseidon hash in Schwarz Zippel
+    cost += POSEIDON_NUM;
+
+    cost
+}
+*/
 pub fn nlookup_cost_model_nohash<'a>(
     dfa: &'a NFA,
     batch_size: usize,
@@ -260,21 +288,19 @@ pub fn opt_cost_model_select_with_commit<'a>(
         cost = nlookup;
         opt_batching = JBatching::Nlookup;
     }
-    let folding_size: usize = ((cost as f32) / 128.0).log2().ceil() as usize;
     (
         opt_batching,
         commit.clone(),
         batch_size,
-        get_folded_cost(cost, doc_length, batch_size),
+        get_folded_cost(cost, doc_length, batch_size)
     )
 }
-
 pub fn opt_cost_model_select_with_batch<'a>(
     dfa: &'a NFA,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_length: usize,
-) -> (JBatching, JCommit, usize,usize) {
+) -> (JBatching, JCommit, usize, usize) {
     let mut opt_batching: JBatching = JBatching::NaivePolys;
     let mut opt_commit: JCommit = JCommit::Nlookup;
 
@@ -338,12 +364,11 @@ pub fn opt_cost_model_select_with_batch<'a>(
         }
     }
 
-    let folding_size: usize = ((cost as f32) / 128.0).log2().ceil() as usize;
     (
         opt_batching,
         opt_commit.clone(),
         batch_size,
-        get_folded_cost(cost, doc_length, batch_size),
+        get_folded_cost(cost, doc_length, batch_size)
     )
 }
 
@@ -353,7 +378,7 @@ pub fn opt_commit_select_with_batch<'a>(
     is_match: Option<(usize, usize)>,
     doc_length: usize,
     batching: JBatching,
-) -> (JBatching, JCommit, usize,usize) {
+) -> (JBatching, JCommit, usize, usize) {
     let can_hashcahin: bool = match is_match {
         None => true,
         Some((_, end)) if end == doc_length => true,
@@ -386,12 +411,11 @@ pub fn opt_commit_select_with_batch<'a>(
         }
     }
 
-    let folding_size: usize = ((cost as f32) / 128.0).log2().ceil() as usize;
     (
         opt_batching,
         opt_commit.clone(),
         batch_size,
-        get_folded_cost(cost, doc_length, batch_size),
+        get_folded_cost(cost, doc_length, batch_size)
     )
 }
 
@@ -431,14 +455,14 @@ pub fn opt_cost_model_select<'a>(
     );
     cost = get_folded_cost(cost, doc_length, 1);
 
-    for n in batch_range_lower..=batch_range_upper {
-        let batching_and_cost: (JBatching, JCommit, usize,usize) =
+    for n in batch_range_lower..=batch_range_upper{
+        let batching_and_cost: (JBatching, JCommit, usize, usize) =
             match (batching.clone(), commit.clone(), can_hashcahin) {
                 (None, None, _) => {
                     opt_cost_model_select_with_batch(dfa, 2 << n, is_match, doc_length)
                 }
                 (_, Some(JCommit::HashChain), false) => {
-                    (JBatching::NaivePolys, JCommit::HashChain, 2<<n,cost + 100)
+                    (JBatching::NaivePolys, JCommit::HashChain, 2<<n, cost + 100)
                 }
                 (None, Some(c), _) => {
                     opt_cost_model_select_with_commit(dfa, 2 << n, is_match, doc_length, c)
@@ -447,8 +471,11 @@ pub fn opt_cost_model_select<'a>(
                     opt_commit_select_with_batch(dfa, 2 << n, is_match, doc_length, b)
                 }
                 (Some(b), Some(c), _) => {
-                    let single_cost =  full_round_cost_model(dfa, 2 << n, b, is_match, doc_length, c);
-                    (b, c, 2<<n, get_folded_cost(single_cost, doc_length, 2<<n))
+                    let single_cost = full_round_cost_model(dfa, 2 << n, b, is_match, doc_length, c);
+                    (b,
+                    c,
+                    2<<n,
+                    get_folded_cost(single_cost, doc_length, 2<<n))
                 },
             };
         if batching_and_cost.3 < cost {
@@ -458,5 +485,5 @@ pub fn opt_cost_model_select<'a>(
             opt_batch_size = 2 << n;
         }
     }
-    (opt_batching.clone(), opt_commit.clone(), opt_batch_size,cost)
+    (opt_batching.clone(), opt_commit.clone(), opt_batch_size, cost)
 }
