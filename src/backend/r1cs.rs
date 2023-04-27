@@ -360,7 +360,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let commit;
         let opt_batch_size;
         let cost: usize;
-        if batch_size > 1 {
+        if batch_size > 0  {
             (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
                 (Some(b), Some(c)) => (b, c, batch_size, 0),
                 (Some(b), _) => {
