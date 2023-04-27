@@ -359,11 +359,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let batching;
         let commit;
         let opt_batch_size;
+        let cost: usize;
         if batch_size > 1 {
-            (batching, commit, opt_batch_size) = match (batch_override, commit_override) {
-                (Some(b), Some(c)) => (b, c, batch_size),
+            (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
+                (Some(b), Some(c)) => (b, c, batch_size, 0),
                 (Some(b), _) => {
-                    opt_commit_select_with_batch(dfa, batch_size, dfa.is_match(doc), doc.len(), b)
+                    opt_commit_select_with_batch(dfa, batch_size, dfa_match, doc.len(), b)
                 }
                 (None, Some(c)) => opt_cost_model_select_with_commit(
                     &dfa,
@@ -377,7 +378,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 }
             };
         } else {
-            (batching, commit, opt_batch_size) = opt_cost_model_select(
+            (batching, commit, opt_batch_size,cost) = opt_cost_model_select(
                 &dfa,
                 0,
                 logmn(doc.len()),
@@ -390,13 +391,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let sel_batch_size = opt_batch_size;
 
-    //        assert!(sel_batch_size >= 1);
-    //    println!(
-    //        "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}",
-    //        batching, commit, sel_batch_size
-    //    );
-
-        println!("substring pre {:#?}", dfa.is_match(doc));
+        println!(
+            "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}, cost {:#?}",
+            batching, commit, sel_batch_size, cost
+        );
+    
 
         let mut substring = (0, doc.len());
         match dfa.is_match(doc) {
