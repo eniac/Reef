@@ -25,7 +25,7 @@ pub struct NFA {
 }
 
 // Null transition character
-const EPSILON: &String = &String::new();
+pub const EPSILON: &String = &String::new();
 
 impl NFA {
     pub fn new<'a>(alphabet: &'a str, re: Regex) -> Self {

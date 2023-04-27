@@ -450,7 +450,7 @@ pub fn opt_cost_model_select<'a>(
                 }
                 (Some(b), Some(c), _) => {
                     let single_cost =  full_round_cost_model(dfa, 2 << n, b, is_match, doc_length, c);
-                    (b, c, 2<<n, get_folded_cost(single_cost, doc_length, 2<<n));
+                    (b, c, 2<<n, get_folded_cost(single_cost, doc_length, 2<<n))
                 },
             };
         if batching_and_cost.3 < cost {

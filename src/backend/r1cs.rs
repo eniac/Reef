@@ -1,7 +1,7 @@
-use crate::backend::costs::*;
+use crate::backend::{costs::*, self};
 use crate::backend::nova::int_to_ff;
 use crate::config::*;
-use crate::dfa::NFA;
+use crate::dfa::{NFA, EPSILON};
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::cfg::*;
@@ -396,17 +396,26 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             batching, commit, sel_batch_size, cost
         );
     
+        let mut batch_doc = doc.clone();
 
-        let mut substring = (0, doc.len());
-        match dfa.is_match(doc) {
+        let epsilon_to_add = doc.len() % sel_batch_size;
+
+        if epsilon_to_add != 0 {
+            for i in 0..epsilon_to_add {
+                batch_doc.push(EPSILON.clone());
+            }
+        }
+
+        let mut substring = (0, batch_doc.len());
+        match dfa.is_match(&batch_doc) {
             Some((start, end)) => {
                 match commit {
                     JCommit::HashChain => {
                         assert!(
-                            end == doc.len(),
+                            end == batch_doc.len(),
                             "for HashChain commitment, Regex must handle EOD, switch commit type or change Regex r to r$ or r.*$"
                         );
-                        substring = (start, doc.len()); // ... right?
+                        substring = (start, batch_doc.len()); // ... right?
                     }
                     JCommit::Nlookup => {
                         substring = (start, end); // exact
@@ -440,7 +449,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: sel_batch_size,
-            doc: doc.clone(),
+            doc: batch_doc.clone(),
             is_match,
             substring,
             pc: pcs,
@@ -1267,7 +1276,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         query.append(&mut vec![prev_running_v.clone()]);
         let query_f: Vec<F> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
-        println!("R1CS sponge absorbs {:#?}", query_f);
+        //println!("R1CS sponge absorbs {:#?}", query_f);
 
         SpongeAPI::absorb(
             &mut sponge,
@@ -1280,7 +1289,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // generate claim r
         let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
-        println!("R1CS sponge squeezes {:#?}", rand);
+        //println!("R1CS sponge squeezes {:#?}", rand);
         let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
@@ -1310,10 +1319,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 int_to_ff(g_xsq.clone()),
             ];
 
-            println!("R1CS sponge absorbs {:#?}", query);
+            //println!("R1CS sponge absorbs {:#?}", query);
             SpongeAPI::absorb(&mut sponge, 3, &query, acc);
             let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            println!("R1CS sponge squeezes {:#?}", rand);
+            //println!("R1CS sponge squeezes {:#?}", rand);
             let sc_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
 
             sc_rs.push(sc_r.clone());
@@ -1840,6 +1849,26 @@ mod tests {
             "^hello$".to_string(),
             "helloworld".to_string(),
             vec![1, 5],
+            false,
+        );
+    }
+
+    #[test]
+    fn weird_batch_size() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello.*$".to_string(),
+            "helloworld".to_string(),
+            vec![3,4,6],
+            true,
+        );
+
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello$".to_string(),
+            "helloworld".to_string(),
+            vec![3,4,6],
             false,
         );
     }
