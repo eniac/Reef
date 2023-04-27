@@ -260,7 +260,6 @@ pub fn opt_cost_model_select_with_commit<'a>(
         cost = nlookup;
         opt_batching = JBatching::Nlookup;
     }
-    let folding_size: usize = ((cost as f32) / 128.0).log2().ceil() as usize;
     (
         opt_batching,
         commit.clone(),
@@ -435,27 +434,27 @@ pub fn opt_cost_model_select<'a>(
         let batching_and_cost: (JBatching, JCommit, usize,usize) =
             match (batching.clone(), commit.clone(), can_hashcahin) {
                 (None, None, _) => {
-                    opt_cost_model_select_with_batch(dfa, 2 << n, is_match, doc_length)
+                    opt_cost_model_select_with_batch(dfa, 1 << n, is_match, doc_length)
                 }
                 (_, Some(JCommit::HashChain), false) => {
-                    (JBatching::NaivePolys, JCommit::HashChain, 2<<n,cost + 100)
+                    (JBatching::NaivePolys, JCommit::HashChain, 1<<n,cost + 100)
                 }
                 (None, Some(c), _) => {
-                    opt_cost_model_select_with_commit(dfa, 2 << n, is_match, doc_length, c)
+                    opt_cost_model_select_with_commit(dfa, 1 << n, is_match, doc_length, c)
                 }
                 (Some(b), None, _) => {
-                    opt_commit_select_with_batch(dfa, 2 << n, is_match, doc_length, b)
+                    opt_commit_select_with_batch(dfa, 1 << n, is_match, doc_length, b)
                 }
                 (Some(b), Some(c), _) => {
-                    let single_cost =  full_round_cost_model(dfa, 2 << n, b, is_match, doc_length, c);
-                    (b, c, 2<<n, get_folded_cost(single_cost, doc_length, 2<<n))
+                    let single_cost =  full_round_cost_model(dfa, 1 << n, b, is_match, doc_length, c);
+                    (b, c, 1<<n, get_folded_cost(single_cost, doc_length, 1<<n))
                 },
             };
         if batching_and_cost.3 < cost {
             cost = batching_and_cost.3;
             opt_commit = batching_and_cost.1;
             opt_batching = batching_and_cost.0;
-            opt_batch_size = 2 << n;
+            opt_batch_size = 1 << n;
         }
     }
     (opt_batching.clone(), opt_commit.clone(), opt_batch_size,cost)

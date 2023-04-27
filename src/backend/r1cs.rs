@@ -398,12 +398,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     
         let mut batch_doc = doc.clone();
 
-        let epsilon_to_add = sel_batch_size - (doc.len() % sel_batch_size);
+        let epsilon_to_add = doc.len() % sel_batch_size;
 
         println!("Doc len: {:#?}, Epsilon to Add: {:#?}", doc.len(), epsilon_to_add);
 
         if epsilon_to_add != 0 {
-            for i in 0..epsilon_to_add {
+            for i in 0..(sel_batch_size-epsilon_to_add) {
                 batch_doc.push(EPSILON.clone());
             }
         }
