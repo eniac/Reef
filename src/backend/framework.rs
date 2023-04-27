@@ -133,6 +133,7 @@ pub fn run_backend(
         None,
         vec![<G1 as Group>::Scalar::from(0); 2],
         empty_glue,
+        Some(<G1 as Group>::Scalar::from(0)),
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         sc.clone(),
@@ -428,6 +429,11 @@ pub fn run_backend(
             }
         };
 
+        let blind = match r1cs_converter.reef_commit.clone().unwrap() {
+            ReefCommitment::HashChain(hcs) => Some(hcs.blind),
+            ReefCommitment::Nlookup(_) => None,
+        };
+
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             &prover_data,
             Some(wits),
@@ -436,6 +442,7 @@ pub fn run_backend(
                 <G1 as Group>::Scalar::from(next_state as u64),
             ],
             glue,
+            blind,
             vec![
                 <G1 as Group>::Scalar::from(
                     r1cs_converter.prover_accepting_state(i, current_state),

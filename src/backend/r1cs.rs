@@ -30,7 +30,7 @@ pub struct R1CS<'a, F: PrimeField> {
     pub table: Vec<Integer>,
     pub batching: JBatching,
     pub commit_type: JCommit,
-    reef_commit: Option<ReefCommitment>,
+    pub reef_commit: Option<ReefCommitment>,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -453,31 +453,32 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.assertions.push(i_plus);
             self.pub_inputs.push(new_var(format!("i_{}", idx)));
         }
-
-        let ite = term(
-            Op::Ite,
-            vec![
-                term(Op::Eq, vec![new_var(format!("i_0")), new_const(0)]),
-                term(
-                    Op::Eq,
-                    vec![
-                        new_var(format!("first_hash_input")),
-                        new_var(format!("random_hash_result")),
-                    ],
-                ),
-                term(
-                    Op::Eq,
-                    vec![
-                        new_var(format!("first_hash_input")),
-                        new_var(format!("z_hash_input")),
-                    ],
-                ),
-            ],
-        );
-        self.assertions.push(ite);
-        self.pub_inputs.push(new_var(format!("first_hash_input")));
-        self.pub_inputs.push(new_var(format!("random_hash_result")));
-        self.pub_inputs.push(new_var(format!("z_hash_input")));
+        /*
+              let ite = term(
+                  Op::Ite,
+                  vec![
+                      term(Op::Eq, vec![new_var(format!("i_0")), new_const(0)]),
+                      term(
+                          Op::Eq,
+                          vec![
+                              new_var(format!("first_hash_input")),
+                              new_var(format!("random_hash_result")),
+                          ],
+                      ),
+                      term(
+                          Op::Eq,
+                          vec![
+                              new_var(format!("first_hash_input")),
+                              new_var(format!("z_hash_input")),
+                          ],
+                      ),
+                  ],
+              );
+              self.assertions.push(ite);
+              self.pub_inputs.push(new_var(format!("first_hash_input")));
+              self.pub_inputs.push(new_var(format!("random_hash_result")));
+              self.pub_inputs.push(new_var(format!("z_hash_input")));
+        */
     }
 
     // for use at the end of sum check

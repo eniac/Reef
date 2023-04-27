@@ -6,6 +6,8 @@ use ::bellperson::{
     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
     Variable,
 };
+use circ::cfg;
+use circ::cfg::*;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::{ir::term::Value, target::r1cs::*};
 use ff::{Field, PrimeField};
@@ -101,6 +103,7 @@ pub struct NFAStepCircuit<'a, F: PrimeField> {
     batch_size: usize,
     states: Vec<F>,
     glue: Vec<GlueOpts<F>>,
+    blind: Option<F>,
     accepting_bool: Vec<F>,
     pc: PoseidonConstants<F, typenum::U2>,
 }
@@ -113,6 +116,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         wits: Option<FxHashMap<String, Value>>, //Option<&'a FxHashMap<String, Value>>,
         states: Vec<F>,
         glue: Vec<GlueOpts<F>>,
+        blind: Option<F>,
         accepting_bool: Vec<F>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U2>,
@@ -153,6 +157,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             batch_size: batch_size,
             states: states,
             glue: glue,
+            blind: blind,
             accepting_bool: accepting_bool,
             pc: pcs,
         }
@@ -210,9 +215,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         alloc_chars: &mut Vec<Option<AllocatedNum<F>>>,
         alloc_idxs: &mut Vec<Option<AllocatedNum<F>>>,
         i_0: AllocatedNum<F>,
-        z_hash_input: AllocatedNum<F>,
         last_i: &mut Option<AllocatedNum<F>>,
-        first_hash_blind: &mut Option<AllocatedNum<F>>,
     ) -> Result<bool, SynthesisError>
     where
         CS: ConstraintSystem<F>,
@@ -247,9 +250,6 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             alloc_idxs[j] = i_j;
 
             return Ok(true);
-        } else if s.starts_with("blind_TODO") {
-            *first_hash_blind = Some(alloc_v.clone());
-            return Ok(true);
         }
 
         return Ok(false);
@@ -259,8 +259,9 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
     fn hash_circuit<CS>(
         &self,
         cs: &mut CS,
-        start_hash: AllocatedNum<F>, // this is "first_hash_input"
-        blind: Option<AllocatedNum<F>>,
+        z_input_hash: AllocatedNum<F>,
+        i_0: AllocatedNum<F>,
+        blind: F,
         alloc_chars: Vec<Option<AllocatedNum<F>>>,
         doc_idxs: Vec<Option<AllocatedNum<F>>>,
     ) -> Result<AllocatedNum<F>, SynthesisError>
@@ -268,13 +269,15 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         CS: ConstraintSystem<F>,
     {
         println!("adding hash chain hashes in nova");
-        let mut ns = cs.namespace(|| format!("poseidon hash ns batch"));
-        let acc = &mut ns;
+        let mut ns = cs.namespace(|| format!("poseidon hash start"));
+
+        // allocate blind
+        let alloc_blind = AllocatedNum::alloc(ns.namespace(|| "blind"), || Ok(blind))?;
 
         let random_hash = {
+            let acc = &mut ns;
             // "random_hash_result"
             let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
-            let acc = &mut ns;
 
             sponge.start(
                 IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
@@ -286,10 +289,9 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                 &mut sponge,
                 2,
                 &[
-                    Elt::Allocated(blind.unwrap()),
+                    Elt::Allocated(alloc_blind),
                     Elt::num_from_fr::<CS>(F::from(0)),
                 ],
-                // TODO "connected"? get rid clones
                 acc,
             );
 
@@ -300,39 +302,38 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             Elt::ensure_allocated(&output[0], &mut ns.namespace(|| "ensure allocated"), true)?
         };
 
-        // if FIRST_SEL then START_HASH = RANDOM_HASH else START_HASH = Z_INPUT_HASH
-        // FIRST_SEL = (i_0 == 0)
-        // -> r1cs:
-        // START_HASH = Z_INPUT_HASH + FIRST_SEL(RANDOM_HASH - Z_INPUT_HASH) <- ite
-        // i_0 * WIT = FIRST_SEL <- wit here is inv(i_0)
-        // (1 - FIRST_SEL) * i_0 = 0
+        let start_hash;
+        let i_0_inv;
+        let first_sel;
 
-        sponge_ns.enforce(
-            || format!("ite {}", tag),
-            |z| z + start_hash.get_variable() - z_input_hash.get_variable(),
-            |z| z + first_sel.get_variable(),
-            |z| z + random_hash.get_variable() - z_input_hash.get_variable(),
-        );
+        let zero = F::zero();
+        match i_0.get_value().unwrap() {
+            zero => {
+                println!("SET WITNESSES FOR i_0 = 0");
+                start_hash = AllocatedNum::alloc(ns.namespace(|| "start_hash"), || {
+                    Ok(random_hash.get_value().unwrap())
+                })?;
+                i_0_inv = AllocatedNum::alloc(ns.namespace(|| "i0 inv"), || Ok(F::from(1)))?;
+                first_sel = AllocatedNum::alloc(ns.namespace(|| "first_sel"), || Ok(F::from(1)))?;
+            }
+            x => {
+                start_hash = AllocatedNum::alloc(ns.namespace(|| "start_hash"), || {
+                    Ok(z_input_hash.get_value().unwrap())
+                })?;
 
-        sponge_ns.enforce(
-            || format!("sel {}", tag),
-            |z| z + i_0.get_variable(),
-            |z| z + i_0_inv.get_variable(),
-            |z| z + first_sel.get_variable(),
-        );
-
-        sponge_ns.enforce(
-            || format!("sel {}", tag),
-            |z| z + CS::one() - first_sel.get_variable(),
-            |z| z + i_0.get_variable(),
-            |z| z + CS::zero(),
-        );
+                type_of(&x);
+                //let inv = x.invert(); // TODO what the type here? cfg().field().modulus()).unwrap();
+                i_0_inv = AllocatedNum::alloc(ns.namespace(|| "io inv"), || Ok(F::from(1)))?; //inv))?;
+                first_sel = AllocatedNum::alloc(ns.namespace(|| "first_sel"), || Ok(F::from(0)))?;
+            }
+        };
 
         // regular hashing
-        let mut next_hash = start_hash;
+        let mut next_hash = start_hash.clone();
         for i in 0..(self.batch_size) {
             //println!("i {:#?}", i);
             next_hash = {
+                let acc = &mut ns;
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
 
                 sponge.start(
@@ -360,6 +361,34 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                 Elt::ensure_allocated(&output[0], &mut ns.namespace(|| "ensure allocated"), true)?
             };
         }
+
+        // if FIRST_SEL then START_HASH = RANDOM_HASH else START_HASH = Z_INPUT_HASH
+        // FIRST_SEL = (i_0 == 0)
+        // -> r1cs:
+        // START_HASH = Z_INPUT_HASH + FIRST_SEL(RANDOM_HASH - Z_INPUT_HASH) <- ite
+        // i_0 * WIT = FIRST_SEL <- wit here is inv(i_0)
+        // (1 - FIRST_SEL) * i_0 = 0
+
+        ns.enforce(
+            || format!("ite"),
+            |z| z + start_hash.get_variable() - z_input_hash.get_variable(),
+            |z| z + first_sel.get_variable(),
+            |z| z + random_hash.get_variable() - z_input_hash.get_variable(),
+        );
+
+        ns.enforce(
+            || format!("sel"),
+            |z| z + i_0.get_variable(),
+            |z| z + i_0_inv.get_variable(),
+            |z| z + first_sel.get_variable(),
+        );
+
+        ns.enforce(
+            || format!("sel 2"),
+            |z| z + CS::one() - first_sel.get_variable(),
+            |z| z + i_0.get_variable(),
+            |z| z + CS::one() - CS::one(),
+        );
 
         return Ok(next_hash); //last hash
     }
@@ -785,7 +814,6 @@ where
         let time = Instant::now();
         // inputs
         let state_0 = z[0].clone();
-        //let char_0 = z[1].clone();
 
         // ouputs
         let mut last_state = None;
@@ -822,6 +850,7 @@ where
             GlueOpts::Poly_Hash(_) => {
                 let i_0 = z[1].clone();
                 alloc_idxs[0] = Some(i_0.clone());
+                let hash_0 = z[2].clone();
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
@@ -876,12 +905,20 @@ where
                 }
                 out.push(last_state.unwrap());
                 out.push(last_i.unwrap());
-                let last_hash = self.hash_circuit(cs, z[2].clone(), alloc_chars, alloc_idxs);
+                let last_hash = self.hash_circuit(
+                    cs,
+                    hash_0,
+                    i_0,
+                    self.blind.unwrap(),
+                    alloc_chars,
+                    alloc_idxs,
+                );
                 out.push(last_hash.unwrap());
             }
             GlueOpts::Nl_Hash((i, h, q, v)) => {
                 let i_0 = z[1].clone();
                 alloc_idxs[0] = Some(i_0.clone());
+                let hash_0 = z[2].clone();
 
                 let sc_l = q.len();
                 println!("glue1 q, v: {:#?}, {:#?}", q, v);
@@ -982,7 +1019,14 @@ where
 
                 out.push(last_state.unwrap());
                 out.push(last_i.unwrap());
-                let last_hash = self.hash_circuit(cs, z[2].clone(), alloc_chars, alloc_idxs);
+                let last_hash = self.hash_circuit(
+                    cs,
+                    hash_0,
+                    i_0,
+                    self.blind.unwrap(),
+                    alloc_chars,
+                    alloc_idxs,
+                );
                 out.push(last_hash.unwrap());
                 for qv in alloc_rc {
                     out.push(qv.unwrap()); // better way to do this?

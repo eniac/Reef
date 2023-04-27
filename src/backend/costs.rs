@@ -44,9 +44,9 @@ pub fn commit_circuit_nohash(
 ) -> usize {
     match commit_type {
         JCommit::HashChain => match is_match {
-            None => batch_size + 7, // i's for hashes: i++ (batch_size),
-            // enforce i_0 != 0 bool (2), TODO?? (5)
-            Some((_, end)) if end == doc_len => batch_size + 7,
+            None => batch_size, // i's for hashes: i++ (batch_size),
+            // enforce i_0 != 0 bool (2), ite (5) -> on nova level :)
+            Some((_, end)) if end == doc_len => batch_size,
             _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
