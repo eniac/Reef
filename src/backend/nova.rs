@@ -509,7 +509,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             )?
         };
 
-        println!("SQUEEZE {:#?}", new_pos.clone().get_value());
+        //println!("SQUEEZE {:#?}", new_pos.clone().get_value());
         assert_eq!(new_pos.clone().get_value(), input_eq.clone().get_value());
 
         sponge_ns.enforce(
@@ -561,15 +561,15 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         // (combined_q, vs, running_q, running_v)
         let mut elts = vec![];
         for e in alloc_qv {
-            println!("alloc qv eval {:#?}", e.clone().unwrap().get_value());
+            //println!("alloc qv eval {:#?}", e.clone().unwrap().get_value());
 
             elts.push(Elt::Allocated(e.clone().unwrap()));
         }
         for e in alloc_prev_rc {
-            println!("alloc rc eval {:#?}", e.clone().unwrap().get_value());
+            //println!("alloc rc eval {:#?}", e.clone().unwrap().get_value());
             elts.push(Elt::Allocated(e.clone().unwrap()));
         }
-        println!("ELTS {:#?}", elts.len());
+        //println!("ELTS {:#?}", elts.len());
 
         self.fiatshamir_circuit(
             &elts,
@@ -584,11 +584,11 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             for coeffs in &alloc_gs[j] {
                 for e in coeffs {
                     elts.push(Elt::Allocated(e.clone()));
-                    println!("alloc gs {:#?}", e.clone().get_value());
+                    //println!("alloc gs {:#?}", e.clone().get_value());
                 }
             }
 
-            println!("ELTS {:#?}", elts.len());
+            //println!("ELTS {:#?}", elts.len());
             self.fiatshamir_circuit(
                 &elts,
                 &mut sponge,
@@ -921,7 +921,7 @@ where
                 let hash_0 = z[2].clone();
 
                 let sc_l = q.len();
-                println!("glue1 q, v: {:#?}, {:#?}", q, v);
+                //println!("glue1 q, v: {:#?}, {:#?}", q, v);
 
                 let mut alloc_rc = vec![None; sc_l + 1];
                 let mut alloc_prev_rc = vec![None; sc_l + 1];
@@ -937,7 +937,7 @@ where
                             ff_val
                         })
                     };
-                    println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+                    //println!("Var (name?) {:#?}", self.r1cs.names[&var]);
 
                     let mut matched = self
                         .input_variable_parsing(
@@ -1051,7 +1051,7 @@ where
                         })
                     };
 
-                    println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+                    //println!("Var (name?) {:#?}", self.r1cs.names[&var]);
 
                     let mut matched = self
                         .input_variable_parsing(
@@ -1142,7 +1142,7 @@ where
                             ff_val
                         })
                     };
-                    println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+                    //println!("Var (name?) {:#?}", self.r1cs.names[&var]);
                     let mut matched = self
                         .input_variable_parsing(
                             cs,
@@ -1243,7 +1243,7 @@ where
                 )?;
 
                 out.push(last_state.unwrap());
-                println!("full alloc len {:#?}", alloc_rc.len());
+                //println!("full alloc len {:#?}", alloc_rc.len());
 
                 for qv in alloc_rc {
                     out.push(qv.unwrap()); // better way to do this?

@@ -174,7 +174,7 @@ pub fn run_backend(
         (JBatching::NaivePolys, JCommit::HashChain) => {
             vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+                <G1 as Group>::Scalar::from(0), //fa.ab_to_num(&doc[0]) as u64),
                 <G1 as Group>::Scalar::from(0),
                 /*            <G1 as Group>::Scalar::from(
                     r1cs_converter.prover_accepting_state(0, current_state),
@@ -184,7 +184,7 @@ pub fn run_backend(
         (JBatching::Nlookup, JCommit::HashChain) => {
             let mut z = vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+                <G1 as Group>::Scalar::from(0), //dfa.ab_to_num(&doc[0]) as u64),
                 <G1 as Group>::Scalar::from(0),
             ];
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len + 1]);
@@ -196,7 +196,7 @@ pub fn run_backend(
         (JBatching::NaivePolys, JCommit::Nlookup) => {
             let mut z = vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+                //<G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
             ];
 
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len + 1]);
@@ -208,7 +208,7 @@ pub fn run_backend(
         (JBatching::Nlookup, JCommit::Nlookup) => {
             let mut z = vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+                //<G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
             ];
 
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len + 1]);
@@ -518,7 +518,7 @@ pub fn run_backend(
     // // state, char, opt<hash>, opt<v,q for eval>, opt<v,q for doc>, accepting
     let zn = res.unwrap().0;
 
-    // eval type, reef commitment, accepting state bool, table, final_q, final_v, final_hash
+    // eval type, reef commitment, accepting state bool, table, doc, final_q, final_v, final_hash,
     // final_doc_q, final_doc_v
     match (r1cs_converter.batching, r1cs_converter.commit_type) {
         (JBatching::NaivePolys, JCommit::HashChain) => {
@@ -545,8 +545,8 @@ pub fn run_backend(
                 None,
                 None,
                 None,
-                Some(zn[2..(qd_len + 2)].to_vec()),
-                Some(zn[2 + qd_len]),
+                Some(zn[1..(qd_len + 1)].to_vec()),
+                Some(zn[1 + qd_len]),
             );
         }
         (JBatching::Nlookup, JCommit::HashChain) => {
@@ -570,11 +570,11 @@ pub fn run_backend(
                 //zn[2 + q_len + 1 + qd_len + 1],
                 &r1cs_converter.table,
                 &usize_doc,
-                Some(zn[2..(q_len + 2)].to_vec()),
-                Some(zn[q_len + 2]),
+                Some(zn[1..(q_len + 1)].to_vec()),
+                Some(zn[q_len + 1]),
                 None,
-                Some(zn[(2 + q_len + 1)..(2 + q_len + 1 + qd_len)].to_vec()),
-                Some(zn[2 + q_len + 1 + qd_len]),
+                Some(zn[(1 + q_len + 1)..(1 + q_len + 1 + qd_len)].to_vec()),
+                Some(zn[1 + q_len + 1 + qd_len]),
             );
         }
     }
@@ -618,7 +618,7 @@ mod tests {
         }
     }
 
-    // #[test]
+    #[test]
     fn e2e_poly_hash() {
         backend_test(
             "ab".to_string(),
@@ -630,7 +630,7 @@ mod tests {
         );
     }
 
-    // #[test]
+    #[test]
     fn e2e_poly_nl() {
         backend_test(
             "ab".to_string(),
@@ -642,7 +642,7 @@ mod tests {
         );
     }
 
-    // #[test]
+    #[test]
     fn e2e_nl_hash() {
         backend_test(
             "ab".to_string(),
@@ -654,7 +654,7 @@ mod tests {
         );
     }
 
-    //    #[test]
+    #[test]
     fn e2e_nl_nl() {
         backend_test(
             "ab".to_string(),
