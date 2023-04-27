@@ -42,10 +42,13 @@ impl NFA {
             n: usize) {
             // Add to DFA if not already there
             states.insert(q.clone(), n);
+            // The reflexive step
+            trans.insert((states[q], EPSILON.clone()), states[q]);
 
             // Explore derivatives
             for c in &ab[..] {
                 let q_c = q.deriv(&c);
+                // Non-reflexive step
                 if states.contains_key(&q_c) {
                     trans.insert((states[q], c.to_string()), states[&q_c]);
                 } else {
@@ -123,11 +126,8 @@ impl NFA {
     }
 
     pub fn delta(&self, state: usize, c: &String) -> Option<usize> {
-        let res = if c.is_empty() {
-            Some(state)
-        } else {
-            self.trans.get(&(state, c.clone())).map(|c|c.clone())
-        };
+        let res = self.trans.get(&(state, c.clone())).map(|c|c.clone());
+
         // println!("{} --[ {} ]--> {}", state, c, res.map(|c|c.to_string()).unwrap_or(String::from("NONE")));
         res
     }
@@ -207,8 +207,6 @@ impl NFA {
             // All the pairs (t1, t3) such that t1 -[a+b]-> t3
             let mut trans_clos: BTreeSet<(usize, usize)> = BTreeSet::new();
             for t1 in self.get_states() {
-                let tttt: Vec<(String, usize)> = self.trans.clone().into_iter()
-                        .filter_map(|((a,b), c)| if a == t1 { Some((b, c)) } else {None}).collect();
                 let t2 = self.delta(t1, &a).unwrap();
                 // Epsilon does not transition
                 let t3 = self.delta(t2, &b).unwrap();
@@ -252,7 +250,9 @@ impl NFA {
         let mut abset = HashSet::new();
 
         // Build transition relation from classes
-        self.trans = HashMap::new();
+        self.trans = self.trans.clone().into_iter()
+                         .filter(|((t, c), u)| if t == u && c == EPSILON { true } else { false }).collect();
+
         for (set, class) in classes {
             for (t, u) in set {
                 self.trans.insert((t, find_representative(&class)), u);

@@ -8,8 +8,8 @@ use itertools::Itertools;
 use criterion::*;
 
 static MICRO_REGEX : [&'static str; 4] = [ ".*ab", "(a|b)*c", "a{5}", "[a-z]*" ];
-static MICRO_AB : &'static str = "abcdefghijklmnopqrstuvwxyz ";
-static MICRO_DOC: [&'static str; 8] = [ "aaaaaab", "abababac", "d", "", "dddd", "aaaaa", "y", "hello ab"];
+static MICRO_AB : &'static str = "abcdefghijklmnopqrstuvwxyz";
+static MICRO_DOC: [&'static str; 8] = [ "aaaaaab", "abababac", "d", "", "dddd", "aaaaa", "y", "helloab"];
 static MAX_K: usize = 4;
 static MAX_BATCH: usize = 4;
 
@@ -79,7 +79,7 @@ fn nfa_kstride_matcher(c: &mut Criterion) {
             new_re.push_str("$");
             let mut nfa = NFA::new(&MICRO_AB[..], Regex::new(&new_re));
             d = nfa.k_stride(k, &d);
-            group.bench_with_input(BenchmarkId::from_parameter(format!("{} @ {} with k = {}", rstr, doc, k)), &k, |b, &k| {
+            group.bench_with_input(BenchmarkId::from_parameter(format!("{} @ {} with k = {}", rstr, doc, k)), &k, |b, &_k| {
                 b.iter(|| { nfa.is_match(&d) });
             });
         }
@@ -88,7 +88,7 @@ fn nfa_kstride_matcher(c: &mut Criterion) {
 }
 
 fn prove_verify(c: &mut Criterion) {
-    let mut group = c.benchmark_group("nfa_matcher");
+    let mut group = c.benchmark_group("prove");
     for (rstr, doc) in MICRO_REGEX.iter().cartesian_product(MICRO_DOC) {
         let nfa = NFA::new(&MICRO_AB[..], Regex::new(rstr));
         let d = doc.chars().map(|c|c.to_string()).collect();
@@ -103,7 +103,8 @@ fn prove_verify(c: &mut Criterion) {
         for batch_size in 1..MAX_BATCH {
             group.throughput(Throughput::Bytes(batch_size as u64));
             // Less sampling, we are testing many inputs here
-            group.bench_with_input(BenchmarkId::from_parameter(format!("{} @ {} (NLOOKUP, batch_size = {})", rstr, doc, batch_size)), &batch_size, |b, &batch_size| {
+            group.bench_with_input(BenchmarkId::from_parameter(format!("{} @ {} (NLOOKUP, batch_size = {})", rstr, doc, batch_size)),
+                &batch_size, |b, &batch_size| {
                 b.iter(|| run_backend(&nfa, &d, eval_type, commit_type, batch_size));
             });
         }
