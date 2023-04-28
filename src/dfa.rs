@@ -43,10 +43,13 @@ impl NFA {
         ) {
             // Add to DFA if not already there
             states.insert(q.clone(), n);
+            // The reflexive step
+            trans.insert((states[q], EPSILON.clone()), states[q]);
 
             // Explore derivatives
             for c in &ab[..] {
                 let q_c = q.deriv(&c);
+                // Non-reflexive step
                 if states.contains_key(&q_c) {
                     trans.insert((states[q], c.to_string()), states[&q_c]);
                 } else {
@@ -132,11 +135,8 @@ impl NFA {
     }
 
     pub fn delta(&self, state: usize, c: &String) -> Option<usize> {
-        let res = if c.is_empty() {
-            Some(state)
-        } else {
-            self.trans.get(&(state, c.clone())).map(|c| c.clone())
-        };
+        let res = self.trans.get(&(state, c.clone())).map(|c| c.clone());
+
         // println!("{} --[ {} ]--> {}", state, c, res.map(|c|c.to_string()).unwrap_or(String::from("NONE")));
         res
     }
@@ -169,7 +169,9 @@ impl NFA {
             return Some((0, 0));
         }
         // For every postfix of doc (O(n^2))
-        start_idxs.into_par_iter().find_map_any(|i| {
+        start_idxs.into_iter().find_map(|i| {
+            // .into_par_iter()
+            // .find_map_any(|i| {
             let mut s = self.get_init_state();
             for j in i..doc.len() {
                 // Apply transition relation
@@ -197,7 +199,6 @@ impl NFA {
     pub fn double_stride(&mut self, doc: &Vec<String>) -> Vec<String> {
         let mut ab: HashSet<(String, String)> = HashSet::new();
         let mut classes: HashMap<BTreeSet<(usize, usize)>, BTreeSet<String>> = HashMap::new();
-
         // S' := S + S*S (cartesian product)
         for c0 in self.ab.iter() {
             ab.insert((c0.clone(), EPSILON.clone()));
@@ -206,11 +207,9 @@ impl NFA {
             }
         }
 
-        // Clear the old alphabet
-        self.ab = Vec::new();
-
         // Result transition will be t1 -[a+b]-> t3
         for (a, b) in ab {
+            // All the pairs (t1, t3) such that t1 -[a+b]-> t3
             let mut trans_clos: BTreeSet<(usize, usize)> = BTreeSet::new();
             for t1 in self.get_states() {
                 let t2 = self.delta(t1, &a).unwrap();
@@ -220,7 +219,6 @@ impl NFA {
                 trans_clos.insert((t1, t3));
             }
 
-            // New alphabet
             let s = a + &b;
 
             // Equivalence classes have the same transitive closure
@@ -232,14 +230,18 @@ impl NFA {
                     classes.insert(trans_clos, BTreeSet::from([s.clone()]));
                 }
             }
-            self.ab.push(s)
         }
 
         // Find a representative string from an eqivalence class
         fn find_representative(class: &BTreeSet<String>) -> String {
+            let size = class
+                .iter()
+                .max_by(|a, b| a.len().cmp(&b.len()))
+                .unwrap()
+                .len();
             class
                 .iter()
-                .next()
+                .find(|c| c.len() >= size)
                 .map(|c| c.clone())
                 .expect("No equivalence classes found")
         }
@@ -258,13 +260,24 @@ impl NFA {
         // Translate doc into equivalent doc
         let equiv_classes = classes.clone().into_values().collect();
 
+        // Clear the old alphabet
+        let mut abset = HashSet::new();
+
         // Build transition relation from classes
-        self.trans = HashMap::new();
+        self.trans = self
+            .trans
+            .clone()
+            .into_iter()
+            .filter(|((t, c), u)| if t == u && c == EPSILON { true } else { false })
+            .collect();
+
         for (set, class) in classes {
             for (t, u) in set {
                 self.trans.insert((t, find_representative(&class)), u);
+                abset.insert(find_representative(&class));
             }
         }
+        self.ab = abset.into_iter().collect();
 
         // Return new document (modulo equiv classes)
         doc.chunks(2)

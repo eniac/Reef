@@ -1,7 +1,11 @@
-use crate::backend::{commitment::*, costs::*, nova::int_to_ff, r1cs_helper::*};
+use crate::backend::nova::int_to_ff;
+use crate::backend::{self, costs::*};
 use crate::config::*;
-use crate::dfa::NFA;
-use circ::cfg::cfg;
+use crate::config::*;
+use crate::dfa::{EPSILON, NFA};
+use circ::cfg;
+use circ::cfg::CircOpt;
+use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::*;
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
@@ -53,17 +57,19 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         batch_override: Option<JBatching>,
         commit_override: Option<JCommit>,
     ) -> Self {
-        let is_match = dfa.is_match(doc).is_some();
+        let dfa_match = dfa.is_match(doc);
+        let is_match = dfa_match.is_some();
 
         println!("Match? {:#?}", is_match);
         let batching;
         let commit;
         let opt_batch_size;
-        if batch_size > 1 {
-            (batching, commit, opt_batch_size) = match (batch_override, commit_override) {
-                (Some(b), Some(c)) => (b, c, batch_size),
+        let cost: usize;
+        if batch_size > 0 {
+            (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
+                (Some(b), Some(c)) => (b, c, batch_size, 0),
                 (Some(b), _) => {
-                    opt_commit_select_with_batch(dfa, batch_size, dfa.is_match(doc), doc.len(), b)
+                    opt_commit_select_with_batch(dfa, batch_size, dfa_match, doc.len(), b)
                 }
                 (None, Some(c)) => opt_cost_model_select_with_commit(
                     &dfa,
@@ -77,11 +83,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 }
             };
         } else {
-            (batching, commit, opt_batch_size) = opt_cost_model_select(
+            (batching, commit, opt_batch_size, cost) = opt_cost_model_select(
                 &dfa,
                 0,
                 logmn(doc.len()),
-                dfa.is_match(doc),
+                dfa_match,
                 doc.len(),
                 commit_override,
                 batch_override,
@@ -90,24 +96,37 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let sel_batch_size = opt_batch_size;
 
-        assert!(sel_batch_size >= 1);
         println!(
-            "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}",
-            batching, commit, sel_batch_size
+            "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}, cost {:#?}",
+            batching, commit, sel_batch_size, cost
         );
 
-        println!("substring pre {:#?}", dfa.is_match(doc));
+        let mut batch_doc = doc.clone();
 
-        let mut substring = (0, doc.len());
-        match dfa.is_match(doc) {
+        let epsilon_to_add = doc.len() % sel_batch_size;
+
+        println!(
+            "Doc len: {:#?}, Epsilon to Add: {:#?}",
+            doc.len(),
+            epsilon_to_add
+        );
+
+        if epsilon_to_add != 0 {
+            for i in 0..(sel_batch_size - epsilon_to_add) {
+                batch_doc.push(EPSILON.clone());
+            }
+        }
+
+        let mut substring = (0, batch_doc.len());
+        match dfa.is_match(&batch_doc) {
             Some((start, end)) => {
                 match commit {
                     JCommit::HashChain => {
                         assert!(
-                            end == doc.len(),
+                            end == batch_doc.len(),
                             "for HashChain commitment, Regex must handle EOD, switch commit type or change Regex r to r$ or r.*$"
                         );
-                        substring = (start, doc.len()); // ... right?
+                        substring = (start, batch_doc.len()); // ... right?
                     }
                     JCommit::Nlookup => {
                         substring = (start, end); // exact
@@ -142,7 +161,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: sel_batch_size,
-            doc: doc.clone(),
+            doc: batch_doc.clone(),
             is_match,
             substring,
             pc: pcs,
@@ -1229,7 +1248,7 @@ mod tests {
     type G1 = pasta_curves::pallas::Point;
 
     fn set_up_cfg() {
-        println!("cfg set? {:#?}", cfg::is_cfg_set());
+        //println!("cfg set? {:#?}", cfg::is_cfg_set());
         if !cfg::is_cfg_set() {
             //let m = format!("1019");
             let m = format!(
@@ -1269,10 +1288,10 @@ mod tests {
                         true,
                         None,
                     );
-                    println!(
-                        "coeff {:#?}, con {:#?} @ {:#?}{:#?}{:#?}",
-                        coeff, con, x_1, x_2, x_3
-                    );
+                    // println!(
+                    //     "coeff {:#?}, con {:#?} @ {:#?}{:#?}{:#?}",
+                    //     coeff, con, x_1, x_2, x_3
+                    // );
 
                     if ((x_1 == -1) ^ (x_2 == -1) ^ (x_3 == -1)) & !(x_1 + x_2 + x_3 == -3) {
                         if x_1 == -1 {
@@ -1456,7 +1475,8 @@ mod tests {
                     let mut values;
                     let mut next_state;
 
-                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0) / s;
+                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0)
+                        / r1cs_converter.batch_size;
                     for i in 0..num_steps {
                         (
                             values,
@@ -1486,7 +1506,7 @@ mod tests {
                         "cost model: {:#?}",
                         costs::full_round_cost_model_nohash(
                             &dfa,
-                            s,
+                            r1cs_converter.batch_size,
                             b.clone(),
                             dfa.is_match(&chars),
                             doc.len(),
@@ -1498,7 +1518,7 @@ mod tests {
                         prover_data.r1cs.constraints.len() as usize
                             == costs::full_round_cost_model_nohash(
                                 &dfa,
-                                s,
+                                r1cs_converter.batch_size,
                                 b.clone(),
                                 dfa.is_match(&chars),
                                 doc.len(),
@@ -1529,7 +1549,7 @@ mod tests {
             "ab".to_string(),
             "^ab$".to_string(),
             "ab".to_string(),
-            vec![1],
+            vec![0, 1],
             true,
         );
         test_func_no_hash(
@@ -1562,7 +1582,7 @@ mod tests {
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaaaaabbbbbbbbbbbbbb".to_string(),
-            vec![1, 2, 4],
+            vec![0, 1, 2, 4],
             true,
         );
         test_func_no_hash(
@@ -1661,7 +1681,27 @@ mod tests {
         );
     }
 
-    //#[test]
+    #[test]
+    fn weird_batch_size() {
+        init();
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello.*$".to_string(),
+            "helloworld".to_string(),
+            vec![3, 4, 6, 7],
+            true,
+        );
+
+        test_func_no_hash(
+            "helowrd".to_string(),
+            "^hello$".to_string(),
+            "helloworld".to_string(),
+            vec![3, 4, 6, 7],
+            false,
+        );
+    }
+
+    // #[test]
     fn big() {
         init();
         let ASCIIchars: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
@@ -1672,5 +1712,76 @@ mod tests {
             vec![1],
             true,
         );
+    }
+
+    fn test_func_no_hash_kstride(
+        ab: String,
+        rstr: String,
+        doc: String,
+        batch_sizes: Vec<usize>,
+        k: usize,
+    ) {
+        let r = Regex::new(&rstr);
+        let mut dfa = NFA::new(&ab[..], r);
+        let mut d = doc.chars().map(|c| c.to_string()).collect();
+        d = dfa.k_stride(k, &d);
+        let dfa_match = dfa.is_match(&d);
+        println!(
+            "DFA Size: {:#?}, |doc| : {}, |ab| : {}, match: {:?}",
+            dfa.trans.len(),
+            d.len(),
+            dfa.ab.len(),
+            dfa_match
+        );
+
+        //let chars: Vec<String> = d.clone();
+        //.chars().map(|c| c.to_string()).collect();
+
+        for s in batch_sizes {
+            for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
+                for c in vec![JCommit::HashChain, JCommit::Nlookup] {
+                    println!("Batching {:#?}", b.clone());
+                    println!("Commit {:#?}", c);
+                    println!(
+                        "cost model: {:#?}",
+                        costs::full_round_cost_model(&dfa, s, b.clone(), dfa_match, d.len(), c,)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn k_stride2() {
+        init();
+        let preamble: String = "ffffabcdffffabcd".to_string();
+        let ab = "abcdef".to_string();
+        for i in 0..9 {
+            println!("K:{:#?}", i);
+            test_func_no_hash_kstride(
+                ab.clone(),
+                "^hello.*$".to_string(),
+                preamble.clone(),
+                vec![1],
+                i,
+            );
+        }
+    }
+
+    #[test]
+    fn k_stride() {
+        init();
+        let preamble: String = "we the people in order to form a more perfect union, establish justic ensure domestic tranquility, provide for the common defense, promote the general welfare and procure the blessings of liberty to ourselves and our posterity do ordain and establish this ".to_string();
+        let ab = " ,abcdefghijlmnopqrstuvwy".to_string();
+        for i in 0..9 {
+            println!("K:{:#?}", i);
+            test_func_no_hash_kstride(
+                ab.clone(),
+                "^.*order.to.*$".to_string(),
+                preamble.clone(),
+                vec![1],
+                i,
+            );
+        }
     }
 }

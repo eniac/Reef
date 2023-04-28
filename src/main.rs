@@ -1,9 +1,10 @@
 #![allow(missing_docs, non_snake_case)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser};
 use std::time::{Duration, Instant};
 
+<<<<<<< HEAD
 pub mod backend;
 pub mod config;
 pub mod dfa;
@@ -12,9 +13,15 @@ pub mod regex;
 use crate::backend::{framework::*, r1cs_helper::init};
 use crate::config::*;
 use crate::dfa::NFA;
+=======
+use reef::backend::{framework::*, r1cs::init};
+use reef::config::*;
+>>>>>>> 8196e48f54c63b9eb821efb63e0ac3c994c73a9e
 
 #[cfg(feature = "plot")]
-pub mod plot;
+use reef::plot;
+
+use reef::dfa::NFA;
 
 fn main() {
     let p_time = Instant::now();
@@ -24,31 +31,21 @@ fn main() {
     let ab = String::from_iter(opt.config.alphabet());
 
     // Regular expresion parser and convert the Regex to a DFA
-    let mut nfa = opt.config.compile_nfa();
+    let mut doc = opt.config.read_file(&opt.input).iter().map(|c|c.to_string()).collect();
 
     // Input document
-    let mut doc: Vec<String> = opt
-        .config
-        .read_doc()
-        .iter()
-        .map(|c| c.to_string())
-        .collect();
+    let mut nfa = NFA::new(&ab, opt.re);
 
-    match opt.k_stride {
-        Some(k) => {
-            for i in 0..k {
-                doc = nfa.double_stride(&doc);
-            }
-        }
-        None => (),
-    }
+    // Try to use k-stride
+    opt.k_stride.map(|k| { doc = nfa.k_stride(k, &doc); });
+
     // Is document well-formed
     nfa.well_formed(&doc);
 
-    println!("dfa: {:#?}", nfa);
+    println!("NFA: {:#?}", nfa);
 
     #[cfg(feature = "plot")]
-    plot::plot_nfa(&nfa).expect("Failed to plot DFA to a pdf file");
+    plot::plot_nfa(&nfa).expect("Failed to plot NFA to a pdf file");
 
     let num_steps = doc.len();
     println!("Doc len is {}", num_steps);
@@ -64,3 +61,4 @@ fn main() {
 
     //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }
+

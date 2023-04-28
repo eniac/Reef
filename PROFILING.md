@@ -1,7 +1,7 @@
 How to profile Reef
 
 
-1) You need to add the following to the Cargo.toml 
+1) You need to add the following to the Cargo.toml
 
 [profile.release]
 debug = true
@@ -10,14 +10,14 @@ debug = true
 That will get us the symbols we need. Then you need to recompile (cargo build --release).
 
 
-2) Before you start Reef, type `sudo perf -g`. Here's an example.
+2) Before you start Reef, type `sudo perf record -g`. Here's an example.
 
 ```
-sudo perf -g ./target/release/reef ...
+sudo perf record -g ./target/release/reef ...
 ```
 
 After it completes, you should now see a file called: `perf.data` in the reef folder.
-This file has the raw results. The next step is to interpret it. Since we had used "sudo" to collect the data, 
+This file has the raw results. The next step is to interpret it. Since we had used "sudo" to collect the data,
 perf.data is owned by root. Let's change that.
 
 ```
@@ -46,4 +46,5 @@ reef/FlameGraph/
 
 and your current directory is reef.
 
-The above command should produce the html document containing the flamegraph. 
+The above command should produce the html document containing the flamegraph.
+
