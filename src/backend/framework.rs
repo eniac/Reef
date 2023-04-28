@@ -328,7 +328,7 @@ pub fn run_backend(
                 } else {
                     next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
                 }
-                println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
+                // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
 
                 let i_0 = <G1 as Group>::Scalar::from((i * r1cs_converter.batch_size) as u64);
                 let i_last =
@@ -338,7 +338,7 @@ pub fn run_backend(
                     GlueOpts::Poly_Hash((i_last, next_hash)),
                 ];
                 prev_hash = next_hash;
-                println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
+                // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
                 g
             }
             (JBatching::Nlookup, JCommit::HashChain) => {
@@ -501,7 +501,7 @@ pub fn run_backend(
         z0_primary.clone(),
         z0_secondary.clone(),
     );
-    println!("Recursive res: {:#?}", res);
+    // println!("Recursive res: {:#?}", res);
 
     assert!(res.is_ok()); // TODO delete
 

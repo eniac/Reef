@@ -104,12 +104,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let epsilon_to_add = doc.len() % sel_batch_size;
 
-        println!(
-            "Doc len: {:#?}, Epsilon to Add: {:#?}",
-            doc.len(),
-            epsilon_to_add
-        );
-
         if epsilon_to_add != 0 {
             for i in 0..(sel_batch_size - epsilon_to_add) {
                 batch_doc.push(EPSILON.clone());
@@ -202,7 +196,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             next_hash = vec![start_hash_or_blind];
         }
 
-        println!("PROVER START HASH ROUND {:#?}", next_hash);
+        // println!("PROVER START HASH ROUND {:#?}", next_hash);
         let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
         for b in 0..self.batch_size {
             // expected poseidon
@@ -230,7 +224,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 prev_hash, expected_next_hash
             );
             */
-            println!("PROVER HASH ROUND {:#?}", next_hash);
+            // println!("PROVER HASH ROUND {:#?}", next_hash);
             sponge.finish(acc).unwrap(); // assert expected hash finished correctly
         }
 
@@ -388,7 +382,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
         for r in circ_r1cs.constraints().clone() {
-            println!("{:#?}", circ_r1cs.format_qeq(&r));
+            // println!("{:#?}", circ_r1cs.format_qeq(&r));
         }
 
         //println!("Prover data {:#?}", circ_r1cs);

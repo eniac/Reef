@@ -38,7 +38,7 @@ fn main() {
     // Is document well-formed
     nfa.well_formed(&doc);
 
-    println!("NFA: {:#?}", nfa);
+    // println!("NFA: {:#?}", nfa);
 
     #[cfg(feature = "plot")]
     plot::plot_nfa(&nfa).expect("Failed to plot NFA to a pdf file");

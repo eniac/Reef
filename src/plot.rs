@@ -15,7 +15,7 @@ impl<'a> dot::Labeller<'a, usize, Ed> for NFA {
         dot::Id::new("example").unwrap()
     }
     fn node_id(&'a self, n: &usize) -> dot::Id<'a> {
-        println!("EXPR: {:?}\n", self.expressions);
+        // println!("EXPR: {:?}\n", self.expressions);
         dot::Id::new(format!("N{}", n)).unwrap()
     }
     fn node_label<'b>(&'b self, n: &usize) -> dot::LabelText<'b> {
