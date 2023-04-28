@@ -104,6 +104,7 @@ pub struct NFAStepCircuit<'a, F: PrimeField> {
     states: Vec<F>,
     glue: Vec<GlueOpts<F>>,
     blind: Option<F>,
+    first: bool,
     accepting_bool: Vec<F>,
     pc: PoseidonConstants<F, typenum::U2>,
 }
@@ -117,6 +118,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         states: Vec<F>,
         glue: Vec<GlueOpts<F>>,
         blind: Option<F>,
+        first: bool,
         accepting_bool: Vec<F>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U2>,
@@ -137,6 +139,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                 panic!("glue I/O does not match");
             }
         }
+        // todo blind, first checking here
 
         let values: Option<Vec<_>> = wits.map(|values| {
             let mut evaluator = StagedWitCompEvaluator::new(&prover_data.precompute);
@@ -158,6 +161,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             states: states,
             glue: glue,
             blind: blind,
+            first: first,
             accepting_bool: accepting_bool,
             pc: pcs,
         }
@@ -259,6 +263,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
     fn hash_circuit<CS>(
         &self,
         cs: &mut CS,
+        first: bool,
         z_input_hash: AllocatedNum<F>,
         i_0: AllocatedNum<F>,
         blind: F,
@@ -269,11 +274,10 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         CS: ConstraintSystem<F>,
     {
         println!("adding hash chain hashes in nova");
-        let mut ns = cs.namespace(|| format!("poseidon hash start"));
-
         // allocate blind
-        let alloc_blind = AllocatedNum::alloc(ns.namespace(|| "blind"), || Ok(blind))?;
+        let alloc_blind = AllocatedNum::alloc(cs.namespace(|| "blind"), || Ok(blind))?;
 
+        let mut ns = cs.namespace(|| format!("poseidon hash start"));
         let random_hash = {
             let acc = &mut ns;
             // "random_hash_result"
@@ -306,34 +310,35 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         let i_0_inv;
         let first_sel;
 
-        let zero = F::zero();
-        match i_0.get_value().unwrap() {
-            zero => {
+        match first {
+            true => {
                 println!("SET WITNESSES FOR i_0 = 0");
                 start_hash = AllocatedNum::alloc(ns.namespace(|| "start_hash"), || {
                     Ok(random_hash.get_value().unwrap())
                 })?;
                 i_0_inv = AllocatedNum::alloc(ns.namespace(|| "i0 inv"), || Ok(F::from(1)))?;
-                first_sel = AllocatedNum::alloc(ns.namespace(|| "first_sel"), || Ok(F::from(1)))?;
+                first_sel = AllocatedNum::alloc(ns.namespace(|| "first_sel"), || Ok(F::from(0)))?;
             }
-            x => {
+            false => {
                 start_hash = AllocatedNum::alloc(ns.namespace(|| "start_hash"), || {
                     Ok(z_input_hash.get_value().unwrap())
                 })?;
 
-                type_of(&x);
-                //let inv = x.invert(); // TODO what the type here? cfg().field().modulus()).unwrap();
-                i_0_inv = AllocatedNum::alloc(ns.namespace(|| "io inv"), || Ok(F::from(1)))?; //inv))?;
-                first_sel = AllocatedNum::alloc(ns.namespace(|| "first_sel"), || Ok(F::from(0)))?;
+                //type_of(&i_0.get_value().unwrap());
+                let inv_opt = i_0.get_value().unwrap().invert();
+                let inv = inv_opt.expect("couldn't invert i_0 for wit");
+                i_0_inv = AllocatedNum::alloc(ns.namespace(|| "io inv"), || Ok(inv))?;
+                first_sel = AllocatedNum::alloc(ns.namespace(|| "first_sel"), || Ok(F::from(1)))?;
             }
         };
 
         // regular hashing
         let mut next_hash = start_hash.clone();
         for i in 0..(self.batch_size) {
+            let mut hash_ns = ns.namespace(|| format!("poseidon hash batch {}", i));
             //println!("i {:#?}", i);
             next_hash = {
-                let acc = &mut ns;
+                let acc = &mut hash_ns;
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
 
                 sponge.start(
@@ -341,6 +346,15 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                     None,
                     acc,
                 );
+
+                if i_0.get_value().is_some() {
+                    println!(
+                        "ELTS FOR HASH: {:#?}, {:#?}, {:#?}",
+                        next_hash.get_value().unwrap(),
+                        alloc_chars[i].clone().unwrap().get_value().unwrap(),
+                        doc_idxs[i].clone().unwrap().get_value().unwrap()
+                    );
+                }
 
                 SpongeAPI::absorb(
                     &mut sponge,
@@ -358,22 +372,50 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
                 sponge.finish(acc).unwrap();
 
-                Elt::ensure_allocated(&output[0], &mut ns.namespace(|| "ensure allocated"), true)?
+                Elt::ensure_allocated(
+                    &output[0],
+                    &mut hash_ns.namespace(|| "ensure allocated"),
+                    true,
+                )?
             };
         }
 
-        // if FIRST_SEL then START_HASH = RANDOM_HASH else START_HASH = Z_INPUT_HASH
-        // FIRST_SEL = (i_0 == 0)
+        // if FIRST_SEL==0 then START_HASH = RANDOM_HASH else START_HASH = Z_INPUT_HASH
+        // FIRST_SEL = !(i_0 == 0)
         // -> r1cs:
-        // START_HASH = Z_INPUT_HASH + FIRST_SEL(RANDOM_HASH - Z_INPUT_HASH) <- ite
+        // START_HASH = RANDOM_HASH + FIRST_SEL(Z_INPUT_HASH - RANDOM_HASH) <- ite
         // i_0 * WIT = FIRST_SEL <- wit here is inv(i_0)
         // (1 - FIRST_SEL) * i_0 = 0
 
+        // sanity - get rid of
+        if i_0.get_value().is_some() {
+            assert_eq!(
+                first_sel.get_value().unwrap()
+                    * (z_input_hash.get_value().unwrap() - random_hash.get_value().unwrap()),
+                start_hash.get_value().unwrap() - random_hash.get_value().unwrap()
+            );
+            assert_eq!(
+                i_0.get_value().unwrap() * i_0_inv.get_value().unwrap(),
+                first_sel.get_value().unwrap()
+            );
+            assert_eq!(
+                (F::from(1) - first_sel.get_value().unwrap()) * i_0.get_value().unwrap(),
+                F::from(1) - F::from(1)
+            );
+
+            println!("BLIND NOVA: {:#?}", blind);
+            println!("RANDOM NOVA: {:#?}", random_hash.get_value().unwrap());
+            println!("OUT HASH: {:#?}", next_hash.get_value().unwrap());
+        } else {
+            println!("NO SANITY CHECK");
+        }
+        println!("ITE CS");
+
         ns.enforce(
             || format!("ite"),
-            |z| z + start_hash.get_variable() - z_input_hash.get_variable(),
             |z| z + first_sel.get_variable(),
-            |z| z + random_hash.get_variable() - z_input_hash.get_variable(),
+            |z| z + z_input_hash.get_variable() - random_hash.get_variable(),
+            |z| z + start_hash.get_variable() - random_hash.get_variable(),
         );
 
         ns.enforce(
@@ -907,6 +949,7 @@ where
                 out.push(last_i.unwrap());
                 let last_hash = self.hash_circuit(
                     cs,
+                    self.first,
                     hash_0,
                     i_0,
                     self.blind.unwrap(),
@@ -1021,6 +1064,7 @@ where
                 out.push(last_i.unwrap());
                 let last_hash = self.hash_circuit(
                     cs,
+                    self.first,
                     hash_0,
                     i_0,
                     self.blind.unwrap(),

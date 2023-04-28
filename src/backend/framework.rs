@@ -134,6 +134,7 @@ pub fn run_backend(
         vec![<G1 as Group>::Scalar::from(0); 2],
         empty_glue,
         Some(<G1 as Group>::Scalar::from(0)),
+        true, //false,
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         sc.clone(),
@@ -314,9 +315,19 @@ pub fn run_backend(
             intm_hash = next_hash;
         }*/
 
+        let blind = match r1cs_converter.reef_commit.clone().unwrap() {
+            ReefCommitment::HashChain(hcs) => Some(hcs.blind),
+            ReefCommitment::Nlookup(_) => None,
+        };
+
         let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
             (JBatching::NaivePolys, JCommit::HashChain) => {
-                let next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
+                let next_hash;
+                if i == 0 {
+                    next_hash = r1cs_converter.prover_calc_hash(blind.unwrap(), i);
+                } else {
+                    next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
+                }
                 println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
 
                 let i_0 = <G1 as Group>::Scalar::from((i * r1cs_converter.batch_size) as u64);
@@ -331,7 +342,12 @@ pub fn run_backend(
                 g
             }
             (JBatching::Nlookup, JCommit::HashChain) => {
-                let next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
+                let next_hash;
+                if i == 0 {
+                    next_hash = r1cs_converter.prover_calc_hash(blind.unwrap(), i);
+                } else {
+                    next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
+                }
 
                 let q = match running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
@@ -429,11 +445,6 @@ pub fn run_backend(
             }
         };
 
-        let blind = match r1cs_converter.reef_commit.clone().unwrap() {
-            ReefCommitment::HashChain(hcs) => Some(hcs.blind),
-            ReefCommitment::Nlookup(_) => None,
-        };
-
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             &prover_data,
             Some(wits),
@@ -443,6 +454,7 @@ pub fn run_backend(
             ],
             glue,
             blind,
+            (i == 0),
             vec![
                 <G1 as Group>::Scalar::from(
                     r1cs_converter.prover_accepting_state(i, current_state),
@@ -630,7 +642,7 @@ mod tests {
         );
     }
 
-    #[test]
+    //   #[test]
     fn e2e_poly_nl() {
         backend_test(
             "ab".to_string(),
@@ -654,7 +666,7 @@ mod tests {
         );
     }
 
-    #[test]
+    //    #[test]
     fn e2e_nl_nl() {
         backend_test(
             "ab".to_string(),

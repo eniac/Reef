@@ -67,16 +67,20 @@ pub fn gen_commitment(
             let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
             let acc = &mut ();
 
-            let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
             sponge.start(parameter, None, acc);
 
             let blind = <G1 as Group>::Scalar::random(&mut OsRng);
 
-            SpongeAPI::absorb(&mut sponge, 3, &[F::from(0), blind, F::from(0)], acc);
+            println!("HASH BLIND: {:#?}", blind.clone());
+
+            SpongeAPI::absorb(&mut sponge, 2, &[blind, F::from(0)], acc);
             hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
             sponge.finish(acc).unwrap();
 
-            let mut i = 1;
+            println!("RANDOM HASH: {:#?}", hash[0].clone());
+
+            let mut i = 0;
             // H_i = Hash(H_i-1, char, i)
             for c in doc.into_iter() {
                 let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
@@ -84,6 +88,14 @@ pub fn gen_commitment(
 
                 let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
                 sponge.start(parameter, None, acc);
+
+                println!(
+                    "REAL HASH ELTS: {:#?}, {:#?}, {:#?}",
+                    hash[0],
+                    F::from(c as u64),
+                    F::from(i)
+                );
+
                 SpongeAPI::absorb(
                     &mut sponge,
                     3,

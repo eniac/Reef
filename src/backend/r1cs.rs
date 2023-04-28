@@ -166,9 +166,26 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // IN THE CLEAR
 
-    pub fn prover_calc_hash(&self, start_hash: F, i: usize) -> F {
-        let mut next_hash = start_hash;
-        let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+    pub fn prover_calc_hash(&self, start_hash_or_blind: F, i: usize) -> F {
+        let mut next_hash;
+
+        if i == 0 {
+            // H_0 = Hash(0, r, 0)
+            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+            let acc = &mut ();
+
+            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+            sponge.start(parameter, None, acc);
+
+            SpongeAPI::absorb(&mut sponge, 2, &[start_hash_or_blind, F::from(0)], acc);
+            next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            sponge.finish(acc).unwrap();
+        } else {
+            next_hash = vec![start_hash_or_blind];
+        }
+
+        println!("PROVER START HASH ROUND {:#?}", next_hash);
+        let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
         for b in 0..self.batch_size {
             // expected poseidon
             let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
@@ -177,29 +194,29 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             sponge.start(parameter.clone(), None, acc);
             SpongeAPI::absorb(
                 &mut sponge,
-                2,
+                3,
                 &[
-                    next_hash,
+                    next_hash[0],
                     F::from(
                         self.dfa
                             .ab_to_num(&self.doc[i * self.batch_size + b].clone())
                             as u64,
                     ),
+                    F::from((i * self.batch_size + b) as u64),
                 ],
                 acc,
             );
-            let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
             /*println!(
                 "prev, expected next hash in main {:#?} {:#?}",
                 prev_hash, expected_next_hash
             );
             */
+            println!("PROVER HASH ROUND {:#?}", next_hash);
             sponge.finish(acc).unwrap(); // assert expected hash finished correctly
-
-            next_hash = expected_next_hash[0];
         }
 
-        next_hash
+        next_hash[0]
     }
 
     // PROVER
@@ -1044,7 +1061,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         query.append(&mut vec![prev_running_v.clone()]);
         let query_f: Vec<F> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
-        println!("R1CS sponge absorbs {:#?}", query_f);
+        //println!("R1CS sponge absorbs {:#?}", query_f);
 
         SpongeAPI::absorb(
             &mut sponge,
@@ -1057,7 +1074,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // generate claim r
         let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
-        println!("R1CS sponge squeezes {:#?}", rand);
+        //println!("R1CS sponge squeezes {:#?}", rand);
         let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
@@ -1087,10 +1104,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 int_to_ff(g_xsq.clone()),
             ];
 
-            println!("R1CS sponge absorbs {:#?}", query);
+            //println!("R1CS sponge absorbs {:#?}", query);
             SpongeAPI::absorb(&mut sponge, 3, &query, acc);
             let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            println!("R1CS sponge squeezes {:#?}", rand);
+            //println!("R1CS sponge squeezes {:#?}", rand);
             let sc_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
 
             sc_rs.push(sc_r.clone());
