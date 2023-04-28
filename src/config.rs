@@ -6,8 +6,8 @@ use std::io::{BufReader, Read};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
-use crate::regex::Regex;
 use crate::backend::costs::{JBatching, JCommit};
+use crate::regex::Regex;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -88,7 +88,7 @@ pub enum Config {
         re: String,
         #[arg(short = 'i', long, value_name = "FILE")]
         inp: PathBuf,
-    }
+    },
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -212,7 +212,9 @@ impl BaseParser<char> for AsciiParser {
         let mut reader = BufReader::new(f);
         let mut buffer: Vec<u8> = Vec::new();
         // Read file into vector.
-        reader.read_to_end(&mut buffer).expect("Could not parse document");
+        reader
+            .read_to_end(&mut buffer)
+            .expect("Could not parse document");
         buffer.into_iter().map(|i| i as char).collect()
     }
 }

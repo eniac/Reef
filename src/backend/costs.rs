@@ -44,8 +44,9 @@ pub fn commit_circuit_nohash(
 ) -> usize {
     match commit_type {
         JCommit::HashChain => match is_match {
-            None => 0,
-            Some((_, end)) if end == doc_len => 0,
+            None => batch_size, // i's for hashes: i++ (batch_size),
+            // enforce i_0 != 0 bool (2), ite (5) -> on nova level :)
+            Some((_, end)) if end == doc_len => batch_size,
             _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
@@ -200,7 +201,7 @@ pub fn full_round_cost_model_nohash<'a>(
         }
         JBatching::Nlookup => {
             nlookup_cost_model_nohash(dfa, batch_size, is_match, doc_len, commit_type)
-        } //        JBatching::Plookup => plookup_cost_model_nohash(dfa, batch_size),
+        }
     };
     cost
 }
@@ -273,7 +274,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_length: usize,
-) -> (JBatching, JCommit, usize,usize) {
+) -> (JBatching, JCommit, usize, usize) {
     let mut opt_batching: JBatching = JBatching::NaivePolys;
     let mut opt_commit: JCommit = JCommit::Nlookup;
 
@@ -352,7 +353,7 @@ pub fn opt_commit_select_with_batch<'a>(
     is_match: Option<(usize, usize)>,
     doc_length: usize,
     batching: JBatching,
-) -> (JBatching, JCommit, usize,usize) {
+) -> (JBatching, JCommit, usize, usize) {
     let can_hashcahin: bool = match is_match {
         None => true,
         Some((_, end)) if end == doc_length => true,
@@ -402,7 +403,7 @@ pub fn opt_cost_model_select<'a>(
     doc_length: usize,
     commit: Option<JCommit>,
     batching: Option<JBatching>,
-) -> (JBatching, JCommit, usize,usize) {
+) -> (JBatching, JCommit, usize, usize) {
     let mut opt_batching: JBatching = match batching {
         None => JBatching::NaivePolys,
         Some(b) => b,
@@ -431,14 +432,17 @@ pub fn opt_cost_model_select<'a>(
     cost = get_folded_cost(cost, doc_length, 1);
 
     for n in batch_range_lower..=batch_range_upper {
-        let batching_and_cost: (JBatching, JCommit, usize,usize) =
+        let batching_and_cost: (JBatching, JCommit, usize, usize) =
             match (batching.clone(), commit.clone(), can_hashcahin) {
                 (None, None, _) => {
                     opt_cost_model_select_with_batch(dfa, 1 << n, is_match, doc_length)
                 }
-                (_, Some(JCommit::HashChain), false) => {
-                    (JBatching::NaivePolys, JCommit::HashChain, 1<<n,cost + 100)
-                }
+                (_, Some(JCommit::HashChain), false) => (
+                    JBatching::NaivePolys,
+                    JCommit::HashChain,
+                    1 << n,
+                    cost + 100,
+                ),
                 (None, Some(c), _) => {
                     opt_cost_model_select_with_commit(dfa, 1 << n, is_match, doc_length, c)
                 }
@@ -446,9 +450,15 @@ pub fn opt_cost_model_select<'a>(
                     opt_commit_select_with_batch(dfa, 1 << n, is_match, doc_length, b)
                 }
                 (Some(b), Some(c), _) => {
-                    let single_cost =  full_round_cost_model(dfa, 1 << n, b, is_match, doc_length, c);
-                    (b, c, 1<<n, get_folded_cost(single_cost, doc_length, 1<<n))
-                },
+                    let single_cost =
+                        full_round_cost_model(dfa, 1 << n, b, is_match, doc_length, c);
+                    (
+                        b,
+                        c,
+                        1 << n,
+                        get_folded_cost(single_cost, doc_length, 1 << n),
+                    )
+                }
             };
         if batching_and_cost.3 < cost {
             cost = batching_and_cost.3;
@@ -457,5 +467,10 @@ pub fn opt_cost_model_select<'a>(
             opt_batch_size = 1 << n;
         }
     }
-    (opt_batching.clone(), opt_commit.clone(), opt_batch_size,cost)
+    (
+        opt_batching.clone(),
+        opt_commit.clone(),
+        opt_batch_size,
+        cost,
+    )
 }

@@ -1,12 +1,12 @@
-use crate::backend::{costs::*, self};
 use crate::backend::nova::int_to_ff;
+use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
 use crate::config::*;
-use crate::dfa::{NFA, EPSILON};
+use crate::dfa::{EPSILON, NFA};
 use circ::cfg;
 use circ::cfg::CircOpt;
 use circ::cfg::*;
-use crate::config::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
+use circ::target::r1cs::*;
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use ff::PrimeField;
 use fxhash::FxHashMap;
@@ -17,7 +17,6 @@ use neptune::{
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
-use std::fs;
 use nova_snark::traits::Group;
 use rug::{
     integer::Order,
@@ -25,311 +24,16 @@ use rug::{
     rand::RandState,
     Assign, Integer,
 };
+use std::fs;
 use std::sync::Once;
 use std::time::{Duration, Instant};
-
-static INIT: Once = Once::new();
-
-pub fn init() {
-    INIT.call_once(|| {
-        setup_circ();
-    });
-}
-fn setup_circ() {
-    if !cfg::is_cfg_set() {
-        // set up CirC library
-        let mut circ: CircOpt = Default::default();
-        circ.field.custom_modulus =
-            "28948022309329048855892746252171976963363056481941647379679742748393362948097".into(); // vesta (fuck???)
-                                                                                                    //"28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); // pallas curve (i think?)
-        cfg::set(&circ);
-    }
-}
-
-// circuit values
-fn new_const<I>(i: I) -> Term
-// constants
-where
-    Integer: From<I>,
-{
-    leaf_term(Op::Const(Value::Field(cfg().field().new_v(i))))
-}
-fn new_bool_const(b: bool) -> Term
-// constants
-{
-    leaf_term(Op::Const(Value::Bool(b)))
-}
-
-fn new_var(name: String) -> Term {
-    // empty holes
-    leaf_term(Op::Var(name, Sort::Field(cfg().field().clone())))
-}
-
-fn new_bool_var(name: String) -> Term {
-    // empty holes
-    leaf_term(Op::Var(name, Sort::Bool))
-}
-
-fn new_wit<I>(i: I) -> Value
-// wit values
-where
-    Integer: From<I>,
-{
-    Value::Field(cfg().field().new_v(i))
-}
-
-fn new_bool_wit(b: bool) -> Value
-// wit values
-{
-    Value::Bool(b)
-}
-
-// feild ops
-fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
-    let mut res = Integer::from(1);
-    for j in (0..evals.len()).rev() {
-        if i != j {
-            res *= evals[i].0.clone() - &evals[j].0; //.rem_floor_assign(cfg().field().modulus().clone());
-                                                     //res.rem_floor(cfg().field().modulus());
-        } // TODO
-    }
-
-    // find inv in feild
-    let inv = res.invert(cfg().field().modulus()).unwrap();
-
-    return inv;
-}
-
-// TODO Q - do we need to pad out the table ??
-
-// PROVER WORK
-
-// x = [r_0, r_1, ... -1, {0,1}, {0,1},...]
-// where -1 is the "hole"
-// returns (coeff (of "hole"), constant)
-// if no hole, returns (crap, full result)
-// O(mn log mn) :) - or was once upon a time, i'll update this later
-// x = eval_at, prods = coeffs of table/eq(), e's = e/q's
-fn prover_mle_partial_eval(
-    prods: &Vec<Integer>,
-    x: &Vec<Integer>,
-    es: &Vec<usize>,
-    for_t: bool,
-    last_q: Option<&Vec<Integer>>, // only q that isn't in {0,1}, inelegant but whatever
-) -> (Integer, Integer) {
-    let base: usize = 2;
-    let m = x.len();
-
-    if for_t {
-        assert!(base.pow(m as u32 - 1) <= prods.len());
-        assert!(base.pow(m as u32) >= prods.len());
-        assert_eq!(es.len(), prods.len()); //todo final q
-    } else if last_q.is_some() {
-        assert_eq!(es.len() + 1, prods.len());
-    }
-
-    let mut hole_coeff = Integer::from(0);
-    let mut minus_coeff = Integer::from(0);
-    for i in 0..es.len() + 1 {
-        //e in 0..table.len() {
-
-        //println!("\ni = {:#?}", i);
-        // ~eq(x,e)
-        if i < es.len() {
-            let mut prod = prods[i].clone();
-            let mut next_hole_coeff = 0; // TODO as below ???
-            let mut next_minus_coeff = 0;
-            for j in (0..m).rev() {
-                let ej = (es[i] >> j) & 1;
-
-                // for each x
-                if x[m - j - 1] == -1 {
-                    // if x_j is the hole
-                    next_hole_coeff = ej;
-                    next_minus_coeff = 1 - ej;
-                } else {
-                    let mut intm = Integer::from(1);
-                    if ej == 1 {
-                        intm.assign(&x[m - j - 1]);
-                    } else {
-                        // ej == 0
-                        intm -= &x[m - j - 1];
-                    }
-                    prod *= intm; //&x[j] * ej + (1 - &x[j]) * (1 - ej);
-                }
-            }
-            if next_hole_coeff == 1 {
-                hole_coeff += &prod;
-            } else {
-                // next minus coeff == 1
-                minus_coeff += &prod;
-            }
-        } else {
-            // final q?
-            match last_q {
-                Some(q) => {
-                    let mut prod = prods[i].clone();
-                    let mut next_hole_coeff = Integer::from(1); // in case of no hole
-                    let mut next_minus_coeff = Integer::from(1);
-                    for j in 0..m {
-                        let ej = q[j].clone(); // TODO order?
-                                               // for each x
-                        if x[j] == -1 {
-                            // if x_j is the hole
-                            next_hole_coeff = ej.clone();
-                            next_minus_coeff = Integer::from(1) - &ej;
-                        } else {
-                            let mut intm = ej.clone() * &x[j]; // ei*xi
-                            intm += (Integer::from(1) - &ej) * (Integer::from(1) - &x[j]); // +(1-ei)(1-xi)
-                            prod *= intm; //&x[j] * ej + (1 - &x[j]) * (1 - ej);
-                        }
-                    }
-
-                    hole_coeff += &prod * next_hole_coeff;
-                    minus_coeff += &prod * next_minus_coeff;
-                }
-                None => {}
-            }
-        }
-    }
-    hole_coeff -= &minus_coeff;
-    (
-        hole_coeff.rem_floor(cfg().field().modulus()),
-        minus_coeff.rem_floor(cfg().field().modulus()),
-    )
-}
-
-// external full "partial" eval for table check
-pub fn verifier_mle_eval(table: &Vec<Integer>, q: &Vec<Integer>) -> Integer {
-    let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
-
-    con
-}
-
-// for sum check, computes the sum of many mle univar slices
-// takes raw table (pre mle'd), and rands = [r_0, r_1,...], leaving off the hole and x_i's
-fn prover_mle_sum_eval(
-    table: &Vec<Integer>,
-    rands: &Vec<Integer>,
-    qs: &Vec<usize>,
-    claim_r: &Integer,
-    last_q: Option<&Vec<Integer>>,
-) -> (Integer, Integer, Integer) {
-    let mut sum_xsq = Integer::from(0);
-    let mut sum_x = Integer::from(0);
-    let mut sum_con = Integer::from(0);
-    let hole = rands.len();
-    let total = logmn(table.len());
-
-    assert!(hole + 1 <= total, "batch size too small for nlookup");
-    let num_x = total - hole - 1;
-
-    let base: usize = 2;
-
-    for combo in 0..base.pow(num_x as u32) {
-        let mut eval_at = rands.clone();
-        eval_at.push(Integer::from(-1));
-
-        for i in 0..num_x {
-            eval_at.push(Integer::from((combo >> i) & 1));
-        }
-
-        //println!("eval at: {:#?}", eval_at.clone());
-        // T(j)
-        let (coeff_a, con_a) =
-            prover_mle_partial_eval(table, &eval_at, &(0..table.len()).collect(), true, None); // TODO
-                                                                                               //println!("T {:#?}, {:#?}", coeff_a, con_a);
-
-        // r^i * eq(q_i,j) for all i
-        // TODO - eq must be an MLE? ask
-
-        // make rs (horner esq)
-        let mut rs = vec![claim_r.clone()];
-        for i in 1..(qs.len() + 1) {
-            rs.push(rs[i - 1].clone() * claim_r);
-        }
-
-        let (coeff_b, con_b) = prover_mle_partial_eval(&rs, &eval_at, &qs, false, last_q);
-        sum_xsq += &coeff_a * &coeff_b;
-        sum_x += &coeff_b * &con_a;
-        sum_x += &coeff_a * &con_b;
-        sum_con += &con_a * &con_b;
-    }
-
-    (
-        sum_xsq.rem_floor(cfg().field().modulus()),
-        sum_x.rem_floor(cfg().field().modulus()),
-        sum_con.rem_floor(cfg().field().modulus()),
-    )
-}
-
-// CIRCUITS
-
-// coeffs = [constant, x, x^2 ...]
-fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
-    let num_c = coeffs.len();
-    //println!("coeffs = {:#?}", coeffs);
-
-    let mut horners = term(
-        Op::PfNaryOp(PfNaryOp::Mul),
-        vec![coeffs[num_c - 1].clone(), x_lookup.clone()],
-    );
-    for i in (1..(num_c - 1)).rev() {
-        horners = term(
-            Op::PfNaryOp(PfNaryOp::Mul),
-            vec![
-                x_lookup.clone(),
-                term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![horners, coeffs[i].clone()],
-                ),
-            ],
-        );
-    }
-
-    // constant
-    horners = term(
-        Op::PfNaryOp(PfNaryOp::Add),
-        vec![horners, coeffs[0].clone()],
-    );
-
-    horners
-}
-
-// eval circuit
-fn poly_eval_circuit(points: Vec<Integer>, x_lookup: Term) -> Term {
-    let mut eval = new_const(1); // dummy
-
-    for p in points {
-        // for sub
-        let sub = if p == 0 {
-            p
-        } else {
-            cfg().field().modulus() - p
-        };
-
-        eval = term(
-            Op::PfNaryOp(PfNaryOp::Mul),
-            vec![
-                eval,
-                term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![x_lookup.clone(), new_const(sub)], // subtraction
-                                                            // - TODO for
-                                                            // bit eq too
-                ),
-            ],
-        );
-    }
-
-    eval
-}
 
 pub struct R1CS<'a, F: PrimeField> {
     dfa: &'a NFA,
     pub table: Vec<Integer>,
     pub batching: JBatching,
     pub commit_type: JCommit,
+    pub reef_commit: Option<ReefCommitment>,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -360,7 +64,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let commit;
         let opt_batch_size;
         let cost: usize;
-        if batch_size > 0  {
+        if batch_size > 0 {
             (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
                 (Some(b), Some(c)) => (b, c, batch_size, 0),
                 (Some(b), _) => {
@@ -378,7 +82,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 }
             };
         } else {
-            (batching, commit, opt_batch_size,cost) = opt_cost_model_select(
+            (batching, commit, opt_batch_size, cost) = opt_cost_model_select(
                 &dfa,
                 0,
                 logmn(doc.len()),
@@ -395,15 +99,19 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}, cost {:#?}",
             batching, commit, sel_batch_size, cost
         );
-    
+
         let mut batch_doc = doc.clone();
 
         let epsilon_to_add = doc.len() % sel_batch_size;
 
-        println!("Doc len: {:#?}, Epsilon to Add: {:#?}", doc.len(), epsilon_to_add);
+        println!(
+            "Doc len: {:#?}, Epsilon to Add: {:#?}",
+            doc.len(),
+            epsilon_to_add
+        );
 
         if epsilon_to_add != 0 {
-            for i in 0..(sel_batch_size-epsilon_to_add) {
+            for i in 0..(sel_batch_size - epsilon_to_add) {
                 batch_doc.push(EPSILON.clone());
             }
         }
@@ -448,6 +156,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             table,    // TODO fix else
             batching, // TODO
             commit_type: commit,
+            reef_commit: None,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: sel_batch_size,
@@ -458,11 +167,43 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
+    pub fn set_commitment(&mut self, rc: ReefCommitment) {
+        println!("SETTING COMMITMENT");
+        match (&rc, self.commit_type) {
+            (ReefCommitment::HashChain(_), JCommit::HashChain) => {
+                self.reef_commit = Some(rc);
+            }
+            (ReefCommitment::Nlookup(_), JCommit::Nlookup) => {
+                self.reef_commit = Some(rc);
+            }
+            _ => {
+                panic!("Commitment does not match selected type");
+            }
+        }
+    }
+
     // IN THE CLEAR
 
-    pub fn prover_calc_hash(&self, start_hash: F, i: usize) -> F {
-        let mut next_hash = start_hash;
-        let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+    pub fn prover_calc_hash(&self, start_hash_or_blind: F, i: usize) -> F {
+        let mut next_hash;
+
+        if i == 0 {
+            // H_0 = Hash(0, r, 0)
+            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+            let acc = &mut ();
+
+            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+            sponge.start(parameter, None, acc);
+
+            SpongeAPI::absorb(&mut sponge, 2, &[start_hash_or_blind, F::from(0)], acc);
+            next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            sponge.finish(acc).unwrap();
+        } else {
+            next_hash = vec![start_hash_or_blind];
+        }
+
+        println!("PROVER START HASH ROUND {:#?}", next_hash);
+        let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
         for b in 0..self.batch_size {
             // expected poseidon
             let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
@@ -471,48 +212,32 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             sponge.start(parameter.clone(), None, acc);
             SpongeAPI::absorb(
                 &mut sponge,
-                2,
+                3,
                 &[
-                    next_hash,
+                    next_hash[0],
                     F::from(
                         self.dfa
                             .ab_to_num(&self.doc[i * self.batch_size + b].clone())
                             as u64,
                     ),
+                    F::from((i * self.batch_size + b) as u64),
                 ],
                 acc,
             );
-            let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
             /*println!(
                 "prev, expected next hash in main {:#?} {:#?}",
                 prev_hash, expected_next_hash
             );
             */
+            println!("PROVER HASH ROUND {:#?}", next_hash);
             sponge.finish(acc).unwrap(); // assert expected hash finished correctly
-
-            next_hash = expected_next_hash[0];
         }
 
-        next_hash
+        next_hash[0]
     }
 
     // PROVER
-
-    // seed Questions todo
-    fn prover_random_from_seed(&self, absorbs: u32, s: &[F]) -> Integer {
-        assert_eq!(absorbs, s.len() as u32);
-
-        let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-        let acc = &mut ();
-        let parameter = IOPattern(vec![SpongeOp::Absorb(absorbs), SpongeOp::Squeeze(1)]);
-
-        sponge.start(parameter, None, acc);
-        SpongeAPI::absorb(&mut sponge, absorbs, s, acc);
-        let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
-        sponge.finish(acc).unwrap();
-
-        Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf)
-    }
 
     pub fn prover_accepting_state(&self, batch_num: usize, state: usize) -> bool {
         let mut out = false;
@@ -531,7 +256,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
 
         // sanity
-        if (batch_num + 1) * self.batch_size >= self.doc.len() {
+        if (batch_num + 1) * self.batch_size - 1 >= self.doc.len() {
+            // todo check
             assert!(out);
         }
 
@@ -592,24 +318,19 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let final_states = self.dfa.get_final_states();
         let non_final_states = self.dfa.get_non_final_states();
         let mut vanish_on = vec![];
-        let v_time = Instant::now();
+
         if self.is_match {
-            //println!("in states: {:#?}", final_states);
             // proof of membership
             for xi in final_states.into_iter() {
                 vanish_on.push(Integer::from(xi));
             }
         } else {
-            //println!("in states: {:#?}", non_final_states);
             for xi in non_final_states.into_iter() {
                 vanish_on.push(Integer::from(xi));
             }
         }
         vanishing_poly =
             poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
-        let vanish_ms = v_time.elapsed().as_millis();
-
-        //println!("lag {:#?}, vanish {:#?}", lag_ms, vanish_ms);
 
         let match_term = term(
             Op::Eq,
@@ -655,6 +376,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             ],
         );
         let final_cs = css.get("main");
+        //println!("{:#?}", final_cs.clone());
+
         let mut circ_r1cs = to_r1cs(final_cs, cfg());
 
         println!(
@@ -664,7 +387,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // println!("Prover data {:#?}", prover_data);
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
-        //println!("Prover data {:#?}", prover_data);
+        for r in circ_r1cs.constraints().clone() {
+            println!("{:#?}", circ_r1cs.format_qeq(&r));
+        }
+
+        //println!("Prover data {:#?}", circ_r1cs);
         let ms = time.elapsed().as_millis();
         println!(
             "Final R1cs size (no hashes): {}",
@@ -679,7 +406,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         match self.batching {
             JBatching::NaivePolys => self.to_polys(),
             JBatching::Nlookup => self.to_nlookup(),
-            //JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
@@ -714,19 +440,64 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
             self.assertions.push(eq);
         }
-        let lag_ms = l_time.elapsed().as_millis();
 
         self.accepting_state_circuit();
 
-        if matches!(self.commit_type, JCommit::Nlookup) {
-            assert!(
-                self.batch_size > 1,
-                "don't use a doc commitment if you aren't going to batch"
-            );
-            self.nlookup_doc_commit();
+        match self.commit_type {
+            JCommit::HashChain => {
+                self.hashchain_commit();
+            }
+            JCommit::Nlookup => {
+                self.nlookup_doc_commit();
+            }
         }
 
         self.r1cs_conv()
+    }
+
+    fn hashchain_commit(&mut self) {
+        self.pub_inputs.push(new_var(format!("i_0")));
+        for idx in 1..=self.batch_size {
+            let i_plus = term(
+                Op::Eq,
+                vec![
+                    new_var(format!("i_{}", idx)),
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Add),
+                        vec![new_var(format!("i_{}", idx - 1)), new_const(1)],
+                    ),
+                ],
+            );
+
+            self.assertions.push(i_plus);
+            self.pub_inputs.push(new_var(format!("i_{}", idx)));
+        }
+        /*
+              let ite = term(
+                  Op::Ite,
+                  vec![
+                      term(Op::Eq, vec![new_var(format!("i_0")), new_const(0)]),
+                      term(
+                          Op::Eq,
+                          vec![
+                              new_var(format!("first_hash_input")),
+                              new_var(format!("random_hash_result")),
+                          ],
+                      ),
+                      term(
+                          Op::Eq,
+                          vec![
+                              new_var(format!("first_hash_input")),
+                              new_var(format!("z_hash_input")),
+                          ],
+                      ),
+                  ],
+              );
+              self.assertions.push(ite);
+              self.pub_inputs.push(new_var(format!("first_hash_input")));
+              self.pub_inputs.push(new_var(format!("random_hash_result")));
+              self.pub_inputs.push(new_var(format!("z_hash_input")));
+        */
     }
 
     // for use at the end of sum check
@@ -914,10 +685,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         self.accepting_state_circuit(); // TODO
 
-        if matches!(self.commit_type, JCommit::Nlookup) {
-            self.nlookup_doc_commit();
+        match self.commit_type {
+            JCommit::HashChain => {
+                self.hashchain_commit();
+            }
+            JCommit::Nlookup => {
+                self.nlookup_doc_commit();
+            }
         }
-
         self.r1cs_conv()
     }
 
@@ -1139,30 +914,36 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             new_bool_wit(self.prover_accepting_state(batch_num, next_state)),
         );
 
-        if matches!(self.commit_type, JCommit::Nlookup) {
-            assert!(doc_running_q.is_some() || batch_num == 0);
-            assert!(doc_running_v.is_some() || batch_num == 0);
-            let (w, next_doc_running_q, next_doc_running_v) =
-                self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
-            wits = w;
-            //println!("RUNNING DOC Q {:#?}", next_doc_running_q.clone());
-            (
-                wits,
-                next_state,
-                Some(next_running_q),
-                Some(next_running_v),
-                Some(next_doc_running_q),
-                Some(next_doc_running_v),
-            )
-        } else {
-            (
-                wits,
-                next_state,
-                Some(next_running_q),
-                Some(next_running_v),
-                None,
-                None,
-            )
+        match self.commit_type {
+            JCommit::HashChain => {
+                for i in 0..=self.batch_size {
+                    wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
+                }
+                (
+                    wits,
+                    next_state,
+                    Some(next_running_q),
+                    Some(next_running_v),
+                    None,
+                    None,
+                )
+            }
+            JCommit::Nlookup => {
+                assert!(doc_running_q.is_some() || batch_num == 0);
+                assert!(doc_running_v.is_some() || batch_num == 0);
+                let (w, next_doc_running_q, next_doc_running_v) =
+                    self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
+                wits = w;
+                //println!("RUNNING DOC Q {:#?}", next_doc_running_q.clone());
+                (
+                    wits,
+                    next_state,
+                    Some(next_running_q),
+                    Some(next_running_v),
+                    Some(next_doc_running_q),
+                    Some(next_doc_running_v),
+                )
+            }
         }
     }
 
@@ -1261,17 +1042,35 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
         let acc = &mut ();
 
-        let mut pattern = vec![
-            SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs, combined_q, running q,v
-            SpongeOp::Squeeze(1),
-        ];
+        let mut pattern = match id {
+            "nl" => vec![
+                SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs, combined_q, running q,v
+                SpongeOp::Squeeze(1),
+            ],
+            "nldoc" => vec![
+                SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // doc commit, vs, combined_q, running q,v
+                SpongeOp::Squeeze(1),
+            ],
+            _ => panic!("weird tag"),
+        };
+
         for i in 0..sc_l {
             // sum check rounds
             pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
         }
 
         sponge.start(IOPattern(pattern), None, acc);
-
+        /* TODO
+        match id {
+            "nl" => {}
+            "nldoc" => match self.reef_commit {
+                Some(ReefCommitment::Nlookup(dcs)) => {
+                    dcs.absorb_commitment(&mut sponge);
+                }
+                None => panic!("commitment not found"),
+            },
+            _ => panic!("weird tag"),
+        }*/
         let mut query = vec![combined_q]; // q_comb, v1,..., vm, running q, running v
         query.extend(v);
         query.append(&mut prev_running_q.clone());
@@ -1374,7 +1173,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     fn gen_wit_i_polys(
         &self,
         batch_num: usize,
-        current_state: usize,
+        current_state: usize, // pass in the real one, let's deal with all the dummy stuff under
+        // the hood
         doc_running_q: Option<Vec<Integer>>,
         doc_running_v: Option<Integer>,
     ) -> (
@@ -1389,10 +1189,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         for i in 0..self.batch_size {
             let doc_i = self.doc[batch_num * self.batch_size + i].clone();
-            next_state = self.dfa.delta(state_i, &doc_i.clone()).unwrap();
-
-            wits.insert(format!("state_{}", i), new_wit(state_i));
             wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(&doc_i)));
+            next_state = self.dfa.delta(state_i, &doc_i.clone()).unwrap();
+            wits.insert(format!("state_{}", i), new_wit(state_i));
 
             state_i = next_state;
         }
@@ -1404,21 +1203,28 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         );
         //println!("wits {:#?}", wits);
 
-        if matches!(self.commit_type, JCommit::Nlookup) {
-            assert!(doc_running_q.is_some() || batch_num == 0);
-            assert!(doc_running_v.is_some() || batch_num == 0);
-            let (w, next_doc_running_q, next_doc_running_v) =
-                self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
-            wits = w;
-            //println!("RUNNING DOC Q {:#?}", next_doc_running_q.clone());
-            (
-                wits,
-                next_state,
-                Some(next_doc_running_q),
-                Some(next_doc_running_v),
-            )
-        } else {
-            (wits, next_state, None, None)
+        match self.commit_type {
+            JCommit::HashChain => {
+                for i in 0..=self.batch_size {
+                    wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
+                }
+                // values not actually checked or used
+                (wits, next_state, None, None)
+            }
+            JCommit::Nlookup => {
+                assert!(doc_running_q.is_some() || batch_num == 0);
+                assert!(doc_running_v.is_some() || batch_num == 0);
+                let (w, next_doc_running_q, next_doc_running_v) =
+                    self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
+                wits = w;
+                //println!("RUNNING DOC Q {:#?}", next_doc_running_q.clone());
+                (
+                    wits,
+                    next_state,
+                    Some(next_doc_running_q),
+                    Some(next_doc_running_v),
+                )
+            }
         }
     }
 }
@@ -1599,6 +1405,15 @@ mod tests {
 
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
+        // doc to usizes - can I use this elsewhere too? TODO
+        let mut usize_doc = vec![];
+        let mut int_doc = vec![];
+        for c in chars.clone().into_iter() {
+            let u = dfa.ab_to_num(&c.to_string());
+            usize_doc.push(u);
+            int_doc.push(<G1 as Group>::Scalar::from(u as u64));
+        }
+
         for s in batch_sizes {
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
@@ -1611,10 +1426,14 @@ mod tests {
                         &dfa,
                         &doc.chars().map(|c| c.to_string()).collect(),
                         s,
-                        sc,
+                        sc.clone(),
                         Some(b.clone()),
                         Some(c.clone()),
                     );
+
+                    let reef_commit =
+                        gen_commitment(r1cs_converter.commit_type, usize_doc.clone(), &sc);
+                    r1cs_converter.set_commitment(reef_commit.clone());
 
                     assert_eq!(expected_match, r1cs_converter.is_match);
 
@@ -1650,7 +1469,8 @@ mod tests {
                     let mut values;
                     let mut next_state;
 
-                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0) / r1cs_converter.batch_size;
+                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0)
+                        / r1cs_converter.batch_size;
                     for i in 0..num_steps {
                         (
                             values,
@@ -1690,7 +1510,7 @@ mod tests {
                     println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
                     assert!(
                         prover_data.r1cs.constraints.len() as usize
-                            <= costs::full_round_cost_model_nohash(
+                            == costs::full_round_cost_model_nohash(
                                 &dfa,
                                 r1cs_converter.batch_size,
                                 b.clone(),
@@ -1723,7 +1543,7 @@ mod tests {
             "ab".to_string(),
             "^ab$".to_string(),
             "ab".to_string(),
-            vec![0,1],
+            vec![0, 1],
             true,
         );
         test_func_no_hash(
@@ -1756,7 +1576,7 @@ mod tests {
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaaaaabbbbbbbbbbbbbb".to_string(),
-            vec![0,1, 2, 4],
+            vec![0, 1, 2, 4],
             true,
         );
         test_func_no_hash(
@@ -1862,7 +1682,7 @@ mod tests {
             "helowrd".to_string(),
             "^hello.*$".to_string(),
             "helloworld".to_string(),
-            vec![3,4,6,7],
+            vec![3, 4, 6, 7],
             true,
         );
 
@@ -1870,7 +1690,7 @@ mod tests {
             "helowrd".to_string(),
             "^hello$".to_string(),
             "helloworld".to_string(),
-            vec![3,4,6,7],
+            vec![3, 4, 6, 7],
             false,
         );
     }
@@ -1893,15 +1713,20 @@ mod tests {
         rstr: String,
         doc: String,
         batch_sizes: Vec<usize>,
-        k: usize
+        k: usize,
     ) {
         let r = Regex::new(&rstr);
         let mut dfa = NFA::new(&ab[..], r);
         let mut d = doc.chars().map(|c| c.to_string()).collect();
         d = dfa.k_stride(k, &d);
         let dfa_match = dfa.is_match(&d);
-        println!("DFA Size: {:#?}, |doc| : {}, |ab| : {}, match: {:?}",
-            dfa.trans.len(), d.len(), dfa.ab.len(), dfa_match);
+        println!(
+            "DFA Size: {:#?}, |doc| : {}, |ab| : {}, match: {:?}",
+            dfa.trans.len(),
+            d.len(),
+            dfa.ab.len(),
+            dfa_match
+        );
 
         //let chars: Vec<String> = d.clone();
         //.chars().map(|c| c.to_string()).collect();
@@ -1909,18 +1734,11 @@ mod tests {
         for s in batch_sizes {
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
-                    println!("Batching {:#?}",b.clone());
-                    println!("Commit {:#?}",c);
+                    println!("Batching {:#?}", b.clone());
+                    println!("Commit {:#?}", c);
                     println!(
                         "cost model: {:#?}",
-                        costs::full_round_cost_model(
-                            &dfa,
-                            s,
-                            b.clone(),
-                            dfa_match,
-                            d.len(),
-                            c,
-                        )
+                        costs::full_round_cost_model(&dfa, s, b.clone(), dfa_match, d.len(), c,)
                     );
                 }
             }
