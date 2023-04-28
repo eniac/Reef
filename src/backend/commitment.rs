@@ -41,8 +41,8 @@ pub enum ReefCommitment<F: PrimeField> {
 
 #[derive(Debug, Clone)]
 pub struct HashCommitmentStruct<F: PrimeField> {
-    commit: F,    // <G1 as Group>::Scalar,
-    pub blind: F, // <G1 as Group>::Scalar,
+    pub commit: F, // <G1 as Group>::Scalar,
+    pub blind: F,  // <G1 as Group>::Scalar,
 }
 
 #[derive(Debug, Clone)]

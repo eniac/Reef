@@ -1495,6 +1495,42 @@ mod tests {
                         // for next i+1 round
                         current_state = next_state;
                     }
+
+                    let rq = match running_q {
+                        Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+                        None => None,
+                    };
+                    let rv = match running_v {
+                        Some(x) => Some(int_to_ff(x)),
+                        None => None,
+                    };
+                    let drq = match doc_running_q {
+                        Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+                        None => None,
+                    };
+                    let drv = match doc_running_v {
+                        Some(x) => Some(int_to_ff(x)),
+                        None => None,
+                    };
+                    //dummy hash check (hashes not generated at this level)
+                    let dummy_hash = match &reef_commit {
+                        ReefCommitment::HashChain(hcs) => Some(hcs.commit),
+                        _ => None,
+                    };
+
+                    final_clear_checks(
+                        r1cs_converter.batching,
+                        reef_commit,
+                        //accepting state ,
+                        &r1cs_converter.table,
+                        &usize_doc,
+                        rq,
+                        rv,
+                        dummy_hash, // final hash not checked
+                        drq,
+                        drv,
+                    );
+
                     println!("b? {:#?}", b.clone());
                     println!(
                         "cost model: {:#?}",
