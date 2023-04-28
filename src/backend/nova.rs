@@ -103,7 +103,7 @@ pub struct NFAStepCircuit<'a, F: PrimeField> {
     batch_size: usize,
     states: Vec<F>,
     glue: Vec<GlueOpts<F>>,
-    blind: Option<F>,
+    commit_blind: F,
     first: bool,
     accepting_bool: Vec<F>,
     pc: PoseidonConstants<F, typenum::U2>,
@@ -117,7 +117,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         wits: Option<FxHashMap<String, Value>>, //Option<&'a FxHashMap<String, Value>>,
         states: Vec<F>,
         glue: Vec<GlueOpts<F>>,
-        blind: Option<F>,
+        commit_blind: F,
         first: bool,
         accepting_bool: Vec<F>,
         batch_size: usize,
@@ -160,7 +160,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             batch_size: batch_size,
             states: states,
             glue: glue,
-            blind: blind,
+            commit_blind: commit_blind,
             first: first,
             accepting_bool: accepting_bool,
             pc: pcs,
@@ -577,6 +577,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         alloc_claim_r: &Option<AllocatedNum<F>>,
         //alloc_sc_r: &Vec<Option<AllocatedNum<F>>>,
         alloc_gs: &Vec<Vec<Option<AllocatedNum<F>>>>,
+        vesta_hash: F,
     ) -> Result<(), SynthesisError>
     where
         //A: Arity<F>,
@@ -585,14 +586,19 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
         let mut sponge_ns = cs.namespace(|| format!("{} sponge", tag));
 
-        // TODO if doc, add commit
-
-        let mut pattern = vec![
-            SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs,
-            // combined_q,
-            // running q,v
-            SpongeOp::Squeeze(1),
-        ];
+        let mut pattern = match tag {
+            "eval" => vec![
+                SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs,
+                // combined_q,
+                // running q,v
+                SpongeOp::Squeeze(1),
+            ],
+            "doc" => vec![
+                SpongeOp::Absorb((self.batch_size + sc_l + 3) as u32), // vs,
+                SpongeOp::Squeeze(1),
+            ],
+            _ => panic!("weird tag"),
+        };
         for i in 0..sc_l {
             // sum check rounds
             pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
@@ -602,6 +608,14 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
         // (combined_q, vs, running_q, running_v)
         let mut elts = vec![];
+        // if DOC
+        if matches!(tag, "doc") {
+            println!("DOC TAG");
+            let e = AllocatedNum::alloc(sponge_ns.namespace(|| "doc commit hash start"), || {
+                Ok(vesta_hash)
+            })?;
+            elts.push(Elt::Allocated(e));
+        }
         for e in alloc_qv {
             //println!("alloc qv eval {:#?}", e.clone().unwrap().get_value());
 
@@ -952,7 +966,7 @@ where
                     self.first,
                     hash_0,
                     i_0,
-                    self.blind.unwrap(),
+                    self.commit_blind,
                     alloc_chars,
                     alloc_idxs,
                 );
@@ -1058,6 +1072,7 @@ where
                     &alloc_rc,
                     &alloc_claim_r,
                     &alloc_gs,
+                    self.commit_blind,
                 )?;
 
                 out.push(last_state.unwrap());
@@ -1067,7 +1082,7 @@ where
                     self.first,
                     hash_0,
                     i_0,
-                    self.blind.unwrap(),
+                    self.commit_blind,
                     alloc_chars,
                     alloc_idxs,
                 );
@@ -1156,6 +1171,7 @@ where
                     &alloc_doc_rc,
                     &alloc_doc_claim_r,
                     &alloc_doc_gs,
+                    self.commit_blind,
                 )?;
 
                 out.push(last_state.unwrap());
@@ -1272,6 +1288,7 @@ where
                     &alloc_rc,
                     &alloc_claim_r,
                     &alloc_gs,
+                    self.commit_blind,
                 )?;
                 self.nl_eval_fiatshamir(
                     cs,
@@ -1284,6 +1301,7 @@ where
                     &alloc_doc_rc,
                     &alloc_doc_claim_r,
                     &alloc_doc_gs,
+                    self.commit_blind,
                 )?;
 
                 out.push(last_state.unwrap());

@@ -18,10 +18,11 @@ use nova_snark::{
     provider::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
         pedersen::{Commitment, CommitmentGens},
+        poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
     traits::{
         circuit::TrivialTestCircuit, commitment::*, evaluation::EvaluationEngineTrait,
-        AbsorbInROTrait, Group,
+        AbsorbInROTrait, Group, ROConstantsTrait, ROTrait,
     },
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
@@ -33,24 +34,25 @@ use rug::{
 };
 
 #[derive(Debug, Clone)]
-pub enum ReefCommitment {
-    HashChain(HashCommitmentStruct),
-    Nlookup(DocCommitmentStruct),
+pub enum ReefCommitment<F: PrimeField> {
+    HashChain(HashCommitmentStruct<F>),
+    Nlookup(DocCommitmentStruct<F>),
 }
 
 #[derive(Debug, Clone)]
-pub struct HashCommitmentStruct {
-    commit: <G1 as Group>::Scalar,
-    pub blind: <G1 as Group>::Scalar,
+pub struct HashCommitmentStruct<F: PrimeField> {
+    commit: F,    // <G1 as Group>::Scalar,
+    pub blind: F, // <G1 as Group>::Scalar,
 }
 
 #[derive(Debug, Clone)]
-pub struct DocCommitmentStruct {
+pub struct DocCommitmentStruct<F: PrimeField> {
     gens: CommitmentGens<G1>,
     gens_single: CommitmentGens<G1>,
     commit_doc: Commitment<G1>, // todo compress
-    vec_t: Vec<<G1 as Group>::Scalar>,
-    decommit_doc: <G1 as Group>::Scalar,
+    vec_t: Vec<F>,              //<G1 as Group>::Scalar>,
+    decommit_doc: F,            //<G1 as Group>::Scalar,
+    pub commit_doc_hash: F,     //<G1 as Group>::Scalar,
 }
 /*
 impl DocCommitmentStruct {
@@ -65,7 +67,11 @@ pub fn gen_commitment(
     commit_docype: JCommit,
     doc: Vec<usize>,
     pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U2>,
-) -> ReefCommitment {
+) -> ReefCommitment<<G1 as Group>::Scalar>
+where
+    G1: Group<Base = <G2 as Group>::Scalar>,
+    G2: Group<Base = <G1 as Group>::Scalar>,
+{
     type F = <G1 as Group>::Scalar;
     match commit_docype {
         JCommit::HashChain => {
@@ -133,14 +139,20 @@ pub fn gen_commitment(
             println!("mle: {:#?}", mle);
 
             let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
-            let blind = <G1 as Group>::Scalar::random(&mut OsRng);
+            let blind = F::random(&mut OsRng);
 
-            let scalars: Vec<<G1 as Group>::Scalar> =
+            let scalars: Vec<F> = //<G1 as Group>::Scalar> =
                 mle.into_iter().map(|x| int_to_ff(x)).collect();
 
             let commit_doc = <G1 as Group>::CE::commit(&gens_t, &scalars, &blind);
             // TODO compress ?
             //self.doc_commitement = Some(commitment);
+
+            // for in circuit hashing
+            let mut ro: PoseidonRO<<G2 as Group>::Scalar, F> =
+                PoseidonRO::new(PoseidonConstantsCircuit::new(), 3);
+            commit_doc.absorb_in_ro(&mut ro);
+            let commit_doc_hash = ro.squeeze(128);
 
             let doc_commit = DocCommitmentStruct {
                 gens: gens_t.clone(),
@@ -152,6 +164,7 @@ pub fn gen_commitment(
                 commit_doc: commit_doc,
                 vec_t: scalars,
                 decommit_doc: blind,
+                commit_doc_hash: commit_doc_hash,
             };
 
             return ReefCommitment::Nlookup(doc_commit);
@@ -161,7 +174,7 @@ pub fn gen_commitment(
 
 // this crap will need to be seperated out
 pub fn proof_dot_prod(
-    dc: DocCommitmentStruct,
+    dc: DocCommitmentStruct<<G1 as Group>::Scalar>,
     running_q: Vec<<G1 as Group>::Scalar>,
     running_v: <G1 as Group>::Scalar,
 ) -> Result<(), NovaError> {
@@ -190,7 +203,7 @@ pub fn proof_dot_prod(
 
 pub fn final_clear_checks(
     eval_type: JBatching,
-    reef_commitment: ReefCommitment,
+    reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
     //accepting_state: <G1 as Group>::Scalar,
     table: &Vec<Integer>,
     doc: &Vec<usize>,
@@ -200,8 +213,6 @@ pub fn final_clear_checks(
     final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_doc_v: Option<<G1 as Group>::Scalar>,
 ) {
-    type F = <G1 as Group>::Scalar;
-
     // state matches?
     // TODO assert_eq!(accepting_state, F::from(1));
 

@@ -33,7 +33,7 @@ pub struct R1CS<'a, F: PrimeField> {
     pub table: Vec<Integer>,
     pub batching: JBatching,
     pub commit_type: JCommit,
-    pub reef_commit: Option<ReefCommitment>,
+    pub reef_commit: Option<ReefCommitment<F>>,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -167,7 +167,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
-    pub fn set_commitment(&mut self, rc: ReefCommitment) {
+    pub fn set_commitment(&mut self, rc: ReefCommitment<F>) {
         println!("SETTING COMMITMENT");
         match (&rc, self.commit_type) {
             (ReefCommitment::HashChain(_), JCommit::HashChain) => {
@@ -1048,7 +1048,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 SpongeOp::Squeeze(1),
             ],
             "nldoc" => vec![
-                SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // doc commit, vs, combined_q, running q,v
+                SpongeOp::Absorb((self.batch_size + sc_l + 3) as u32), // doc commit, vs, combined_q, running q,v
                 SpongeOp::Squeeze(1),
             ],
             _ => panic!("weird tag"),
@@ -1060,31 +1060,31 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
 
         sponge.start(IOPattern(pattern), None, acc);
-        /* TODO
-        match id {
-            "nl" => {}
-            "nldoc" => match self.reef_commit {
-                Some(ReefCommitment::Nlookup(dcs)) => {
-                    dcs.absorb_commitment(&mut sponge);
-                }
-                None => panic!("commitment not found"),
+        let mut query: Vec<F> = match id {
+            "nl" => vec![],
+            "nldoc" => match &self.reef_commit {
+                Some(ReefCommitment::Nlookup(dcs)) => vec![dcs.commit_doc_hash],
+                _ => panic!("commitment not found"),
             },
             _ => panic!("weird tag"),
-        }*/
-        let mut query = vec![combined_q]; // q_comb, v1,..., vm, running q, running v
-        query.extend(v);
-        query.append(&mut prev_running_q.clone());
-        query.append(&mut vec![prev_running_v.clone()]);
-        let query_f: Vec<F> = query.into_iter().map(|i| int_to_ff(i)).collect();
+        };
+        query.push(int_to_ff(combined_q)); // q_comb, v1,..., vm, running q, running v
+        for vi in v.into_iter() {
+            query.push(int_to_ff(vi));
+        }
+        query.append(
+            &mut prev_running_q
+                .clone()
+                .into_iter()
+                .map(|i| int_to_ff(i))
+                .collect(),
+        );
+        query.push(int_to_ff(prev_running_v.clone()));
+        //let query_f: Vec<F> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
         //println!("R1CS sponge absorbs {:#?}", query_f);
 
-        SpongeAPI::absorb(
-            &mut sponge,
-            (self.batch_size + sc_l + 2) as u32,
-            &query_f,
-            acc,
-        );
+        SpongeAPI::absorb(&mut sponge, query.len() as u32, &query, acc);
 
         // TODO - what needs to be public?
 

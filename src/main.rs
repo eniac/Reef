@@ -1,6 +1,4 @@
 #![allow(missing_docs, non_snake_case)]
-type G1 = pasta_curves::pallas::Point;
-type G2 = pasta_curves::vesta::Point;
 use clap::{Args, Parser};
 use std::time::{Duration, Instant};
 

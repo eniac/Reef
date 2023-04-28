@@ -133,7 +133,7 @@ pub fn run_backend(
         None,
         vec![<G1 as Group>::Scalar::from(0); 2],
         empty_glue,
-        Some(<G1 as Group>::Scalar::from(0)),
+        <G1 as Group>::Scalar::from(0),
         true, //false,
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
@@ -315,16 +315,19 @@ pub fn run_backend(
             intm_hash = next_hash;
         }*/
 
+        // this variable could be two different types of things, which is potentially dicey, but
+        // literally whatever
         let blind = match r1cs_converter.reef_commit.clone().unwrap() {
-            ReefCommitment::HashChain(hcs) => Some(hcs.blind),
-            ReefCommitment::Nlookup(_) => None,
+            ReefCommitment::HashChain(hcs) => hcs.blind,
+            ReefCommitment::Nlookup(dcs) => dcs.commit_doc_hash,
         };
 
         let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
             (JBatching::NaivePolys, JCommit::HashChain) => {
                 let next_hash;
                 if i == 0 {
-                    next_hash = r1cs_converter.prover_calc_hash(blind.unwrap(), i);
+                    next_hash = r1cs_converter.prover_calc_hash(blind, i); // TODO checks for type,
+                                                                           // etc
                 } else {
                     next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
                 }
@@ -344,7 +347,7 @@ pub fn run_backend(
             (JBatching::Nlookup, JCommit::HashChain) => {
                 let next_hash;
                 if i == 0 {
-                    next_hash = r1cs_converter.prover_calc_hash(blind.unwrap(), i);
+                    next_hash = r1cs_converter.prover_calc_hash(blind, i);
                 } else {
                     next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
                 }
