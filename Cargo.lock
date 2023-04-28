@@ -1755,7 +1755,7 @@ dependencies = [
 [[package]]
 name = "nova-snark"
 version = "0.14.0"
-source = "git+https://github.com/jkwoods/Nova#d34479807734dce09d4f828bd3e0e3446934da5a"
+source = "git+https://github.com/sga001/Nova#09ff568f3ce94aea75d2e12aec80080af1bd622e"
 dependencies = [
  "bellperson",
  "bincode",

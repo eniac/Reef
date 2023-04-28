@@ -20,7 +20,8 @@ use nova_snark::{
         pedersen::{Commitment, CommitmentGens},
     },
     traits::{
-        circuit::TrivialTestCircuit, commitment::*, evaluation::EvaluationEngineTrait, Group,
+        circuit::TrivialTestCircuit, commitment::*, evaluation::EvaluationEngineTrait,
+        AbsorbInROTrait, Group,
     },
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
@@ -51,6 +52,14 @@ pub struct DocCommitmentStruct {
     vec_t: Vec<<G1 as Group>::Scalar>,
     decommit_doc: <G1 as Group>::Scalar,
 }
+/*
+impl DocCommitmentStruct {
+    pub fn get_commit_coord(&self) -> Vec<<G1 as Group>::Scalar> {
+        let coordinates = self.commit_doc.to_coordinates();
+
+        vec![coordinates.0, coordinates.1]
+    }
+} TODO*/
 
 pub fn gen_commitment(
     commit_docype: JCommit,

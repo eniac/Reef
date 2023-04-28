@@ -1,6 +1,5 @@
 use crate::backend::nova::int_to_ff;
-use crate::backend::{self, costs::*};
-use crate::config::*;
+use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
 use crate::config::*;
 use crate::dfa::{EPSILON, NFA};
 use circ::cfg;
@@ -239,22 +238,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     // PROVER
-
-    // seed Questions todo
-    fn prover_random_from_seed(&self, absorbs: u32, s: &[F]) -> Integer {
-        assert_eq!(absorbs, s.len() as u32);
-
-        let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-        let acc = &mut ();
-        let parameter = IOPattern(vec![SpongeOp::Absorb(absorbs), SpongeOp::Squeeze(1)]);
-
-        sponge.start(parameter, None, acc);
-        SpongeAPI::absorb(&mut sponge, absorbs, s, acc);
-        let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
-        sponge.finish(acc).unwrap();
-
-        Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf)
-    }
 
     pub fn prover_accepting_state(&self, batch_num: usize, state: usize) -> bool {
         let mut out = false;
@@ -936,10 +919,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 for i in 0..=self.batch_size {
                     wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
                 }
-                // values not actually checked or used
-                wits.insert(format!("first_hash_input"), new_wit(0));
-                wits.insert(format!("random_hash_result"), new_wit(0));
-                wits.insert(format!("z_hash_input"), new_wit(0));
                 (
                     wits,
                     next_state,
@@ -1063,17 +1042,35 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
         let acc = &mut ();
 
-        let mut pattern = vec![
-            SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs, combined_q, running q,v
-            SpongeOp::Squeeze(1),
-        ];
+        let mut pattern = match id {
+            "nl" => vec![
+                SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs, combined_q, running q,v
+                SpongeOp::Squeeze(1),
+            ],
+            "nldoc" => vec![
+                SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // doc commit, vs, combined_q, running q,v
+                SpongeOp::Squeeze(1),
+            ],
+            _ => panic!("weird tag"),
+        };
+
         for i in 0..sc_l {
             // sum check rounds
             pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
         }
 
         sponge.start(IOPattern(pattern), None, acc);
-
+        /* TODO
+        match id {
+            "nl" => {}
+            "nldoc" => match self.reef_commit {
+                Some(ReefCommitment::Nlookup(dcs)) => {
+                    dcs.absorb_commitment(&mut sponge);
+                }
+                None => panic!("commitment not found"),
+            },
+            _ => panic!("weird tag"),
+        }*/
         let mut query = vec![combined_q]; // q_comb, v1,..., vm, running q, running v
         query.extend(v);
         query.append(&mut prev_running_q.clone());
@@ -1212,9 +1209,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
                 }
                 // values not actually checked or used
-                wits.insert(format!("first_hash_input"), new_wit(0));
-                wits.insert(format!("random_hash_result"), new_wit(0));
-                wits.insert(format!("z_hash_input"), new_wit(0));
                 (wits, next_state, None, None)
             }
             JCommit::Nlookup => {

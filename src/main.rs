@@ -4,19 +4,8 @@ type G2 = pasta_curves::vesta::Point;
 use clap::{Args, Parser};
 use std::time::{Duration, Instant};
 
-<<<<<<< HEAD
-pub mod backend;
-pub mod config;
-pub mod dfa;
-pub mod regex;
-
-use crate::backend::{framework::*, r1cs_helper::init};
-use crate::config::*;
-use crate::dfa::NFA;
-=======
-use reef::backend::{framework::*, r1cs::init};
+use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
->>>>>>> 8196e48f54c63b9eb821efb63e0ac3c994c73a9e
 
 #[cfg(feature = "plot")]
 use reef::plot;
@@ -31,13 +20,20 @@ fn main() {
     let ab = String::from_iter(opt.config.alphabet());
 
     // Regular expresion parser and convert the Regex to a DFA
-    let mut doc = opt.config.read_file(&opt.input).iter().map(|c|c.to_string()).collect();
+    let mut doc = opt
+        .config
+        .read_file(&opt.input)
+        .iter()
+        .map(|c| c.to_string())
+        .collect();
 
     // Input document
     let mut nfa = NFA::new(&ab, opt.re);
 
     // Try to use k-stride
-    opt.k_stride.map(|k| { doc = nfa.k_stride(k, &doc); });
+    opt.k_stride.map(|k| {
+        doc = nfa.k_stride(k, &doc);
+    });
 
     // Is document well-formed
     nfa.well_formed(&doc);
@@ -61,4 +57,3 @@ fn main() {
 
     //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }
-
