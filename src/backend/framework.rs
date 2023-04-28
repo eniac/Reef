@@ -444,7 +444,7 @@ pub fn run_backend(
                 ]
             }
         };
-
+        let start = Instant::now();
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             &prover_data,
             Some(wits),
@@ -481,6 +481,12 @@ pub fn run_backend(
 
         assert!(result.is_ok());
         println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
+        println!(
+            "RecursiveSNARK::prove_step {}: {:?}, took {:?} ",
+            i,
+            result.is_ok(),
+            start.elapsed()
+          );
         recursive_snark = Some(result.unwrap());
 
         // for next i+1 round

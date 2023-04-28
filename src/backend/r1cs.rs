@@ -85,7 +85,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             (batching, commit, opt_batch_size, cost) = opt_cost_model_select(
                 &dfa,
                 0,
-                logmn(doc.len()),
+                logmn(doc.len())-1,
                 dfa_match,
                 doc.len(),
                 commit_override,
