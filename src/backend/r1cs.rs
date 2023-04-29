@@ -83,7 +83,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             (batching, commit, opt_batch_size, cost) = opt_cost_model_select(
                 &dfa,
                 0,
-                logmn(doc.len()),
+                logmn(doc.len()) - 1,
                 dfa_match,
                 doc.len(),
                 commit_override,
@@ -111,7 +111,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             epsilon_to_add
         );
 
-        let mut substring = (0, doc.len());
+        let mut substring = (0, batch_doc.len());
+
         match dfa.is_match(&batch_doc) {
             // todo remove this bs call
             Some((start, end)) => {
@@ -213,7 +214,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             next_hash = vec![start_hash_or_blind];
         }
 
-        println!("PROVER START HASH ROUND {:#?}", next_hash);
+        // println!("PROVER START HASH ROUND {:#?}", next_hash);
         let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
         for b in 0..self.batch_size {
             let access_at = i * self.batch_size + b;

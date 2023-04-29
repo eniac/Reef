@@ -213,6 +213,8 @@ pub fn run_backend(
     //let n_time = Instant::now();
     let num_steps =
         (r1cs_converter.substring.1 - r1cs_converter.substring.0) / r1cs_converter.batch_size;
+    println!("NUM STEPS {}", num_steps);
+
     let mut wits;
     let mut running_q = None;
     let mut running_v = None;
@@ -266,7 +268,7 @@ pub fn run_backend(
                 } else {
                     next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
                 }
-                println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
+                // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
 
                 let i_0 = <G1 as Group>::Scalar::from((i * r1cs_converter.batch_size) as u64);
                 let i_last =
@@ -276,7 +278,7 @@ pub fn run_backend(
                     GlueOpts::PolyHash((i_last, next_hash)),
                 ];
                 prev_hash = next_hash;
-                println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
+                // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
                 g
             }
             (JBatching::Nlookup, JCommit::HashChain) => {
@@ -384,6 +386,8 @@ pub fn run_backend(
         };
 
         println!("START OF EPS {}", start_of_epsilons);
+        let start = Instant::now();
+
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             &prover_data,
             Some(wits),
@@ -422,6 +426,12 @@ pub fn run_backend(
 
         assert!(result.is_ok());
         println!("RecursiveSNARK::prove_step {}: {:?}", i, result.is_ok());
+        println!(
+            "RecursiveSNARK::prove_step {}: {:?}, took {:?} ",
+            i,
+            result.is_ok(),
+            start.elapsed()
+        );
         recursive_snark = Some(result.unwrap());
 
         // for next i+1 round
@@ -442,7 +452,7 @@ pub fn run_backend(
         z0_primary.clone(),
         z0_secondary.clone(),
     );
-    println!("Recursive res: {:#?}", res);
+    // println!("Recursive res: {:#?}", res);
 
     assert!(res.is_ok()); // TODO delete
 

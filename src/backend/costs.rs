@@ -389,7 +389,6 @@ pub fn opt_commit_select_with_batch<'a>(
         }
     }
 
-    let folding_size: usize = ((cost as f32) / 128.0).log2().ceil() as usize;
     (
         opt_batching,
         opt_commit.clone(),

@@ -370,6 +370,7 @@ where {
                                     );
                                 }
                 */
+
                 SpongeAPI::absorb(
                     &mut sponge,
                     3,
@@ -507,13 +508,13 @@ where {
                 F::from(1) - F::from(1)
             );
 
-            println!("BLIND NOVA: {:#?}", blind);
-            println!("RANDOM NOVA: {:#?}", random_hash.get_value().unwrap());
-            //println!("OUT HASH: {:#?}", next_hash.get_value().unwrap());
+            // println!("BLIND NOVA: {:#?}", blind);
+            // println!("RANDOM NOVA: {:#?}", random_hash.get_value().unwrap());
+            // println!("OUT HASH: {:#?}", next_hash.get_value().unwrap());
         } else {
             println!("NO SANITY CHECK");
         }
-        println!("ITE CS");
+        // println!("ITE CS");
 
         ns.enforce(
             || format!("ite"),
@@ -553,7 +554,7 @@ where {
             || (is_doc_nl && s.starts_with("nldoc_combined_q"))
         {
             alloc_qv[0] = Some(alloc_v.clone());
-            //println!("ALLOC QV PARSING {:#?}: {:#?}", 0, alloc_v.get_value());
+            // println!("ALLOC QV PARSING {:#?}: {:#?}", 0, alloc_v.get_value());
 
             return Ok(true);
         } else if !is_doc_nl && s.starts_with("v_") {
@@ -591,7 +592,7 @@ where {
         } else if (!is_doc_nl && s.starts_with("nl_claim_r"))
             || (is_doc_nl && s.starts_with("nldoc_claim_r"))
         {
-            //     println!("NL CLAIM R PARSING");
+            // println!("NL CLAIM R PARSING");
 
             *alloc_claim_r = Some(alloc_v.clone());
         } else if (!is_doc_nl && s.starts_with("nl_sc_g"))
@@ -605,15 +606,15 @@ where {
             match s_sub[4] {
                 "const" => {
                     alloc_gs[j - 1][0] = gij;
-                    println!("CONST found");
+                    // println!("CONST found");
                 }
                 "x" => {
                     alloc_gs[j - 1][1] = gij;
-                    println!("X found");
+                    // println!("X found");
                 }
                 "xsq" => {
                     alloc_gs[j - 1][2] = gij;
-                    println!("X SQ found");
+                    // println!("X SQ found");
                 }
                 _ => {
                     panic!("weird variable name for sumcheck polys");

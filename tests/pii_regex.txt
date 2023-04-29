@@ -1,0 +1,12 @@
+Phone number 
+164
+168-198
+,[1-9][0-9]{9},
+
+Addrress
+269
+270
+592
+756 
+766
+[0-9]{1,6}\s[a-zA-z\s]*\s(CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\s]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\s]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8},
