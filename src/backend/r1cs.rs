@@ -794,16 +794,22 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Option<Integer>,
         Option<Vec<Integer>>,
         Option<Integer>,
+        Option<isize>,
     ) {
         match self.batching {
             JBatching::NaivePolys => {
-                let (wits, next_state, next_doc_running_claim_q, next_doc_running_claim_v) = self
-                    .gen_wit_i_polys(
-                        batch_num,
-                        current_state,
-                        prev_doc_running_claim_q,
-                        prev_doc_running_claim_v,
-                    );
+                let (
+                    wits,
+                    next_state,
+                    next_doc_running_claim_q,
+                    next_doc_running_claim_v,
+                    start_epsilons,
+                ) = self.gen_wit_i_polys(
+                    batch_num,
+                    current_state,
+                    prev_doc_running_claim_q,
+                    prev_doc_running_claim_v,
+                );
                 (
                     wits,
                     next_state,
@@ -811,6 +817,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     None,
                     next_doc_running_claim_q,
                     next_doc_running_claim_v,
+                    start_epsilons,
                 )
             }
             JBatching::Nlookup => self.gen_wit_i_nlookup(
@@ -849,6 +856,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Option<Integer>,
         Option<Vec<Integer>>,
         Option<Integer>,
+        Option<isize>,
     ) {
         let mut wits = FxHashMap::default();
 
@@ -858,11 +866,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let mut v = vec![];
         let mut q = vec![];
+        let mut start_epsilons = -1;
         for i in 1..=self.batch_size {
             let access_at = self.access_doc_at(batch_num, i - 1);
             next_state = self.dfa.delta(state_i, &self.cdoc[access_at]).unwrap();
             wits.insert(format!("state_{}", i - 1), new_wit(state_i));
             wits.insert(format!("char_{}", i - 1), new_wit(self.udoc[access_at]));
+
+            if (start_epsilons == -1) && (self.udoc[access_at] == self.dfa.nchars()) {
+                start_epsilons = (i - 1) as isize;
+            }
 
             // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
             let v_i = Integer::from(
@@ -933,6 +946,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Some(next_running_v),
                     None,
                     None,
+                    Some(start_epsilons),
                 )
             }
             JCommit::Nlookup => {
@@ -949,6 +963,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Some(next_running_v),
                     Some(next_doc_running_q),
                     Some(next_doc_running_v),
+                    None,
                 )
             }
         }
@@ -1185,11 +1200,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         usize,
         Option<Vec<Integer>>,
         Option<Integer>,
+        Option<isize>,
     ) {
         let mut wits = FxHashMap::default();
         let mut state_i = current_state;
         let mut next_state = 0;
 
+        let mut start_epsilons = -1;
         for i in 0..self.batch_size {
             let access_at = self.access_doc_at(batch_num, i);
 
@@ -1199,6 +1216,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 .delta(state_i, &self.cdoc[access_at].clone())
                 .unwrap();
             wits.insert(format!("state_{}", i), new_wit(state_i));
+
+            if (start_epsilons == -1) && (self.udoc[access_at] == self.dfa.nchars()) {
+                start_epsilons = i as isize;
+            }
 
             state_i = next_state;
         }
@@ -1216,7 +1237,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
                 }
                 // values not actually checked or used
-                (wits, next_state, None, None)
+                (wits, next_state, None, None, Some(start_epsilons))
             }
             JCommit::Nlookup => {
                 assert!(doc_running_q.is_some() || batch_num == 0);
@@ -1230,6 +1251,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     next_state,
                     Some(next_doc_running_q),
                     Some(next_doc_running_v),
+                    None,
                 )
             }
         }
@@ -1471,6 +1493,7 @@ mod tests {
                     let mut values;
                     let mut next_state;
 
+                    let mut start_epsilons = None;
                     let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0)
                         / r1cs_converter.batch_size;
                     for i in 0..num_steps {
@@ -1482,6 +1505,7 @@ mod tests {
                             running_v,
                             doc_running_q,
                             doc_running_v,
+                            start_epsilons,
                         ) = r1cs_converter.gen_wit_i(
                             i,
                             current_state,

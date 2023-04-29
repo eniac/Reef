@@ -126,6 +126,8 @@ pub fn run_backend(
         empty_glue,
         <G1 as Group>::Scalar::from(0),
         true, //false,
+        <G1 as Group>::Scalar::from(dfa.nchars() as u64),
+        -1,
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         sc.clone(),
@@ -240,6 +242,8 @@ pub fn run_backend(
     let mut next_doc_running_q = None;
     let mut next_doc_running_v = None;
 
+    let mut start_of_epsilons = None;
+
     let mut next_state = 0; //dfa.get init state ??
     let mut prev_hash = <G1 as Group>::Scalar::from(0);
     for i in 0..num_steps {
@@ -253,6 +257,7 @@ pub fn run_backend(
             next_running_v,
             next_doc_running_q,
             next_doc_running_v,
+            start_of_epsilons,
         ) = r1cs_converter.gen_wit_i(
             i,
             next_state,
@@ -449,6 +454,8 @@ pub fn run_backend(
             glue,
             blind,
             (i == 0),
+            <G1 as Group>::Scalar::from(dfa.nchars() as u64),
+            start_of_epsilons.unwrap(),
             vec![
                 <G1 as Group>::Scalar::from(
                     r1cs_converter.prover_accepting_state(i, current_state),

@@ -105,6 +105,8 @@ pub struct NFAStepCircuit<'a, F: PrimeField> {
     glue: Vec<GlueOpts<F>>,
     commit_blind: F,
     first: bool,
+    epsilon_num: F,
+    start_of_ep: isize,
     accepting_bool: Vec<F>,
     pc: PoseidonConstants<F, typenum::U2>,
 }
@@ -119,6 +121,8 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         glue: Vec<GlueOpts<F>>,
         commit_blind: F,
         first: bool,
+        epsilon_num: F,
+        start_of_ep: isize,
         accepting_bool: Vec<F>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U2>,
@@ -162,6 +166,8 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             glue: glue,
             commit_blind: commit_blind,
             first: first,
+            epsilon_num: epsilon_num,
+            start_of_ep: start_of_ep,
             accepting_bool: accepting_bool,
             pc: pcs,
         }
@@ -264,6 +270,8 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         &self,
         cs: &mut CS,
         first: bool,
+        epsilon_num: F,
+        start_of_ep: isize,
         z_input_hash: AllocatedNum<F>,
         i_0: AllocatedNum<F>,
         blind: F,
@@ -333,11 +341,13 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         };
 
         // regular hashing
-        let mut next_hash = start_hash.clone();
+        let mut prev_hash = start_hash.clone();
+        let mut next_hash = start_hash.clone(); // dummy
         for i in 0..(self.batch_size) {
+            let unwrap_alloc_char = alloc_chars[i].clone().unwrap();
             let mut hash_ns = ns.namespace(|| format!("poseidon hash batch {}", i));
             //println!("i {:#?}", i);
-            next_hash = {
+            let hashed = {
                 let acc = &mut hash_ns;
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
 
@@ -346,22 +356,22 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                     None,
                     acc,
                 );
-
-                if i_0.get_value().is_some() {
-                    println!(
-                        "ELTS FOR HASH: {:#?}, {:#?}, {:#?}",
-                        next_hash.get_value().unwrap(),
-                        alloc_chars[i].clone().unwrap().get_value().unwrap(),
-                        doc_idxs[i].clone().unwrap().get_value().unwrap()
-                    );
-                }
-
+                /*
+                                if i_0.get_value().is_some() {
+                                    println!(
+                                        "ELTS FOR HASH: {:#?}, {:#?}, {:#?}",
+                                        prev_hash.get_value().unwrap(),
+                                        unwrap_alloc_char.get_value().unwrap(),
+                                        doc_idxs[i].clone().unwrap().get_value().unwrap()
+                                    );
+                                }
+                */
                 SpongeAPI::absorb(
                     &mut sponge,
                     3,
                     &[
-                        Elt::Allocated(next_hash.clone()),
-                        Elt::Allocated(alloc_chars[i].clone().unwrap()),
+                        Elt::Allocated(prev_hash.clone()),
+                        Elt::Allocated(unwrap_alloc_char.clone()),
                         Elt::Allocated(doc_idxs[i].clone().unwrap()),
                     ],
                     // TODO "connected"? get rid clones
@@ -379,9 +389,87 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                 )?
             };
 
-            //wrap each in ite for epsilon in batching (first not necessary)
+            // wrap each in ite for epsilon in batching (first not necessary)
+            // if EP_SEL then NEXT_HASH = PREV_HASH else NEXT_HASH = HASHED(PREV_HASH)
+            // EP_SEL = (alloc_chars[i] == EPSILON_NUM)
+            // -> r1cs:
+            // NEXT_HASH = PREV_HASH + EP_SEL(HASHED - PREV_HASH)
+            // (epsilon_num - char) * WIT = EP_SEL
+            // (1 - EP_SEL) * (epsilon_num - char) = 0
+
+            let comp_inv;
+            let ep_sel;
+
+            if (i as isize) >= start_of_ep {
+                next_hash = AllocatedNum::alloc(hash_ns.namespace(|| "next_hash"), || {
+                    Ok(prev_hash.get_value().unwrap())
+                })?;
+
+                comp_inv =
+                    AllocatedNum::alloc(hash_ns.namespace(|| "comp inv"), || Ok(F::from(1)))?;
+                ep_sel = AllocatedNum::alloc(hash_ns.namespace(|| "ep_sel"), || Ok(F::from(0)))?;
+            } else {
+                next_hash = AllocatedNum::alloc(hash_ns.namespace(|| "next_hash"), || {
+                    Ok(hashed.get_value().unwrap())
+                })?;
+
+                let comp_inv_pre = (epsilon_num - unwrap_alloc_char.get_value().unwrap())
+                    .invert()
+                    .expect("couldn't invert comp for wit");
+                comp_inv =
+                    AllocatedNum::alloc(hash_ns.namespace(|| "comp inv"), || Ok(comp_inv_pre))?;
+                ep_sel = AllocatedNum::alloc(hash_ns.namespace(|| "ep_sel"), || Ok(F::from(1)))?;
+            }
+
+            let mut ep_num =
+                AllocatedNum::alloc(hash_ns.namespace(|| "epsilon"), || Ok(epsilon_num))?;
+
+            // sanity - get rid of
+            if i_0.get_value().is_some() {
+                assert_eq!(
+                    ep_sel.get_value().unwrap()
+                        * (hashed.get_value().unwrap() - prev_hash.get_value().unwrap()),
+                    next_hash.get_value().unwrap() - prev_hash.get_value().unwrap()
+                );
+                assert_eq!(
+                    (ep_num.get_value().unwrap() - unwrap_alloc_char.get_value().unwrap())
+                        * comp_inv.get_value().unwrap(),
+                    ep_sel.get_value().unwrap()
+                );
+                assert_eq!(
+                    (F::from(1) - ep_sel.get_value().unwrap())
+                        * (ep_num.get_value().unwrap() - unwrap_alloc_char.get_value().unwrap()),
+                    F::from(1) - F::from(1)
+                );
+            } else {
+                println!("NO SANITY CHECK");
+            }
+
+            hash_ns.enforce(
+                || format!("epsilon ite {}", i),
+                |z| z + ep_sel.get_variable(),
+                |z| z + hashed.get_variable() - prev_hash.get_variable(),
+                |z| z + next_hash.get_variable() - prev_hash.get_variable(),
+            );
+
+            hash_ns.enforce(
+                || format!("epsilon sel {}", i),
+                |z| z + ep_num.get_variable() - unwrap_alloc_char.get_variable(),
+                |z| z + comp_inv.get_variable(),
+                |z| z + ep_sel.get_variable(),
+            );
+
+            hash_ns.enforce(
+                || format!("epsilon sel2 {}", i),
+                |z| z + CS::one() - ep_sel.get_variable(),
+                |z| z + ep_num.get_variable() - unwrap_alloc_char.get_variable(),
+                |z| z + CS::one() - CS::one(),
+            );
+
+            prev_hash = next_hash.clone();
         }
 
+        // random start ite
         // if FIRST_SEL==0 then START_HASH = RANDOM_HASH else START_HASH = Z_INPUT_HASH
         // FIRST_SEL = !(i_0 == 0)
         // -> r1cs:
@@ -407,7 +495,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
             println!("BLIND NOVA: {:#?}", blind);
             println!("RANDOM NOVA: {:#?}", random_hash.get_value().unwrap());
-            println!("OUT HASH: {:#?}", next_hash.get_value().unwrap());
+            //println!("OUT HASH: {:#?}", next_hash.get_value().unwrap());
         } else {
             println!("NO SANITY CHECK");
         }
@@ -963,9 +1051,12 @@ where
                 }
                 out.push(last_state.unwrap());
                 out.push(last_i.unwrap());
+
                 let last_hash = self.hash_circuit(
                     cs,
                     self.first,
+                    self.epsilon_num,
+                    self.start_of_ep,
                     hash_0,
                     i_0,
                     self.commit_blind,
@@ -1082,6 +1173,8 @@ where
                 let last_hash = self.hash_circuit(
                     cs,
                     self.first,
+                    self.epsilon_num,
+                    self.start_of_ep,
                     hash_0,
                     i_0,
                     self.commit_blind,
