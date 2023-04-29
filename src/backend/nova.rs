@@ -102,7 +102,7 @@ pub struct NFAStepCircuit<'a, F: PrimeField> {
     first: bool,
     epsilon_num: F,
     start_of_ep: isize,
-    accepting_bool: Vec<F>,
+    accepting: Vec<F>,
     pc: PoseidonConstants<F, typenum::U2>,
 }
 
@@ -118,16 +118,16 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         first: bool,
         epsilon_num: F,
         start_of_ep: isize,
-        accepting_bool: Vec<F>,
+        accepting: Vec<F>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U2>,
     ) -> Self {
         // todo check wits line up with the non det advice
 
-        println!("ACCEPTING VEC {:#?}", accepting_bool);
+        println!("ACCEPTING VEC {:#?}", accepting);
         assert_eq!(states.len(), 2);
         assert_eq!(glue.len(), 2);
-        assert_eq!(accepting_bool.len(), 2);
+        assert_eq!(accepting.len(), 2);
 
         match (&glue[0], &glue[1]) {
             (GlueOpts::PolyHash(_), GlueOpts::PolyHash(_)) => {}
@@ -163,7 +163,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             first: first,
             epsilon_num: epsilon_num,
             start_of_ep: start_of_ep,
-            accepting_bool: accepting_bool,
+            accepting: accepting,
             pc: pcs,
         }
     }
@@ -851,7 +851,7 @@ where
     fn arity(&self) -> usize {
         // [state, opt<i>, opt<hash>, opt<v,q for eval claim>, opt<v,q for doc claim>]
 
-        let mut arity = 1;
+        let mut arity = 2;
         match &self.glue[0] {
             GlueOpts::PolyHash(_) => {
                 arity += 2;
@@ -916,11 +916,10 @@ where
                 i += 1;
             }
         }
+        assert_eq!(z[i], self.accepting[0]);
 
         let mut out = vec![
             self.states[1], // "next state"
-                            //self.chars[1],
-                            //     self.accepting_bool[1],
         ];
         match &self.glue[1] {
             GlueOpts::PolyHash((i, h)) => {
@@ -944,6 +943,7 @@ where
                 out.push(*dv);
             }
         }
+        out.push(self.accepting[1]);
         out
     }
 
@@ -969,7 +969,7 @@ where
         // ouputs
         let mut last_state = None;
         let mut last_i = None;
-        //let mut accepting = None;
+        let mut accepting = None;
         let mut out = vec![];
 
         //println!("BATCH SIZE IN NOVA {:#?}", self.batch_size);
@@ -1042,13 +1042,8 @@ where
                             .unwrap();
 
                         if !matched {
-                            if s.starts_with(&format!("state_{}", self.batch_size)) {
-                                last_state = Some(alloc_v.clone()); //.get_variable();
-                                                                    /* } else if s.starts_with(&format!("accepting")) {
-                                                                                            accepting = Some(alloc_v.clone());
-                                                                                            println!("get alloc v accepting {:#?}", alloc_v.clone().get_value());
-                                                                    */
-                            }
+                            self.default_parsing(&s, &alloc_v, &mut last_state, &mut accepting)
+                                .unwrap();
                         }
                     }
                 }
@@ -1067,6 +1062,7 @@ where
                     alloc_idxs,
                 );
                 out.push(last_hash.unwrap());
+                out.push(accepting.unwrap());
             }
             GlueOpts::NlHash((_i, _h, q, _v)) => {
                 let i_0 = z[1].clone();
@@ -1141,13 +1137,13 @@ where
                                     )
                                     .unwrap();
                                 if !matched {
-                                    if s.starts_with(&format!("state_{}", self.batch_size)) {
-                                        last_state = Some(alloc_v.clone()); //.get_variable();
-                                                                            /* } else if s.starts_with(&format!("accepting")) {
-                                                                                                    accepting = Some(alloc_v.clone());
-                                                                                                    println!("get alloc v accepting {:#?}", alloc_v.clone().get_value());
-                                                                            */
-                                    }
+                                    self.default_parsing(
+                                        &s,
+                                        &alloc_v,
+                                        &mut last_state,
+                                        &mut accepting,
+                                    )
+                                    .unwrap();
                                 }
                             }
                         }
@@ -1184,6 +1180,7 @@ where
                 for qv in alloc_rc {
                     out.push(qv.unwrap()); // better way to do this?
                 }
+                out.push(accepting.unwrap());
             }
             GlueOpts::PolyNL((dq, _dv)) => {
                 let doc_l = dq.len();
@@ -1241,12 +1238,8 @@ where
                                 )
                                 .unwrap();
                             if !matched {
-                                if s.starts_with(&format!("state_{}", self.batch_size)) {
-                                    last_state = Some(alloc_v.clone());
-                                    /*} else if s.starts_with(&format!("accepting")) {
-                                         accepting = Some(alloc_v.clone());
-                                    */
-                                }
+                                self.default_parsing(&s, &alloc_v, &mut last_state, &mut accepting)
+                                    .unwrap();
                             }
                         }
                     }
@@ -1269,6 +1262,7 @@ where
                 for qv in alloc_doc_rc {
                     out.push(qv.unwrap()); // better way to do this?
                 }
+                out.push(accepting.unwrap());
             }
             GlueOpts::NlNl((q, _v, dq, _dv)) => {
                 let sc_l = q.len();
@@ -1350,12 +1344,13 @@ where
                                         )
                                         .unwrap();
                                     if !matched {
-                                        if s.starts_with(&format!("state_{}", self.batch_size)) {
-                                            last_state = Some(alloc_v.clone());
-                                            /* } else if s.starts_with(&format!("accepting")) {
-                                                    accepting = Some(alloc_v.clone());
-                                            */
-                                        }
+                                        self.default_parsing(
+                                            &s,
+                                            &alloc_v,
+                                            &mut last_state,
+                                            &mut accepting,
+                                        )
+                                        .unwrap();
                                     }
                                 }
                             }
@@ -1399,6 +1394,7 @@ where
                 for qv in alloc_doc_rc {
                     out.push(qv.unwrap()); // better way to do this?
                 }
+                out.push(accepting.unwrap());
             }
         }
 

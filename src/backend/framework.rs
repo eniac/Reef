@@ -478,7 +478,7 @@ pub fn run_backend(
             final_clear_checks(
                 r1cs_converter.batching,
                 reef_commit,
-                //zn[3],
+                zn[3],
                 &r1cs_converter.table,
                 r1cs_converter.udoc.len(),
                 None,
@@ -492,7 +492,7 @@ pub fn run_backend(
             final_clear_checks(
                 r1cs_converter.batching,
                 reef_commit,
-                //zn[2 + qd_len + 1],
+                zn[2 + qd_len],
                 &r1cs_converter.table,
                 r1cs_converter.udoc.len(),
                 None,
@@ -506,7 +506,7 @@ pub fn run_backend(
             final_clear_checks(
                 r1cs_converter.batching,
                 reef_commit,
-                //zn[3 + q_len + 1],
+                zn[3 + q_len + 1],
                 &r1cs_converter.table,
                 r1cs_converter.udoc.len(),
                 Some(zn[3..(3 + q_len)].to_vec()),
@@ -520,7 +520,7 @@ pub fn run_backend(
             final_clear_checks(
                 r1cs_converter.batching,
                 reef_commit,
-                //zn[2 + q_len + 1 + qd_len + 1],
+                zn[1 + q_len + 1 + qd_len + 1],
                 &r1cs_converter.table,
                 r1cs_converter.udoc.len(),
                 Some(zn[1..(q_len + 1)].to_vec()),

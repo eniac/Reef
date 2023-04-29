@@ -1524,7 +1524,7 @@ mod tests {
                     final_clear_checks(
                         r1cs_converter.batching,
                         reef_commit,
-                        //accepting state ,
+                        <G1 as Group>::Scalar::from(1), // dummy, not checked
                         &r1cs_converter.table,
                         r1cs_converter.udoc.len(),
                         rq,

@@ -198,7 +198,7 @@ pub fn proof_dot_prod(
 pub fn final_clear_checks(
     eval_type: JBatching,
     reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
-    //accepting_state: <G1 as Group>::Scalar,
+    accepting_state: <G1 as Group>::Scalar,
     table: &Vec<Integer>,
     doc_len: usize,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
@@ -208,7 +208,7 @@ pub fn final_clear_checks(
     final_doc_v: Option<<G1 as Group>::Scalar>,
 ) {
     // state matches?
-    // TODO assert_eq!(accepting_state, F::from(1));
+    assert_eq!(accepting_state, <G1 as Group>::Scalar::from(1));
 
     // nlookup eval T check
     match (final_q, final_v) {
