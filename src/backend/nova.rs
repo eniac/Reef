@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-use super::*;
 use ::bellperson::{
     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
     Variable,
@@ -214,6 +213,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         accepting: &mut Option<AllocatedNum<F>>,
     ) -> Result<(), SynthesisError>
 where {
+        println!("DEFAULT PARSING");
         if s.starts_with(&format!("state_{}", self.batch_size)) {
             *last_state = Some(alloc_v.clone()); //.get_variable();
         } else if s.starts_with(&format!("accepting")) {
@@ -850,7 +850,7 @@ where
     F: PrimeField,
 {
     fn arity(&self) -> usize {
-        // [state, opt<i>, opt<hash>, opt<v,q for eval claim>, opt<v,q for doc claim>]
+        // [state, opt<i>, opt<hash>, opt<v,q for eval claim>, opt<v,q for doc claim>, accepting?]
 
         let mut arity = 2;
         match &self.glue[0] {
@@ -1288,7 +1288,7 @@ where
                             ff_val
                         })
                     };
-                    //println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+                    println!("Var (name?) {:#?}", self.r1cs.names[&var]);
                     let mut matched = self
                         .input_variable_parsing(
                             &mut vars,

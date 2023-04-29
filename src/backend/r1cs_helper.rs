@@ -2,12 +2,7 @@ use crate::backend::costs::*;
 use circ::cfg;
 use circ::cfg::*;
 use circ::ir::term::*;
-use rug::{
-    integer::Order,
-    ops::{RemRounding, RemRoundingAssign},
-    rand::RandState,
-    Assign, Integer,
-};
+use rug::{ops::RemRounding, Assign, Integer};
 use std::sync::Once;
 
 pub static INIT: Once = Once::new();
