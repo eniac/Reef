@@ -6,13 +6,10 @@ use ::bellperson::{
     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
     Variable,
 };
-use circ::cfg;
-use circ::cfg::*;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::{ir::term::Value, target::r1cs::*};
 use ff::{Field, PrimeField};
 use fxhash::FxHashMap;
-use fxhash::FxHasher;
 use generic_array::typenum;
 use gmp_mpfr_sys::gmp::limb_t;
 use neptune::{
@@ -21,7 +18,6 @@ use neptune::{
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::circuit::SpongeCircuit,
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
-    Strength,
 };
 use nova_snark::{
     traits::{circuit::StepCircuit, Group},
@@ -30,7 +26,6 @@ use nova_snark::{
 use rug::integer::{IsPrime, Order};
 use rug::Integer;
 use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
 use std::time::{Duration, Instant};
 
 fn type_of<T>(_: &T) {
@@ -88,10 +83,10 @@ fn get_modulus<F: Field + PrimeField>() -> Integer {
 
 #[derive(Clone, Debug)]
 pub enum GlueOpts<F: PrimeField> {
-    Poly_Hash((F, F)),             // i, hash
-    Nl_Hash((F, F, Vec<F>, F)),    // i, hash, q, v
-    Poly_Nl((Vec<F>, F)),          // doc_q, doc_v
-    Nl_Nl((Vec<F>, F, Vec<F>, F)), // q, v, doc_q, doc_v
+    PolyHash((F, F)),             // i, hash
+    NlHash((F, F, Vec<F>, F)),    // i, hash, q, v
+    PolyNL((Vec<F>, F)),          // doc_q, doc_v
+    NlNl((Vec<F>, F, Vec<F>, F)), // q, v, doc_q, doc_v
 }
 
 #[derive(Clone, Debug)]
@@ -135,10 +130,10 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         assert_eq!(accepting_bool.len(), 2);
 
         match (&glue[0], &glue[1]) {
-            (GlueOpts::Poly_Hash(_), GlueOpts::Poly_Hash(_)) => {}
-            (GlueOpts::Nl_Hash(_), GlueOpts::Nl_Hash(_)) => {}
-            (GlueOpts::Poly_Nl(_), GlueOpts::Poly_Nl(_)) => {}
-            (GlueOpts::Nl_Nl(_), GlueOpts::Nl_Nl(_)) => {}
+            (GlueOpts::PolyHash(_), GlueOpts::PolyHash(_)) => {}
+            (GlueOpts::NlHash(_), GlueOpts::NlHash(_)) => {}
+            (GlueOpts::PolyNL(_), GlueOpts::PolyNL(_)) => {}
+            (GlueOpts::NlNl(_), GlueOpts::NlNl(_)) => {}
             (_, _) => {
                 panic!("glue I/O does not match");
             }
@@ -190,18 +185,14 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         (name_f, s)
     }
 
-    fn input_variable_parsing<CS>(
+    fn input_variable_parsing(
         &self,
-        cs: &mut CS,
         vars: &mut HashMap<Var, Variable>,
         s: &String,
         var: Var,
         state_0: AllocatedNum<F>,
         // char_0: AllocatedNum<F>,
-    ) -> Result<bool, SynthesisError>
-    where
-        CS: ConstraintSystem<F>,
-    {
+    ) -> Result<bool, SynthesisError> {
         /* if s.starts_with("char_0") {
             vars.insert(var, char_0.get_variable());
             return Ok(true);
@@ -215,9 +206,25 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         return Ok(false);
     }
 
-    fn hash_parsing<CS>(
+    fn default_parsing(
         &self,
-        cs: &mut CS,
+        s: &String,
+        alloc_v: &AllocatedNum<F>,
+        last_state: &mut Option<AllocatedNum<F>>,
+        accepting: &mut Option<AllocatedNum<F>>,
+    ) -> Result<(), SynthesisError>
+where {
+        if s.starts_with(&format!("state_{}", self.batch_size)) {
+            *last_state = Some(alloc_v.clone()); //.get_variable();
+        } else if s.starts_with(&format!("accepting")) {
+            *accepting = Some(alloc_v.clone());
+            println!("get alloc v accepting {:#?}", alloc_v.clone().get_value());
+        }
+        Ok(())
+    }
+
+    fn hash_parsing(
+        &self,
         vars: &mut HashMap<Var, Variable>,
         s: &String,
         var: Var,
@@ -226,10 +233,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         alloc_idxs: &mut Vec<Option<AllocatedNum<F>>>,
         i_0: AllocatedNum<F>,
         last_i: &mut Option<AllocatedNum<F>>,
-    ) -> Result<bool, SynthesisError>
-    where
-        CS: ConstraintSystem<F>,
-    {
+    ) -> Result<bool, SynthesisError> {
         // intermediate (in circ) wits
         if s.starts_with("char_") {
             let char_j = Some(alloc_v.clone()); //.get_variable();
@@ -400,7 +404,11 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             let comp_inv;
             let ep_sel;
 
-            if (i as isize) >= start_of_ep {
+            let mut ep_num =
+                AllocatedNum::alloc(hash_ns.namespace(|| "epsilon"), || Ok(epsilon_num))?;
+
+            if (i as isize) <= start_of_ep {
+                println!("STARTING EPS");
                 next_hash = AllocatedNum::alloc(hash_ns.namespace(|| "next_hash"), || {
                     Ok(prev_hash.get_value().unwrap())
                 })?;
@@ -413,16 +421,22 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                     Ok(hashed.get_value().unwrap())
                 })?;
 
-                let comp_inv_pre = (epsilon_num - unwrap_alloc_char.get_value().unwrap())
-                    .invert()
-                    .expect("couldn't invert comp for wit");
+                let comp_inv_pre = (ep_num.get_value().unwrap()
+                    - unwrap_alloc_char.get_value().unwrap())
+                .invert()
+                .expect("couldn't invert comp for wit");
                 comp_inv =
                     AllocatedNum::alloc(hash_ns.namespace(|| "comp inv"), || Ok(comp_inv_pre))?;
+                assert_eq!(
+                    comp_inv_pre
+                        * (ep_num.get_value().unwrap() - unwrap_alloc_char.get_value().unwrap()),
+                    F::from(1)
+                );
+
                 ep_sel = AllocatedNum::alloc(hash_ns.namespace(|| "ep_sel"), || Ok(F::from(1)))?;
             }
 
-            let mut ep_num =
-                AllocatedNum::alloc(hash_ns.namespace(|| "epsilon"), || Ok(epsilon_num))?;
+            println!("OUT HASH: {:#?}", next_hash.get_value());
 
             // sanity - get rid of
             if i_0.get_value().is_some() {
@@ -525,25 +539,21 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         return Ok(next_hash); //last hash
     }
 
-    fn intm_fs_parsing<CS>(
+    fn intm_fs_parsing(
         &self,
-        cs: &mut CS,
         alloc_v: &AllocatedNum<F>,
         s: &String,
         is_doc_nl: bool,
         alloc_qv: &mut Vec<Option<AllocatedNum<F>>>,
         alloc_claim_r: &mut Option<AllocatedNum<F>>,
         alloc_gs: &mut Vec<Vec<Option<AllocatedNum<F>>>>,
-    ) -> Result<bool, SynthesisError>
-    where
-        CS: ConstraintSystem<F>,
-    {
+    ) -> Result<bool, SynthesisError> {
         // intermediate (in circ) wits
         if (!is_doc_nl && s.starts_with("nl_combined_q"))
             || (is_doc_nl && s.starts_with("nldoc_combined_q"))
         {
             alloc_qv[0] = Some(alloc_v.clone());
-            println!("ALLOC QV PARSING {:#?}: {:#?}", 0, alloc_v.get_value());
+            //println!("ALLOC QV PARSING {:#?}: {:#?}", 0, alloc_v.get_value());
 
             return Ok(true);
         } else if !is_doc_nl && s.starts_with("v_") {
@@ -551,12 +561,13 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
 
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
-
-            println!(
-                "ALLOC QV PARSING {:#?}: {:#?}",
-                j,
-                v_j.clone().unwrap().get_value()
-            );
+            /*
+                      println!(
+                          "ALLOC QV PARSING {:#?}: {:#?}",
+                          j,
+                          v_j.clone().unwrap().get_value()
+                      );
+            */
             alloc_qv[j] = v_j; // TODO check
 
             return Ok(true);
@@ -566,11 +577,12 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             //let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
-            println!(
-                "ALLOC QV PARSING CHAR {:#?}: {:#?}",
-                j,
-                v_j.clone().unwrap().get_value()
-            );
+            /*        println!(
+                      "ALLOC QV PARSING CHAR {:#?}: {:#?}",
+                      j,
+                      v_j.clone().unwrap().get_value()
+                  );
+            */
             if j < self.batch_size {
                 alloc_qv[j + 1] = v_j;
             } // don't add the last one
@@ -579,7 +591,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         } else if (!is_doc_nl && s.starts_with("nl_claim_r"))
             || (is_doc_nl && s.starts_with("nldoc_claim_r"))
         {
-            println!("NL CLAIM R PARSING");
+            //     println!("NL CLAIM R PARSING");
 
             *alloc_claim_r = Some(alloc_v.clone());
         } else if (!is_doc_nl && s.starts_with("nl_sc_g"))
@@ -748,18 +760,14 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         return Ok(());
     }
 
-    fn nl_eval_parsing<CS>(
+    fn nl_eval_parsing(
         &self,
-        cs: &mut CS,
         alloc_v: &AllocatedNum<F>,
         s: &String,
         sc_l: usize,
         alloc_rc: &mut Vec<Option<AllocatedNum<F>>>,
         alloc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
-    ) -> Result<bool, SynthesisError>
-    where
-        CS: ConstraintSystem<F>,
-    {
+    ) -> Result<bool, SynthesisError> {
         if s.starts_with("nl_next_running_claim") {
             // v
 
@@ -794,18 +802,15 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
     }
 
     // TODO combine above
-    fn nl_doc_parsing<CS>(
+    fn nl_doc_parsing(
         &self,
-        cs: &mut CS,
         alloc_v: &AllocatedNum<F>,
         s: &String,
         sc_l: usize,
         alloc_doc_rc: &mut Vec<Option<AllocatedNum<F>>>,
         alloc_doc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
     ) -> Result<bool, SynthesisError>
-    where
-        CS: ConstraintSystem<F>,
-    {
+where {
         if s.starts_with("nldoc_next_running_claim") {
             // v
 
@@ -848,12 +853,12 @@ where
 
         let mut arity = 1;
         match &self.glue[0] {
-            GlueOpts::Poly_Hash(_) => {
+            GlueOpts::PolyHash(_) => {
                 arity += 2;
             }
-            GlueOpts::Nl_Hash((_, _, q, _)) => arity += q.len() + 1 + 2, // q, v, hashes
-            GlueOpts::Poly_Nl((dq, _)) => arity += dq.len() + 1,         // doc_q, doc_v
-            GlueOpts::Nl_Nl((q, _, dq, _)) => {
+            GlueOpts::NlHash((_, _, q, _)) => arity += q.len() + 1 + 2, // q, v, hashes
+            GlueOpts::PolyNL((dq, _)) => arity += dq.len() + 1,         // doc_q, doc_v
+            GlueOpts::NlNl((q, _, dq, _)) => {
                 arity += q.len() + 1 + dq.len() + 1;
             }
         }
@@ -870,13 +875,13 @@ where
 
         let mut i = 1;
         match &self.glue[0] {
-            GlueOpts::Poly_Hash((idx, h)) => {
+            GlueOpts::PolyHash((idx, h)) => {
                 assert_eq!(z[i], *idx);
                 i += 1;
                 assert_eq!(z[i], *h);
                 i += 1;
             }
-            GlueOpts::Nl_Hash((idx, h, q, v)) => {
+            GlueOpts::NlHash((idx, h, q, v)) => {
                 assert_eq!(z[i], *idx);
                 i += 1;
                 assert_eq!(z[i], *h);
@@ -888,7 +893,7 @@ where
                 assert_eq!(z[i], *v);
                 i += 1;
             }
-            GlueOpts::Poly_Nl((dq, dv)) => {
+            GlueOpts::PolyNL((dq, dv)) => {
                 for qi in dq {
                     assert_eq!(z[i], *qi);
                     i += 1;
@@ -896,7 +901,7 @@ where
                 assert_eq!(z[i], *dv);
                 i += 1;
             }
-            GlueOpts::Nl_Nl((q, v, dq, dv)) => {
+            GlueOpts::NlNl((q, v, dq, dv)) => {
                 for qi in q {
                     assert_eq!(z[i], *qi);
                     i += 1;
@@ -918,21 +923,21 @@ where
                             //     self.accepting_bool[1],
         ];
         match &self.glue[1] {
-            GlueOpts::Poly_Hash((i, h)) => {
+            GlueOpts::PolyHash((i, h)) => {
                 out.push(*i);
                 out.push(*h);
             }
-            GlueOpts::Nl_Hash((i, h, q, v)) => {
+            GlueOpts::NlHash((i, h, q, v)) => {
                 out.push(*i);
                 out.push(*h);
                 out.extend(q);
                 out.push(*v);
             }
-            GlueOpts::Poly_Nl((dq, dv)) => {
+            GlueOpts::PolyNL((dq, dv)) => {
                 out.extend(dq);
                 out.push(*dv);
             }
-            GlueOpts::Nl_Nl((q, v, dq, dv)) => {
+            GlueOpts::NlNl((q, v, dq, dv)) => {
                 out.extend(q);
                 out.push(*v);
                 out.extend(dq);
@@ -993,7 +998,7 @@ where
         let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
 
         match &self.glue[1] {
-            GlueOpts::Poly_Hash(_) => {
+            GlueOpts::PolyHash(_) => {
                 let i_0 = z[1].clone();
                 alloc_idxs[0] = Some(i_0.clone());
                 let hash_0 = z[2].clone();
@@ -1012,7 +1017,6 @@ where
 
                     let mut matched = self
                         .input_variable_parsing(
-                            cs,
                             &mut vars,
                             &s,
                             var,
@@ -1026,7 +1030,6 @@ where
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
                             .hash_parsing(
-                                cs,
                                 &mut vars,
                                 &s,
                                 var,
@@ -1065,7 +1068,7 @@ where
                 );
                 out.push(last_hash.unwrap());
             }
-            GlueOpts::Nl_Hash((i, h, q, v)) => {
+            GlueOpts::NlHash((_i, _h, q, _v)) => {
                 let i_0 = z[1].clone();
                 alloc_idxs[0] = Some(i_0.clone());
                 let hash_0 = z[2].clone();
@@ -1091,7 +1094,6 @@ where
 
                     let mut matched = self
                         .input_variable_parsing(
-                            cs,
                             &mut vars,
                             &s,
                             var,
@@ -1105,7 +1107,6 @@ where
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
                             .hash_parsing(
-                                cs,
                                 &mut vars,
                                 &s,
                                 var,
@@ -1120,7 +1121,6 @@ where
                         if !matched {
                             matched = self
                                 .intm_fs_parsing(
-                                    cs,
                                     &alloc_v,
                                     &s,
                                     false,
@@ -1133,7 +1133,6 @@ where
                             if !matched {
                                 matched = self
                                     .nl_eval_parsing(
-                                        cs,
                                         &alloc_v,
                                         &s,
                                         sc_l,
@@ -1186,7 +1185,7 @@ where
                     out.push(qv.unwrap()); // better way to do this?
                 }
             }
-            GlueOpts::Poly_Nl((dq, dv)) => {
+            GlueOpts::PolyNL((dq, _dv)) => {
                 let doc_l = dq.len();
 
                 let mut alloc_doc_rc = vec![None; doc_l + 1];
@@ -1209,7 +1208,6 @@ where
 
                     let mut matched = self
                         .input_variable_parsing(
-                            cs,
                             &mut vars,
                             &s,
                             var,
@@ -1222,7 +1220,6 @@ where
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
                             .intm_fs_parsing(
-                                cs,
                                 &alloc_v,
                                 &s,
                                 true,
@@ -1236,7 +1233,6 @@ where
                         if !matched {
                             matched = self
                                 .nl_doc_parsing(
-                                    cs,
                                     &alloc_v,
                                     &s,
                                     doc_l,
@@ -1274,7 +1270,7 @@ where
                     out.push(qv.unwrap()); // better way to do this?
                 }
             }
-            GlueOpts::Nl_Nl((q, v, dq, dv)) => {
+            GlueOpts::NlNl((q, _v, dq, _dv)) => {
                 let sc_l = q.len();
                 let doc_l = dq.len();
 
@@ -1300,7 +1296,6 @@ where
                     //println!("Var (name?) {:#?}", self.r1cs.names[&var]);
                     let mut matched = self
                         .input_variable_parsing(
-                            cs,
                             &mut vars,
                             &s,
                             var,
@@ -1314,7 +1309,6 @@ where
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
                             .intm_fs_parsing(
-                                cs,
                                 &alloc_v,
                                 &s,
                                 false,
@@ -1327,7 +1321,6 @@ where
                         if !matched {
                             matched = self
                                 .intm_fs_parsing(
-                                    cs,
                                     &alloc_v,
                                     &s,
                                     true,
@@ -1339,7 +1332,6 @@ where
                             if !matched {
                                 matched = self
                                     .nl_eval_parsing(
-                                        cs,
                                         &alloc_v,
                                         &s,
                                         sc_l,
@@ -1350,7 +1342,6 @@ where
                                 if !matched {
                                     matched = self
                                         .nl_doc_parsing(
-                                            cs,
                                             &alloc_v,
                                             &s,
                                             doc_l,

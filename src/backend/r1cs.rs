@@ -2,11 +2,8 @@ use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
 use crate::config::*;
 use crate::dfa::{EPSILON, NFA};
-use circ::cfg;
-use circ::cfg::CircOpt;
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
-use circ::target::r1cs::*;
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use ff::PrimeField;
 use fxhash::FxHashMap;
@@ -21,11 +18,9 @@ use nova_snark::traits::Group;
 use rug::{
     integer::Order,
     ops::{RemRounding, RemRoundingAssign},
-    rand::RandState,
     Assign, Integer,
 };
 use std::fs;
-use std::sync::Once;
 use std::time::{Duration, Instant};
 
 pub struct R1CS<'a, F: PrimeField> {
@@ -256,7 +251,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // PROVER
 
-    pub fn prover_accepting_state(&self, batch_num: usize, state: usize) -> bool {
+    pub fn prover_accepting_state(&self, batch_num: usize, state: usize) -> u64 {
         let mut out = false;
 
         if self.is_match {
@@ -278,7 +273,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             assert!(out);
         }
 
-        out
+        if out {
+            1
+        } else {
+            0
+        }
     }
 
     // CIRCUIT
@@ -350,15 +349,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
 
         let match_term = term(
-            Op::Eq,
+            Op::Ite,
             vec![
-                new_bool_var("accepting".to_owned()),
                 term(Op::Eq, vec![new_const(0), vanishing_poly]),
+                term(Op::Eq, vec![new_var(format!("accepting")), new_const(1)]),
+                term(Op::Eq, vec![new_var(format!("accepting")), new_const(0)]),
             ],
         );
 
         self.assertions.push(match_term);
-        self.pub_inputs.push(new_bool_var(format!("accepting")));
+        self.pub_inputs.push(new_var(format!("accepting")));
     }
 
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
@@ -404,10 +404,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // println!("Prover data {:#?}", prover_data);
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
-        for r in circ_r1cs.constraints().clone() {
-            println!("{:#?}", circ_r1cs.format_qeq(&r));
-        }
-
+        /* for r in circ_r1cs.constraints().clone() {
+                    println!("{:#?}", circ_r1cs.format_qeq(&r));
+                }
+        */
         //println!("Prover data {:#?}", circ_r1cs);
         let ms = time.elapsed().as_millis();
         println!(
@@ -428,7 +428,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // TODO batch size (1 currently)
     fn to_polys(&mut self) -> (ProverData, VerifierData) {
-        let l_time = Instant::now();
+        //let l_time = Instant::now();
         let lookup = self.lookup_idxs(false);
 
         let mut evals = vec![];
@@ -611,9 +611,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     // C_1 = LHS/"claim"
-    fn sum_check_circuit(&mut self, C_1: Term, num_rounds: usize, id: &str) {
+    fn sum_check_circuit(&mut self, c_1: Term, num_rounds: usize, id: &str) {
         // first round claim
-        let mut claim = C_1.clone();
+        let mut claim = c_1.clone();
 
         for j in 1..=num_rounds {
             // P makes a claim g_j(X_j) about a univariate slice of its large multilinear polynomial
@@ -760,8 +760,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let eq_eval = horners_circuit_vars(&eq_evals, new_var(format!("{}_claim_r", id)));
 
         // make combined_q
-        let combined_q = self.combined_q_circuit(self.batch_size, sc_l, id); // running claim q not
-                                                                             // included
+        self.combined_q_circuit(self.batch_size, sc_l, id); // running claim q not
+                                                            // included
 
         // last_claim = eq_eval * next_running_claim
         let sum_check_domino = term(
@@ -794,7 +794,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Option<Integer>,
         Option<Vec<Integer>>,
         Option<Integer>,
-        Option<isize>,
+        isize,
     ) {
         match self.batching {
             JBatching::NaivePolys => {
@@ -856,7 +856,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Option<Integer>,
         Option<Vec<Integer>>,
         Option<Integer>,
-        Option<isize>,
+        isize,
     ) {
         let mut wits = FxHashMap::default();
 
@@ -931,7 +931,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         wits.insert(
             format!("accepting"),
-            new_bool_wit(self.prover_accepting_state(batch_num, next_state)),
+            new_wit(self.prover_accepting_state(batch_num, next_state)),
         );
 
         match self.commit_type {
@@ -946,7 +946,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Some(next_running_v),
                     None,
                     None,
-                    Some(start_epsilons),
+                    start_epsilons,
                 )
             }
             JCommit::Nlookup => {
@@ -963,7 +963,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Some(next_running_v),
                     Some(next_doc_running_q),
                     Some(next_doc_running_v),
-                    None,
+                    start_epsilons,
                 )
             }
         }
@@ -976,8 +976,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
-        let epsilon_num = self.dfa.ab_to_num(EPSILON);
-
         let mut v = vec![];
         let mut q = vec![];
         for i in 0..self.batch_size {
@@ -1010,11 +1008,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // running claim about T (optimization)
         // if first (not yet generated)
-        let mut prev_running_q = match running_q {
+        let prev_running_q = match running_q {
             Some(q) => q,
             None => vec![Integer::from(0); sc_l],
         };
-        let mut prev_running_v = match running_v {
+        let prev_running_v = match running_v {
             Some(v) => v,
             None => table[0].clone(),
         };
@@ -1038,7 +1036,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
 
             for qj in qjs.into_iter().rev() {
-                combined_q += (Integer::from(qj) * &next_slot);
+                combined_q += Integer::from(qj) * &next_slot;
                 next_slot *= Integer::from(2);
             }
         }
@@ -1127,11 +1125,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             // new sumcheck rand for the round
             // generate rands
-            let prev_rand = match i {
-                1 => Integer::from(0),
-                _ => sc_rs[i - 2].clone(),
-            };
-            // let query = vec![]; //vs TODO?
             let query = vec![
                 int_to_ff(g_const.clone()),
                 int_to_ff(g_x.clone()),
@@ -1200,7 +1193,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         usize,
         Option<Vec<Integer>>,
         Option<Integer>,
-        Option<isize>,
+        isize,
     ) {
         let mut wits = FxHashMap::default();
         let mut state_i = current_state;
@@ -1227,7 +1220,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         wits.insert(
             format!("accepting"),
-            new_bool_wit(self.prover_accepting_state(batch_num, next_state)),
+            new_wit(self.prover_accepting_state(batch_num, next_state)),
         );
         //println!("wits {:#?}", wits);
 
@@ -1237,7 +1230,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
                 }
                 // values not actually checked or used
-                (wits, next_state, None, None, Some(start_epsilons))
+                (wits, next_state, None, None, start_epsilons)
             }
             JCommit::Nlookup => {
                 assert!(doc_running_q.is_some() || batch_num == 0);
@@ -1251,7 +1244,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     next_state,
                     Some(next_doc_running_q),
                     Some(next_doc_running_v),
-                    None,
+                    start_epsilons,
                 )
             }
         }
@@ -1265,24 +1258,7 @@ mod tests {
     use crate::backend::r1cs::*;
     use crate::dfa::NFA;
     use crate::regex::Regex;
-    use circ::cfg;
-    use circ::cfg::CircOpt;
-    use serial_test::serial;
     type G1 = pasta_curves::pallas::Point;
-
-    fn set_up_cfg() {
-        //println!("cfg set? {:#?}", cfg::is_cfg_set());
-        if !cfg::is_cfg_set() {
-            //let m = format!("1019");
-            let m = format!(
-                "28948022309329048855892746252171976963363056481941647379679742748393362948097"
-            );
-            let mut circ: CircOpt = Default::default();
-            circ.field.custom_modulus = m.into();
-
-            cfg::set(&circ);
-        }
-    }
 
     #[test]
     fn mle_partial() {
@@ -1493,7 +1469,7 @@ mod tests {
                     let mut values;
                     let mut next_state;
 
-                    let mut start_epsilons = None;
+                    let mut start_epsilons = -1;
                     let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0)
                         / r1cs_converter.batch_size;
                     for i in 0..num_steps {
@@ -1651,7 +1627,7 @@ mod tests {
         );
     }
 
-    // #[test]
+    #[test]
     fn dfa_non_match() {
         init();
         // TODO make sure match/non match is expected

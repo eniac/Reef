@@ -7,32 +7,15 @@ use crate::backend::{
     r1cs::*,
 };
 use crate::dfa::{EPSILON, NFA};
-use circ::cfg::{cfg, CircOpt};
-use circ::target::r1cs::ProverData;
-use ff::{Field, PrimeField};
 use generic_array::typenum;
 use neptune::{
-    poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
-    sponge::vanilla::{Mode, Sponge, SpongeTrait},
+    sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
 use nova_snark::{
-    errors::NovaError,
-    provider::{
-        ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pedersen::{Commitment, CommitmentGens},
-    },
-    traits::{
-        circuit::TrivialTestCircuit, commitment::*, evaluation::EvaluationEngineTrait, Group,
-    },
+    traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
-};
-use rand::rngs::OsRng;
-use rug::{
-    integer::Order,
-    ops::{RemRounding, RemRoundingAssign},
-    Assign, Integer,
 };
 use std::time::{Duration, Instant};
 
@@ -55,31 +38,31 @@ pub fn run_backend(
         commit_docype,
     );
 
-    let c_time = Instant::now();
+    ////let c_time = Instant::now();
     println!("generate commitment");
     // to get rid clone
     let reef_commit = gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
     r1cs_converter.set_commitment(reef_commit.clone());
-    let commit_ms = c_time.elapsed().as_millis();
+    //let commit_ms = c_time.elapsed().as_millis();
 
     //let parse_ms = p_time.elapsed().as_millis();
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());
 
-    let r_time = Instant::now();
+    //let r_time = Instant::now();
     let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
-    let r1cs_ms = r_time.elapsed().as_millis();
+    //let r1cs_ms = r_time.elapsed().as_millis();
 
-    let s_time = Instant::now();
+    //let s_time = Instant::now();
     // use "empty" (witness-less) circuit to generate nova F
     let empty_glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
         (JBatching::NaivePolys, JCommit::HashChain) => {
             vec![
-                GlueOpts::Poly_Hash((
+                GlueOpts::PolyHash((
                     <G1 as Group>::Scalar::from(0),
                     <G1 as Group>::Scalar::from(0),
                 )),
-                GlueOpts::Poly_Hash((
+                GlueOpts::PolyHash((
                     <G1 as Group>::Scalar::from(0),
                     <G1 as Group>::Scalar::from(0),
                 )),
@@ -91,8 +74,8 @@ pub fn run_backend(
             let q = vec![<G1 as Group>::Scalar::from(0); q_len];
 
             vec![
-                GlueOpts::Nl_Hash((zero.clone(), zero.clone(), q.clone(), zero.clone())),
-                GlueOpts::Nl_Hash((zero.clone(), zero.clone(), q, zero.clone())),
+                GlueOpts::NlHash((zero.clone(), zero.clone(), q.clone(), zero.clone())),
+                GlueOpts::NlHash((zero.clone(), zero.clone(), q, zero.clone())),
             ]
         }
         (JBatching::NaivePolys, JCommit::Nlookup) => {
@@ -101,8 +84,8 @@ pub fn run_backend(
             let doc_v = <G1 as Group>::Scalar::from(0);
 
             vec![
-                GlueOpts::Poly_Nl((doc_q.clone(), doc_v.clone())),
-                GlueOpts::Poly_Nl((doc_q, doc_v)),
+                GlueOpts::PolyNL((doc_q.clone(), doc_v.clone())),
+                GlueOpts::PolyNL((doc_q, doc_v)),
             ]
         }
         (JBatching::Nlookup, JCommit::Nlookup) => {
@@ -113,8 +96,8 @@ pub fn run_backend(
 
             let doc_v = <G1 as Group>::Scalar::from(0);
             vec![
-                GlueOpts::Nl_Nl((q.clone(), v.clone(), doc_q.clone(), doc_v.clone())),
-                GlueOpts::Nl_Nl((q, v, doc_q, doc_v)),
+                GlueOpts::NlNl((q.clone(), v.clone(), doc_q.clone(), doc_v.clone())),
+                GlueOpts::NlNl((q, v, doc_q, doc_v)),
             ]
         }
     };
@@ -127,7 +110,7 @@ pub fn run_backend(
         <G1 as Group>::Scalar::from(0),
         true, //false,
         <G1 as Group>::Scalar::from(dfa.nchars() as u64),
-        -1,
+        dfa.nchars() as isize,
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         sc.clone(),
@@ -227,22 +210,20 @@ pub fn run_backend(
 
     // TODO deal with time bs
 
-    let n_time = Instant::now();
-    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-
+    //let n_time = Instant::now();
     let num_steps =
         (r1cs_converter.substring.1 - r1cs_converter.substring.0) / r1cs_converter.batch_size;
     let mut wits;
     let mut running_q = None;
     let mut running_v = None;
-    let mut next_running_q = None;
-    let mut next_running_v = None;
+    let mut next_running_q;
+    let mut next_running_v;
     let mut doc_running_q = None;
     let mut doc_running_v = None;
-    let mut next_doc_running_q = None;
-    let mut next_doc_running_v = None;
+    let mut next_doc_running_q;
+    let mut next_doc_running_v;
 
-    let mut start_of_epsilons = None;
+    let mut start_of_epsilons = -1;
 
     let mut next_state = 0; //dfa.get init state ??
     let mut prev_hash = <G1 as Group>::Scalar::from(0);
@@ -266,50 +247,8 @@ pub fn run_backend(
             doc_running_q.clone(),
             doc_running_v.clone(),
         );
-        //println!("prover_data {:#?}", prover_data.clone());
-        //println!("wits {:#?}", wits.clone());
-        //let extended_wit = prover_data.precomp.eval(&wits);
-        //println!("extended wit {:#?}", extended_wit);
 
-        //prover_data.check_all(&extended_wit);
         prover_data.check_all(&wits);
-
-        //let current_char = r1cs_converter.cdoc[i * r1cs_converter.batch_size].clone();
-        /*let mut next_char: String = String::from("");
-                if i + 1 < num_steps {
-                    next_char = doc[(i + 1) * r1cs_converter.batch_size].clone();
-                };
-                //println!("next char = {}", next_char);
-        */
-        // todo put this in r1cs
-        let mut next_hash = <G1 as Group>::Scalar::from(0);
-        /*for b in 0..r1cs_converter.batch_size {
-            // expected poseidon
-            let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
-            let acc = &mut ();
-
-            sponge.start(parameter.clone(), None, acc);
-            SpongeAPI::absorb(
-                &mut sponge,
-                2,
-                &[
-                    intm_hash,
-                    <G1 as Group>::Scalar::from(
-                        dfa.ab_to_num(&doc[i * r1cs_converter.batch_size + b].clone()) as u64,
-                    ),
-                ],
-                acc,
-            );
-            let expected_next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            println!(
-                "prev, expected next hash in main {:#?} {:#?}",
-                intm_hash, expected_next_hash
-            );
-            sponge.finish(acc).unwrap(); // assert expected hash finished correctly
-
-            next_hash = expected_next_hash[0];
-            intm_hash = next_hash;
-        }*/
 
         // this variable could be two different types of things, which is potentially dicey, but
         // literally whatever
@@ -333,8 +272,8 @@ pub fn run_backend(
                 let i_last =
                     <G1 as Group>::Scalar::from(((i + 1) * r1cs_converter.batch_size) as u64);
                 let g = vec![
-                    GlueOpts::Poly_Hash((i_0, prev_hash)),
-                    GlueOpts::Poly_Hash((i_last, next_hash)),
+                    GlueOpts::PolyHash((i_0, prev_hash)),
+                    GlueOpts::PolyHash((i_last, next_hash)),
                 ];
                 prev_hash = next_hash;
                 println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
@@ -370,8 +309,8 @@ pub fn run_backend(
                 let i_last =
                     <G1 as Group>::Scalar::from(((i + 1) * r1cs_converter.batch_size) as u64);
                 let g = vec![
-                    GlueOpts::Nl_Hash((i_0, prev_hash, q, v)),
-                    GlueOpts::Nl_Hash((i_last, next_hash, next_q, next_v)),
+                    GlueOpts::NlHash((i_0, prev_hash, q, v)),
+                    GlueOpts::NlHash((i_last, next_hash, next_q, next_v)),
                 ];
                 prev_hash = next_hash;
 
@@ -397,8 +336,8 @@ pub fn run_backend(
                 let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
 
                 vec![
-                    GlueOpts::Poly_Nl((doc_q, doc_v)),
-                    GlueOpts::Poly_Nl((next_doc_q, next_doc_v)),
+                    GlueOpts::PolyNL((doc_q, doc_v)),
+                    GlueOpts::PolyNL((next_doc_q, next_doc_v)),
                 ]
             }
             (JBatching::Nlookup, JCommit::Nlookup) => {
@@ -438,12 +377,13 @@ pub fn run_backend(
                 let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
 
                 vec![
-                    GlueOpts::Nl_Nl((q, v, doc_q, doc_v)),
-                    GlueOpts::Nl_Nl((next_q, next_v, next_doc_q, next_doc_v)),
+                    GlueOpts::NlNl((q, v, doc_q, doc_v)),
+                    GlueOpts::NlNl((next_q, next_v, next_doc_q, next_doc_v)),
                 ]
             }
         };
 
+        println!("START OF EPS {}", start_of_epsilons);
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             &prover_data,
             Some(wits),
@@ -453,9 +393,9 @@ pub fn run_backend(
             ],
             glue,
             blind,
-            (i == 0),
+            i == 0,
             <G1 as Group>::Scalar::from(dfa.nchars() as u64),
-            start_of_epsilons.unwrap(),
+            start_of_epsilons,
             vec![
                 <G1 as Group>::Scalar::from(
                     r1cs_converter.prover_accepting_state(i, current_state),
@@ -515,17 +455,17 @@ pub fn run_backend(
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
 
-    let nova_prover_ms = n_time.elapsed().as_millis();
+    //let nova_prover_ms = n_time.elapsed().as_millis();
 
-    println!("nova prover ms {:#?}", nova_prover_ms / 10);
+    //println!("nova prover ms {:#?}", nova_prover_ms / 10);
 
     // VERIFIER verify compressed snark
-    let n_time = Instant::now();
+    //let n_time = Instant::now();
     let res = compressed_snark.verify(&pp, FINAL_EXTERNAL_COUNTER, z0_primary, z0_secondary);
     assert!(res.is_ok());
-    let nova_verifier_ms = n_time.elapsed().as_millis();
+    //let nova_verifier_ms = n_time.elapsed().as_millis();
 
-    println!("nova verifier ms {:#?}", nova_verifier_ms);
+    //println!("nova verifier ms {:#?}", nova_verifier_ms);
 
     // final "in the clear" V checks
     // // state, char, opt<hash>, opt<v,q for eval>, opt<v,q for doc>, accepting
@@ -596,16 +536,10 @@ pub fn run_backend(
 #[cfg(test)]
 mod tests {
 
-    use crate::backend::costs;
     use crate::backend::framework::*;
-    use crate::backend::r1cs::*;
     use crate::backend::r1cs_helper::init;
     use crate::dfa::NFA;
     use crate::regex::Regex;
-    use circ::cfg;
-    use circ::cfg::CircOpt;
-    use serial_test::serial;
-    type G1 = pasta_curves::pallas::Point;
 
     fn backend_test(
         ab: String,

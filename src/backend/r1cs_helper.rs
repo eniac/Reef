@@ -1,8 +1,7 @@
 use crate::backend::costs::*;
 use circ::cfg;
 use circ::cfg::*;
-use circ::ir::{opt::*, proof::Constraints, term::*};
-use ff::PrimeField;
+use circ::ir::term::*;
 use rug::{
     integer::Order,
     ops::{RemRounding, RemRoundingAssign},
@@ -37,20 +36,10 @@ where
 {
     leaf_term(Op::Const(Value::Field(cfg().field().new_v(i))))
 }
-pub(crate) fn new_bool_const(b: bool) -> Term
-// constants
-{
-    leaf_term(Op::Const(Value::Bool(b)))
-}
 
 pub(crate) fn new_var(name: String) -> Term {
     // empty holes
     leaf_term(Op::Var(name, Sort::Field(cfg().field().clone())))
-}
-
-pub(crate) fn new_bool_var(name: String) -> Term {
-    // empty holes
-    leaf_term(Op::Var(name, Sort::Bool))
 }
 
 pub(crate) fn new_wit<I>(i: I) -> Value
@@ -60,30 +49,6 @@ where
 {
     Value::Field(cfg().field().new_v(i))
 }
-
-pub(crate) fn new_bool_wit(b: bool) -> Value
-// wit values
-{
-    Value::Bool(b)
-}
-
-// feild ops
-fn denom(i: usize, evals: &Vec<(Integer, Integer)>) -> Integer {
-    let mut res = Integer::from(1);
-    for j in (0..evals.len()).rev() {
-        if i != j {
-            res *= evals[i].0.clone() - &evals[j].0; //.rem_floor_assign(cfg().field().modulus().clone());
-                                                     //res.rem_floor(cfg().field().modulus());
-        } // TODO
-    }
-
-    // find inv in feild
-    let inv = res.invert(cfg().field().modulus()).unwrap();
-
-    return inv;
-}
-
-// TODO Q - do we need to pad out the table ??
 
 // PROVER WORK
 

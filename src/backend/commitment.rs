@@ -11,7 +11,6 @@ use neptune::{
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
-    Strength,
 };
 use nova_snark::{
     errors::NovaError,
@@ -20,11 +19,7 @@ use nova_snark::{
         pedersen::{Commitment, CommitmentGens},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
-    traits::{
-        circuit::TrivialTestCircuit, commitment::*, evaluation::EvaluationEngineTrait,
-        AbsorbInROTrait, Group, ROConstantsTrait, ROTrait,
-    },
-    CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+    traits::{commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait},
 };
 use rand::rngs::OsRng;
 use rug::{
@@ -75,7 +70,6 @@ where
     type F = <G1 as Group>::Scalar;
     match commit_docype {
         JCommit::HashChain => {
-            let mut i = 0;
             let mut hash;
 
             // H_0 = Hash(0, r, 0)
@@ -135,7 +129,7 @@ where
             let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
             doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
 
-            let mut mle = mle_from_pts(doc_ext);
+            let mle = mle_from_pts(doc_ext);
             println!("mle: {:#?}", mle);
 
             let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
@@ -328,7 +322,7 @@ fn q_to_mle_q(q: &Vec<<G1 as Group>::Scalar>, mle_len: usize) -> Vec<<G1 as Grou
         let mut new_term = <G1 as Group>::Scalar::from(1);
         for j in 0..q.len() {
             // for each possible var in this term
-            if ((idx / base.pow(j as u32)) % 2 == 1) {
+            if (idx / base.pow(j as u32)) % 2 == 1 {
                 // is this var in this term?
                 new_term *= q[j].clone(); // todo?
                                           //println!("new term after mul {:#?}", new_term);
@@ -346,15 +340,8 @@ fn q_to_mle_q(q: &Vec<<G1 as Group>::Scalar>, mle_len: usize) -> Vec<<G1 as Grou
 mod tests {
 
     use crate::backend::commitment::*;
-    use crate::backend::costs;
     use crate::backend::nova::int_to_ff;
-    use crate::backend::r1cs::*;
-    use crate::dfa::NFA;
-    use crate::regex::Regex;
-    use circ::cfg;
-    use circ::cfg::CircOpt;
     use rug::Integer;
-    use serial_test::serial;
     type G1 = pasta_curves::pallas::Point;
 
     #[test]
@@ -422,7 +409,7 @@ mod tests {
     #[test]
     fn mle_q_ext() {
         init();
-        let mut uni: Vec<Integer> = vec![
+        let uni: Vec<Integer> = vec![
             Integer::from(60),
             Integer::from(80),
             Integer::from(9),
