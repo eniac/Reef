@@ -206,7 +206,7 @@ pub fn final_clear_checks(
     reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
     //accepting_state: <G1 as Group>::Scalar,
     table: &Vec<Integer>,
-    doc: &Vec<usize>,
+    doc_len: usize,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
     final_hash: Option<<G1 as Group>::Scalar>,
@@ -268,7 +268,7 @@ pub fn final_clear_checks(
                         q, v, dc
                     );*/
 
-                    let doc_ext_len = doc.len().next_power_of_two();
+                    let doc_ext_len = doc_len.next_power_of_two();
 
                     // right form for inner product
                     let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone

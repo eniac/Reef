@@ -46,21 +46,9 @@ pub fn run_backend(
 ) {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
 
-    let mut e_doc = doc.clone();
-    e_doc.push(EPSILON.clone()); //String::new()); // MUST do to make batching work w/commitments
-
-    // doc to usizes - can I use this elsewhere too? TODO
-    let mut usize_doc = vec![];
-    let mut int_doc = vec![];
-    for c in e_doc.clone().into_iter() {
-        let u = dfa.ab_to_num(&c.to_string());
-        usize_doc.push(u);
-        int_doc.push(<G1 as Group>::Scalar::from(u as u64));
-    }
-
     let mut r1cs_converter = R1CS::new(
         dfa,
-        &e_doc,
+        &doc,
         temp_batch_size,
         sc.clone(),
         batching_type,
@@ -70,13 +58,13 @@ pub fn run_backend(
     let c_time = Instant::now();
     println!("generate commitment");
     // to get rid clone
-    let reef_commit = gen_commitment(r1cs_converter.commit_type, usize_doc.clone(), &sc);
+    let reef_commit = gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
     r1cs_converter.set_commitment(reef_commit.clone());
     let commit_ms = c_time.elapsed().as_millis();
 
     //let parse_ms = p_time.elapsed().as_millis();
     let q_len = logmn(r1cs_converter.table.len());
-    let qd_len = logmn(r1cs_converter.doc.len());
+    let qd_len = logmn(r1cs_converter.udoc.len());
 
     let r_time = Instant::now();
     let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
@@ -281,7 +269,7 @@ pub fn run_backend(
         //prover_data.check_all(&extended_wit);
         prover_data.check_all(&wits);
 
-        let current_char = r1cs_converter.doc[i * r1cs_converter.batch_size].clone();
+        //let current_char = r1cs_converter.cdoc[i * r1cs_converter.batch_size].clone();
         /*let mut next_char: String = String::from("");
                 if i + 1 < num_steps {
                     next_char = doc[(i + 1) * r1cs_converter.batch_size].clone();
@@ -545,7 +533,7 @@ pub fn run_backend(
                 reef_commit,
                 //zn[3],
                 &r1cs_converter.table,
-                &usize_doc,
+                r1cs_converter.udoc.len(),
                 None,
                 None,
                 Some(zn[2]),
@@ -559,7 +547,7 @@ pub fn run_backend(
                 reef_commit,
                 //zn[2 + qd_len + 1],
                 &r1cs_converter.table,
-                &usize_doc,
+                r1cs_converter.udoc.len(),
                 None,
                 None,
                 None,
@@ -573,7 +561,7 @@ pub fn run_backend(
                 reef_commit,
                 //zn[3 + q_len + 1],
                 &r1cs_converter.table,
-                &usize_doc,
+                r1cs_converter.udoc.len(),
                 Some(zn[3..(3 + q_len)].to_vec()),
                 Some(zn[3 + q_len]),
                 Some(zn[2]),
@@ -587,7 +575,7 @@ pub fn run_backend(
                 reef_commit,
                 //zn[2 + q_len + 1 + qd_len + 1],
                 &r1cs_converter.table,
-                &usize_doc,
+                r1cs_converter.udoc.len(),
                 Some(zn[1..(q_len + 1)].to_vec()),
                 Some(zn[q_len + 1]),
                 None,
@@ -636,63 +624,51 @@ mod tests {
         }
     }
 
-    //    #[test]
+    #[test]
     fn e2e_poly_hash() {
         backend_test(
             "ab".to_string(),
             "^a*b*$".to_string(),
-            "aaabbb".to_string(),
+            "aaab".to_string(),
             JBatching::NaivePolys,
             JCommit::HashChain,
-            vec![1, 2],
+            vec![1, 3],
         );
     }
 
-    //    #[test]
+    #[test]
     fn e2e_poly_nl() {
         backend_test(
             "ab".to_string(),
             "^a*b*$".to_string(),
-            "aaabbb".to_string(),
+            "aaab".to_string(),
             JBatching::NaivePolys,
             JCommit::Nlookup,
-            vec![2],
+            vec![3],
         );
     }
 
-    //  #[test]
+    #[test]
     fn e2e_nl_hash() {
         backend_test(
             "ab".to_string(),
             "^a*b*$".to_string(),
-            "aaabbb".to_string(),
+            "aaab".to_string(),
             JBatching::Nlookup,
             JCommit::HashChain,
-            vec![2],
+            vec![3],
         );
     }
 
-    // #[test]
+    #[test]
     fn e2e_nl_nl() {
         backend_test(
             "ab".to_string(),
             "^a*b*$".to_string(),
-            "aaabbb".to_string(),
+            "aaabbbb".to_string(),
             JBatching::Nlookup,
             JCommit::Nlookup,
-            vec![2],
+            vec![3],
         );
-        /*
-        backend_test(
-            "abc".to_string(),
-            "^a*b*c*$".to_string(),
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string(),
-            JBatching::Nlookup,
-            JCommit::Nlookup,
-            vec![2],
-        );
-
-        panic!("EXPECTED");
-        */
     }
 }

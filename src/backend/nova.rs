@@ -378,6 +378,8 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
                     true,
                 )?
             };
+
+            //wrap each in ite for epsilon in batching (first not necessary)
         }
 
         // if FIRST_SEL==0 then START_HASH = RANDOM_HASH else START_HASH = Z_INPUT_HASH

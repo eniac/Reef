@@ -41,7 +41,9 @@ pub struct R1CS<'a, F: PrimeField> {
     // sticking out here
     pub_inputs: Vec<Term>,
     pub batch_size: usize,
-    pub doc: Vec<String>,
+    pub cdoc: Vec<String>,
+    pub udoc: Vec<usize>,
+    pub idoc: Vec<Integer>,
     pub doc_extend: usize,
     is_match: bool,
     pub substring: (usize, usize), // todo getters
@@ -101,7 +103,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             batching, commit, sel_batch_size, cost
         );
 
-        let epsilon_to_add = doc.len() % sel_batch_size;
+        let mut batch_doc = doc.clone();
+        if matches!(commit, JCommit::Nlookup) {
+            batch_doc.push(EPSILON.clone()); // MUST do to make batching work w/commitments
+        }
+
+        let epsilon_to_add = batch_doc.len() % sel_batch_size;
 
         println!(
             "Doc len: {:#?} +1, Epsilon to Add: {:#?}",
@@ -110,15 +117,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         );
 
         let mut substring = (0, doc.len());
-        match dfa.is_match(&doc) {
+        match dfa.is_match(&batch_doc) {
+            // todo remove this bs call
             Some((start, end)) => {
                 match commit {
                     JCommit::HashChain => {
                         assert!(
-                            end == doc.len(),
+                            end == batch_doc.len(),
                             "for HashChain commitment, Regex must handle EOD, switch commit type or change Regex r to r$ or r.*$"
                         );
-                        substring = (start, doc.len() + epsilon_to_add); // ... right?
+                        substring = (start, batch_doc.len() + epsilon_to_add); // ... right?
                     }
                     JCommit::Nlookup => {
                         substring = (start, end + epsilon_to_add); // exact
@@ -144,7 +152,15 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
         }
 
-        // TODO table reuse, and move doc here
+        // generate usize doc
+        // doc to usizes - can I use this elsewhere too? TODO
+        let mut usize_doc = vec![];
+        let mut int_doc = vec![];
+        for c in batch_doc.clone().into_iter() {
+            let u = dfa.ab_to_num(&c.to_string());
+            usize_doc.push(u);
+            int_doc.push(Integer::from(u));
+        }
 
         println!("DOC IS {:#?}", doc.clone());
 
@@ -157,7 +173,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: sel_batch_size,
-            doc: doc.clone(),
+            cdoc: batch_doc, //chars
+            udoc: usize_doc, //usizes
+            idoc: int_doc,   // big ints
             doc_extend: epsilon_to_add,
             is_match,
             substring,
@@ -203,33 +221,34 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         println!("PROVER START HASH ROUND {:#?}", next_hash);
         let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
         for b in 0..self.batch_size {
-            // expected poseidon
-            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-            let acc = &mut ();
+            let access_at = i * self.batch_size + b;
+            if access_at < self.udoc.len() {
+                // else nothing
 
-            sponge.start(parameter.clone(), None, acc);
-            SpongeAPI::absorb(
-                &mut sponge,
-                3,
-                &[
-                    next_hash[0],
-                    F::from(
-                        self.dfa
-                            .ab_to_num(&self.doc[i * self.batch_size + b].clone())
-                            as u64,
-                    ),
-                    F::from((i * self.batch_size + b) as u64),
-                ],
-                acc,
-            );
-            next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            /*println!(
-                "prev, expected next hash in main {:#?} {:#?}",
-                prev_hash, expected_next_hash
-            );
-            */
-            println!("PROVER HASH ROUND {:#?}", next_hash);
-            sponge.finish(acc).unwrap(); // assert expected hash finished correctly
+                // expected poseidon
+                let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+                let acc = &mut ();
+
+                sponge.start(parameter.clone(), None, acc);
+                SpongeAPI::absorb(
+                    &mut sponge,
+                    3,
+                    &[
+                        next_hash[0],
+                        F::from(self.udoc[access_at].clone() as u64),
+                        F::from((i * self.batch_size + b) as u64),
+                    ],
+                    acc,
+                );
+                next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+                /*println!(
+                    "prev, expected next hash in main {:#?} {:#?}",
+                    prev_hash, expected_next_hash
+                );
+                */
+                println!("PROVER HASH ROUND {:#?}", next_hash);
+                sponge.finish(acc).unwrap(); // assert expected hash finished correctly
+            }
         }
 
         next_hash[0]
@@ -254,7 +273,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
 
         // sanity
-        if (batch_num + 1) * self.batch_size - 1 >= self.doc.len() {
+        if (batch_num + 1) * self.batch_size - 1 >= self.udoc.len() {
             // todo check
             assert!(out);
         }
@@ -344,7 +363,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
         let time = Instant::now();
-        let mut cs = Computation::from_constraint_system_parts(
+        let cs = Computation::from_constraint_system_parts(
             self.assertions.clone(),
             self.pub_inputs.clone(),
         );
@@ -703,7 +722,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             //self.pub_inputs.push(new_var(format!("char_{}", c))); <- done elsewhere
         }
 
-        self.nlookup_gadget(char_lookups, self.doc.len(), "nldoc");
+        self.nlookup_gadget(char_lookups, self.udoc.len(), "nldoc");
     }
 
     fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
@@ -806,19 +825,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
-    /* TODO
-        fn access_doc_at(batch_num: usize, i: usize, &doc:) {
-
-    let access_at = batch_num * self.batch_size + i;
-                let c = if access_at >= self.doc.len() {
-                    q.push(doc.len() - 1); // the last epsilon char
-                    Integer::from(epsilon_num)
-                } else {
-                    q.push(access_at);
-                    doc[access_at].clone()
-                };
-
-        }*/
+    fn access_doc_at(&self, batch_num: usize, i: usize) -> usize {
+        let access_at = batch_num * self.batch_size + i;
+        if access_at >= self.udoc.len() {
+            self.udoc.len() - 1 // the last epsilon char
+        } else {
+            access_at
+        }
+    }
 
     fn gen_wit_i_nlookup(
         &self,
@@ -836,21 +850,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Option<Vec<Integer>>,
         Option<Integer>,
     ) {
-        // generate T
-        let mut table = vec![];
-        for (ins, c, out) in self.dfa.deltas() {
-            table.push(
-                Integer::from(
-                    (ins * self.dfa.nstates() * self.dfa.nchars())
-                        + (out * self.dfa.nchars())
-                        + self.dfa.ab_to_num(&c.to_string()),
-                )
-                .rem_floor(cfg().field().modulus()),
-            );
-        }
-
-        //println!("TABLE {:#?}", table);
-
         let mut wits = FxHashMap::default();
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
@@ -860,32 +859,22 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut v = vec![];
         let mut q = vec![];
         for i in 1..=self.batch_size {
-            let access_at = batch_num * self.batch_size + i - 1;
-            let c = if access_at >= self.doc.len() {
-                EPSILON.clone()
-            } else {
-                self.doc[access_at].clone()
-            };
-
-            next_state = self.dfa.delta(state_i, &c.to_string()).unwrap();
-
+            let access_at = self.access_doc_at(batch_num, i - 1);
+            next_state = self.dfa.delta(state_i, &self.cdoc[access_at]).unwrap();
             wits.insert(format!("state_{}", i - 1), new_wit(state_i));
-            wits.insert(
-                format!("char_{}", i - 1),
-                new_wit(self.dfa.ab_to_num(&c.to_string())),
-            );
+            wits.insert(format!("char_{}", i - 1), new_wit(self.udoc[access_at]));
 
             // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
             let v_i = Integer::from(
                 (state_i * self.dfa.nstates() * self.dfa.nchars())
                     + (next_state * self.dfa.nchars())
-                    + self.dfa.ab_to_num(&c.to_string()),
+                    + self.udoc[access_at], // TODO?
             )
             .rem_floor(cfg().field().modulus());
             v.push(v_i.clone());
             wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-            q.push(table.iter().position(|val| val == &v_i).unwrap());
+            q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
             //println!("vi = {:#?}", v_i);
 
@@ -923,7 +912,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         assert!(running_q.is_some() || batch_num == 0);
         assert!(running_v.is_some() || batch_num == 0);
         let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, table, q, v, running_q, running_v, "nl");
+            self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
         wits = w;
         //println!("next running q out of main {:#?}", next_running_q.clone());
 
@@ -972,36 +961,21 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
-        // generate T
-        let mut doc = vec![];
-        for c in self.doc.clone().into_iter() {
-            // todo save this crap somewhere so we don't recalc
-            doc.push(Integer::from(self.dfa.ab_to_num(&c.to_string())));
-            // .rem_floor(cfg().field().modulus()), // thoughts?
-        }
         let epsilon_num = self.dfa.ab_to_num(EPSILON);
 
         let mut v = vec![];
         let mut q = vec![];
-        let mut sq = vec![]; // TODO DELTE
         for i in 0..self.batch_size {
-            let access_at = batch_num * self.batch_size + i;
-            let c = if access_at >= doc.len() {
-                q.push(doc.len() - 1); // the last epsilon char
-                Integer::from(epsilon_num)
-            } else {
-                q.push(access_at);
-                doc[access_at].clone()
-            };
+            let access_at = self.access_doc_at(batch_num, i);
+            q.push(access_at);
 
-            sq.push(access_at);
-            v.push(c);
+            v.push(self.idoc[access_at].clone());
         }
 
-        println!("SQs {:#?}, Qs {:#?}, Vs {:#?}", sq, q, v);
+        println!("Qs {:#?}, Vs {:#?}", q, v);
 
         let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, doc, q, v, running_q, running_v, "nldoc");
+            self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
         wits = w;
 
         (wits, next_running_q, next_running_v)
@@ -1010,7 +984,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     fn wit_nlookup_gadget(
         &self,
         mut wits: FxHashMap<String, Value>,
-        table: Vec<Integer>,
+        table: &Vec<Integer>,
         q: Vec<usize>,
         v: Vec<Integer>,
         running_q: Option<Vec<Integer>>,
@@ -1130,7 +1104,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         for i in 1..=sc_l {
             (g_xsq, g_x, g_const) =
-                prover_mle_sum_eval(&table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
+                prover_mle_sum_eval(table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
 
             wits.insert(format!("{}_sc_g_{}_xsq", id, i), new_wit(g_xsq.clone()));
             wits.insert(format!("{}_sc_g_{}_x", id, i), new_wit(g_x.clone()));
@@ -1173,7 +1147,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // update running claim
         let (_, next_running_v) =
-            prover_mle_partial_eval(&table, &sc_rs, &(0..table.len()).collect(), true, None);
+            prover_mle_partial_eval(table, &sc_rs, &(0..table.len()).collect(), true, None);
         let next_running_q = sc_rs.clone();
         wits.insert(
             format!("{}_next_running_claim", id),
@@ -1217,15 +1191,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut next_state = 0;
 
         for i in 0..self.batch_size {
-            let access_at = batch_num * self.batch_size + i;
-            let doc_i = if access_at >= self.doc.len() {
-                self.doc[self.doc.len() - 1].clone() // last epsilon
-            } else {
-                self.doc[access_at].clone()
-            };
+            let access_at = self.access_doc_at(batch_num, i);
 
-            wits.insert(format!("char_{}", i), new_wit(self.dfa.ab_to_num(&doc_i)));
-            next_state = self.dfa.delta(state_i, &doc_i.clone()).unwrap();
+            wits.insert(format!("char_{}", i), new_wit(self.udoc[access_at]));
+            next_state = self
+                .dfa
+                .delta(state_i, &self.cdoc[access_at].clone())
+                .unwrap();
             wits.insert(format!("state_{}", i), new_wit(state_i));
 
             state_i = next_state;
@@ -1441,15 +1413,6 @@ mod tests {
         let mut chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
         chars.push(EPSILON.clone());
 
-        // doc to usizes - can I use this elsewhere too? TODO
-        let mut usize_doc = vec![];
-        let mut int_doc = vec![];
-        for c in chars.clone().into_iter() {
-            let u = dfa.ab_to_num(&c.to_string());
-            usize_doc.push(u);
-            int_doc.push(<G1 as Group>::Scalar::from(u as u64));
-        }
-
         for s in batch_sizes {
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
@@ -1467,8 +1430,11 @@ mod tests {
                         Some(c.clone()),
                     );
 
-                    let reef_commit =
-                        gen_commitment(r1cs_converter.commit_type, usize_doc.clone(), &sc);
+                    let reef_commit = gen_commitment(
+                        r1cs_converter.commit_type,
+                        r1cs_converter.udoc.clone(),
+                        &sc,
+                    );
                     r1cs_converter.set_commitment(reef_commit.clone());
 
                     assert_eq!(expected_match, r1cs_converter.is_match);
@@ -1560,7 +1526,7 @@ mod tests {
                         reef_commit,
                         //accepting state ,
                         &r1cs_converter.table,
-                        &usize_doc,
+                        r1cs_converter.udoc.len(),
                         rq,
                         rv,
                         dummy_hash, // final hash not checked
