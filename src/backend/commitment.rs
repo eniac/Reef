@@ -263,10 +263,10 @@ pub fn final_clear_checks(
             // or - nlookup commitment check
             match (final_doc_q, final_doc_v) {
                 (Some(q), Some(v)) => {
-                    println!(
+                    /*println!(
                         "final doc check fixing q,v: {:#?}, {:#?}, dc: {:#?}",
                         q, v, dc
-                    );
+                    );*/
 
                     let doc_ext_len = doc.len().next_power_of_two();
 

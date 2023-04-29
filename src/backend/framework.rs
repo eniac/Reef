@@ -6,7 +6,7 @@ use crate::backend::{
     nova::*,
     r1cs::*,
 };
-use crate::dfa::NFA;
+use crate::dfa::{EPSILON, NFA};
 use circ::cfg::{cfg, CircOpt};
 use circ::target::r1cs::ProverData;
 use ff::{Field, PrimeField};
@@ -46,10 +46,13 @@ pub fn run_backend(
 ) {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
 
+    let mut e_doc = doc.clone();
+    e_doc.push(EPSILON.clone()); //String::new()); // MUST do to make batching work w/commitments
+
     // doc to usizes - can I use this elsewhere too? TODO
     let mut usize_doc = vec![];
     let mut int_doc = vec![];
-    for c in doc.clone().into_iter() {
+    for c in e_doc.clone().into_iter() {
         let u = dfa.ab_to_num(&c.to_string());
         usize_doc.push(u);
         int_doc.push(<G1 as Group>::Scalar::from(u as u64));
@@ -57,7 +60,7 @@ pub fn run_backend(
 
     let mut r1cs_converter = R1CS::new(
         dfa,
-        doc,
+        &e_doc,
         temp_batch_size,
         sc.clone(),
         batching_type,
@@ -278,7 +281,7 @@ pub fn run_backend(
         //prover_data.check_all(&extended_wit);
         prover_data.check_all(&wits);
 
-        let current_char = doc[i * r1cs_converter.batch_size].clone();
+        let current_char = r1cs_converter.doc[i * r1cs_converter.batch_size].clone();
         /*let mut next_char: String = String::from("");
                 if i + 1 < num_steps {
                     next_char = doc[(i + 1) * r1cs_converter.batch_size].clone();

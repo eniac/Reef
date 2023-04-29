@@ -41,8 +41,7 @@ fn main() {
     #[cfg(feature = "plot")]
     plot::plot_nfa(&nfa).expect("Failed to plot NFA to a pdf file");
 
-    let num_steps = doc.len();
-    println!("Doc len is {}", num_steps);
+    println!("Doc len is {}", doc.len());
     println!(
         "Match: {}",
         nfa.is_match(&doc)
