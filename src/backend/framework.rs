@@ -109,7 +109,7 @@ pub fn run_backend(
         <G1 as Group>::Scalar::from(0),
         true, //false,
         <G1 as Group>::Scalar::from(dfa.nchars() as u64),
-        dfa.nchars() as isize,
+        0, //dfa.nchars as isize,
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         sc.clone(),
@@ -145,13 +145,27 @@ pub fn run_backend(
         pp.num_variables().1
     );
 
+    // this variable could be two different types of things, which is potentially dicey, but
+    // literally whatever
+    let blind = match r1cs_converter.reef_commit.clone().unwrap() {
+        ReefCommitment::HashChain(hcs) => hcs.blind,
+        ReefCommitment::Nlookup(dcs) => dcs.commit_doc_hash,
+    };
+    // TODO only do this for HC
+    let mut prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
+        ReefCommitment::HashChain(hcs) => {
+            r1cs_converter.prover_calc_hash(blind, true, 0, r1cs_converter.substring.0)
+        }
+        ReefCommitment::Nlookup(dcs) => <G1 as Group>::Scalar::from(0),
+    };
+
     let mut current_state = dfa.get_init_state();
     let z0_primary = match (r1cs_converter.batching, r1cs_converter.commit_type) {
         (JBatching::NaivePolys, JCommit::HashChain) => {
             vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(0), //fa.ab_to_num(&doc[0]) as u64),
-                <G1 as Group>::Scalar::from(0),
+                <G1 as Group>::Scalar::from(r1cs_converter.substring.0 as u64),
+                prev_hash.clone(),
                 <G1 as Group>::Scalar::from(
                     r1cs_converter.prover_accepting_state(0, current_state),
                 ),
@@ -160,8 +174,8 @@ pub fn run_backend(
         (JBatching::Nlookup, JCommit::HashChain) => {
             let mut z = vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(0), //dfa.ab_to_num(&doc[0]) as u64),
-                <G1 as Group>::Scalar::from(0),
+                <G1 as Group>::Scalar::from(r1cs_converter.substring.0 as u64), //<G1 as Group>::Scalar::from(0), //dfa.ab_to_num(&doc[0]) as u64),
+                prev_hash.clone(),
             ];
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len + 1]);
             z.push(<G1 as Group>::Scalar::from(
@@ -210,8 +224,10 @@ pub fn run_backend(
     // TODO deal with time bs
 
     //let n_time = Instant::now();
-    let num_steps =
-        (r1cs_converter.substring.1 - r1cs_converter.substring.0) / r1cs_converter.batch_size;
+    let num_steps = ceil_div(
+        (r1cs_converter.substring.1 - r1cs_converter.substring.0),
+        r1cs_converter.batch_size,
+    );
     println!("NUM STEPS {}", num_steps);
 
     let mut wits;
@@ -227,7 +243,7 @@ pub fn run_backend(
     let mut start_of_epsilons = -1;
 
     let mut next_state = 0; //dfa.get init state ??
-    let mut prev_hash = <G1 as Group>::Scalar::from(0);
+
     for i in 0..num_steps {
         println!("STEP {}", i);
 
@@ -251,22 +267,14 @@ pub fn run_backend(
 
         prover_data.check_all(&wits);
 
-        // this variable could be two different types of things, which is potentially dicey, but
-        // literally whatever
-        let blind = match r1cs_converter.reef_commit.clone().unwrap() {
-            ReefCommitment::HashChain(hcs) => hcs.blind,
-            ReefCommitment::Nlookup(dcs) => dcs.commit_doc_hash,
-        };
-
         let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
             (JBatching::NaivePolys, JCommit::HashChain) => {
-                let next_hash;
-                if i == 0 {
-                    next_hash = r1cs_converter.prover_calc_hash(blind, i); // TODO checks for type,
-                                                                           // etc
-                } else {
-                    next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
-                }
+                let next_hash = r1cs_converter.prover_calc_hash(
+                    prev_hash,
+                    false,
+                    r1cs_converter.substring.0 + (i * r1cs_converter.batch_size),
+                    r1cs_converter.batch_size,
+                );
                 // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
 
                 let i_0 = <G1 as Group>::Scalar::from((i * r1cs_converter.batch_size) as u64);
@@ -281,12 +289,13 @@ pub fn run_backend(
                 g
             }
             (JBatching::Nlookup, JCommit::HashChain) => {
-                let next_hash;
-                if i == 0 {
-                    next_hash = r1cs_converter.prover_calc_hash(blind, i);
-                } else {
-                    next_hash = r1cs_converter.prover_calc_hash(prev_hash, i);
-                }
+                let next_hash = r1cs_converter.prover_calc_hash(
+                    prev_hash,
+                    false,
+                    r1cs_converter.substring.0 + (i * r1cs_converter.batch_size),
+                    r1cs_converter.batch_size,
+                );
+                println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
 
                 let q = match running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),

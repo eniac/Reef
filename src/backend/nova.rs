@@ -213,7 +213,6 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         accepting: &mut Option<AllocatedNum<F>>,
     ) -> Result<(), SynthesisError>
 where {
-        println!("DEFAULT PARSING");
         if s.starts_with(&format!("state_{}", self.batch_size)) {
             *last_state = Some(alloc_v.clone()); //.get_variable();
         } else if s.starts_with(&format!("accepting")) {
@@ -350,7 +349,7 @@ where {
         for i in 0..(self.batch_size) {
             let unwrap_alloc_char = alloc_chars[i].clone().unwrap();
             let mut hash_ns = ns.namespace(|| format!("poseidon hash batch {}", i));
-            //println!("i {:#?}", i);
+            println!("i {:#?}, start eps {:#?}", i, start_of_ep);
             let hashed = {
                 let acc = &mut hash_ns;
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
@@ -408,7 +407,7 @@ where {
             let mut ep_num =
                 AllocatedNum::alloc(hash_ns.namespace(|| "epsilon"), || Ok(epsilon_num))?;
 
-            if (i as isize) <= start_of_ep {
+            if (i as isize) >= start_of_ep && start_of_ep != -1 {
                 println!("STARTING EPS");
                 next_hash = AllocatedNum::alloc(hash_ns.namespace(|| "next_hash"), || {
                     Ok(prev_hash.get_value().unwrap())

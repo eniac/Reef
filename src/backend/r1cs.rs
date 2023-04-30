@@ -196,10 +196,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // IN THE CLEAR
 
-    pub fn prover_calc_hash(&self, start_hash_or_blind: F, i: usize) -> F {
+    pub fn prover_calc_hash(
+        &self,
+        start_hash_or_blind: F,
+        blind: bool,
+        start: usize,
+        num_iters: usize,
+    ) -> F {
         let mut next_hash;
 
-        if i == 0 {
+        if start == 0 && blind {
             // H_0 = Hash(0, r, 0)
             let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
             let acc = &mut ();
@@ -214,16 +220,24 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             next_hash = vec![start_hash_or_blind];
         }
 
-        // println!("PROVER START HASH ROUND {:#?}", next_hash);
+        println!("PROVER START HASH ROUND {:#?}", next_hash);
         let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
-        for b in 0..self.batch_size {
-            let access_at = i * self.batch_size + b;
+        for b in 0..num_iters {
+            //self.batch_size {
+            let access_at = start + b;
             if access_at < self.udoc.len() {
                 // else nothing
 
                 // expected poseidon
                 let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
                 let acc = &mut ();
+
+                println!(
+                    "P HASH ELTS: {:#?}, {:#?}, {:#?}",
+                    next_hash[0].clone(),
+                    F::from(self.udoc[access_at].clone() as u64),
+                    F::from((access_at) as u64),
+                );
 
                 sponge.start(parameter.clone(), None, acc);
                 SpongeAPI::absorb(
@@ -232,7 +246,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     &[
                         next_hash[0],
                         F::from(self.udoc[access_at].clone() as u64),
-                        F::from((i * self.batch_size + b) as u64),
+                        F::from((access_at) as u64),
                     ],
                     acc,
                 );
@@ -833,12 +847,19 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
-    fn access_doc_at(&self, batch_num: usize, i: usize) -> usize {
+    fn access_doc_at(&self, batch_num: usize, i: usize) -> (usize, bool) {
         let access_at = batch_num * self.batch_size + i;
-        if access_at >= self.udoc.len() {
-            self.udoc.len() - 1 // the last epsilon char
-        } else {
-            access_at
+
+        match self.commit_type {
+            JCommit::HashChain => (access_at, access_at >= self.udoc.len()),
+
+            JCommit::Nlookup => {
+                if access_at >= self.udoc.len() - 1 {
+                    (self.udoc.len() - 1, true)
+                } else {
+                    (access_at, false)
+                }
+            }
         }
     }
 
@@ -869,12 +890,22 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut q = vec![];
         let mut start_epsilons = -1;
         for i in 1..=self.batch_size {
-            let access_at = self.access_doc_at(batch_num, i - 1);
-            next_state = self.dfa.delta(state_i, &self.cdoc[access_at]).unwrap();
-            wits.insert(format!("state_{}", i - 1), new_wit(state_i));
-            wits.insert(format!("char_{}", i - 1), new_wit(self.udoc[access_at]));
+            let (access_at, is_epsilon) = self.access_doc_at(batch_num, i - 1 + self.substring.0);
 
-            if (start_epsilons == -1) && (self.udoc[access_at] == self.dfa.nchars()) {
+            let char_num;
+
+            if is_epsilon {
+                next_state = self.dfa.delta(state_i, EPSILON).unwrap();
+                char_num = self.dfa.nchars();
+            } else {
+                next_state = self.dfa.delta(state_i, &self.cdoc[access_at]).unwrap();
+                char_num = self.udoc[access_at];
+            }
+
+            wits.insert(format!("char_{}", i - 1), new_wit(char_num));
+            wits.insert(format!("state_{}", i - 1), new_wit(state_i));
+
+            if (start_epsilons == -1) && is_epsilon {
                 start_epsilons = (i - 1) as isize;
             }
 
@@ -882,7 +913,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             let v_i = Integer::from(
                 (state_i * self.dfa.nstates() * self.dfa.nchars())
                     + (next_state * self.dfa.nchars())
-                    + self.udoc[access_at], // TODO?
+                    + char_num,
             )
             .rem_floor(cfg().field().modulus());
             v.push(v_i.clone());
@@ -980,7 +1011,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut v = vec![];
         let mut q = vec![];
         for i in 0..self.batch_size {
-            let access_at = self.access_doc_at(batch_num, i);
+            let (access_at, is_epsilon) = self.access_doc_at(batch_num, i + self.substring.0);
             q.push(access_at);
 
             v.push(self.idoc[access_at].clone());
@@ -1202,16 +1233,22 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let mut start_epsilons = -1;
         for i in 0..self.batch_size {
-            let access_at = self.access_doc_at(batch_num, i);
+            let (access_at, is_epsilon) = self.access_doc_at(batch_num, i + self.substring.0);
 
-            wits.insert(format!("char_{}", i), new_wit(self.udoc[access_at]));
-            next_state = self
-                .dfa
-                .delta(state_i, &self.cdoc[access_at].clone())
-                .unwrap();
+            if is_epsilon {
+                wits.insert(format!("char_{}", i), new_wit(self.dfa.nchars()));
+                next_state = self.dfa.delta(state_i, EPSILON).unwrap();
+            } else {
+                wits.insert(format!("char_{}", i), new_wit(self.udoc[access_at]));
+                next_state = self
+                    .dfa
+                    .delta(state_i, &self.cdoc[access_at].clone())
+                    .unwrap();
+            }
+
             wits.insert(format!("state_{}", i), new_wit(state_i));
 
-            if (start_epsilons == -1) && (self.udoc[access_at] == self.dfa.nchars()) {
+            if (start_epsilons == -1) && is_epsilon {
                 start_epsilons = i as isize;
             }
 
@@ -1250,6 +1287,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
         }
     }
+}
+
+pub fn ceil_div(a: usize, b: usize) -> usize {
+    (a + b - 1) / b
 }
 
 #[cfg(test)]
@@ -1471,8 +1512,10 @@ mod tests {
                     let mut next_state;
 
                     let mut start_epsilons = -1;
-                    let num_steps = (r1cs_converter.substring.1 - r1cs_converter.substring.0)
-                        / r1cs_converter.batch_size;
+                    let num_steps = ceil_div(
+                        (r1cs_converter.substring.1 - r1cs_converter.substring.0),
+                        r1cs_converter.batch_size,
+                    );
                     for i in 0..num_steps {
                         println!("STEP {}", i);
                         (
