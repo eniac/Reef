@@ -76,7 +76,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     c,
                 ),
                 (None, None) => {
-                    opt_cost_model_select_with_batch(&dfa, batch_size, dfa.is_match(doc), doc.len())
+                    opt_cost_model_select_with_batch(&dfa, batch_size, dfa_match, doc.len())
                 }
             };
         } else {
@@ -113,7 +113,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let mut substring = (0, batch_doc.len());
 
-        match dfa.is_match(&batch_doc) {
+        match dfa_match {
             // todo remove this bs call
             Some((start, end)) => {
                 match commit {
@@ -122,10 +122,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                             end == batch_doc.len(),
                             "for HashChain commitment, Regex must handle EOD, switch commit type or change Regex r to r$ or r.*$"
                         );
-                        substring = (start, batch_doc.len() + epsilon_to_add); // ... right?
+                        substring = (start, batch_doc.len()); // ... right?
                     }
                     JCommit::Nlookup => {
-                        substring = (start, end + epsilon_to_add); // exact
+                        substring = (start, end); // exact
                     }
                 }
             }
