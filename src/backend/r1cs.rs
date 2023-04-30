@@ -42,7 +42,7 @@ pub struct R1CS<'a, F: PrimeField> {
     pub doc_extend: usize,
     is_match: bool,
     pub substring: (usize, usize), // todo getters
-    pc: PoseidonConstants<F, typenum::U2>,
+    pc: PoseidonConstants<F, typenum::U4>,
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
@@ -50,7 +50,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         dfa: &'a NFA,
         doc: &Vec<String>,
         batch_size: usize,
-        pcs: PoseidonConstants<F, typenum::U2>,
+        pcs: PoseidonConstants<F, typenum::U4>,
         batch_override: Option<JBatching>,
         commit_override: Option<JCommit>,
     ) -> Self {
@@ -1416,7 +1416,7 @@ mod tests {
             for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
                     println!("\nNew");
-                    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(
+                    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(
                         Strength::Standard,
                     );
                     println!("Doc:{:#?}", doc);

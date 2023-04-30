@@ -26,7 +26,7 @@ pub fn run_backend(
     commit_docype: Option<JCommit>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
 ) {
-    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U2>::api_constants(Strength::Standard);
+    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
     let mut r1cs_converter = R1CS::new(
         dfa,

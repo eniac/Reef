@@ -102,7 +102,7 @@ pub struct NFAStepCircuit<'a, F: PrimeField> {
     epsilon_num: F,
     start_of_ep: isize,
     accepting: Vec<F>,
-    pc: PoseidonConstants<F, typenum::U2>,
+    pc: PoseidonConstants<F, typenum::U4>,
 }
 
 // note that this will generate a single round, and no witnesses, unlike nova example code
@@ -119,7 +119,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         start_of_ep: isize,
         accepting: Vec<F>,
         batch_size: usize,
-        pcs: PoseidonConstants<F, typenum::U2>,
+        pcs: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
         // todo check wits line up with the non det advice
 
@@ -543,11 +543,15 @@ where {
     fn intm_fs_parsing(
         &self,
         alloc_v: &AllocatedNum<F>,
+        vars: &mut HashMap<Var, Variable>,
         s: &String,
+        var: Var,
         is_doc_nl: bool,
         alloc_qv: &mut Vec<Option<AllocatedNum<F>>>,
         alloc_claim_r: &mut Option<AllocatedNum<F>>,
         alloc_gs: &mut Vec<Vec<Option<AllocatedNum<F>>>>,
+        prev_q: &Vec<AllocatedNum<F>>,
+        prev_v: &AllocatedNum<F>,
     ) -> Result<bool, SynthesisError> {
         // intermediate (in circ) wits
         if (!is_doc_nl && s.starts_with("nl_combined_q"))
@@ -630,7 +634,7 @@ where {
         //alloc_v: &AllocatedNum<F>,
         //namespace: String,
         query: &[Elt<F>],
-        sponge: &mut SpongeCircuit<'b, F, typenum::U2, CS>,
+        sponge: &mut SpongeCircuit<'b, F, typenum::U4, CS>,
         sponge_ns: &mut Namespace<'b, F, CS>,
         input_eq: AllocatedNum<F>,
         tag: &str,
@@ -998,7 +1002,7 @@ where
 
         let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
 
-        match &self.glue[1] {
+        match &self.glue[0] {
             GlueOpts::PolyHash(_) => {
                 let i_0 = z[1].clone();
                 alloc_idxs[0] = Some(i_0.clone());
@@ -1071,6 +1075,9 @@ where
                 let hash_0 = z[2].clone();
 
                 let sc_l = q.len();
+                let prev_q = z[3..(3 + sc_l)].to_vec(); //.clone();
+                let prev_v = z[3 + sc_l].clone();
+
                 //println!("glue1 q, v: {:#?}, {:#?}", q, v);
 
                 let mut alloc_rc = vec![None; sc_l + 1];
@@ -1119,11 +1126,15 @@ where
                             matched = self
                                 .intm_fs_parsing(
                                     &alloc_v,
+                                    &mut vars,
                                     &s,
+                                    var,
                                     false,
                                     &mut alloc_qv,
                                     &mut alloc_claim_r,
                                     &mut alloc_gs,
+                                    &prev_q,
+                                    &prev_v,
                                 )
                                 .unwrap();
 
@@ -1190,6 +1201,9 @@ where
                 let mut alloc_doc_prev_rc = vec![None; doc_l + 1];
                 let mut alloc_doc_gs = vec![vec![None; 3]; doc_l];
 
+                let prev_dq = z[1..(doc_l + 1)].to_vec(); //.clone();
+                let prev_dv = z[1 + doc_l].clone();
+
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
 
@@ -1219,11 +1233,15 @@ where
                         matched = self
                             .intm_fs_parsing(
                                 &alloc_v,
+                                &mut vars,
                                 &s,
+                                var,
                                 true,
                                 &mut alloc_doc_qv,
                                 &mut alloc_doc_claim_r,
                                 &mut alloc_doc_gs,
+                                &prev_dq,
+                                &prev_dv,
                             )
                             .unwrap();
 
@@ -1277,6 +1295,11 @@ where
                 let mut alloc_doc_prev_rc = vec![None; doc_l + 1];
                 let mut alloc_doc_gs = vec![vec![None; 3]; doc_l];
 
+                let prev_q = z[1..(1 + sc_l)].to_vec(); //.clone();
+                let prev_v = z[1 + sc_l].clone();
+                let prev_dq = z[(sc_l + 2)..(sc_l + doc_l + 2)].to_vec(); //.clone();
+                let prev_dv = z[sc_l + doc_l + 2].clone();
+
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
 
@@ -1305,11 +1328,15 @@ where
                         matched = self
                             .intm_fs_parsing(
                                 &alloc_v,
+                                &mut vars,
                                 &s,
+                                var,
                                 false,
                                 &mut alloc_qv,
                                 &mut alloc_claim_r,
                                 &mut alloc_gs,
+                                &prev_q,
+                                &prev_v,
                             )
                             .unwrap();
 
@@ -1317,11 +1344,15 @@ where
                             matched = self
                                 .intm_fs_parsing(
                                     &alloc_v,
+                                    &mut vars,
                                     &s,
+                                    var,
                                     true,
                                     &mut alloc_doc_qv,
                                     &mut alloc_doc_claim_r,
                                     &mut alloc_doc_gs,
+                                    &prev_dq,
+                                    &prev_dv,
                                 )
                                 .unwrap();
                             if !matched {

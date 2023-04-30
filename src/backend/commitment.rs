@@ -61,7 +61,7 @@ impl DocCommitmentStruct {
 pub fn gen_commitment(
     commit_docype: JCommit,
     doc: Vec<usize>,
-    pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U2>,
+    pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
 ) -> ReefCommitment<<G1 as Group>::Scalar>
 where
     G1: Group<Base = <G2 as Group>::Scalar>,
