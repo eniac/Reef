@@ -103,7 +103,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             batch_doc.push(EPSILON.clone()); // MUST do to make batching work w/commitments
         }
 
-        let epsilon_to_add = batch_doc.len() % sel_batch_size;
+        let epsilon_to_add = sel_batch_size - (batch_doc.len() % sel_batch_size);
 
         println!(
             "Doc len: {:#?} +1, Epsilon to Add: {:#?}",
