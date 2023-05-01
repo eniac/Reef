@@ -454,6 +454,7 @@ pub fn opt_cost_model_select<'a>(
                 (Some(b), Some(c), _) => {
                     let single_cost =
                         full_round_cost_model(dfa, 1 << n, b, is_match, doc_length, c);
+                    println!("Single Round Cost with hash: {:#?}", single_cost);
                     (
                         b,
                         c,
