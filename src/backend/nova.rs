@@ -236,6 +236,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             let s_sub: Vec<&str> = s.split("_").collect();
             let q: usize = s_sub[4].parse().unwrap();
 
+            println!("q prev {:#?}", q);
             vars.insert(var, prev_q[q].get_variable());
             alloc_prev_rc[q] = Some(prev_q[q].clone());
 
@@ -784,6 +785,7 @@ where {
             }
 
             //println!("ELTS {:#?}", elts.len());
+            println!("alloc rc issue j {:#?}", j);
             self.fiatshamir_circuit(
                 &elts,
                 &mut sponge,
@@ -806,14 +808,14 @@ where {
         tag: &str,
         //alloc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
     ) -> Result<bool, SynthesisError> {
-        if s.starts_with("nl_next_running_claim") {
+        if s.starts_with(&format!("{}_next_running_claim", tag)) {
             // v
 
             alloc_rc[sc_l] = Some(alloc_v.clone());
 
             //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
             return Ok(true);
-        } else if s.starts_with(&format!("nl_sc_r_")) {
+        } else if s.starts_with(&format!("{}_sc_r_", tag)) {
             // TODO move, do this in order
             // q
             let s_sub: Vec<&str> = s.split("_").collect();
@@ -823,63 +825,9 @@ where {
             //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
 
             return Ok(true);
-            /*    } else if s.starts_with("nl_prev_running_claim") {
-                alloc_prev_rc[sc_l] = Some(alloc_v.clone());
-
-                return Ok(true);
-            } else if s.starts_with(&format!("nl_eq_{}_q", self.batch_size)) {
-                // q
-                let s_sub: Vec<&str> = s.split("_").collect();
-                let q: usize = s_sub[4].parse().unwrap();
-
-                alloc_prev_rc[q] = Some(alloc_v.clone());
-
-                return Ok(true);*/
         }
         return Ok(false);
     }
-    /*
-        // TODO combine above
-        fn nl_doc_parsing(
-            &self,
-            alloc_v: &AllocatedNum<F>,
-            s: &String,
-            sc_l: usize,
-            alloc_doc_rc: &mut Vec<Option<AllocatedNum<F>>>,
-            alloc_doc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
-        ) -> Result<bool, SynthesisError>
-    where {
-            if s.starts_with("nldoc_next_running_claim") {
-                // v
-
-                alloc_doc_rc[sc_l] = Some(alloc_v.clone());
-
-                //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
-                return Ok(true);
-            } else if s.starts_with(&format!("nldoc_sc_r_")) {
-                // q
-                let s_sub: Vec<&str> = s.split("_").collect();
-                let q: usize = s_sub[3].parse().unwrap();
-
-                alloc_doc_rc[q - 1] = Some(alloc_v.clone());
-                //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
-
-                return Ok(true);
-            } else if s.starts_with("nldoc_prev_running_claim") {
-                alloc_doc_prev_rc[sc_l] = Some(alloc_v.clone());
-
-                return Ok(true);
-            } else if s.starts_with(&format!("nldoc_eq_{}_q", self.batch_size)) {
-                // q
-                let s_sub: Vec<&str> = s.split("_").collect();
-                let q: usize = s_sub[4].parse().unwrap();
-
-                alloc_doc_prev_rc[q] = Some(alloc_v.clone());
-
-                return Ok(true);
-            }
-            return Ok(false);
-        }*/
 }
 
 impl<'a, F> StepCircuit<F> for NFAStepCircuit<'a, F>
