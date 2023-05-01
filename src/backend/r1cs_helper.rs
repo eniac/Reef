@@ -46,6 +46,24 @@ where
 }
 
 // PROVER WORK
+pub(crate) fn linear_mle_initialize_a(prods: &Vec<Integer>, ell: usize) -> Vec<Integer> {
+    return a;
+}
+
+pub(crate) fn linear_mle_func_evals(a: &mut Vec<Integer>, ell: usize, i: usize, r_i: Integer) {
+    let i_evals = (0, 0);
+    for b in (0..(ell - i)) {
+        //for t in vec![0,1] {
+        i_evals.0 = A[b];
+        i_evals.1 = A[b + 2 ^ (ell - i)];
+
+        A[b] = A[b] * (1 - r_i) + A[b + 2 ^ (ell - i)] * r_i;
+
+        let bb = (es[i] >> j) & 1;
+    }
+
+    return;
+}
 
 // x = [r_0, r_1, ... -1, {0,1}, {0,1},...]
 // where -1 is the "hole"
