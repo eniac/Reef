@@ -1303,6 +1303,29 @@ mod tests {
     type G1 = pasta_curves::pallas::Point;
 
     #[test]
+    fn mle_linear() {
+        init();
+
+        let evals = vec![
+            Integer::from(2),
+            Integer::from(3),
+            Integer::from(5),
+            Integer::from(7),
+        ];
+
+        let r = vec![Integer::from(10), Integer::from(100)];
+
+        let mut a = evals.clone();
+
+        for i in 1..=2 {
+            let message_i = linear_mle_func_evals(&mut a, 2, i, &r[i - 1]);
+            println!("message_i {:#?}, a {:#?}", message_i, a);
+        }
+
+        panic!("as expected");
+    }
+
+    #[test]
     fn mle_partial() {
         init();
 

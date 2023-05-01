@@ -46,23 +46,29 @@ where
 }
 
 // PROVER WORK
-pub(crate) fn linear_mle_initialize_a(prods: &Vec<Integer>, ell: usize) -> Vec<Integer> {
-    return a;
-}
 
-pub(crate) fn linear_mle_func_evals(a: &mut Vec<Integer>, ell: usize, i: usize, r_i: Integer) {
-    let i_evals = (0, 0);
-    for b in (0..(ell - i)) {
+// a starts with evals on hypercube
+pub(crate) fn linear_mle_func_evals(
+    a: &mut Vec<Integer>,
+    ell: usize,
+    i: usize,
+    r_i: &Integer,
+) -> (Integer, Integer) {
+    let base: usize = 2;
+    assert_eq!(a.len(), base.pow(ell as u32));
+
+    let mut message_i = (Integer::from(0), Integer::from(0));
+    for b in (0..=(ell - i)) {
         //for t in vec![0,1] {
-        i_evals.0 = A[b];
-        i_evals.1 = A[b + 2 ^ (ell - i)];
+        let mut ai_0 = &a[b];
+        let mut ai_1 = &a[b + base.pow((ell - i) as u32)];
+        message_i.0 += ai_0;
+        message_i.1 += ai_1;
 
-        A[b] = A[b] * (1 - r_i) + A[b + 2 ^ (ell - i)] * r_i;
-
-        let bb = (es[i] >> j) & 1;
+        a[b] = &a[b] * (Integer::from(1) - r_i) + &a[b + base.pow((ell - i) as u32)] * r_i;
     }
 
-    return;
+    message_i
 }
 
 // x = [r_0, r_1, ... -1, {0,1}, {0,1},...]
