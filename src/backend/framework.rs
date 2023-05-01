@@ -177,7 +177,8 @@ pub fn run_backend(
                 <G1 as Group>::Scalar::from(r1cs_converter.substring.0 as u64), //<G1 as Group>::Scalar::from(0), //dfa.ab_to_num(&doc[0]) as u64),
                 prev_hash.clone(),
             ];
-            z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len + 1]);
+            z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
+            z.push(int_to_ff(r1cs_converter.table[0].clone()));
             z.push(<G1 as Group>::Scalar::from(
                 r1cs_converter.prover_accepting_state(0, current_state),
             ));
@@ -189,7 +190,8 @@ pub fn run_backend(
                 //<G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
             ];
 
-            z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len + 1]);
+            z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
+            z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
             z.push(<G1 as Group>::Scalar::from(
                 r1cs_converter.prover_accepting_state(0, current_state),
             ));
@@ -201,8 +203,10 @@ pub fn run_backend(
                 //<G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
             ];
 
-            z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len + 1]);
-            z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len + 1]);
+            z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
+            z.push(int_to_ff(r1cs_converter.table[0].clone()));
+            z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
+            z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
             z.push(<G1 as Group>::Scalar::from(
                 r1cs_converter.prover_accepting_state(0, current_state),
             ));
@@ -304,7 +308,7 @@ pub fn run_backend(
 
                 let v = match running_v {
                     Some(rv) => int_to_ff(rv),
-                    None => <G1 as Group>::Scalar::from(0),
+                    None => int_to_ff(r1cs_converter.table[0].clone()),
                 };
 
                 let next_q = next_running_q
@@ -334,7 +338,7 @@ pub fn run_backend(
 
                 let doc_v = match doc_running_v {
                     Some(rv) => int_to_ff(rv),
-                    None => <G1 as Group>::Scalar::from(0),
+                    None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
                 };
 
                 let next_doc_q = next_doc_running_q
@@ -358,7 +362,7 @@ pub fn run_backend(
 
                 let v = match running_v {
                     Some(rv) => int_to_ff(rv),
-                    None => <G1 as Group>::Scalar::from(0),
+                    None => int_to_ff(r1cs_converter.table[0].clone()),
                 };
 
                 let next_q = next_running_q
@@ -376,7 +380,7 @@ pub fn run_backend(
 
                 let doc_v = match doc_running_v {
                     Some(rv) => int_to_ff(rv),
-                    None => <G1 as Group>::Scalar::from(0),
+                    None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
                 };
                 let next_doc_q = next_doc_running_q
                     .clone()

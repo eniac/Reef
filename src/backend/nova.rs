@@ -190,18 +190,58 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         s: &String,
         var: Var,
         state_0: AllocatedNum<F>,
-        // char_0: AllocatedNum<F>,
     ) -> Result<bool, SynthesisError> {
-        /* if s.starts_with("char_0") {
-            vars.insert(var, char_0.get_variable());
-            return Ok(true);
-        } else
-        */
         if s.starts_with("state_0") {
             vars.insert(var, state_0.get_variable());
 
             return Ok(true);
         }
+        return Ok(false);
+    }
+
+    fn input_variable_hash_parsing(
+        &self,
+        vars: &mut HashMap<Var, Variable>,
+        s: &String,
+        var: Var,
+        i_0: AllocatedNum<F>,
+    ) -> Result<bool, SynthesisError> {
+        if s.starts_with("i_0") {
+            vars.insert(var, i_0.get_variable());
+
+            return Ok(true);
+        }
+        return Ok(false);
+    }
+
+    fn input_variable_qv_parsing(
+        &self,
+        vars: &mut HashMap<Var, Variable>,
+        s: &String,
+        var: Var,
+        tag: &str,
+        sc_l: usize,
+        prev_q: &Vec<AllocatedNum<F>>,
+        prev_v: &AllocatedNum<F>,
+        alloc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
+    ) -> Result<bool, SynthesisError> {
+        if s.starts_with(&format!("{}_prev_running_claim", tag)) {
+            vars.insert(var, prev_v.get_variable());
+
+            alloc_prev_rc[sc_l] = Some(prev_v.clone());
+
+            return Ok(true);
+        } else if s.starts_with(&format!("{}_eq_{}_q", tag, self.batch_size)) {
+            // q
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let q: usize = s_sub[4].parse().unwrap();
+
+            vars.insert(var, prev_q[q].get_variable());
+            alloc_prev_rc[q] = Some(prev_q[q].clone());
+
+            return Ok(true);
+        }
+
         return Ok(false);
     }
 
@@ -224,13 +264,10 @@ where {
 
     fn hash_parsing(
         &self,
-        vars: &mut HashMap<Var, Variable>,
         s: &String,
-        var: Var,
         alloc_v: &AllocatedNum<F>,
         alloc_chars: &mut Vec<Option<AllocatedNum<F>>>,
         alloc_idxs: &mut Vec<Option<AllocatedNum<F>>>,
-        i_0: AllocatedNum<F>,
         last_i: &mut Option<AllocatedNum<F>>,
     ) -> Result<bool, SynthesisError> {
         // intermediate (in circ) wits
@@ -243,10 +280,6 @@ where {
             if j < self.batch_size {
                 alloc_chars[j] = char_j;
             } // don't add the last one
-
-            return Ok(true);
-        } else if s.starts_with("i_0") {
-            vars.insert(var, i_0.get_variable());
 
             return Ok(true);
         } else if s.starts_with(&format!("i_{}", self.batch_size)) {
@@ -770,7 +803,8 @@ where {
         s: &String,
         sc_l: usize,
         alloc_rc: &mut Vec<Option<AllocatedNum<F>>>,
-        alloc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
+        tag: &str,
+        //alloc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
     ) -> Result<bool, SynthesisError> {
         if s.starts_with("nl_next_running_claim") {
             // v
@@ -789,63 +823,63 @@ where {
             //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
 
             return Ok(true);
-        } else if s.starts_with("nl_prev_running_claim") {
-            alloc_prev_rc[sc_l] = Some(alloc_v.clone());
+            /*    } else if s.starts_with("nl_prev_running_claim") {
+                alloc_prev_rc[sc_l] = Some(alloc_v.clone());
 
-            return Ok(true);
-        } else if s.starts_with(&format!("nl_eq_{}_q", self.batch_size)) {
-            // q
-            let s_sub: Vec<&str> = s.split("_").collect();
-            let q: usize = s_sub[4].parse().unwrap();
+                return Ok(true);
+            } else if s.starts_with(&format!("nl_eq_{}_q", self.batch_size)) {
+                // q
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let q: usize = s_sub[4].parse().unwrap();
 
-            alloc_prev_rc[q] = Some(alloc_v.clone());
+                alloc_prev_rc[q] = Some(alloc_v.clone());
 
-            return Ok(true);
+                return Ok(true);*/
         }
         return Ok(false);
     }
+    /*
+        // TODO combine above
+        fn nl_doc_parsing(
+            &self,
+            alloc_v: &AllocatedNum<F>,
+            s: &String,
+            sc_l: usize,
+            alloc_doc_rc: &mut Vec<Option<AllocatedNum<F>>>,
+            alloc_doc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
+        ) -> Result<bool, SynthesisError>
+    where {
+            if s.starts_with("nldoc_next_running_claim") {
+                // v
 
-    // TODO combine above
-    fn nl_doc_parsing(
-        &self,
-        alloc_v: &AllocatedNum<F>,
-        s: &String,
-        sc_l: usize,
-        alloc_doc_rc: &mut Vec<Option<AllocatedNum<F>>>,
-        alloc_doc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
-    ) -> Result<bool, SynthesisError>
-where {
-        if s.starts_with("nldoc_next_running_claim") {
-            // v
+                alloc_doc_rc[sc_l] = Some(alloc_v.clone());
 
-            alloc_doc_rc[sc_l] = Some(alloc_v.clone());
+                //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
+                return Ok(true);
+            } else if s.starts_with(&format!("nldoc_sc_r_")) {
+                // q
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let q: usize = s_sub[3].parse().unwrap();
 
-            //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
-            return Ok(true);
-        } else if s.starts_with(&format!("nldoc_sc_r_")) {
-            // q
-            let s_sub: Vec<&str> = s.split("_").collect();
-            let q: usize = s_sub[3].parse().unwrap();
+                alloc_doc_rc[q - 1] = Some(alloc_v.clone());
+                //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
 
-            alloc_doc_rc[q - 1] = Some(alloc_v.clone());
-            //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
+                return Ok(true);
+            } else if s.starts_with("nldoc_prev_running_claim") {
+                alloc_doc_prev_rc[sc_l] = Some(alloc_v.clone());
 
-            return Ok(true);
-        } else if s.starts_with("nldoc_prev_running_claim") {
-            alloc_doc_prev_rc[sc_l] = Some(alloc_v.clone());
+                return Ok(true);
+            } else if s.starts_with(&format!("nldoc_eq_{}_q", self.batch_size)) {
+                // q
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let q: usize = s_sub[4].parse().unwrap();
 
-            return Ok(true);
-        } else if s.starts_with(&format!("nldoc_eq_{}_q", self.batch_size)) {
-            // q
-            let s_sub: Vec<&str> = s.split("_").collect();
-            let q: usize = s_sub[4].parse().unwrap();
+                alloc_doc_prev_rc[q] = Some(alloc_v.clone());
 
-            alloc_doc_prev_rc[q] = Some(alloc_v.clone());
-
-            return Ok(true);
-        }
-        return Ok(false);
-    }
+                return Ok(true);
+            }
+            return Ok(false);
+        }*/
 }
 
 impl<'a, F> StepCircuit<F> for NFAStepCircuit<'a, F>
@@ -1028,19 +1062,20 @@ where
                             //    char_0.clone(),
                         )
                         .unwrap();
-
+                    if !matched {
+                        matched = self
+                            .input_variable_hash_parsing(&mut vars, &s, var, i_0.clone())
+                            .unwrap();
+                    }
                     if !matched {
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
                             .hash_parsing(
-                                &mut vars,
                                 &s,
-                                var,
                                 &alloc_v,
                                 &mut alloc_chars,
                                 &mut alloc_idxs,
-                                i_0.clone(),
                                 &mut last_i,
                             )
                             .unwrap();
@@ -1104,19 +1139,34 @@ where
                             //   char_0.clone(),
                         )
                         .unwrap();
-
+                    if !matched {
+                        matched = self
+                            .input_variable_hash_parsing(&mut vars, &s, var, i_0.clone())
+                            .unwrap();
+                    }
+                    if !matched {
+                        matched = self
+                            .input_variable_qv_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                "nl",
+                                sc_l,
+                                &prev_q,
+                                &prev_v,
+                                &mut alloc_prev_rc,
+                            )
+                            .unwrap();
+                    }
                     if !matched {
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
                             .hash_parsing(
-                                &mut vars,
                                 &s,
-                                var,
                                 &alloc_v,
                                 &mut alloc_chars,
                                 &mut alloc_idxs,
-                                i_0.clone(),
                                 &mut last_i,
                             )
                             .unwrap();
@@ -1144,7 +1194,8 @@ where
                                         &s,
                                         sc_l,
                                         &mut alloc_rc,
-                                        &mut alloc_prev_rc,
+                                        "nl",
+                                        //    &mut alloc_prev_rc,
                                     )
                                     .unwrap();
                                 if !matched {
@@ -1227,6 +1278,20 @@ where
                         )
                         .unwrap();
                     if !matched {
+                        matched = self
+                            .input_variable_qv_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                "nldoc",
+                                doc_l,
+                                &prev_dq,
+                                &prev_dv,
+                                &mut alloc_doc_prev_rc,
+                            )
+                            .unwrap();
+                    }
+                    if !matched {
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
@@ -1247,12 +1312,13 @@ where
                         // todo get rn of _ in nl_doc
                         if !matched {
                             matched = self
-                                .nl_doc_parsing(
+                                .nl_eval_parsing(
                                     &alloc_v,
                                     &s,
                                     doc_l,
                                     &mut alloc_doc_rc,
-                                    &mut alloc_doc_prev_rc,
+                                    "nldoc",
+                                    //&mut alloc_doc_prev_rc,
                                 )
                                 .unwrap();
                             if !matched {
@@ -1320,7 +1386,34 @@ where
                             //   char_0.clone(),
                         )
                         .unwrap();
-
+                    if !matched {
+                        matched = self
+                            .input_variable_qv_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                "nl",
+                                sc_l,
+                                &prev_q,
+                                &prev_v,
+                                &mut alloc_prev_rc,
+                            )
+                            .unwrap();
+                    }
+                    if !matched {
+                        matched = self
+                            .input_variable_qv_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                "nldoc",
+                                doc_l,
+                                &prev_dq,
+                                &prev_dv,
+                                &mut alloc_doc_prev_rc,
+                            )
+                            .unwrap();
+                    }
                     if !matched {
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
@@ -1361,17 +1454,19 @@ where
                                         &s,
                                         sc_l,
                                         &mut alloc_rc,
-                                        &mut alloc_prev_rc,
+                                        "nl",
+                                        //   &mut alloc_prev_rc,
                                     )
                                     .unwrap();
                                 if !matched {
                                     matched = self
-                                        .nl_doc_parsing(
+                                        .nl_eval_parsing(
                                             &alloc_v,
                                             &s,
                                             doc_l,
                                             &mut alloc_doc_rc,
-                                            &mut alloc_doc_prev_rc,
+                                            "nldoc",
+                                            //&mut alloc_doc_prev_rc,
                                         )
                                         .unwrap();
                                     if !matched {
