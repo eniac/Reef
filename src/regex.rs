@@ -5,6 +5,7 @@ use regex_syntax::hir::{Hir, HirKind, Anchor, Class, RepetitionKind, RepetitionR
 use regex_syntax::Parser;
 
 use std::str::FromStr;
+use std::slice::Iter;
 
 /// Hash-consed regex terms
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -54,62 +55,60 @@ impl fmt::Display for Regex {
 impl FromStr for Regex {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Regex::new(s))
-    }
-}
-
-impl Regex {
-    pub fn new<'a>(r: &'a str) -> Self {
-        fn to_regex<'a>(h: &'a Hir) -> Regex {
+        fn to_regex<'a>(h: &'a Hir) -> Result<Regex, String> {
             match h.kind() {
-                HirKind::Concat(l) => l
-                    .iter()
-                    .map(|a| to_regex(&a))
-                    .reduce(Regex::app)
-                    .unwrap_or(Regex::nil()),
-                HirKind::Alternation(l) => l
-                    .iter()
-                    .map(|a| to_regex(&a))
-                    .reduce(Regex::alt)
-                    .unwrap_or(Regex::empty()),
+                HirKind::Concat(l) =>
+                   l.iter()
+                    .try_fold(Regex::nil(),
+                        |acc, a| Ok(Regex::app(acc, to_regex(&a)?))),
+                HirKind::Alternation(l) =>
+                   l.iter()
+                    .try_fold(Regex::empty(),
+                        |acc, a| Ok(Regex::alt(acc, to_regex(&a)?))),
                 HirKind::Repetition(r) => {
-                    let inner = to_regex(&r.hir);
+                    let inner = to_regex(&r.hir)?;
                     match r.kind {
-                        RepetitionKind::OneOrMore => Regex::app(inner.clone(), Regex::star(inner)),
-                        RepetitionKind::ZeroOrMore => Regex::star(inner),
-                        RepetitionKind::Range(RepetitionRange::Bounded(i, j)) => Regex::range(inner, i as usize, j as usize),
-                        RepetitionKind::Range(RepetitionRange::Exactly(i)) => Regex::range(inner, i as usize, i as usize),
-                        _ => panic!("Supported repetition operators [+,*, {{i}}, {{i, j}}]: {:?}", r),
+                        RepetitionKind::OneOrMore => Ok(Regex::app(inner.clone(), Regex::star(inner))),
+                        RepetitionKind::ZeroOrMore => Ok(Regex::star(inner)),
+                        RepetitionKind::Range(RepetitionRange::Bounded(i, j)) => Ok(Regex::range(inner, i as usize, j as usize)),
+                        RepetitionKind::Range(RepetitionRange::Exactly(i)) => Ok(Regex::range(inner, i as usize, i as usize)),
+                        _ => Err(format!("Supported repetition operators [+,*, {{i}}, {{i, j}}]: {:?}", r)),
                     }
                 },
-                HirKind::Anchor(Anchor::StartText) => Regex(G.mk(RegexF::LineStart)),
-                HirKind::Anchor(Anchor::EndText) => Regex(G.mk(RegexF::LineEnd)),
+                HirKind::Anchor(Anchor::StartText) => Ok(Regex(G.mk(RegexF::LineStart))),
+                HirKind::Anchor(Anchor::EndText) => Ok(Regex(G.mk(RegexF::LineEnd))),
                 HirKind::Group(g) => to_regex(&g.hir),
                 HirKind::Class(Class::Unicode(ranges)) => {
                     let size = ranges
                                  .iter()
                                  .fold(0, |a, r| a + (r.end() as u32 - r.start() as u32));
                     if size > 100 {
-                        Regex::dot()
+                        Ok(Regex::dot())
                     } else if size == 0 {
-                        Regex::empty()
+                        Ok(Regex::empty())
                     } else {
-                        ranges
+                        Ok(ranges
                             .iter()
                             .flat_map(|a| (a.start()..= a.end()))
                             .map(|a| Regex::character(a))
                             .reduce(Regex::alt)
-                            .unwrap_or(Regex::empty())
+                            .unwrap_or(Regex::empty()))
                     }
                 },
-                HirKind::Literal(Literal::Unicode(c)) => Regex::character(*c),
-                _ => panic!("Unsupported regex {:?}", h),
+                HirKind::Literal(Literal::Unicode(c)) => Ok(Regex::character(*c)),
+                _ => Err(format!("Unsupported regex {:?}", h)),
             }
         }
-        match Parser::new().parse(r) {
-            Ok(hir) => to_regex(&hir),
-            Err(e) => panic!("Error parsing regexp {}", e),
-        }
+
+        let hir = Parser::new().parse(s).map_err(|err|err.to_string())?;
+        to_regex(&hir)
+    }
+}
+
+
+impl Regex {
+    pub fn new<'a>(rstr: &'a str) -> Self {
+        Regex::from_str(rstr).unwrap()
     }
 
     // Smart constructors for regex simplification
