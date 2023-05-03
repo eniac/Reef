@@ -114,8 +114,6 @@ fn commit_circuit_hash(
             //Sum check poseidon hashes
             cost += log_mn * 290;
 
-            //R generation hashes
-            // cost += POSEIDON_NUM;
             cost
         }
     }
@@ -192,11 +190,19 @@ pub fn nlookup_cost_model_hash<'a>(
     let log_mn: usize = logmn(mn);
     let mut cost = nlookup_cost_model_nohash(dfa, batch_size, is_match, doc_len, commit_type);
 
-    //Sum check poseidon hashes
-    cost += log_mn * POSEIDON_NUM;
+    cost+= 578;
 
-    //R generation hashes
-    cost += POSEIDON_NUM;
+    //Running claim
+    if log_mn+batch_size > 5 {
+        let mut n_sponge = (((log_mn+batch_size - 5)/4) as f32).ceil() as usize;
+        if n_sponge == 0 {
+            n_sponge +=1;
+        }
+        cost += n_sponge * 288;
+    } 
+
+    //Sum check poseidon hashes
+    cost += log_mn * 290;
 
     cost
 }

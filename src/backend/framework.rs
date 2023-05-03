@@ -736,14 +736,14 @@ mod tests {
 
     #[test]
     fn e2e_poly_nl() {
-        // backend_test(
-        //     "ab".to_string(),
-        //     "^a*b*$".to_string(),
-        //     &("a".to_string()).chars().map(|c| c.to_string()).collect(),
-        //     Some(JBatching::NaivePolys),
-        //     Some(JCommit::Nlookup),
-        //     vec![0],
-        // );
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            &("a".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::NaivePolys),
+            Some(JCommit::Nlookup),
+            vec![0],
+        );
         backend_test(
             "ab".to_string(),
             "^a*b*$".to_string(),
@@ -751,7 +751,6 @@ mod tests {
             Some(JBatching::NaivePolys),
             Some(JCommit::Nlookup),
             vec![0],
-            //3,4],
         );
         backend_test(
             "ab".to_string(),
@@ -781,57 +780,91 @@ mod tests {
 
     #[test]
     fn e2e_nl_hash() {
-        // backend_test(
-        //     "ab".to_string(),
-        //     "^a*b*$".to_string(),
-        //     "aaab".to_string(),
-        //     JBatching::Nlookup,
-        //     JCommit::HashChain,
-        //     vec![0],
-        // );
-        // backend_test(
-        //     "ab".to_string(),
-        //     "^ab*$".to_string(),
-        //     "abbbbbbb".to_string(),
-        //     JBatching::Nlookup,
-        //     JCommit::HashChain,
-        //     vec![0],
-        // );
-        // backend_test(
-        //     "ab".to_string(),
-        //     "^a*$".to_string(),
-        //     "aaaaaaaaaaaaaaaa".to_string(),
-        //     JBatching::Nlookup,
-        //     JCommit::HashChain,
-        //     vec![0],
-        // );
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            &("a".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::HashChain),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            &("aa".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::HashChain),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            &("aaab".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::HashChain),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^ab*$".to_string(),
+            &("abbbbbbb".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::HashChain),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^a*$".to_string(),
+            &("aaaaaaaaaaaaaaaa".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::HashChain),
+            vec![0],
+            // [1,2,3,4,5,6,7,8,
+        );
     }
 
     #[test]
     fn e2e_nl_nl() {
-        // backend_test(
-        //     "ab".to_string(),
-        //     "^a*b*$".to_string(),
-        //     "aaab".to_string(),
-        //     JBatching::Nlookup,
-        //     JCommit::Nlookup,
-        //     vec![0],
-        // );
-        // backend_test(
-        //     "ab".to_string(),
-        //     "^ab*$".to_string(),
-        //     "abbbbbbb".to_string(),
-        //     JBatching::Nlookup,
-        //     JCommit::Nlookup,
-        //     vec![0],
-        // );
-        // backend_test(
-        //     "ab".to_string(),
-        //     "^a*$".to_string(),
-        //     "aaaaaaaaaaaaaaaa".to_string(),
-        //     JBatching::Nlookup,
-        //     JCommit::Nlookup,
-        //     vec![0],
-        // );
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            &("a".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::Nlookup),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            &("aa".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::Nlookup),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            &("aaab".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::Nlookup),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^ab*$".to_string(),
+            &("abbbbbbb".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::Nlookup),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^a*$".to_string(),
+            &("aaaaaaaaaaaaaaaa".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::Nlookup),
+            vec![0],
+            // [1,2,3,4,5,6,7,8,
+        );
     }
 }

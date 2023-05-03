@@ -726,6 +726,7 @@ where {
         let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
         let mut sponge_ns = cs.namespace(|| format!("{} sponge", tag));
 
+        println!("b:{:#?}, sc_l: {:#?}", self.batch_size,sc_l);
         let mut pattern = match tag {
             "eval" => vec![
                 SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs,
