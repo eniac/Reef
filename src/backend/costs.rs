@@ -3,7 +3,9 @@ use core::panic;
 use crate::dfa::NFA;
 use clap::ValueEnum;
 
-static POSEIDON_NUM: usize = 238; // jess took literal measurement and 238 is the real diff
+static POSEIDON_NUM: usize = 292;
+static GLUE_NUMBER: usize= 11376;
+//238; // jess took literal measurement and 238 is the real diff
 
 #[derive(Debug, Clone, ValueEnum, Copy)]
 pub enum JBatching {
@@ -92,19 +94,28 @@ fn commit_circuit_hash(
     match commit_type {
         JCommit::HashChain => match is_match {
             None => (batch_size+1) * (POSEIDON_NUM + 3),
-            Some((_, end)) if end == doc_len => batch_size * POSEIDON_NUM,
+            Some((_, end)) if end == doc_len => (batch_size+1) * POSEIDON_NUM,
             _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
             let mn: usize = doc_len+1;
             let log_mn: usize = logmn(mn);
-            let mut cost = 0;
+            let mut cost = 578;
+
+            //Running claim
+            if log_mn+batch_size > 5 {
+                let mut n_sponge = (((log_mn+batch_size - 5)/4) as f32).ceil() as usize;
+                if n_sponge == 0 {
+                    n_sponge +=1;
+                }
+                cost += n_sponge * 288;
+            } 
 
             //Sum check poseidon hashes
-            cost += log_mn * POSEIDON_NUM;
+            cost += log_mn * 290;
 
             //R generation hashes
-            cost += POSEIDON_NUM;
+            // cost += POSEIDON_NUM;
             cost
         }
     }
@@ -232,7 +243,7 @@ pub fn full_round_cost_model<'a>(
 
 pub fn get_folded_cost(cost: usize, doc_len: usize, batch_size: usize) -> usize {
     let folding_size: usize = ((cost as f32) / 128.0).log2().ceil() as usize;
-    (cost + 10000) * (2 * (doc_len / batch_size) + folding_size)
+    (cost + GLUE_NUMBER) * (2 * (doc_len / batch_size) + folding_size)
 }
 
 pub fn opt_cost_model_select_with_commit<'a>(
@@ -454,7 +465,7 @@ pub fn opt_cost_model_select<'a>(
                 (Some(b), Some(c), _) => {
                     let single_cost =
                         full_round_cost_model(dfa, 1 << n, b, is_match, doc_length, c);
-                    println!("Single Round Cost with hash: {:#?}", single_cost);
+                    println!("Single Round Cost with hash: {:#?}, b {:#?}", single_cost+GLUE_NUMBER,1<<n);
                     (
                         b,
                         c,

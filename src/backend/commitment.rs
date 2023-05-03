@@ -81,13 +81,13 @@ where
 
             let blind = <G1 as Group>::Scalar::random(&mut OsRng);
 
-            println!("HASH BLIND: {:#?}", blind.clone());
+            // println!("HASH BLIND: {:#?}", blind.clone());
 
             SpongeAPI::absorb(&mut sponge, 2, &[blind, F::from(0)], acc);
             hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
             sponge.finish(acc).unwrap();
 
-            println!("RANDOM HASH: {:#?}", hash[0].clone());
+            // println!("RANDOM HASH: {:#?}", hash[0].clone());
 
             let mut i = 0;
             // H_i = Hash(H_i-1, char, i)
@@ -98,12 +98,12 @@ where
                 let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
                 sponge.start(parameter, None, acc);
 
-                println!(
-                    "REAL HASH ELTS: {:#?}, {:#?}, {:#?}",
-                    hash[0],
-                    F::from(c as u64),
-                    F::from(i)
-                );
+                // println!(
+                //     "REAL HASH ELTS: {:#?}, {:#?}, {:#?}",
+                //     hash[0],
+                //     F::from(c as u64),
+                //     F::from(i)
+                // );
 
                 SpongeAPI::absorb(
                     &mut sponge,
@@ -113,12 +113,12 @@ where
                 );
                 hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
 
-                println!("COM HASH {:#?}", hash.clone());
+                // println!("COM HASH {:#?}", hash.clone());
                 sponge.finish(acc).unwrap();
                 i += 1;
             }
 
-            println!("commitment = {:#?}", hash.clone());
+            // println!("commitment = {:#?}", hash.clone());
             //self.hash_commitment = Some((start, hash[0]));
 
             return ReefCommitment::HashChain(HashCommitmentStruct {

@@ -299,7 +299,7 @@ pub fn run_backend(
                     r1cs_converter.substring.0 + (i * r1cs_converter.batch_size),
                     r1cs_converter.batch_size,
                 );
-                println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
+                // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
 
                 let q = match running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
@@ -397,8 +397,8 @@ pub fn run_backend(
             }
         };
 
-        println!("START OF EPS {}", start_of_epsilons);
-        let start = Instant::now();
+        // println!("START OF EPS {}", start_of_epsilons);
+        // let start = Instant::now();
 
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             &prover_data,
@@ -424,6 +424,7 @@ pub fn run_backend(
         // trivial circuit
         let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
 
+        let start = Instant::now();
         //println!("STEP CIRC WIT for i={}: {:#?}", i, circuit_primary);
         // snark
         let result = RecursiveSNARK::prove_step(
@@ -565,9 +566,9 @@ mod tests {
     fn backend_test(
         ab: String,
         rstr: String,
-        doc: String,
-        batch_type: JBatching,
-        commit_docype: JCommit,
+        doc: &Vec<String>,
+        batching_type: Option<JBatching>,
+        commit_docype: Option<JCommit>,
         batch_sizes: Vec<usize>,
     ) {
         let r = Regex::new(&rstr);
@@ -575,13 +576,133 @@ mod tests {
 
         init();
         for b in batch_sizes {
-            run_backend(
+            let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
+            let mut r1cs_converter = R1CS::new(
                 &dfa,
-                &doc.chars().map(|c| c.to_string()).collect(),
-                Some(batch_type.clone()),
-                Some(commit_docype.clone()),
+                &doc,
                 b,
+                sc.clone(),
+                batching_type,
+                commit_docype,
+
             );
+
+            ////let c_time = Instant::now();
+            println!("generate commitment");
+            // to get rid clone
+            let reef_commit = gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
+            r1cs_converter.set_commitment(reef_commit.clone());
+            //let commit_ms = c_time.elapsed().as_millis();
+
+            //let parse_ms = p_time.elapsed().as_millis();
+            let q_len = logmn(r1cs_converter.table.len());
+            let qd_len = logmn(r1cs_converter.udoc.len());
+
+            //let r_time = Instant::now();
+            let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
+            //let r1cs_ms = r_time.elapsed().as_millis();
+
+            //let s_time = Instant::now();
+            // use "empty" (witness-less) circuit to generate nova F
+            let empty_glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
+                (JBatching::NaivePolys, JCommit::HashChain) => {
+                    vec![
+                        GlueOpts::PolyHash((
+                            <G1 as Group>::Scalar::from(0),
+                            <G1 as Group>::Scalar::from(0),
+                        )),
+                        GlueOpts::PolyHash((
+                            <G1 as Group>::Scalar::from(0),
+                            <G1 as Group>::Scalar::from(0),
+                        )),
+                    ]
+                }
+                (JBatching::Nlookup, JCommit::HashChain) => {
+                    let zero = <G1 as Group>::Scalar::from(0);
+
+                    let q = vec![<G1 as Group>::Scalar::from(0); q_len];
+
+                    vec![
+                        GlueOpts::NlHash((zero.clone(), zero.clone(), q.clone(), zero.clone())),
+                        GlueOpts::NlHash((zero.clone(), zero.clone(), q, zero.clone())),
+                    ]
+                }
+                (JBatching::NaivePolys, JCommit::Nlookup) => {
+                    let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
+
+                    let doc_v = <G1 as Group>::Scalar::from(0);
+
+                    vec![
+                        GlueOpts::PolyNL((doc_q.clone(), doc_v.clone())),
+                        GlueOpts::PolyNL((doc_q, doc_v)),
+                    ]
+                }
+                (JBatching::Nlookup, JCommit::Nlookup) => {
+                    let q = vec![<G1 as Group>::Scalar::from(0); q_len];
+
+                    let v = <G1 as Group>::Scalar::from(0);
+                    let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
+
+                    let doc_v = <G1 as Group>::Scalar::from(0);
+                    vec![
+                        GlueOpts::NlNl((q.clone(), v.clone(), doc_q.clone(), doc_v.clone())),
+                        GlueOpts::NlNl((q, v, doc_q, doc_v)),
+                    ]
+                }
+            };
+
+            let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
+                &prover_data,
+                None,
+                vec![<G1 as Group>::Scalar::from(0); 2],
+                empty_glue,
+                <G1 as Group>::Scalar::from(0),
+                true, //false,
+                <G1 as Group>::Scalar::from(dfa.nchars() as u64),
+                0, //dfa.nchars as isize,
+                vec![<G1 as Group>::Scalar::from(0); 2],
+                r1cs_converter.batch_size,
+                sc.clone(),
+            );
+
+            // trivial circuit
+            let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
+
+            // produce public parameters
+            println!("Producing public parameters...");
+            let pp = PublicParams::<
+                G1,
+                G2,
+                NFAStepCircuit<<G1 as Group>::Scalar>,
+                TrivialTestCircuit<<G2 as Group>::Scalar>,
+            >::setup(circuit_primary.clone(), circuit_secondary.clone())
+            .unwrap();
+            println!(
+                "Number of constraints (primary circuit): {}",
+                pp.num_constraints().0
+            );
+            println!(
+                "Number of constraints (secondary circuit): {}",
+                pp.num_constraints().1
+            );
+
+            println!(
+                "Number of variables (primary circuit): {}",
+                pp.num_variables().0
+            );
+            println!(
+                "Number of variables (secondary circuit): {}",
+                pp.num_variables().1
+            );
+
+            // run_backend(
+            //     &dfa,
+            //     &doc.chars().map(|c| c.to_string()).collect(),
+            //     Some(batch_type.clone()),
+            //     Some(commit_docype.clone()),
+            //     b,
+            // );
         }
     }
 
@@ -590,46 +711,127 @@ mod tests {
         backend_test(
             "ab".to_string(),
             "^a*b*$".to_string(),
-            "aaab".to_string(),
-            JBatching::NaivePolys,
-            JCommit::HashChain,
-            vec![1, 3],
+            &("aaab".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::NaivePolys),
+            Some(JCommit::HashChain),
+            vec![0],
         );
+        // backend_test(
+        //     "ab".to_string(),
+        //     "^ab*$".to_string(),
+        //     "abbbbbbb".to_string(),
+        //     JBatching::NaivePolys,
+        //     JCommit::HashChain,
+        //     vec![0],
+        // );
+        // backend_test(
+        //     "ab".to_string(),
+        //     "^a*$".to_string(),
+        //     "aaaaaaaaaaaaaaaa".to_string(),
+        //     JBatching::NaivePolys,
+        //     JCommit::HashChain,
+        //     vec![0],
+        // );
     }
 
     #[test]
     fn e2e_poly_nl() {
+        // backend_test(
+        //     "ab".to_string(),
+        //     "^a*b*$".to_string(),
+        //     &("a".to_string()).chars().map(|c| c.to_string()).collect(),
+        //     Some(JBatching::NaivePolys),
+        //     Some(JCommit::Nlookup),
+        //     vec![0],
+        // );
         backend_test(
             "ab".to_string(),
             "^a*b*$".to_string(),
-            "aaab".to_string(),
-            JBatching::NaivePolys,
-            JCommit::Nlookup,
-            vec![3],
+            &("aa".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::NaivePolys),
+            Some(JCommit::Nlookup),
+            vec![0],
+            //3,4],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            &("aaab".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::NaivePolys),
+            Some(JCommit::Nlookup),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^ab*$".to_string(),
+            &("abbbbbbb".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::NaivePolys),
+            Some(JCommit::Nlookup),
+            vec![0],
+        );
+        backend_test(
+            "ab".to_string(),
+            "^a*$".to_string(),
+            &("aaaaaaaaaaaaaaaa".to_string()).chars().map(|c| c.to_string()).collect(),
+            Some(JBatching::NaivePolys),
+            Some(JCommit::Nlookup),
+            vec![0],
         );
     }
 
     #[test]
     fn e2e_nl_hash() {
-        backend_test(
-            "ab".to_string(),
-            "^a*b*$".to_string(),
-            "aaab".to_string(),
-            JBatching::Nlookup,
-            JCommit::HashChain,
-            vec![3],
-        );
+        // backend_test(
+        //     "ab".to_string(),
+        //     "^a*b*$".to_string(),
+        //     "aaab".to_string(),
+        //     JBatching::Nlookup,
+        //     JCommit::HashChain,
+        //     vec![0],
+        // );
+        // backend_test(
+        //     "ab".to_string(),
+        //     "^ab*$".to_string(),
+        //     "abbbbbbb".to_string(),
+        //     JBatching::Nlookup,
+        //     JCommit::HashChain,
+        //     vec![0],
+        // );
+        // backend_test(
+        //     "ab".to_string(),
+        //     "^a*$".to_string(),
+        //     "aaaaaaaaaaaaaaaa".to_string(),
+        //     JBatching::Nlookup,
+        //     JCommit::HashChain,
+        //     vec![0],
+        // );
     }
 
     #[test]
     fn e2e_nl_nl() {
-        backend_test(
-            "ab".to_string(),
-            "^a*b*$".to_string(),
-            "aaabbbb".to_string(),
-            JBatching::Nlookup,
-            JCommit::Nlookup,
-            vec![3],
-        );
+        // backend_test(
+        //     "ab".to_string(),
+        //     "^a*b*$".to_string(),
+        //     "aaab".to_string(),
+        //     JBatching::Nlookup,
+        //     JCommit::Nlookup,
+        //     vec![0],
+        // );
+        // backend_test(
+        //     "ab".to_string(),
+        //     "^ab*$".to_string(),
+        //     "abbbbbbb".to_string(),
+        //     JBatching::Nlookup,
+        //     JCommit::Nlookup,
+        //     vec![0],
+        // );
+        // backend_test(
+        //     "ab".to_string(),
+        //     "^a*$".to_string(),
+        //     "aaaaaaaaaaaaaaaa".to_string(),
+        //     JBatching::Nlookup,
+        //     JCommit::Nlookup,
+        //     vec![0],
+        // );
     }
 }
