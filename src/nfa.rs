@@ -1,25 +1,23 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::{BTreeSet, HashSet};
-
+use petgraph::{Directed, Direction, Graph};
+use petgraph::graph::NodeIndex;
+use petgraph::visit::EdgeRef;
 use crate::regex::Regex;
 
 #[derive(Debug, Clone)]
 pub struct NFA {
     /// Alphabet
     pub ab: Vec<String>,
-    /// Set of states (and their index)
-    pub n: usize,
     /// Accepting states
-    pub accepting: HashSet<usize>,
-    /// Regular expressions (for printing)
-    pub expressions: HashMap<usize, Regex>,
+    accepting: HashSet<usize>,
     /// Transition relation from [state -> char -> state] given an input
-    pub trans: HashMap<(usize, String), usize>,
+    g: Graph<Regex, String>,
     /// Must match from the begining of the document (default: false)
-    pub anchor_start: bool,
+    anchor_start: bool,
     /// Must match until the end of the document (default: false)
-    pub anchor_end: bool,
+    anchor_end: bool,
 }
 
 // Null transition character
@@ -28,50 +26,45 @@ pub const EPSILON: &String = &String::new();
 impl NFA {
     pub fn new<'a>(alphabet: &'a str, re: Regex) -> Self {
         let ab = alphabet.chars().sorted().collect();
+        let mut graph: Graph<Regex, String> = Graph::new();
 
-        let mut trans = HashMap::new();
-        let mut states: HashMap<Regex, usize> = HashMap::new();
         // Recursive funtion
         fn build_trans(
-            states: &mut HashMap<Regex, usize>,
-            trans: &mut HashMap<(usize, String), usize>,
+            g: &mut Graph<Regex, String>,
             ab: &Vec<char>,
             q: &Regex,
-            n: usize,
-        ) {
-            // Add to DFA if not already there
-            states.insert(q.clone(), n);
-            // The reflexive step
-            trans.insert((states[q], EPSILON.clone()), states[q]);
+            n: NodeIndex<u32>) {
 
             // Explore derivatives
             for c in &ab[..] {
                 let q_c = q.deriv(&c);
-                // Non-reflexive step
-                if states.contains_key(&q_c) {
-                    trans.insert((states[q], c.to_string()), states[&q_c]);
+
+                if let Some(n_c) = g.node_indices().find(|i| g[*i] == q_c) {
+                    g.add_edge(n, n_c, c.to_string());
                 } else {
-                    let n_c = states.len();
-                    trans.insert((states[q], c.to_string()), n_c);
-                    build_trans(states, trans, ab, &q_c, n_c);
+                    // Add to DFA if not already there
+                    let n_c = g.add_node(q_c.clone());
+                    // Reflexive step
+                    g.add_edge(n_c, n_c, EPSILON.clone());
+                    g.add_edge(n, n_c, c.to_string());
+                    build_trans(g, ab, &q_c, n_c);
                 }
             }
         }
 
+        let n = graph.add_node(re.clone());
+        graph.add_edge(n, n, EPSILON.clone());
         // Recursively build transitions
-        build_trans(&mut states, &mut trans, &ab, &re, 0);
+        build_trans(&mut graph, &ab, &re, n);
 
         // Return DFA
         Self {
             ab: ab.into_iter().map(|c| c.to_string()).collect(),
-            n: states.len(),
-            accepting: states
-                .clone()
-                .into_iter()
-                .filter_map(|(k, v)| if k.nullable() { Some(v) } else { None })
+            accepting: graph.node_indices()
+                .filter(|&k| graph[k].nullable())
+                .map(|i| i.index())
                 .collect(),
-            expressions: states.into_iter().map(|(k, v)| (v, k)).collect(),
-            trans,
+            g: graph,
             anchor_start: re.is_start_anchored(),
             anchor_end: re.is_end_anchored(),
         }
@@ -98,11 +91,15 @@ impl NFA {
     }
 
     pub fn nstates(&self) -> usize {
-        self.n
+        self.g.node_count()
     }
 
     pub fn nchars(&self) -> usize {
         self.ab.len()
+    }
+
+    pub fn nedges(&self) -> usize {
+        self.g.edge_count()
     }
 
     pub fn is_exact_match(&self) -> bool {
@@ -116,7 +113,7 @@ impl NFA {
 
     /// All states
     pub fn get_states(&self) -> HashSet<usize> {
-        (0..self.n).collect()
+        self.g.node_indices().map(|i|i.index()).collect()
     }
 
     /// Final states
@@ -134,18 +131,19 @@ impl NFA {
 
     /// Single step transition
     pub fn delta(&self, state: usize, c: &String) -> Option<usize> {
-        let res = self.trans.get(&(state, c.clone())).map(|c| c.clone());
+        let res = self.g.edges_directed(NodeIndex::new(state), Direction::Outgoing)
+                        .find(|e| e.weight() == c)
+                        .map(|e| e.target().index());
 
-        // println!("{} --[ {} ]--> {}", state, c, res.map(|c|c.to_string()).unwrap_or(String::from("NONE")));
+        println!("{} --[ {} ]--> {}", state, c, res.map(|c|c.to_string()).unwrap_or(String::from("NONE")));
         res
     }
 
     /// Transition relation as a vector
-    pub fn deltas(&self) -> Vec<(usize, String, usize)> {
-        self.trans
-            .clone()
-            .into_iter()
-            .map(|((a, b), c)| (a, b, c))
+    pub fn deltas(&self) -> HashSet<(usize, String, usize)> {
+        self.g.node_indices()
+            .flat_map(|i| self.g.edges(i))
+            .map(|e| (e.source().index(), e.weight().clone(), e.target().index()))
             .collect()
     }
 
@@ -168,9 +166,7 @@ impl NFA {
             return Some((0, 0));
         }
         // For every postfix of doc (O(n^2))
-        start_idxs.into_iter().find_map(|i| {
-            // .into_par_iter()
-            // .find_map_any(|i| {
+        start_idxs.into_par_iter().find_map_any(|i| {
             let mut s = self.get_init_state();
             for j in i..doc.len() {
                 // Apply transition relation
@@ -263,16 +259,11 @@ impl NFA {
         let mut abset = HashSet::new();
 
         // Build transition relation from classes
-        self.trans = self
-            .trans
-            .clone()
-            .into_iter()
-            .filter(|((t, c), u)| if t == u && c == EPSILON { true } else { false })
-            .collect();
+        self.g.clear_edges();
 
         for (set, class) in classes {
             for (t, u) in set {
-                self.trans.insert((t, find_representative(&class)), u);
+                self.g.add_edge(NodeIndex::new(t), NodeIndex::new(u), find_representative(&class));
                 abset.insert(find_representative(&class));
             }
         }
@@ -291,7 +282,7 @@ impl NFA {
 
 #[cfg(test)]
 mod tests {
-    use crate::dfa::NFA;
+    use crate::nfa::NFA;
     use crate::regex::Regex;
 
     fn setup_nfa(r: &str, alpha: &str) -> NFA {

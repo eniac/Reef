@@ -710,7 +710,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs(true);
-        self.nlookup_gadget(lookups, self.nfa.trans.len(), "nl");
+        self.nlookup_gadget(lookups, self.nfa.nedges(), "nl");
 
         self.accepting_state_circuit(); // TODO
 
@@ -1527,7 +1527,7 @@ mod tests {
     ) {
         let r = Regex::new(&rstr);
         let nfa = NFA::new(&ab[..], r);
-        println!("NFA Size: {:#?}", nfa.trans.len());
+        println!("NFA Size: {:#?}", nfa.nedges());
 
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
@@ -1861,7 +1861,7 @@ mod tests {
         let nfa_match = nfa.is_match(&d);
         println!(
             "DFA Size: {:#?}, |doc| : {}, |ab| : {}, match: {:?}",
-            nfa.trans.len(),
+            nfa.nedges(),
             d.len(),
             nfa.ab.len(),
             nfa_match
