@@ -1,6 +1,6 @@
 pub mod backend;
 pub mod config;
-pub mod dfa;
+pub mod nfa;
 pub mod regex;
 
 #[cfg(feature = "metrics")]

@@ -13,7 +13,7 @@ use crate::backend::{
     nova::*,
     r1cs::*,
 };
-use crate::dfa::NFA;
+use crate::nfa::NFA;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::ProverData;
 use generic_array::typenum;
@@ -47,7 +47,7 @@ use crate::metrics::{log, log::Component};
 
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(
-    dfa: NFA,
+    nfa: NFA,
     doc: Vec<String>,
     batching_type: Option<JBatching>,
     commit_doctype: Option<JCommit>,
@@ -67,7 +67,7 @@ pub fn run_backend(
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Optimization Selection, R1CS precomputations");
         let mut r1cs_converter = R1CS::new(
-            &dfa,
+            &nfa,
             &doc,
             temp_batch_size,
             sc.clone(),
@@ -197,8 +197,8 @@ fn setup<'a>(
         empty_glue,
         <G1 as Group>::Scalar::from(0),
         true, //false,
-        <G1 as Group>::Scalar::from(r1cs_converter.dfa.nchars() as u64),
-        0, //dfa.nchars as isize,
+        <G1 as Group>::Scalar::from(r1cs_converter.nfa.nchars() as u64),
+        0, //nfa.nchars as isize,
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         r1cs_converter.pc.clone(),
@@ -253,7 +253,7 @@ fn setup<'a>(
         ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
     };
 
-    let current_state = r1cs_converter.dfa.get_init_state();
+    let current_state = r1cs_converter.nfa.get_init_state();
     let z0_primary = match (r1cs_converter.batching, r1cs_converter.commit_type) {
         (JBatching::NaivePolys, JCommit::HashChain) => {
             vec![
@@ -268,7 +268,7 @@ fn setup<'a>(
         (JBatching::Nlookup, JCommit::HashChain) => {
             let mut z = vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(r1cs_converter.substring.0 as u64), //<G1 as Group>::Scalar::from(0), //dfa.ab_to_num(&doc[0]) as u64),
+                <G1 as Group>::Scalar::from(r1cs_converter.substring.0 as u64), //<G1 as Group>::Scalar::from(0), //nfa.ab_to_num(&doc[0]) as u64),
                 prev_hash.clone(),
             ];
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
@@ -281,7 +281,7 @@ fn setup<'a>(
         (JBatching::NaivePolys, JCommit::Nlookup) => {
             let mut z = vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                //<G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+                //<G1 as Group>::Scalar::from(nfa.ab_to_num(&doc[0]) as u64),
             ];
 
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
@@ -294,7 +294,7 @@ fn setup<'a>(
         (JBatching::Nlookup, JCommit::Nlookup) => {
             let mut z = vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                //<G1 as Group>::Scalar::from(dfa.ab_to_num(&doc[0]) as u64),
+                //<G1 as Group>::Scalar::from(nfa.ab_to_num(&doc[0]) as u64),
             ];
 
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
@@ -354,7 +354,7 @@ fn solve<'a>(
         ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
     };
 
-    let mut current_state = r1cs_converter.dfa.get_init_state();
+    let mut current_state = r1cs_converter.nfa.get_init_state();
     // TODO don't recalc :(
 
     let mut next_state = current_state;
@@ -546,7 +546,7 @@ fn solve<'a>(
             glue,
             blind,
             i == 0,
-            <G1 as Group>::Scalar::from(r1cs_converter.dfa.nchars() as u64),
+            <G1 as Group>::Scalar::from(r1cs_converter.nfa.nchars() as u64),
             start_of_epsilons,
             vec![
                 <G1 as Group>::Scalar::from(
@@ -772,7 +772,7 @@ mod tests {
 
     use crate::backend::framework::*;
     use crate::backend::r1cs_helper::init;
-    use crate::dfa::NFA;
+    use crate::nfa::NFA;
     use crate::regex::Regex;
 
     fn backend_test(
@@ -784,11 +784,11 @@ mod tests {
         batch_size: usize,
     ) {
         let r = Regex::new(&rstr);
-        let dfa = NFA::new(&ab[..], r);
+        let nfa = NFA::new(&ab[..], r);
 
         init();
         run_backend(
-            dfa.clone(),
+            nfa.clone(),
             doc.clone(),
             batching_type.clone(),
             commit_docype.clone(),

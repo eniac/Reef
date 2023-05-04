@@ -132,6 +132,7 @@ impl NFA {
             .collect()
     }
 
+    /// Single step transition
     pub fn delta(&self, state: usize, c: &String) -> Option<usize> {
         let res = self.trans.get(&(state, c.clone())).map(|c| c.clone());
 

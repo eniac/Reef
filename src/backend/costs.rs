@@ -1,7 +1,6 @@
 use core::panic;
 
-use crate::dfa::NFA;
-use circ::ir::opt::cfold::fold_cache;
+use crate::nfa::NFA;
 use clap::ValueEnum;
 
 static POSEIDON_NUM: usize = 292;
@@ -68,7 +67,7 @@ pub fn commit_circuit_nohash(
         },
         JCommit::Nlookup => {
             let match_len = match is_match {
-                None => doc_len, 
+                None => doc_len,
                 Some((start, end)) =>  (end - start) + 1
             };
             let mn: usize = match_len + get_padding(match_len, batch_size, JCommit::Nlookup);
@@ -115,7 +114,7 @@ fn commit_circuit_hash(
         },
         JCommit::Nlookup => {
             let mod_len = match is_match {
-                None => doc_len, 
+                None => doc_len,
                 Some((start, end)) =>  (end - start) + 1
             };
             let mn: usize = mod_len + get_padding(mod_len, batch_size, JCommit::Nlookup);
@@ -271,11 +270,11 @@ pub fn get_folded_cost(cost: usize, doc_len: usize, batch_size: usize) -> usize 
     if cost == std::usize::MAX {
         return std::usize::MAX;
     }
-    let n_foldings = ((doc_len/batch_size) as f32).ceil() as usize; 
+    let n_foldings = ((doc_len/batch_size) as f32).ceil() as usize;
     let final_circuit_size = cost + GLUE_NUMBER;
     let cost_folding = 2 * final_circuit_size * n_foldings;
     let cost_snark = (((final_circuit_size) as f32) * 128.0).log2().ceil() as usize;
-    let total_cost = cost_folding + cost_snark; 
+    let total_cost = cost_folding + cost_snark;
     total_cost
 }
 
@@ -289,14 +288,14 @@ pub fn opt_cost_model_select_with_commit<'a>(
     let mut opt_batching: JBatching = JBatching::NaivePolys;
 
     let batch_size_v_match = match is_match {
-        None => true, 
+        None => true,
         Some((start, end)) =>  ((end - start) + 1) > batch_size
     };
 
     let mut mod_len = doc_length;
 
     let match_len = match is_match {
-        None => doc_length, 
+        None => doc_length,
         Some((start, end)) => end-start +1
     };
 
@@ -340,7 +339,7 @@ pub fn opt_cost_model_select_with_commit<'a>(
                     match_len,
                     commit,
                 );
-                mod_len = match_len; 
+                mod_len = match_len;
             } else {
                 cost = std::usize::MAX;
                 nlookup = std::usize::MAX;

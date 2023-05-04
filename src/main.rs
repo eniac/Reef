@@ -3,14 +3,14 @@ use clap::Parser;
 
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
+use reef::regex::Regex;
+use reef::nfa::NFA;
 
 #[cfg(feature = "metrics")]
 use reef::metrics::{log, log::Component};
 
 #[cfg(feature = "plot")]
-use reef::plot;
-
-use reef::dfa::NFA;
+use reef::plot::*;
 
 fn main() {
     let opt = Options::parse();
@@ -18,7 +18,7 @@ fn main() {
     // Alphabet
     let ab = String::from_iter(opt.config.alphabet());
 
-    // Regular expresion parser and convert the Regex to a DFA
+    // Input document
     let mut doc = opt
         .config
         .read_file(&opt.input)
@@ -32,7 +32,10 @@ fn main() {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA", "DFA");
 
-    let mut nfa = NFA::new(&ab, opt.re);
+    let mut nfa = NFA::new(&ab, Regex::new(&opt.re));
+
+    // Is document well-formed
+    nfa.well_formed(&doc);
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA", "DFA");
@@ -47,17 +50,14 @@ fn main() {
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "DFA", "K Stride");
     };
-
-    // Is document well-formed
-    nfa.well_formed(&doc);
-
     #[cfg(feature = "plot")]
-    plot::plot_nfa(&nfa).expect("Failed to plot NFA to a pdf file");
+    nfa.plot("nfa").expect("Failed to plot NFA to a pdf file");
 
     println!("Doc len is {}", doc.len());
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "DFA Solving", "Clear Match");
+
     println!(
         "Match: {}",
         nfa.is_match(&doc)
