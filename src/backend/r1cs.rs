@@ -24,7 +24,7 @@ use std::fs;
 use std::time::{Duration, Instant};
 
 pub struct R1CS<'a, F: PrimeField> {
-    dfa: &'a NFA,
+    pub dfa: &'a NFA,
     pub table: Vec<Integer>,
     pub batching: JBatching,
     pub commit_type: JCommit,
@@ -42,7 +42,7 @@ pub struct R1CS<'a, F: PrimeField> {
     pub doc_extend: usize,
     is_match: bool,
     pub substring: (usize, usize), // todo getters
-    pc: PoseidonConstants<F, typenum::U4>,
+    pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
@@ -1127,7 +1127,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 .collect(),
         );
         query.push(int_to_ff(prev_running_v.clone()));
-        //let query_f: Vec<F> = query.into_iter().map(|i| int_to_ff(i)).collect();
+        //let query_f: Vec<G1::Scalar> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
         //println!("R1CS sponge absorbs {:#?}", query_f);
 
@@ -1306,20 +1306,56 @@ mod tests {
     fn mle_linear() {
         init();
 
-        let evals = vec![
+        let mut evals = vec![
             Integer::from(2),
             Integer::from(3),
             Integer::from(5),
             Integer::from(7),
+            Integer::from(9),
+            Integer::from(13),
+            Integer::from(17),
+            Integer::from(19),
         ];
 
-        let r = vec![Integer::from(10), Integer::from(100)];
+        let qs = vec![2, 1, 7];
+        let last_q = vec![Integer::from(0), Integer::from(0), Integer::from(0)];
 
-        let mut a = evals.clone();
+        let claims = vec![
+            Integer::from(3),
+            Integer::from(9),
+            Integer::from(27),
+            Integer::from(81),
+        ];
 
-        for i in 1..=2 {
-            let message_i = linear_mle_func_evals(&mut a, 2, i, &r[i - 1]);
-            println!("message_i {:#?}, a {:#?}", message_i, a);
+        let mut eq_a = Vec::new();
+
+        let bool_combos = vec![
+            vec![Integer::from(0), Integer::from(0), Integer::from(0)],
+            vec![Integer::from(0), Integer::from(0), Integer::from(1)],
+            vec![Integer::from(0), Integer::from(1), Integer::from(0)],
+            vec![Integer::from(0), Integer::from(1), Integer::from(1)],
+            vec![Integer::from(1), Integer::from(0), Integer::from(0)],
+            vec![Integer::from(1), Integer::from(0), Integer::from(1)],
+            vec![Integer::from(1), Integer::from(1), Integer::from(0)],
+            vec![Integer::from(1), Integer::from(1), Integer::from(1)],
+        ];
+
+        for cube in bool_combos {
+            let (_, res) = prover_mle_partial_eval(&claims, &cube, &qs, false, Some(&last_q)); //Some(&last_q));
+            eq_a.push(res);
+        }
+
+        println!("eqs {:#?}", eq_a);
+
+        let r = vec![Integer::from(2), Integer::from(8), Integer::from(4)];
+
+        // let mut a = //evals.clone();
+
+        for i in 1..=3 {
+            let message_i = linear_mle_func_evals(&mut evals, 3, i, &r[i - 1]);
+            //let message_i = linear_mle_product(&mut evals.clone(), &mut eq_a, 3, i, &r[i - 1]);
+
+            println!("message {:#?}, a {:#?}", message_i, evals);
         }
 
         panic!("as expected");
@@ -1527,7 +1563,7 @@ mod tests {
 
                     println!("Batching {:#?}", r1cs_converter.batching);
                     println!("Commit {:#?}", r1cs_converter.commit_type);
-                    let (prover_data, _) = r1cs_converter.to_circuit();
+                    r1cs_converter.to_circuit();
 
                     let mut current_state = dfa.get_init_state();
 
@@ -1561,7 +1597,7 @@ mod tests {
                         //println!("VALUES ROUND {:#?}: {:#?}", i, values);
                         //println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
 
-                        prover_data.check_all(&values);
+                        r1cs_converter.prover_data.unwrap().check_all(&values);
                         // for next i+1 round
                         current_state = next_state;
                     }
@@ -1613,7 +1649,10 @@ mod tests {
                             c,
                         )
                     );
-                    println!("actual cost: {:#?}", prover_data.r1cs.constraints.len());
+                    println!(
+                        "actual cost: {:#?}",
+                        r1cs_converter.prover_data.unwrap().r1cs.constraints.len()
+                    );
                     /*assert!(
                         prover_data.r1cs.constraints.len() as usize
                             == costs::full_round_cost_model_nohash(

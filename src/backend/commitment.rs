@@ -1,5 +1,3 @@
-type G1 = pasta_curves::pallas::Point;
-type G2 = pasta_curves::vesta::Point;
 use crate::backend::costs::{JBatching, JCommit};
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::{init, verifier_mle_eval};
@@ -28,6 +26,9 @@ use rug::{
     Assign, Integer,
 };
 
+type G1 = pasta_curves::pallas::Point;
+type G2 = pasta_curves::vesta::Point;
+
 #[derive(Debug, Clone)]
 pub enum ReefCommitment<F: PrimeField> {
     HashChain(HashCommitmentStruct<F>),
@@ -36,27 +37,19 @@ pub enum ReefCommitment<F: PrimeField> {
 
 #[derive(Debug, Clone)]
 pub struct HashCommitmentStruct<F: PrimeField> {
-    pub commit: F, // <G1 as Group>::Scalar,
-    pub blind: F,  // <G1 as Group>::Scalar,
+    pub commit: F,
+    pub blind: F,
 }
 
 #[derive(Debug, Clone)]
-pub struct DocCommitmentStruct<F: PrimeField> {
+pub struct DocCommitmentStruct<F> {
     gens: CommitmentGens<G1>,
     gens_single: CommitmentGens<G1>,
     commit_doc: Commitment<G1>, // todo compress
     vec_t: Vec<F>,              //<G1 as Group>::Scalar>,
-    decommit_doc: F,            //<G1 as Group>::Scalar,
-    pub commit_doc_hash: F,     //<G1 as Group>::Scalar,
+    decommit_doc: F,
+    pub commit_doc_hash: F,
 }
-/*
-impl DocCommitmentStruct {
-    pub fn get_commit_coord(&self) -> Vec<<G1 as Group>::Scalar> {
-        let coordinates = self.commit_doc.to_coordinates();
-
-        vec![coordinates.0, coordinates.1]
-    }
-} TODO*/
 
 pub fn gen_commitment(
     commit_docype: JCommit,
@@ -67,7 +60,6 @@ where
     G1: Group<Base = <G2 as Group>::Scalar>,
     G2: Group<Base = <G1 as Group>::Scalar>,
 {
-    type F = <G1 as Group>::Scalar;
     match commit_docype {
         JCommit::HashChain => {
             let mut hash;
@@ -83,7 +75,12 @@ where
 
             println!("HASH BLIND: {:#?}", blind.clone());
 
-            SpongeAPI::absorb(&mut sponge, 2, &[blind, F::from(0)], acc);
+            SpongeAPI::absorb(
+                &mut sponge,
+                2,
+                &[blind, <G1 as Group>::Scalar::from(0)],
+                acc,
+            );
             hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
             sponge.finish(acc).unwrap();
 
@@ -101,14 +98,18 @@ where
                 println!(
                     "REAL HASH ELTS: {:#?}, {:#?}, {:#?}",
                     hash[0],
-                    F::from(c as u64),
-                    F::from(i)
+                    <G1 as Group>::Scalar::from(c as u64),
+                    <G1 as Group>::Scalar::from(i)
                 );
 
                 SpongeAPI::absorb(
                     &mut sponge,
                     3,
-                    &[hash[0], F::from(c as u64), F::from(i)],
+                    &[
+                        hash[0],
+                        <G1 as Group>::Scalar::from(c as u64),
+                        <G1 as Group>::Scalar::from(i),
+                    ],
                     acc,
                 );
                 hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
@@ -136,9 +137,9 @@ where
             // println!("mle: {:#?}", mle);
 
             let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
-            let blind = F::random(&mut OsRng);
+            let blind = <G1 as Group>::Scalar::random(&mut OsRng);
 
-            let scalars: Vec<F> = //<G1 as Group>::Scalar> =
+            let scalars: Vec<<G1 as Group>::Scalar> = //<G1 as Group>::Scalar> =
                 mle.into_iter().map(|x| int_to_ff(x)).collect();
 
             let commit_doc = <G1 as Group>::CE::commit(&gens_t, &scalars, &blind);
@@ -146,10 +147,10 @@ where
             //self.doc_commitement = Some(commitment);
 
             // for in circuit hashing
-            let mut ro: PoseidonRO<<G2 as Group>::Scalar, F> =
+            let mut ro: PoseidonRO<<G2 as Group>::Scalar, <G1 as Group>::Scalar> =
                 PoseidonRO::new(PoseidonConstantsCircuit::new(), 3);
             commit_doc.absorb_in_ro(&mut ro);
-            let commit_doc_hash = ro.squeeze(128);
+            let commit_doc_hash = ro.squeeze(256); // todo
 
             let doc_commit = DocCommitmentStruct {
                 gens: gens_t.clone(),
@@ -317,12 +318,12 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
     l
 }
 
-fn q_to_mle_q(q: &Vec<<G1 as Group>::Scalar>, mle_len: usize) -> Vec<<G1 as Group>::Scalar> {
+fn q_to_mle_q<F: PrimeField>(q: &Vec<F>, mle_len: usize) -> Vec<F> {
     let mut q_out = vec![];
     let base: usize = 2;
 
     for idx in 0..mle_len {
-        let mut new_term = <G1 as Group>::Scalar::from(1);
+        let mut new_term = F::from(1);
         for j in 0..q.len() {
             // for each possible var in this term
             if (idx / base.pow(j as u32)) % 2 == 1 {

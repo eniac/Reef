@@ -1488,8 +1488,7 @@ where
         );
 
         println!("SYNTHESIZE TIME {:#?}", time.elapsed().as_millis());
-
-        Ok(out)
+        Ok((out))
         //Ok(vec![last_state.unwrap(), last_char, last_hash.unwrap()])
     }
 }

@@ -47,6 +47,29 @@ where
 
 // PROVER WORK
 
+pub(crate) fn linear_mle_product(
+    table_t: &mut Vec<Integer>,
+    table_eq: &mut Vec<Integer>,
+    ell: usize,
+    i: usize,
+    r_i: &Integer,
+) -> (Integer, Integer, Integer) {
+    let (t_0, t_1) = linear_mle_func_evals(table_t, ell, i, r_i);
+
+    let (eq_0, eq_1) = linear_mle_func_evals(table_eq, ell, i, r_i);
+
+    let sum_xsq = t_1.clone() * eq_1.clone();
+    let mut sum_x = eq_1 * t_0.clone();
+    sum_x += t_1 * eq_0.clone();
+    let sum_con = t_0 * eq_0;
+
+    (
+        sum_xsq.rem_floor(cfg().field().modulus()),
+        sum_x.rem_floor(cfg().field().modulus()),
+        sum_con.rem_floor(cfg().field().modulus()),
+    )
+}
+
 // a starts with evals on hypercube
 pub(crate) fn linear_mle_func_evals(
     a: &mut Vec<Integer>,
