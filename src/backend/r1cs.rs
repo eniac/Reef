@@ -1563,7 +1563,7 @@ mod tests {
 
                     println!("Batching {:#?}", r1cs_converter.batching);
                     println!("Commit {:#?}", r1cs_converter.commit_type);
-                    r1cs_converter.to_circuit();
+                    let (pd, _vd) = r1cs_converter.to_circuit();
 
                     let mut current_state = dfa.get_init_state();
 
@@ -1597,7 +1597,7 @@ mod tests {
                         //println!("VALUES ROUND {:#?}: {:#?}", i, values);
                         //println!("EXT VALUES ROUND {:#?}: {:#?}", i, extd_val);
 
-                        r1cs_converter.prover_data.unwrap().check_all(&values);
+                        pd.check_all(&values);
                         // for next i+1 round
                         current_state = next_state;
                     }
@@ -1649,10 +1649,7 @@ mod tests {
                             c,
                         )
                     );
-                    println!(
-                        "actual cost: {:#?}",
-                        r1cs_converter.prover_data.unwrap().r1cs.constraints.len()
-                    );
+                    println!("actual cost: {:#?}", pd.r1cs.constraints.len());
                     /*assert!(
                         prover_data.r1cs.constraints.len() as usize
                             == costs::full_round_cost_model_nohash(
