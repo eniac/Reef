@@ -103,7 +103,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             batch_doc.push(EPSILON.clone()); // MUST do to make batching work w/commitments
         }
 
-        let epsilon_to_add = sel_batch_size - (batch_doc.len() % sel_batch_size);
+        let mut epsilon_to_add = sel_batch_size - (batch_doc.len() % sel_batch_size);
+
+        if batch_doc.len() % sel_batch_size == 0 {
+            epsilon_to_add = 0;
+        }
 
         println!(
             "Doc len: {:#?} +1, Epsilon to Add: {:#?}",
@@ -220,7 +224,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             next_hash = vec![start_hash_or_blind];
         }
 
-        println!("PROVER START HASH ROUND {:#?}", next_hash);
+        // println!("PROVER START HASH ROUND {:#?}", next_hash);
         let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
         for b in 0..num_iters {
             //self.batch_size {
@@ -232,12 +236,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
                 let acc = &mut ();
 
-                println!(
-                    "P HASH ELTS: {:#?}, {:#?}, {:#?}",
-                    next_hash[0].clone(),
-                    F::from(self.udoc[access_at].clone() as u64),
-                    F::from((access_at) as u64),
-                );
+                // println!(
+                //     "P HASH ELTS: {:#?}, {:#?}, {:#?}",
+                //     next_hash[0].clone(),
+                //     F::from(self.udoc[access_at].clone() as u64),
+                //     F::from((access_at) as u64),
+                // );
 
                 sponge.start(parameter.clone(), None, acc);
                 SpongeAPI::absorb(
@@ -256,7 +260,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     prev_hash, expected_next_hash
                 );
                 */
-                println!("PROVER HASH ROUND {:#?}", next_hash);
+                // println!("PROVER HASH ROUND {:#?}", next_hash);
                 sponge.finish(acc).unwrap(); // assert expected hash finished correctly
             }
         }
@@ -280,7 +284,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
         }
 
-        println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
+        // println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
 
         // sanity
         if (batch_num + 1) * self.batch_size - 1 >= self.udoc.len() {

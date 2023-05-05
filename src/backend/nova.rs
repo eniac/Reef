@@ -123,7 +123,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
     ) -> Self {
         // todo check wits line up with the non det advice
 
-        println!("ACCEPTING VEC {:#?}", accepting);
+        // println!("ACCEPTING VEC {:#?}", accepting);
         assert_eq!(states.len(), 2);
         assert_eq!(glue.len(), 2);
         assert_eq!(accepting.len(), 2);
@@ -236,7 +236,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             let s_sub: Vec<&str> = s.split("_").collect();
             let q: usize = s_sub[4].parse().unwrap();
 
-            println!("q prev {:#?}", q);
+            // println!("q prev {:#?}", q);
             vars.insert(var, prev_q[q].get_variable());
             alloc_prev_rc[q] = Some(prev_q[q].clone());
 
@@ -258,7 +258,7 @@ where {
             *last_state = Some(alloc_v.clone()); //.get_variable();
         } else if s.starts_with(&format!("accepting")) {
             *accepting = Some(alloc_v.clone());
-            println!("get alloc v accepting {:#?}", alloc_v.clone().get_value());
+            // println!("get alloc v accepting {:#?}", alloc_v.clone().get_value());
         }
         Ok(())
     }
@@ -318,7 +318,7 @@ where {
     where
         CS: ConstraintSystem<F>,
     {
-        println!("adding hash chain hashes in nova");
+        // println!("adding hash chain hashes in nova");
         // allocate blind
         let alloc_blind = AllocatedNum::alloc(cs.namespace(|| "blind"), || Ok(blind))?;
 
@@ -357,7 +357,7 @@ where {
 
         match first {
             true => {
-                println!("SET WITNESSES FOR i_0 = 0");
+                // println!("SET WITNESSES FOR i_0 = 0");
                 start_hash = AllocatedNum::alloc(ns.namespace(|| "start_hash"), || {
                     Ok(random_hash.get_value().unwrap())
                 })?;
@@ -383,7 +383,7 @@ where {
         for i in 0..(self.batch_size) {
             let unwrap_alloc_char = alloc_chars[i].clone().unwrap();
             let mut hash_ns = ns.namespace(|| format!("poseidon hash batch {}", i));
-            println!("i {:#?}, start eps {:#?}", i, start_of_ep);
+            // println!("i {:#?}, start eps {:#?}", i, start_of_ep);
             let hashed = {
                 let acc = &mut hash_ns;
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
@@ -442,7 +442,7 @@ where {
                 AllocatedNum::alloc(hash_ns.namespace(|| "epsilon"), || Ok(epsilon_num))?;
 
             if (i as isize) >= start_of_ep && start_of_ep != -1 {
-                println!("STARTING EPS");
+                // println!("STARTING EPS");
                 next_hash = AllocatedNum::alloc(hash_ns.namespace(|| "next_hash"), || {
                     Ok(prev_hash.get_value().unwrap())
                 })?;
@@ -470,7 +470,7 @@ where {
                 ep_sel = AllocatedNum::alloc(hash_ns.namespace(|| "ep_sel"), || Ok(F::from(1)))?;
             }
 
-            println!("OUT HASH: {:#?}", next_hash.get_value());
+            // println!("OUT HASH: {:#?}", next_hash.get_value());
 
             // sanity - get rid of
             if i_0.get_value().is_some() {
@@ -726,6 +726,7 @@ where {
         let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
         let mut sponge_ns = cs.namespace(|| format!("{} sponge", tag));
 
+        println!("b:{:#?}, sc_l: {:#?}", self.batch_size,sc_l);
         let mut pattern = match tag {
             "eval" => vec![
                 SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs,
@@ -750,7 +751,7 @@ where {
         let mut elts = vec![];
         // if DOC
         if matches!(tag, "doc") {
-            println!("DOC TAG");
+            // println!("DOC TAG");
             let e = AllocatedNum::alloc(sponge_ns.namespace(|| "doc commit hash start"), || {
                 Ok(vesta_hash)
             })?;
@@ -785,7 +786,7 @@ where {
             }
 
             //println!("ELTS {:#?}", elts.len());
-            println!("alloc rc issue j {:#?}", j);
+            // println!("alloc rc issue j {:#?}", j);
             self.fiatshamir_circuit(
                 &elts,
                 &mut sponge,
@@ -1037,6 +1038,7 @@ where
                 out.push(last_state.unwrap());
                 out.push(last_i.unwrap());
 
+                //let last_hash = Some(hash_0.clone());
                 let last_hash = self.hash_circuit(
                     cs,
                     self.first,
@@ -1324,7 +1326,7 @@ where
                             ff_val
                         })
                     };
-                    println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+                    // println!("Var (name?) {:#?}", self.r1cs.names[&var]);
                     let mut matched = self
                         .input_variable_parsing(
                             &mut vars,
