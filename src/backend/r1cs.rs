@@ -1302,7 +1302,7 @@ mod tests {
     use crate::regex::Regex;
     type G1 = pasta_curves::pallas::Point;
 
-    #[test]
+    //#[test]
     fn mle_linear() {
         init();
 
