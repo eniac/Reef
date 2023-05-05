@@ -154,6 +154,8 @@ impl Regex {
         match (&*a.0, &*b.0) {
             (x, y) if x == y => a,
             (RegexF::Alt(x, y), _) => Regex::alt(x.clone(), Regex::alt(y.clone(), b)),
+            (x1, RegexF::Alt(x2, y)) if *x1 == *x2.0 => b,
+            (x1, RegexF::Alt(y, x2)) if *x1 == *x2.0 => b,
             (RegexF::Not(inner), _) if *inner.0 == RegexF::Empty => {
                 Regex(G.mk(RegexF::Not(Regex::empty())))
             }

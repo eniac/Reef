@@ -48,7 +48,7 @@ pub struct Options {
         value_name = "K STRIDE LENGTH",
         help = "Take 2^k steps at one NFA step"
     )]
-    pub k_stride: Option<usize>,
+    pub k_stride: Option<usize>
 }
 
 #[derive(Debug, Subcommand)]
@@ -84,12 +84,7 @@ pub enum Config {
         rulesfile: PathBuf,
     },
     #[clap(about = "Accepts DNA base ASCII files")]
-    Dna {
-        #[arg(short = 'r', long)]
-        re: String,
-        #[arg(short = 'i', long, value_name = "FILE")]
-        inp: PathBuf,
-    },
+    Dna { },
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -242,7 +237,9 @@ impl BaseParser<char> for DnaParser {
         vec!['A', 'C', 'G', 'T']
     }
     fn read_file(&self, file: &PathBuf) -> Vec<char> {
-        let doc = AsciiParser.read_file(file);
+        let mut doc = AsciiParser.read_file(file);
+        doc.retain(|c| *c != '\n' && *c != '\r');
+        println!("{:?}", doc.as_slice());
         for c in doc.iter() {
             assert!(
                 self.alphabet().contains(&c),

@@ -1,9 +1,14 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::{BTreeSet, HashSet};
-use petgraph::{Directed, Direction, Graph};
+use std::process::Command;
+
+use petgraph::{Direction, Graph};
 use petgraph::graph::NodeIndex;
-use petgraph::visit::EdgeRef;
+use petgraph::visit::*;
+use petgraph::dot::Dot;
+use petgraph::algo::{ tarjan_scc, kosaraju_scc, condensation };
+
 use crate::regex::Regex;
 
 #[derive(Debug, Clone)]
@@ -35,6 +40,7 @@ impl NFA {
             q: &Regex,
             n: NodeIndex<u32>) {
 
+            println!("Adding trans {}, {}", q, n.index());
             // Explore derivatives
             for c in &ab[..] {
                 let q_c = q.deriv(&c);
@@ -44,6 +50,7 @@ impl NFA {
                 } else {
                     // Add to DFA if not already there
                     let n_c = g.add_node(q_c.clone());
+                    println!("Calling build_trans [{}] : {}, {}", c, q_c, n_c.index());
                     // Reflexive step
                     g.add_edge(n_c, n_c, EPSILON.clone());
                     g.add_edge(n, n_c, c.to_string());
@@ -181,6 +188,66 @@ impl NFA {
         })
     }
 
+    pub fn scc(&self) -> Vec<Self> {
+        let  sccs = tarjan_scc(&self.g);
+        sccs.into_iter().map(|v| NFA::new(&self.ab.join(""),
+            self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone())).collect()
+    }
+
+    /// Split NFA in .*
+    pub fn split_dot_star(&self) -> std::io::Result<()> {
+        self.write_pdf("original")?;
+
+        let sccs = self.scc();
+
+        let mut files = Vec::new();
+        for i in 0..sccs.len() {
+            let fout = format!("scc-{}", i);
+            sccs[i].write_pdf(fout.as_str())?;
+            files.push(fout.to_string() + ".pdf");
+        }
+
+        Command::new("pdfjam")
+            .args(files.clone())
+            .arg("-o")
+            .arg("scc.pdf")
+            .spawn()
+            .expect("[dot] CLI failed to convert dfa to [pdf] file")
+            .wait()?;
+
+        for fout in files.clone() {
+            std::fs::remove_file(fout)?;
+        }
+
+
+        Ok(())
+    }
+
+    /// Dot file
+    pub fn write_dot(&self, filename: &str) -> std::io::Result<()> {
+        let s: String = Dot::new(&self.g).to_string();
+        let fout = filename.to_string() + ".dot";
+        println!("Wrote DOT file {}.", fout);
+        std::fs::write(fout, s)
+    }
+
+    /// PDF file
+    pub fn write_pdf(&self, filename: &str) -> std::io::Result<()> {
+        self.write_dot(filename)?;
+
+        // Convert to pdf
+        Command::new("dot")
+            .arg("-Tpdf")
+            .arg(filename.to_string() + ".dot")
+            .arg("-o")
+            .arg(filename.to_string() + ".pdf")
+            .spawn()
+            .expect("[dot] CLI failed to convert dfa to [pdf] file")
+            .wait()?;
+
+        Ok(())
+    }
+
     /// Get the 2^k stride DFA
     pub fn k_stride(&mut self, k: usize, doc: &Vec<String>) -> Vec<String> {
         let mut d = doc.clone();
@@ -191,7 +258,8 @@ impl NFA {
     }
 
     /// Double the stride of the DFA
-    pub fn double_stride(&mut self, doc: &Vec<String>) -> Vec<String> {
+    fn double_stride(&mut self, doc: &Vec<String>) -> Vec<String> {
+        assert!(self.anchor_start && self.anchor_end, "k-stride only works for exact match");
         let mut ab: HashSet<(String, String)> = HashSet::new();
         let mut classes: HashMap<BTreeSet<(usize, usize)>, BTreeSet<String>> = HashMap::new();
         // S' := S + S*S (cartesian product)
@@ -269,6 +337,11 @@ impl NFA {
         }
         self.ab = abset.into_iter().collect();
 
+        // Add reflexive steps again
+        for i in self.g.node_indices() {
+            self.g.add_edge(i, i, EPSILON.clone());
+        }
+
         // Return new document (modulo equiv classes)
         doc.chunks(2)
             .filter_map(|c| match c {
@@ -288,8 +361,7 @@ mod tests {
     fn setup_nfa(r: &str, alpha: &str) -> NFA {
         let ab = String::from(alpha);
         let regex = Regex::new(r);
-        let nfa = NFA::new(&ab[..], regex);
-        nfa
+        NFA::new(&ab[..], regex)
     }
 
     fn vs(s: &str) -> Vec<String> {
@@ -357,14 +429,20 @@ mod tests {
     #[test]
     fn test_nfa_double_stride() {
         let mut nfa = setup_nfa("a.*a", "ab");
-        let doc = nfa.double_stride(&vs("abbbba"));
+        let doc = nfa.k_stride(1, &vs("abbbba"));
         check(&nfa, &doc, Some((0, 3)))
     }
 
     #[test]
     fn test_nfa_double_stride_2() {
         let mut nfa = setup_nfa("^.*a$", "ab");
-        let doc = nfa.double_stride(&vs("aabbaaa"));
+        let doc = nfa.k_stride(1, &vs("aabbaaa"));
         check(&nfa, &doc, Some((0, 4)))
+    }
+
+    #[test]
+    fn test_nfa_split() {
+        let mut nfa = setup_nfa("a.*b.*a", "ab");
+        nfa.split_dot_star().unwrap();
     }
 }
