@@ -78,20 +78,25 @@ pub(crate) fn linear_mle_func_evals(
     r_i: &Integer,
 ) -> (Integer, Integer) {
     let base: usize = 2;
+    let pow: usize = base.pow((ell - i) as u32);
     assert_eq!(a.len(), base.pow(ell as u32));
 
+    //    println!("ell {:#?}, i {:#?}", ell, i);
+    //    println!("pow {:#?}", pow);
     let mut message_i = (Integer::from(0), Integer::from(0));
-    for b in (0..=(ell - i)) {
+    for b in (0..pow) {
         //for t in vec![0,1] {
         let mut ai_0 = &a[b];
-        let mut ai_1 = &a[b + base.pow((ell - i) as u32)];
+        let mut ai_1 = &a[b + pow];
+        //        println!("add ({:#?}, {:#?})", ai_0, ai_1);
         message_i.0 += ai_0;
         message_i.1 += ai_1;
 
-        a[b] = &a[b] * (Integer::from(1) - r_i) + &a[b + base.pow((ell - i) as u32)] * r_i;
+        a[b] = &a[b] * (Integer::from(1) - r_i) + &a[b + pow] * r_i;
     }
 
-    message_i
+    // todo elim clone
+    (message_i.0.clone(), message_i.1 - message_i.0)
 }
 
 // x = [r_0, r_1, ... -1, {0,1}, {0,1},...]
