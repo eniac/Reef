@@ -1307,69 +1307,6 @@ mod tests {
     type G1 = pasta_curves::pallas::Point;
 
     #[test]
-    fn mle_linear_big() {
-        init();
-
-        let mut evals = vec![
-            Integer::from(2),
-            Integer::from(3),
-            Integer::from(5),
-            Integer::from(7),
-            Integer::from(9),
-            Integer::from(13),
-            Integer::from(17),
-            Integer::from(19),
-        ];
-
-        let qs = vec![2, 1, 7];
-        let last_q = vec![Integer::from(0), Integer::from(0), Integer::from(0)];
-
-        let claims = vec![
-            Integer::from(3),
-            Integer::from(9),
-            Integer::from(27),
-            Integer::from(81),
-        ];
-
-        let mut eq_a = Vec::new();
-
-        let bool_combos = vec![
-            vec![Integer::from(0), Integer::from(0), Integer::from(0)],
-            vec![Integer::from(0), Integer::from(0), Integer::from(1)],
-            vec![Integer::from(0), Integer::from(1), Integer::from(0)],
-            vec![Integer::from(0), Integer::from(1), Integer::from(1)],
-            vec![Integer::from(1), Integer::from(0), Integer::from(0)],
-            vec![Integer::from(1), Integer::from(0), Integer::from(1)],
-            vec![Integer::from(1), Integer::from(1), Integer::from(0)],
-            vec![Integer::from(1), Integer::from(1), Integer::from(1)],
-        ];
-
-        for cube in bool_combos {
-            let (_, res) = prover_mle_partial_eval(&claims, &cube, &qs, false, Some(&last_q)); //Some(&last_q));
-            eq_a.push(res);
-        }
-
-        println!("eqs {:#?}", eq_a);
-
-        let r = vec![Integer::from(2), Integer::from(8), Integer::from(4)];
-
-        // let mut a = //evals.clone();
-
-        let mut claim: Integer = evals.iter().sum();
-        for i in 1..=3 {
-            let message_i = linear_mle_func_evals(&mut evals, 3, i, &r[i - 1]);
-            //let message_i = linear_mle_product(&mut evals.clone(), &mut eq_a, 3, i, &r[i - 1]);
-
-            println!("message {:#?}, a {:#?}", message_i, evals);
-
-            let g0_g1 = Integer::from(2) * &message_i.0 + &message_i.1;
-            assert_eq!(claim, g0_g1);
-
-            claim = message_i.0 + message_i.1 * &r[i - 1]
-        }
-    }
-
-    #[test]
     fn mle_linear_basic() {
         init();
 
@@ -1385,50 +1322,60 @@ mod tests {
         ];
 
         let qs = vec![2, 1, 7];
-        let last_q = vec![Integer::from(0), Integer::from(0), Integer::from(0)];
+        for last_q in vec![
+            vec![Integer::from(2), Integer::from(3), Integer::from(5)],
+            //vec![Integer::from(0), Integer::from(1), Integer::from(0)],
+        ] {
+            let claims = vec![
+                Integer::from(3),
+                Integer::from(9),
+                Integer::from(27),
+                Integer::from(81),
+            ];
 
-        let claims = vec![
-            Integer::from(3),
-            Integer::from(9),
-            Integer::from(27),
-            Integer::from(81),
-        ];
+            let mut eq_a = vec![Integer::from(0); 8];
 
-        let mut eq_a = Vec::new();
+            for i in 0..qs.len() {
+                eq_a[qs[i]] += &claims[i];
+            }
 
-        let bool_combos = vec![
-            vec![Integer::from(0), Integer::from(0), Integer::from(0)],
-            vec![Integer::from(0), Integer::from(0), Integer::from(1)],
-            vec![Integer::from(0), Integer::from(1), Integer::from(0)],
-            vec![Integer::from(0), Integer::from(1), Integer::from(1)],
-            vec![Integer::from(1), Integer::from(0), Integer::from(0)],
-            vec![Integer::from(1), Integer::from(0), Integer::from(1)],
-            vec![Integer::from(1), Integer::from(1), Integer::from(0)],
-            vec![Integer::from(1), Integer::from(1), Integer::from(1)],
-        ];
+            let mut qt = vec![
+                Integer::from(-8),
+                Integer::from(10),
+                Integer::from(12),
+                Integer::from(-15),
+                Integer::from(16),
+                Integer::from(-20),
+                Integer::from(-24),
+                Integer::from(30),
+            ];
 
-        for cube in bool_combos {
-            let (_, res) = prover_mle_partial_eval(&claims, &cube, &qs, false, Some(&last_q)); //Some(&last_q));
-            eq_a.push(res);
-        }
+            eq_a = eq_a
+                .iter()
+                .zip(qt.iter())
+                .map(|(e, q)| e.clone() + q.clone())
+                .collect();
 
-        println!("eqs {:#?}", eq_a);
+            let r = vec![Integer::from(2), Integer::from(8), Integer::from(4)];
 
-        let r = vec![Integer::from(2), Integer::from(8), Integer::from(4)];
+            let mut claim: Integer = evals
+                .iter()
+                .zip(eq_a.iter())
+                .map(|(ti, eqi)| ti * eqi)
+                .sum();
 
-        // let mut a = //evals.clone();
+            println!("t {:#?}, eqs {:#?}", evals, eq_a);
+            for i in 1..=3 {
+                let (xsq, x, con) = linear_mle_product(&mut evals, &mut eq_a, 3, i, &r[i - 1]);
+                println!("message {:#?} * x^2 + {:#?} * x + {:#?}", xsq, x, con);
+                println!("t {:#?}, eqs {:#?}", evals, eq_a);
 
-        let mut claim: Integer = evals.iter().sum();
-        for i in 1..=3 {
-            let message_i = linear_mle_func_evals(&mut evals, 3, i, &r[i - 1]);
-            //let message_i = linear_mle_product(&mut evals.clone(), &mut eq_a, 3, i, &r[i - 1]);
+                let g0_g1 = Integer::from(2) * &con + &x + &xsq;
+                assert_eq!(claim, g0_g1.rem_floor(cfg().field().modulus()));
 
-            println!("message {:#?}, a {:#?}", message_i, evals);
-
-            let g0_g1 = Integer::from(2) * &message_i.0 + &message_i.1;
-            assert_eq!(claim, g0_g1);
-
-            claim = message_i.0 + message_i.1 * &r[i - 1]
+                claim = xsq * &r[i - 1] * &r[i - 1] + x * &r[i - 1] + con;
+                claim = claim.rem_floor(cfg().field().modulus());
+            }
         }
     }
 

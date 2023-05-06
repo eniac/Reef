@@ -47,56 +47,53 @@ where
 
 // PROVER WORK
 
+// a starts with evals on hypercube
 pub(crate) fn linear_mle_product(
     table_t: &mut Vec<Integer>,
     table_eq: &mut Vec<Integer>,
     ell: usize,
     i: usize,
     r_i: &Integer,
+    //    last_q: Vec<Integer>,
 ) -> (Integer, Integer, Integer) {
-    let (t_0, t_1) = linear_mle_func_evals(table_t, ell, i, r_i);
-
-    let (eq_0, eq_1) = linear_mle_func_evals(table_eq, ell, i, r_i);
-
-    let sum_xsq = t_1.clone() * eq_1.clone();
-    let mut sum_x = eq_1 * t_0.clone();
-    sum_x += t_1 * eq_0.clone();
-    let sum_con = t_0 * eq_0;
-
-    (
-        sum_xsq.rem_floor(cfg().field().modulus()),
-        sum_x.rem_floor(cfg().field().modulus()),
-        sum_con.rem_floor(cfg().field().modulus()),
-    )
-}
-
-// a starts with evals on hypercube
-pub(crate) fn linear_mle_func_evals(
-    a: &mut Vec<Integer>,
-    ell: usize,
-    i: usize,
-    r_i: &Integer,
-) -> (Integer, Integer) {
     let base: usize = 2;
     let pow: usize = base.pow((ell - i) as u32);
-    assert_eq!(a.len(), base.pow(ell as u32));
+    assert_eq!(table_t.len(), base.pow(ell as u32));
+    assert_eq!(table_eq.len(), base.pow(ell as u32));
 
     //    println!("ell {:#?}, i {:#?}", ell, i);
     //    println!("pow {:#?}", pow);
-    let mut message_i = (Integer::from(0), Integer::from(0));
+
+    let mut xsq = Integer::from(0);
+    let mut x = Integer::from(0);
+    let mut con = Integer::from(0);
+
     for b in (0..pow) {
         //for t in vec![0,1] {
-        let mut ai_0 = &a[b];
-        let mut ai_1 = &a[b + pow];
-        //        println!("add ({:#?}, {:#?})", ai_0, ai_1);
-        message_i.0 += ai_0;
-        message_i.1 += ai_1;
+        let mut ti_0 = &table_t[b];
+        let mut ti_1 = &table_t[b + pow];
+        let mut ei_0 = &table_eq[b];
+        let mut ei_1 = &table_eq[b + pow];
+        //println!("add ({:#?}, {:#?})", ai_0, ai_1);
 
-        a[b] = &a[b] * (Integer::from(1) - r_i) + &a[b + pow] * r_i;
+        let t_slope = ti_1.clone() - ti_0;
+        let e_slope = ei_1.clone() - ei_0;
+
+        xsq += t_slope.clone() * &e_slope;
+        x += e_slope * ti_0;
+        x += t_slope * ei_0;
+        con += ti_0 * ei_0;
+
+        // todo opt
+        table_t[b] = &table_t[b] * (Integer::from(1) - r_i) + &table_t[b + pow] * r_i;
+        table_eq[b] = &table_eq[b] * (Integer::from(1) - r_i) + &table_eq[b + pow] * r_i;
     }
 
-    // todo elim clone
-    (message_i.0.clone(), message_i.1 - message_i.0)
+    (
+        xsq.rem_floor(cfg().field().modulus()),
+        x.rem_floor(cfg().field().modulus()),
+        con.rem_floor(cfg().field().modulus()),
+    )
 }
 
 // x = [r_0, r_1, ... -1, {0,1}, {0,1},...]
