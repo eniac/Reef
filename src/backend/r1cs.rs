@@ -1323,7 +1323,7 @@ mod tests {
 
         let qs = vec![2, 1, 7];
         for last_q in vec![
-            vec![Integer::from(2), Integer::from(3), Integer::from(5)],
+            vec![Integer::from(5), Integer::from(3), Integer::from(5)],
             //vec![Integer::from(0), Integer::from(1), Integer::from(0)],
         ] {
             let claims = vec![
@@ -1335,19 +1335,22 @@ mod tests {
 
             let mut eq_a = vec![Integer::from(0); 8];
 
+            let mut term = Integer::from(0);
             for i in 0..qs.len() {
                 eq_a[qs[i]] += &claims[i];
+                term += evals[qs[i]].clone() * &claims[i];
+                println!("term: {:#?}", term);
             }
 
             let mut qt = vec![
-                Integer::from(-8),
-                Integer::from(10),
-                Integer::from(12),
-                Integer::from(-15),
-                Integer::from(16),
-                Integer::from(-20),
-                Integer::from(-24),
-                Integer::from(30),
+                Integer::from(-2592),
+                Integer::from(3240),
+                Integer::from(3888),
+                Integer::from(-4860),
+                Integer::from(3240),
+                Integer::from(-4050),
+                Integer::from(-4860),
+                Integer::from(6075),
             ];
 
             eq_a = eq_a
@@ -1358,11 +1361,21 @@ mod tests {
 
             let r = vec![Integer::from(2), Integer::from(8), Integer::from(4)];
 
+            // claim check
+            let (_, running_v) =
+                prover_mle_partial_eval(&evals, &last_q, &(0..evals.len()).collect(), true, None);
+            term += running_v * &claims[3];
+
             let mut claim: Integer = evals
                 .iter()
                 .zip(eq_a.iter())
                 .map(|(ti, eqi)| ti * eqi)
                 .sum();
+
+            assert_eq!(
+                term.rem_floor(cfg().field().modulus()),
+                claim.clone().rem_floor(cfg().field().modulus())
+            );
 
             println!("t {:#?}, eqs {:#?}", evals, eq_a);
             for i in 1..=3 {
@@ -1371,7 +1384,10 @@ mod tests {
                 println!("t {:#?}, eqs {:#?}", evals, eq_a);
 
                 let g0_g1 = Integer::from(2) * &con + &x + &xsq;
-                assert_eq!(claim, g0_g1.rem_floor(cfg().field().modulus()));
+                assert_eq!(
+                    claim.rem_floor(cfg().field().modulus()),
+                    g0_g1.rem_floor(cfg().field().modulus())
+                );
 
                 claim = xsq * &r[i - 1] * &r[i - 1] + x * &r[i - 1] + con;
                 claim = claim.rem_floor(cfg().field().modulus());
