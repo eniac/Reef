@@ -1333,31 +1333,12 @@ mod tests {
                 Integer::from(81),
             ];
 
-            let mut eq_a = vec![Integer::from(0); 8];
-
             let mut term = Integer::from(0);
             for i in 0..qs.len() {
-                eq_a[qs[i]] += &claims[i];
                 term += evals[qs[i]].clone() * &claims[i];
-                println!("term: {:#?}", term);
             }
 
-            let mut qt = vec![
-                Integer::from(-2592),
-                Integer::from(3240),
-                Integer::from(3888),
-                Integer::from(-4860),
-                Integer::from(3240),
-                Integer::from(-4050),
-                Integer::from(-4860),
-                Integer::from(6075),
-            ];
-
-            eq_a = eq_a
-                .iter()
-                .zip(qt.iter())
-                .map(|(e, q)| e.clone() + q.clone())
-                .collect();
+            let mut eq_a = gen_eq_table(&claims, &qs, &last_q);
 
             let r = vec![Integer::from(2), Integer::from(8), Integer::from(4)];
 

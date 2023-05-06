@@ -96,6 +96,51 @@ pub(crate) fn linear_mle_product(
     )
 }
 
+pub(crate) fn gen_eq_table(
+    rs: &Vec<Integer>,
+    qs: &Vec<usize>,
+    last_q: &Vec<Integer>,
+) -> Vec<Integer> {
+    let base: usize = 2;
+    let ell: usize = last_q.len();
+
+    let t_len = base.pow(ell as u32);
+    assert_eq!(rs.len(), qs.len() + 1);
+
+    let mut eq_t = vec![Integer::from(0); t_len];
+
+    //let mut term = Integer::from(0);
+    for i in 0..qs.len() {
+        eq_t[qs[i]] += &rs[i];
+        //term += evals[qs[i]].clone() * &claims[i];
+        //println!("term: {:#?}", term);
+    }
+
+    for i in 0..eq_t.len() {
+        println!("start");
+
+        // eq_t
+        let mut term = rs[qs.len()].clone(); //Integer::from(1);
+
+        for j in (0..ell).rev() {
+            let xi = (i >> j) & 1;
+
+            term *= Integer::from(xi) * &last_q[j]
+                + Integer::from(1 - xi) * (Integer::from(1) - &last_q[j]);
+
+            //println!("{:#?}", term);
+        }
+
+        println!("{:#?}", term);
+
+        eq_t[i] += term;
+
+        println!("{:#?}", eq_t[i]);
+    }
+
+    eq_t
+}
+
 // x = [r_0, r_1, ... -1, {0,1}, {0,1},...]
 // where -1 is the "hole"
 // returns (coeff (of "hole"), constant)
