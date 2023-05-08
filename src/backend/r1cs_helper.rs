@@ -1,4 +1,3 @@
-use crate::backend::costs::*;
 use crate::backend::nova::int_to_ff;
 use circ::cfg;
 use circ::cfg::*;
@@ -72,12 +71,12 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     let mut x = Integer::from(0);
     let mut con = Integer::from(0);
 
-    for b in (0..pow) {
+    for b in 0..pow {
         //for t in vec![0,1] {
-        let mut ti_0 = &table_t[b];
-        let mut ti_1 = &table_t[b + pow];
-        let mut ei_0 = &table_eq[b];
-        let mut ei_1 = &table_eq[b + pow];
+        let ti_0 = &table_t[b];
+        let ti_1 = &table_t[b + pow];
+        let ei_0 = &table_eq[b];
+        let ei_1 = &table_eq[b + pow];
         //println!("add ({:#?}, {:#?})", ai_0, ai_1);
 
         let t_slope = ti_1.clone() - ti_0;
@@ -105,7 +104,7 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     let rand = SpongeAPI::squeeze(sponge, 1, acc);
     let r_i = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
 
-    for b in (0..pow) {
+    for b in 0..pow {
         // todo opt
         table_t[b] = &table_t[b] * (Integer::from(1) - &r_i) + &table_t[b + pow] * &r_i;
         table_eq[b] = &table_eq[b] * (Integer::from(1) - &r_i) + &table_eq[b + pow] * &r_i;
@@ -193,7 +192,7 @@ pub(crate) fn prover_mle_partial_eval(
         if i < es.len() {
             let mut prod = prods[i].clone();
             let mut next_hole_coeff = 0; // TODO as below ???
-            let mut next_minus_coeff = 0;
+                                         //let mut next_minus_coeff;
             for j in (0..m).rev() {
                 let ej = (es[i] >> j) & 1;
 
@@ -201,7 +200,7 @@ pub(crate) fn prover_mle_partial_eval(
                 if x[m - j - 1] == -1 {
                     // if x_j is the hole
                     next_hole_coeff = ej;
-                    next_minus_coeff = 1 - ej;
+                //      next_minus_coeff = 1 - ej;
                 } else {
                     let mut intm = Integer::from(1);
                     if ej == 1 {
@@ -261,6 +260,7 @@ pub fn verifier_mle_eval(table: &Vec<Integer>, q: &Vec<Integer>) -> Integer {
     con
 }
 
+/*
 // for sum check, computes the sum of many mle univar slices
 // takes raw table (pre mle'd), and rands = [r_0, r_1,...], leaving off the hole and x_i's
 pub(crate) fn prover_mle_sum_eval(
@@ -317,6 +317,7 @@ pub(crate) fn prover_mle_sum_eval(
         sum_con.rem_floor(cfg().field().modulus()),
     )
 }
+*/
 
 // CIRCUITS
 

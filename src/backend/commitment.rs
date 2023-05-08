@@ -1,6 +1,6 @@
 use crate::backend::costs::{JBatching, JCommit};
 use crate::backend::nova::int_to_ff;
-use crate::backend::r1cs_helper::{init, verifier_mle_eval};
+use crate::backend::r1cs_helper::verifier_mle_eval;
 use crate::metrics::Timer;
 use circ::cfg::cfg;
 use ff::{Field, PrimeField};
@@ -15,17 +15,13 @@ use nova_snark::{
     errors::NovaError,
     provider::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pedersen::{Commitment, CommitmentGens, CompressedCommitment},
+        pedersen::{CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
-    traits::{commitment::*, AbsorbInROTrait, CompressedGroup, Group, ROConstantsTrait, ROTrait},
+    traits::{commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait},
 };
 use rand::rngs::OsRng;
-use rug::{
-    integer::Order,
-    ops::{RemRounding, RemRoundingAssign},
-    Assign, Integer,
-};
+use rug::{integer::Order, ops::RemRounding, Integer};
 
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
@@ -347,6 +343,7 @@ mod tests {
 
     use crate::backend::commitment::*;
     use crate::backend::nova::int_to_ff;
+    use crate::backend::r1cs_helper::init;
     use rug::Integer;
     type G1 = pasta_curves::pallas::Point;
 

@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::{BufReader, Read};

@@ -1,11 +1,9 @@
 use itertools::Itertools;
-use std::fmt::{Display, Error, Formatter};
 use std::fs::File;
 use std::io::Result;
 use std::process::{Command, ExitStatus};
 
 use crate::dfa::NFA;
-use crate::regex::Regex;
 
 type Ed = (usize, String, usize);
 
@@ -55,7 +53,7 @@ impl<'a> dot::GraphWalk<'a, usize, Ed> for NFA {
             .map(|((a, b), c)| {
                 (
                     a,
-                    if c.len() > 6 && c.len() > self.ab.len()/4 {
+                    if c.len() > 6 && c.len() > self.ab.len() / 4 {
                         "*".to_string()
                     } else {
                         c.join(", ").trim().to_string()
