@@ -1,5 +1,6 @@
 pub mod timer;
 use timer::{Timer, Component};
+static mut TIMER:Timer = Timer::new();
 
 #[test]
 fn e2e_dpi() {

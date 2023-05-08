@@ -1,15 +1,13 @@
-use reef::backend::costs::*;
-use reef::backend::framework::*;
-use reef::backend::r1cs_helper::init;
-use reef::dfa::NFA;
-use reef::regex::Regex;
-
 use csv::Writer;
 use dashmap::DashMap;
 use core::panic;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{self, prelude::*};
+
+lazy_static! {
+    static ref TIMER:Timer = Timer::new();
+}
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
 pub enum Component {
