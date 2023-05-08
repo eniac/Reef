@@ -1,8 +1,12 @@
 use crate::backend::costs::*;
+use crate::backend::nova::int_to_ff;
 use circ::cfg;
 use circ::cfg::*;
 use circ::ir::term::*;
-use rug::{ops::RemRounding, Assign, Integer};
+use ff::PrimeField;
+use generic_array::typenum;
+use neptune::sponge::{api::SpongeAPI, vanilla::Sponge};
+use rug::{integer::Order, ops::RemRounding, Assign, Integer};
 use std::sync::Once;
 
 pub static INIT: Once = Once::new();
@@ -47,51 +51,112 @@ where
 
 // PROVER WORK
 
-pub(crate) fn linear_mle_product(
+// a starts with evals on hypercube
+pub(crate) fn linear_mle_product<F: PrimeField>(
     table_t: &mut Vec<Integer>,
     table_eq: &mut Vec<Integer>,
     ell: usize,
     i: usize,
-    r_i: &Integer,
-) -> (Integer, Integer, Integer) {
-    let (t_0, t_1) = linear_mle_func_evals(table_t, ell, i, r_i);
-
-    let (eq_0, eq_1) = linear_mle_func_evals(table_eq, ell, i, r_i);
-
-    let sum_xsq = t_1.clone() * eq_1.clone();
-    let mut sum_x = eq_1 * t_0.clone();
-    sum_x += t_1 * eq_0.clone();
-    let sum_con = t_0 * eq_0;
-
-    (
-        sum_xsq.rem_floor(cfg().field().modulus()),
-        sum_x.rem_floor(cfg().field().modulus()),
-        sum_con.rem_floor(cfg().field().modulus()),
-    )
-}
-
-// a starts with evals on hypercube
-pub(crate) fn linear_mle_func_evals(
-    a: &mut Vec<Integer>,
-    ell: usize,
-    i: usize,
-    r_i: &Integer,
-) -> (Integer, Integer) {
+    sponge: &mut Sponge<F, typenum::U4>,
+    //    last_q: Vec<Integer>,
+) -> (Integer, Integer, Integer, Integer) {
     let base: usize = 2;
-    assert_eq!(a.len(), base.pow(ell as u32));
+    let pow: usize = base.pow((ell - i) as u32);
+    assert_eq!(table_t.len(), base.pow(ell as u32));
+    assert_eq!(table_eq.len(), base.pow(ell as u32));
 
-    let mut message_i = (Integer::from(0), Integer::from(0));
-    for b in (0..=(ell - i)) {
+    //    println!("ell {:#?}, i {:#?}", ell, i);
+    //    println!("pow {:#?}", pow);
+
+    let mut xsq = Integer::from(0);
+    let mut x = Integer::from(0);
+    let mut con = Integer::from(0);
+
+    for b in (0..pow) {
         //for t in vec![0,1] {
-        let mut ai_0 = &a[b];
-        let mut ai_1 = &a[b + base.pow((ell - i) as u32)];
-        message_i.0 += ai_0;
-        message_i.1 += ai_1;
+        let mut ti_0 = &table_t[b];
+        let mut ti_1 = &table_t[b + pow];
+        let mut ei_0 = &table_eq[b];
+        let mut ei_1 = &table_eq[b + pow];
+        //println!("add ({:#?}, {:#?})", ai_0, ai_1);
 
-        a[b] = &a[b] * (Integer::from(1) - r_i) + &a[b + base.pow((ell - i) as u32)] * r_i;
+        let t_slope = ti_1.clone() - ti_0;
+        let e_slope = ei_1.clone() - ei_0;
+
+        xsq += t_slope.clone() * &e_slope;
+        x += e_slope * ti_0;
+        x += t_slope * ei_0;
+        con += ti_0 * ei_0;
     }
 
-    message_i
+    xsq = xsq.rem_floor(cfg().field().modulus());
+    x = x.rem_floor(cfg().field().modulus());
+    con = con.rem_floor(cfg().field().modulus());
+
+    // generate rands
+    let query = vec![
+        int_to_ff(con.clone()),
+        int_to_ff(x.clone()),
+        int_to_ff(xsq.clone()),
+    ];
+
+    let acc = &mut ();
+    SpongeAPI::absorb(sponge, 3, &query, acc);
+    let rand = SpongeAPI::squeeze(sponge, 1, acc);
+    let r_i = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+
+    for b in (0..pow) {
+        // todo opt
+        table_t[b] = &table_t[b] * (Integer::from(1) - &r_i) + &table_t[b + pow] * &r_i;
+        table_eq[b] = &table_eq[b] * (Integer::from(1) - &r_i) + &table_eq[b + pow] * &r_i;
+    }
+
+    (r_i, xsq, x, con)
+}
+
+pub(crate) fn gen_eq_table(
+    rs: &Vec<Integer>,
+    qs: &Vec<usize>,
+    last_q: &Vec<Integer>,
+) -> Vec<Integer> {
+    let base: usize = 2;
+    let ell: usize = last_q.len();
+
+    let t_len = base.pow(ell as u32);
+    assert_eq!(rs.len(), qs.len() + 1);
+
+    let mut eq_t = vec![Integer::from(0); t_len];
+
+    //let mut term = Integer::from(0);
+    for i in 0..qs.len() {
+        eq_t[qs[i]] += &rs[i];
+        //term += evals[qs[i]].clone() * &claims[i];
+        //println!("term: {:#?}", term);
+    }
+
+    for i in 0..eq_t.len() {
+        println!("start");
+
+        // eq_t
+        let mut term = rs[qs.len()].clone(); //Integer::from(1);
+
+        for j in (0..ell).rev() {
+            let xi = (i >> j) & 1;
+
+            term *= Integer::from(xi) * &last_q[j]
+                + Integer::from(1 - xi) * (Integer::from(1) - &last_q[j]);
+
+            //println!("{:#?}", term);
+        }
+
+        println!("{:#?}", term);
+
+        eq_t[i] += term;
+
+        println!("{:#?}", eq_t[i]);
+    }
+
+    eq_t
 }
 
 // x = [r_0, r_1, ... -1, {0,1}, {0,1},...]

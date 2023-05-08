@@ -15,10 +15,10 @@ use nova_snark::{
     errors::NovaError,
     provider::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pedersen::{Commitment, CommitmentGens},
+        pedersen::{Commitment, CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
-    traits::{commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait},
+    traits::{commitment::*, AbsorbInROTrait, CompressedGroup, Group, ROConstantsTrait, ROTrait},
 };
 use rand::rngs::OsRng;
 use rug::{
@@ -46,8 +46,8 @@ pub struct HashCommitmentStruct<F: PrimeField> {
 pub struct DocCommitmentStruct<F> {
     gens: CommitmentGens<G1>,
     gens_single: CommitmentGens<G1>,
-    commit_doc: Commitment<G1>, // todo compress
-    vec_t: Vec<F>,              //<G1 as Group>::Scalar>,
+    commit_doc: CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
+    vec_t: Vec<F>, //<G1 as Group>::Scalar>,
     decommit_doc: F,
     pub commit_doc_hash: F,
 }
@@ -144,8 +144,6 @@ where
                 mle.into_iter().map(|x| int_to_ff(x)).collect();
 
             let commit_doc = <G1 as Group>::CE::commit(&gens_t, &scalars, &blind);
-            // TODO compress ?
-            //self.doc_commitement = Some(commitment);
 
             // for in circuit hashing
             let mut ro: PoseidonRO<<G2 as Group>::Scalar, <G1 as Group>::Scalar> =
@@ -160,7 +158,7 @@ where
                     1,
                     &gens_t.get_blinding_gen(),
                 ),
-                commit_doc: commit_doc,
+                commit_doc: commit_doc.compress(),
                 vec_t: scalars,
                 decommit_doc: blind,
                 commit_doc_hash: commit_doc_hash,
@@ -186,8 +184,11 @@ pub fn proof_dot_prod(
         <G1 as Group>::CE::commit(&dc.gens_single, &[running_v.clone()], &decommit_running_v);
 
     // prove
-    let ipi: InnerProductInstance<G1> =
-        InnerProductInstance::new(&dc.commit_doc, &running_q, &commit_running_v);
+    let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
+        &dc.commit_doc.decompress().unwrap(),
+        &running_q,
+        &commit_running_v,
+    );
     let ipw =
         InnerProductWitness::new(&dc.vec_t, &dc.decommit_doc, &running_v, &decommit_running_v);
     let ipa =
