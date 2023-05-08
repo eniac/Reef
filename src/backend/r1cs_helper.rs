@@ -1,8 +1,12 @@
 use crate::backend::costs::*;
+use crate::backend::nova::int_to_ff;
 use circ::cfg;
 use circ::cfg::*;
 use circ::ir::term::*;
-use rug::{ops::RemRounding, Assign, Integer};
+use ff::PrimeField;
+use generic_array::typenum;
+use neptune::sponge::{api::SpongeAPI, vanilla::Sponge};
+use rug::{integer::Order, ops::RemRounding, Assign, Integer};
 use std::sync::Once;
 
 pub static INIT: Once = Once::new();
@@ -48,14 +52,14 @@ where
 // PROVER WORK
 
 // a starts with evals on hypercube
-pub(crate) fn linear_mle_product(
+pub(crate) fn linear_mle_product<F: PrimeField>(
     table_t: &mut Vec<Integer>,
     table_eq: &mut Vec<Integer>,
     ell: usize,
     i: usize,
-    r_i: &Integer,
+    sponge: &mut Sponge<F, typenum::U4>,
     //    last_q: Vec<Integer>,
-) -> (Integer, Integer, Integer) {
+) -> (Integer, Integer, Integer, Integer) {
     let base: usize = 2;
     let pow: usize = base.pow((ell - i) as u32);
     assert_eq!(table_t.len(), base.pow(ell as u32));
@@ -83,17 +87,31 @@ pub(crate) fn linear_mle_product(
         x += e_slope * ti_0;
         x += t_slope * ei_0;
         con += ti_0 * ei_0;
-
-        // todo opt
-        table_t[b] = &table_t[b] * (Integer::from(1) - r_i) + &table_t[b + pow] * r_i;
-        table_eq[b] = &table_eq[b] * (Integer::from(1) - r_i) + &table_eq[b + pow] * r_i;
     }
 
-    (
-        xsq.rem_floor(cfg().field().modulus()),
-        x.rem_floor(cfg().field().modulus()),
-        con.rem_floor(cfg().field().modulus()),
-    )
+    xsq = xsq.rem_floor(cfg().field().modulus());
+    x = x.rem_floor(cfg().field().modulus());
+    con = con.rem_floor(cfg().field().modulus());
+
+    // generate rands
+    let query = vec![
+        int_to_ff(con.clone()),
+        int_to_ff(x.clone()),
+        int_to_ff(xsq.clone()),
+    ];
+
+    let acc = &mut ();
+    SpongeAPI::absorb(sponge, 3, &query, acc);
+    let rand = SpongeAPI::squeeze(sponge, 1, acc);
+    let r_i = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+
+    for b in (0..pow) {
+        // todo opt
+        table_t[b] = &table_t[b] * (Integer::from(1) - &r_i) + &table_t[b + pow] * &r_i;
+        table_eq[b] = &table_eq[b] * (Integer::from(1) - &r_i) + &table_eq[b + pow] * &r_i;
+    }
+
+    (r_i, xsq, x, con)
 }
 
 pub(crate) fn gen_eq_table(
