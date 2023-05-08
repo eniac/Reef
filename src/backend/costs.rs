@@ -27,15 +27,29 @@ pub fn logmn(mn: usize) -> usize {
     }
 }
 
+pub fn get_padding(doc_len: usize, batch_size: usize, commit: JCommit)->usize {
+    let modlen: usize = match commit {
+        JCommit::Nlookup => doc_len + 1,
+        _ => doc_len,
+    };
+    let mut epsilon_to_add = batch_size - (modlen % batch_size);
+    if modlen % batch_size == 0 {
+        epsilon_to_add = 0;
+    }
+    epsilon_to_add+1
+}
+
 pub fn accepting_circuit<'a>(dfa: &'a NFA, is_match: Option<(usize, usize)>) -> usize {
     // vanishing selection for final check
     // poly of degree (# final states - 1)
     // (alt, # non final states - 1)
-    let cost: usize = 2; //constrain to boolean costs
-    match is_match {
-        None => cost + dfa.get_non_final_states().len() as usize - 1,
-        _ => cost + dfa.get_final_states().len() as usize - 1,
-    }
+    let cost: usize = 5; //constrain to boolean costs and bool accepting
+    let nstate =  match is_match {
+        None => dfa.get_non_final_states().len() as usize - 1 ,
+        _ => dfa.get_final_states().len() as usize - 1,
+    };
+    let fac2: usize = (nstate as f32 /2.0 ).ceil() as usize;
+    cost+nstate+2
 }
 
 pub fn commit_circuit_nohash(
@@ -46,16 +60,16 @@ pub fn commit_circuit_nohash(
 ) -> usize {
     match commit_type {
         JCommit::HashChain => match is_match {
-            None => batch_size+1, // i's for hashes: i++ (batch_size),
+            None => batch_size, // i's for hashes: i++ (batch_size),
             // enforce i_0 != 0 bool (2), ite (5) -> on nova level :)
-            Some((_, end)) if end >= doc_len => batch_size+1,
+            Some((_, end)) if end >= doc_len => batch_size,
             _ => panic!(
                 "Cant do hashchain with substring: doc len {:#?}, substring {:#?}",
                 doc_len, is_match
             ),
         },
         JCommit::Nlookup => {
-            let mn: usize = doc_len;
+            let mn: usize = doc_len + get_padding(doc_len, batch_size, JCommit::Nlookup);
             let log_mn: usize = logmn(mn);
             let mut cost: usize = 0;
 
@@ -98,7 +112,7 @@ fn commit_circuit_hash(
             _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
-            let mn: usize = doc_len + 1;
+            let mn: usize = get_padding(doc_len, batch_size, JCommit::Nlookup);
             let log_mn: usize = logmn(mn);
             let mut cost = 578;
 
@@ -128,7 +142,7 @@ pub fn naive_cost_model_nohash<'a>(
 ) -> usize {
     // vanishing poly - m * n multiplications + 2 for lookup
     let mut cost = dfa.trans.len() - 1;
-    cost *= (batch_size+1);
+    cost *= batch_size;
 
     cost += accepting_circuit(dfa, is_match);
 

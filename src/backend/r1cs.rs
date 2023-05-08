@@ -64,7 +64,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let cost: usize;
         if batch_size > 0 {
             (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
-                (Some(b), Some(c)) => (b, c, batch_size, 0),
+                (Some(b), Some(c)) => (b, c, batch_size, full_round_cost_model(dfa, batch_size, b, dfa_match, doc.len(), c)),
                 (Some(b), _) => {
                     opt_commit_select_with_batch(dfa, batch_size, dfa_match, doc.len(), b)
                 }
@@ -99,9 +99,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         );
 
         let mut batch_doc = doc.clone();
+
+        println!("batch doc len {}", batch_doc.len());
+        println!("{:#?}",batch_doc);
+
         if matches!(commit, JCommit::Nlookup) {
             batch_doc.push(EPSILON.clone()); // MUST do to make batching work w/commitments
         }
+
+        println!("batch doc len {}", batch_doc.len());
+        println!("{:#?}",batch_doc);
 
         let mut epsilon_to_add = sel_batch_size - (batch_doc.len() % sel_batch_size);
 
@@ -436,10 +443,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // println!("Prover data {:#?}", prover_data);
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
-        /* for r in circ_r1cs.constraints().clone() {
-                    println!("{:#?}", circ_r1cs.format_qeq(&r));
-                }
-        */
+        // for r in circ_r1cs.constraints().clone() {
+        //             println!("{:#?}", circ_r1cs.format_qeq(&r));
+        //         }
+        
         //println!("Prover data {:#?}", circ_r1cs);
         let ms = time.elapsed().as_millis();
         println!(
@@ -1600,7 +1607,7 @@ mod tests {
         println!("DFA Size: {:#?}", dfa.trans.len());
 
         let mut chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
-        chars.push(EPSILON.clone());
+        // chars.push(EPSILON.clone());
 
         for s in batch_sizes {
             for c in vec![JCommit::HashChain, JCommit::Nlookup] {
@@ -1612,7 +1619,7 @@ mod tests {
                     println!("Doc:{:#?}", doc);
                     let mut r1cs_converter = R1CS::new(
                         &dfa,
-                        &chars,
+                        &chars_clone,
                         s,
                         sc.clone(),
                         Some(b.clone()),
@@ -1724,14 +1731,14 @@ mod tests {
                     println!("actual cost: {:#?}", pd.r1cs.constraints.len());
                     assert!(
                         pd.r1cs.constraints.len() as usize
-                            <= costs::full_round_cost_model_nohash(
+                            == costs::full_round_cost_model_nohash(
                                 &dfa,
                                 r1cs_converter.batch_size,
                                 b.clone(),
                                 dfa.is_match(&chars),
                                 doc.len(),
                                 c
-                            ) + 30 
+                            )
                     );
                      // deal with later TODO
                 }
@@ -1746,7 +1753,7 @@ mod tests {
             "a".to_string(),
             "^a*$".to_string(),
             "aaaa".to_string(),
-            vec![2],
+            vec![1,2],
             true,
         );
     }
