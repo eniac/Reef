@@ -7,12 +7,12 @@ type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
 type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
-use crate::backend::{
+use crate::{backend::{
     commitment::*,
     costs::{logmn, JBatching, JCommit},
     nova::*,
     r1cs::*,
-};
+}, metrics::*};
 use crate::dfa::{EPSILON, NFA};
 use circ::target::r1cs::ProverData;
 use ff::Field;
@@ -29,6 +29,7 @@ use nova_snark::{
     },
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
+use core::time;
 use std::time::Instant;
 
 // gen R1CS object, commitment, make step circuit for nova
@@ -38,9 +39,11 @@ pub fn run_backend(
     batching_type: Option<JBatching>,
     commit_doctype: Option<JCommit>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
+    timer: &mut Timer,
 ) {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
+    timer.tic(Component::Compiler, "test", "Optimization Selection");
     let mut r1cs_converter = R1CS::new(
         dfa,
         &doc,
@@ -49,18 +52,22 @@ pub fn run_backend(
         batching_type,
         commit_doctype,
     );
-
+    timer.stop();
     println!("generate commitment");
 
     // to get rid clone
+    timer.tic(Component::Compiler, "test", "Commitment Generations");
     let reef_commit = gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
     // todo clone
     r1cs_converter.set_commitment(reef_commit.clone());
+    timer.stop();
 
     //let r_time = Instant::now();
+    timer.tic(Component::Compiler, "test", "Circuit Generation");
     let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
 
-    let (z0_primary, z0_secondary, pp) = setup(&r1cs_converter, &prover_data);
+    let (z0_primary, z0_secondary, pp) = setup(&r1cs_converter, &prover_data,timer);
+    timer.stop();
 
     let proof = solve_and_prove(
         &r1cs_converter,
@@ -68,14 +75,17 @@ pub fn run_backend(
         &z0_primary,
         &z0_secondary,
         &pp,
+        timer
     );
-
+    timer.tic(Component::Prover, "add test", "Verify");
     verify(proof, r1cs_converter, z0_primary, z0_secondary, &pp);
+    timer.stop();
 }
 
 fn setup<'a>(
     r1cs_converter: &R1CS<<G1 as Group>::Scalar>,
     circ_data: &'a ProverData,
+    timer: &mut Timer
 ) -> (
     Vec<<G1 as Group>::Scalar>,
     Vec<<G2 as Group>::Scalar>,
@@ -158,6 +168,8 @@ fn setup<'a>(
         TrivialTestCircuit<<G2 as Group>::Scalar>,
     >::setup(circuit_primary.clone(), circuit_secondary.clone())
     .unwrap();
+    timer.r1cs(Component::Prover, "add test", "Primary Circuit", pp.num_constraints().0);
+    timer.r1cs(Component::Prover, "add test", "Secondary Circuit", pp.num_constraints().1);
     println!(
         "Number of constraints (primary circuit): {}",
         pp.num_constraints().0
@@ -256,6 +268,7 @@ fn solve_and_prove<'a>(
     z0_primary: &Vec<<G1 as Group>::Scalar>,
     z0_secondary: &Vec<<G2 as Group>::Scalar>,
     pp: &'a PublicParams<G1, G2, C1, C2>,
+    timer: &mut Timer,
 ) -> CompressedSNARK<G1, G2, C1<'a>, C2, S1, S2> {
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());

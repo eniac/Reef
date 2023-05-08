@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{self, prelude::*};
 
 lazy_static! {
-    static ref TIMER:Timer = Timer::new();
+    pub static ref TIMER:Timer = Timer::new();
 }
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
@@ -41,7 +41,8 @@ enum Time {
 
 pub struct Timer {
     time_log: DashMap<Test, Time>,
-    r1cs_log: DashMap<Test, usize>
+    r1cs_log: DashMap<Test, usize>,
+    space_log: DashMap<Test, usize>
 }
 
 use Time::*;
@@ -50,6 +51,7 @@ impl Timer {
         Timer {
             time_log: DashMap::new(),
             r1cs_log: DashMap::new(),
+            space_log: DashMap::new(),
         }
     }
 
@@ -63,6 +65,20 @@ impl Timer {
             self.r1cs_log.insert(
                 (comp, test.to_string(), subtest.to_string()),
                 nR1cs,
+            );
+        }
+    }
+
+    pub fn space(&mut self, comp: Component, test: &str, subtest: &str, sz_bytes:usize) {
+        if self
+            .space_log
+            .contains_key(&(comp.clone(), test.to_string(), subtest.to_string()))
+        {
+           panic!("Trying to write multiple sizes for same test")
+        } else {
+            self.space_log.insert(
+                (comp, test.to_string(), subtest.to_string()),
+                sz_bytes,
             );
         }
     }
@@ -119,6 +135,16 @@ impl Timer {
                 subtest.to_string(),
                 value.to_string(),
                 "constraints".to_string(),
+            ])?;
+        }
+
+        for ((c, test, subtest), value) in self.space_log.clone().into_iter() {
+            wtr.write_record(&[
+                c.to_string(),
+                test.to_string(),
+                subtest.to_string(),
+                value.to_string(),
+                "bytes".to_string(),
             ])?;
         }
         wtr.flush()?;
