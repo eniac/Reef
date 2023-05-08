@@ -50,7 +50,6 @@ impl NFA {
                 } else {
                     // Add to DFA if not already there
                     let n_c = g.add_node(q_c.clone());
-                    println!("Calling build_trans [{}] : {}, {}", c, q_c, n_c.index());
                     // Reflexive step
                     g.add_edge(n_c, n_c, EPSILON.clone());
                     g.add_edge(n, n_c, c.to_string());
@@ -194,6 +193,14 @@ impl NFA {
             self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone())).collect()
     }
 
+    pub fn any_prefix_accepting(&self) -> bool {
+        let mut chars_accepted = self.ab.clone();
+        let mut dfs = Dfs::new(&self.g, NodeIndex::new(self.get_init_state()));
+        while let Some(nx) = dfs.next(&self.g) {
+            // we can access `graph` mutably here still
+        }
+        true
+    }
     /// Split NFA in .*
     pub fn split_dot_star(&self) -> std::io::Result<()> {
         self.write_pdf("original")?;
@@ -309,6 +316,7 @@ impl NFA {
                 .expect("No equivalence classes found")
         }
 
+        // ((a | b) .* c) | d) =
         // Find a equivalent string from an eqivalence class
         fn find_equivalent(c: String, classes: &Vec<BTreeSet<String>>) -> String {
             let mut rep = None;
@@ -442,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_nfa_split() {
-        let mut nfa = setup_nfa("a.*b.*a", "ab");
+        let mut nfa = setup_nfa("(c | (a.*b))", "abc");
         nfa.split_dot_star().unwrap();
     }
 }

@@ -2,7 +2,8 @@
 #![allow(missing_docs)]
 use hashconsing::{consign, HConsed, HashConsign};
 use regex_syntax::hir::{Hir, HirKind, Anchor, Class, RepetitionKind, RepetitionRange, Literal};
-use regex_syntax::Parser;
+use regex_syntax::ast::parse::ParserBuilder;
+use regex_syntax::hir::translate::Translator;
 
 use std::str::FromStr;
 use std::slice::Iter;
@@ -100,7 +101,11 @@ impl FromStr for Regex {
             }
         }
 
-        let hir = Parser::new().parse(s).map_err(|err|err.to_string())?;
+        let mut pb = ParserBuilder::new();
+        let mut transl = Translator::new();
+        pb.ignore_whitespace(true);
+        let ast = pb.build().parse(s.clone()).map_err(|err|err.to_string())?;
+        let hir = transl.translate(s, &ast).map_err(|err|err.to_string())?;
         to_regex(&hir)
     }
 }
@@ -154,8 +159,8 @@ impl Regex {
         match (&*a.0, &*b.0) {
             (x, y) if x == y => a,
             (RegexF::Alt(x, y), _) => Regex::alt(x.clone(), Regex::alt(y.clone(), b)),
-            (x1, RegexF::Alt(x2, y)) if *x1 == *x2.0 => b,
-            (x1, RegexF::Alt(y, x2)) if *x1 == *x2.0 => b,
+            (x1, RegexF::Alt(x2, _)) if *x1 == *x2.0 => b,
+            (x1, RegexF::Alt(_, x2)) if *x1 == *x2.0 => b,
             (RegexF::Not(inner), _) if *inner.0 == RegexF::Empty => {
                 Regex(G.mk(RegexF::Not(Regex::empty())))
             }
@@ -219,7 +224,7 @@ impl Regex {
     }
 
     pub fn deriv(&self, c: &char) -> Regex {
-        match *self.0 {
+        let r = match *self.0 {
             RegexF::Nil => Regex::empty(),
             RegexF::Empty => Regex::empty(),
             RegexF::Dot => Regex::nil(),
@@ -237,7 +242,11 @@ impl Regex {
             RegexF::Range(ref a, i, j) if i == j => Regex::app(a.deriv(c), Regex::range(a.clone(), i-1, j-1)),
             RegexF::Range(ref a, i, j) => Regex::app(a.deriv(c), Regex::range(a.clone(), i+1, j)),
             RegexF::LineStart | RegexF::LineEnd => panic!("No derivatives for ^, $")
-        }
+        };
+
+        println!("d_{}({}) = {}", c, self, r);
+        println!("d_{}({:?}) = {:?}", c, self, r);
+        r
     }
 }
 
