@@ -4,7 +4,7 @@ use crate::dfa::NFA;
 use clap::ValueEnum;
 
 static POSEIDON_NUM: usize = 292;
-static GLUE_NUMBER: usize= 11376;
+static GLUE_NUMBER: usize = 11376;
 //238; // jess took literal measurement and 238 is the real diff
 
 #[derive(Debug, Clone, ValueEnum, Copy)]
@@ -107,8 +107,8 @@ fn commit_circuit_hash(
 ) -> usize {
     match commit_type {
         JCommit::HashChain => match is_match {
-            None => (batch_size+1) * (POSEIDON_NUM + 3),
-            Some((_, end)) if end == doc_len => (batch_size+1) * POSEIDON_NUM,
+            None => (batch_size + 1) * (POSEIDON_NUM + 3),
+            Some((_, end)) if end == doc_len => (batch_size + 1) * POSEIDON_NUM,
             _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
@@ -117,13 +117,13 @@ fn commit_circuit_hash(
             let mut cost = 578;
 
             //Running claim
-            if log_mn+batch_size > 5 {
-                let mut n_sponge = (((log_mn+batch_size - 5)/4) as f32).ceil() as usize;
+            if log_mn + batch_size > 5 {
+                let mut n_sponge = (((log_mn + batch_size - 5) / 4) as f32).ceil() as usize;
                 if n_sponge == 0 {
-                    n_sponge +=1;
+                    n_sponge += 1;
                 }
                 cost += n_sponge * 288;
-            } 
+            }
 
             //Sum check poseidon hashes
             cost += log_mn * 290;
@@ -204,16 +204,16 @@ pub fn nlookup_cost_model_hash<'a>(
     let log_mn: usize = logmn(mn);
     let mut cost = nlookup_cost_model_nohash(dfa, batch_size, is_match, doc_len, commit_type);
 
-    cost+= 578;
+    cost += 578;
 
     //Running claim
-    if log_mn+batch_size > 5 {
-        let mut n_sponge = (((log_mn+batch_size - 5)/4) as f32).ceil() as usize;
+    if log_mn + batch_size > 5 {
+        let mut n_sponge = (((log_mn + batch_size - 5) / 4) as f32).ceil() as usize;
         if n_sponge == 0 {
-            n_sponge +=1;
+            n_sponge += 1;
         }
         cost += n_sponge * 288;
-    } 
+    }
 
     //Sum check poseidon hashes
     cost += log_mn * 290;
@@ -485,7 +485,11 @@ pub fn opt_cost_model_select<'a>(
                 (Some(b), Some(c), _) => {
                     let single_cost =
                         full_round_cost_model(dfa, 1 << n, b, is_match, doc_length, c);
-                    println!("Single Round Cost with hash: {:#?}, b {:#?}", single_cost+GLUE_NUMBER,1<<n);
+                    println!(
+                        "Single Round Cost with hash: {:#?}, b {:#?}",
+                        single_cost + GLUE_NUMBER,
+                        1 << n
+                    );
                     (
                         b,
                         c,

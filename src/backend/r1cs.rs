@@ -159,6 +159,19 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
         }
 
+        // need to round out table size
+        let base: usize = 2;
+        while table.len() < base.pow(logmn(table.len()) as u32) {
+            table.push(
+                Integer::from(
+                    (dfa.nstates() * dfa.nstates() * dfa.nchars())
+                        + (dfa.nstates() * dfa.nchars())
+                        + dfa.nchars(),
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
+        }
+
         // generate usize doc
         // doc to usizes - can I use this elsewhere too? TODO
         let mut usize_doc = vec![];
@@ -950,21 +963,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         //    println!("v: {:#?}", v.clone());
 
-        /*
-        // need to round out table size
-        let base: usize = 2;
-        while table.len() < base.pow((table.len() as f32).log2().ceil() as u32) {
-            table.push(
-                Integer::from(
-                    (self.dfa.nstates() * self.dfa.nstates() * self.dfa.nchars())
-                        + (self.dfa.nstates() * self.dfa.nchars())
-                        + self.dfa.nchars(),
-                )
-                .rem_floor(cfg().field().modulus()),
-            );
-        }
-        */
-
         assert!(running_q.is_some() || batch_num == 0);
         assert!(running_v.is_some() || batch_num == 0);
         let (w, next_running_q, next_running_v) =
@@ -1048,6 +1046,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let sc_l = logmn(table.len()); // sum check rounds
+        println!("WIT GADGET {:#?}, {:#?}", table.len(), sc_l);
 
         // running claim about T (optimization)
         // if first (not yet generated)
@@ -1059,6 +1058,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             Some(v) => v,
             None => table[0].clone(),
         };
+
         wits.insert(
             format!("{}_prev_running_claim", id),
             new_wit(prev_running_v.clone()),
@@ -1152,15 +1152,39 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
+        let mut rs = vec![claim_r.clone()];
+        for i in 1..(q.len() + 1) {
+            rs.push(rs[i - 1].clone() * claim_r.clone());
+        }
+        // make eq table for this round
+        let mut eq_table =
+            gen_eq_table(&rs, &q, &prev_running_q.clone().into_iter().rev().collect());
+        let mut sc_table = match id {
+            "nl" => table.clone(),
+            "nldoc" => {
+                let base: usize = 2;
+                let len = base.pow(logmn(table.len()) as u32) - table.len();
+
+                let mut sct = table.clone();
+                sct.extend(vec![Integer::from(0); len]); // ep num = self.dfa.nchars()
+                sct
+            }
+            _ => panic!("weird tag"),
+        };
+        println!("table {:#?}, {:#?}", sc_table.clone(), sc_l);
+
         // generate polynomial g's for sum check
         let mut sc_rs = vec![];
+        let mut sc_r = Integer::from(0);
         let mut g_xsq = Integer::from(0);
         let mut g_x = Integer::from(0);
         let mut g_const = Integer::from(0);
 
         for i in 1..=sc_l {
-            (g_xsq, g_x, g_const) =
-                prover_mle_sum_eval(table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
+            println!("SUM CHECK ROUND");
+            (sc_r, g_xsq, g_x, g_const) =
+                linear_mle_product(&mut sc_table, &mut eq_table, sc_l, i, &mut sponge);
+            //prover_mle_sum_eval(table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
 
             wits.insert(format!("{}_sc_g_{}_xsq", id, i), new_wit(g_xsq.clone()));
             wits.insert(format!("{}_sc_g_{}_x", id, i), new_wit(g_x.clone()));
@@ -1168,17 +1192,17 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             // new sumcheck rand for the round
             // generate rands
-            let query = vec![
-                int_to_ff(g_const.clone()),
-                int_to_ff(g_x.clone()),
-                int_to_ff(g_xsq.clone()),
-            ];
-
+            /*let query = vec![
+                            int_to_ff(g_const.clone()),
+                            int_to_ff(g_x.clone()),
+                            int_to_ff(g_xsq.clone()),
+                        ];
+            */
             //println!("R1CS sponge absorbs {:#?}", query);
-            SpongeAPI::absorb(&mut sponge, 3, &query, acc);
-            let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            //SpongeAPI::absorb(&mut sponge, 3, &query, acc);
+            //let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
             //println!("R1CS sponge squeezes {:#?}", rand);
-            let sc_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+            //let sc_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
 
             sc_rs.push(sc_r.clone());
             wits.insert(format!("{}_sc_r_{}", id, i), new_wit(sc_r.clone()));
@@ -1187,18 +1211,20 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         // last claim = g_v(r_v)
         //println!("sc rs {:#?}", sc_rs.clone());
-        g_xsq *= &sc_rs[sc_rs.len() - 1];
-        g_xsq *= &sc_rs[sc_rs.len() - 1];
-        g_x *= &sc_rs[sc_rs.len() - 1];
-        g_const += &g_x;
-        g_const += &g_xsq;
-
-        let last_claim = g_const.rem_floor(cfg().field().modulus());
+        let mut last_claim = g_xsq * &sc_rs[sc_rs.len() - 1] * &sc_rs[sc_rs.len() - 1]
+            + g_x * &sc_rs[sc_rs.len() - 1]
+            + g_const;
+        last_claim = last_claim.rem_floor(cfg().field().modulus());
         wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
 
         // update running claim
-        let (_, next_running_v) =
-            prover_mle_partial_eval(table, &sc_rs, &(0..table.len()).collect(), true, None);
+        let (_, next_running_v) = prover_mle_partial_eval(
+            table,
+            &sc_rs, //.clone().into_iter().rev().collect(),
+            &(0..table.len()).collect(),
+            true,
+            None,
+        );
         let next_running_q = sc_rs.clone();
         wits.insert(
             format!("{}_next_running_claim", id),
@@ -1206,12 +1232,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         );
 
         // sanity check - TODO eliminate
-        // make rs
-        let mut rs = vec![claim_r.clone()];
-        for i in 1..(q.len() + 1) {
-            rs.push(rs[i - 1].clone() * claim_r.clone());
-        }
-        let (_, eq_term) = prover_mle_partial_eval(&rs, &sc_rs, &q, false, Some(&prev_running_q));
+        let (_, eq_term) = prover_mle_partial_eval(
+            &rs,
+            &sc_rs, //.into_iter().rev().collect(),
+            &q,
+            false,
+            Some(&prev_running_q),
+        );
         assert_eq!(
             last_claim,
             (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
@@ -1313,8 +1340,8 @@ mod tests {
     use crate::regex::Regex;
     type G1 = pasta_curves::pallas::Point;
 
-    //#[test]
-    fn mle_linear() {
+    #[test]
+    fn mle_linear_basic() {
         init();
 
         let mut evals = vec![
@@ -1328,48 +1355,107 @@ mod tests {
             Integer::from(19),
         ];
 
+        let table = evals.clone();
+
         let qs = vec![2, 1, 7];
-        let last_q = vec![Integer::from(0), Integer::from(0), Integer::from(0)];
+        for last_q in vec![
+            vec![Integer::from(2), Integer::from(3), Integer::from(5)],
+            //vec![Integer::from(0), Integer::from(1), Integer::from(0)],
+        ] {
+            let claims = vec![
+                Integer::from(3),
+                Integer::from(9),
+                Integer::from(27),
+                Integer::from(81),
+            ];
 
-        let claims = vec![
-            Integer::from(3),
-            Integer::from(9),
-            Integer::from(27),
-            Integer::from(81),
-        ];
+            let mut term = Integer::from(0);
+            for i in 0..qs.len() {
+                term += evals[qs[i]].clone() * &claims[i];
+            }
 
-        let mut eq_a = Vec::new();
+            let mut eq_a = gen_eq_table(&claims, &qs, &last_q.clone().into_iter().rev().collect());
 
-        let bool_combos = vec![
-            vec![Integer::from(0), Integer::from(0), Integer::from(0)],
-            vec![Integer::from(0), Integer::from(0), Integer::from(1)],
-            vec![Integer::from(0), Integer::from(1), Integer::from(0)],
-            vec![Integer::from(0), Integer::from(1), Integer::from(1)],
-            vec![Integer::from(1), Integer::from(0), Integer::from(0)],
-            vec![Integer::from(1), Integer::from(0), Integer::from(1)],
-            vec![Integer::from(1), Integer::from(1), Integer::from(0)],
-            vec![Integer::from(1), Integer::from(1), Integer::from(1)],
-        ];
+            // claim check
+            let (_, running_v) = prover_mle_partial_eval(
+                &evals,
+                &last_q, //.clone().into_iter().rev().collect(),
+                &(0..evals.len()).collect(),
+                true,
+                None,
+            );
+            term += running_v * &claims[3];
 
-        for cube in bool_combos {
-            let (_, res) = prover_mle_partial_eval(&claims, &cube, &qs, false, Some(&last_q)); //Some(&last_q));
-            eq_a.push(res);
+            let mut claim: Integer = evals
+                .iter()
+                .zip(eq_a.iter())
+                .map(|(ti, eqi)| ti * eqi)
+                .sum();
+
+            assert_eq!(
+                term.rem_floor(cfg().field().modulus()),
+                claim.clone().rem_floor(cfg().field().modulus())
+            );
+
+            let sc =
+                Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
+            let mut sponge = Sponge::new_with_constants(&sc, Mode::Simplex);
+            let acc = &mut ();
+
+            let mut pattern = vec![];
+            for i in 0..3 {
+                // sum check rounds
+                pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+            }
+
+            sponge.start(IOPattern(pattern), None, acc);
+
+            println!("t {:#?}, eqs {:#?}", evals, eq_a);
+            let mut sc_rs = vec![];
+            for i in 1..=3 {
+                let (r_i, xsq, x, con) =
+                    linear_mle_product(&mut evals, &mut eq_a, 3, i, &mut sponge);
+
+                println!("message {:#?} * x^2 + {:#?} * x + {:#?}", xsq, x, con);
+                println!("t {:#?}, eqs {:#?}", evals, eq_a);
+
+                let g0_g1 = Integer::from(2) * &con + &x + &xsq;
+                assert_eq!(
+                    claim.rem_floor(cfg().field().modulus()),
+                    g0_g1.rem_floor(cfg().field().modulus())
+                );
+
+                claim = xsq * &r_i * &r_i + x * &r_i + con;
+                claim = claim.rem_floor(cfg().field().modulus());
+
+                sc_rs.push(r_i);
+            }
+
+            // next
+            let (_, next_running_v) = prover_mle_partial_eval(
+                &table,
+                &sc_rs, //.clone().into_iter().rev().collect(),
+                &(0..table.len()).collect(),
+                true,
+                None,
+            );
+
+            // sanity check - TODO eliminate
+            let (_, eq_term) = prover_mle_partial_eval(
+                &claims,
+                &sc_rs, //.into_iter().rev().collect(),
+                &qs,
+                false,
+                Some(&last_q), //.into_iter().rev().collect()),
+            );
+            assert_eq!(
+                claim, // last claim
+                (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
+            );
+
+            sponge.finish(acc).unwrap();
         }
-
-        println!("eqs {:#?}", eq_a);
-
-        let r = vec![Integer::from(2), Integer::from(8), Integer::from(4)];
-
-        // let mut a = //evals.clone();
-
-        for i in 1..=3 {
-            let message_i = linear_mle_func_evals(&mut evals, 3, i, &r[i - 1]);
-            //let message_i = linear_mle_product(&mut evals.clone(), &mut eq_a, 3, i, &r[i - 1]);
-
-            println!("message {:#?}, a {:#?}", message_i, evals);
-        }
-
-        panic!("as expected");
     }
 
     #[test]
@@ -1524,9 +1610,8 @@ mod tests {
         // chars.push(EPSILON.clone());
 
         for s in batch_sizes {
-            let mut chars_clone = chars.clone();
-            for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
-                for c in vec![JCommit::HashChain, JCommit::Nlookup] {
+            for c in vec![JCommit::HashChain, JCommit::Nlookup] {
+                for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
                     println!("\nNew");
                     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(
                         Strength::Standard,
@@ -1554,24 +1639,6 @@ mod tests {
                     let mut running_v = None;
                     let mut doc_running_q = None;
                     let mut doc_running_v = None;
-                    match b {
-                        JBatching::NaivePolys => {}
-                        JBatching::Nlookup => {
-                            if s <= 1 {
-                                // don't use nlookup with batch of 1
-                                break;
-                            }
-                        } //JBatching::Plookup => todo!(),
-                    }
-                    match c {
-                        JCommit::HashChain => {}
-                        JCommit::Nlookup => {
-                            if s <= 1 {
-                                // don't use nlookup with batch of 1
-                                break;
-                            }
-                        } //JBatching::Plookup => todo!(),
-                    } // TODO make batch size 1 work at some point, you know for nice figs
 
                     println!("Batching {:#?}", r1cs_converter.batching);
                     println!("Commit {:#?}", r1cs_converter.commit_type);
