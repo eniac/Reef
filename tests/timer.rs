@@ -1,14 +1,7 @@
-use reef::backend::costs::*;
-use reef::backend::framework::*;
-use reef::backend::r1cs_helper::init;
-use reef::dfa::NFA;
-use reef::regex::Regex;
-
 use csv::Writer;
 use dashmap::DashMap;
 use std::fmt::Display;
-use std::fs::File;
-use std::io::{self, prelude::*};
+use std::io;
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
 pub enum Component {

@@ -1,8 +1,6 @@
 use itertools::Itertools;
-use rayon::prelude::*;
 use std::collections::HashMap;
 use std::collections::{BTreeSet, HashSet};
-use std::io::Result;
 
 use crate::regex::Regex;
 

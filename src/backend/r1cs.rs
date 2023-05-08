@@ -1886,7 +1886,7 @@ mod tests {
         );
     }
 
-    // #[test]
+    #[test]
     fn big() {
         use std::fs;
 

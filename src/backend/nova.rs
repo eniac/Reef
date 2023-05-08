@@ -570,15 +570,15 @@ where {
     fn intm_fs_parsing(
         &self,
         alloc_v: &AllocatedNum<F>,
-        vars: &mut HashMap<Var, Variable>,
+        //vars: &mut HashMap<Var, Variable>,
         s: &String,
-        var: Var,
+        //var: Var,
         is_doc_nl: bool,
         alloc_qv: &mut Vec<Option<AllocatedNum<F>>>,
         alloc_claim_r: &mut Option<AllocatedNum<F>>,
         alloc_gs: &mut Vec<Vec<Option<AllocatedNum<F>>>>,
-        prev_q: &Vec<AllocatedNum<F>>,
-        prev_v: &AllocatedNum<F>,
+        //prev_q: &Vec<AllocatedNum<F>>,
+        //prev_v: &AllocatedNum<F>,
     ) -> Result<bool, SynthesisError> {
         // intermediate (in circ) wits
         if (!is_doc_nl && s.starts_with("nl_combined_q"))
@@ -1119,15 +1119,15 @@ where
                             matched = self
                                 .intm_fs_parsing(
                                     &alloc_v,
-                                    &mut vars,
+                                    //    &mut vars,
                                     &s,
-                                    var,
+                                    //    var,
                                     false,
                                     &mut alloc_qv,
                                     &mut alloc_claim_r,
                                     &mut alloc_gs,
-                                    &prev_q,
-                                    &prev_v,
+                                    //    &prev_q,
+                                    //    &prev_v,
                                 )
                                 .unwrap();
 
@@ -1241,15 +1241,15 @@ where
                         matched = self
                             .intm_fs_parsing(
                                 &alloc_v,
-                                &mut vars,
+                                //   &mut vars,
                                 &s,
-                                var,
+                                //   var,
                                 true,
                                 &mut alloc_doc_qv,
                                 &mut alloc_doc_claim_r,
                                 &mut alloc_doc_gs,
-                                &prev_dq,
-                                &prev_dv,
+                                //   &prev_dq,
+                                //   &prev_dv,
                             )
                             .unwrap();
 
@@ -1364,15 +1364,15 @@ where
                         matched = self
                             .intm_fs_parsing(
                                 &alloc_v,
-                                &mut vars,
+                                //   &mut vars,
                                 &s,
-                                var,
+                                //   var,
                                 false,
                                 &mut alloc_qv,
                                 &mut alloc_claim_r,
                                 &mut alloc_gs,
-                                &prev_q,
-                                &prev_v,
+                                //   &prev_q,
+                                //   &prev_v,
                             )
                             .unwrap();
 
@@ -1380,15 +1380,15 @@ where
                             matched = self
                                 .intm_fs_parsing(
                                     &alloc_v,
-                                    &mut vars,
+                                    //     &mut vars,
                                     &s,
-                                    var,
+                                    //    var,
                                     true,
                                     &mut alloc_doc_qv,
                                     &mut alloc_doc_claim_r,
                                     &mut alloc_doc_gs,
-                                    &prev_dq,
-                                    &prev_dv,
+                                    //  &prev_dq,
+                                    //&prev_dv,
                                 )
                                 .unwrap();
                             if !matched {
