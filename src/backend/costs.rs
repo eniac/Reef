@@ -46,9 +46,9 @@ pub fn commit_circuit_nohash(
 ) -> usize {
     match commit_type {
         JCommit::HashChain => match is_match {
-            None => batch_size, // i's for hashes: i++ (batch_size),
+            None => batch_size+1, // i's for hashes: i++ (batch_size),
             // enforce i_0 != 0 bool (2), ite (5) -> on nova level :)
-            Some((_, end)) if end >= doc_len => batch_size,
+            Some((_, end)) if end >= doc_len => batch_size+1,
             _ => panic!(
                 "Cant do hashchain with substring: doc len {:#?}, substring {:#?}",
                 doc_len, is_match
@@ -128,7 +128,7 @@ pub fn naive_cost_model_nohash<'a>(
 ) -> usize {
     // vanishing poly - m * n multiplications + 2 for lookup
     let mut cost = dfa.trans.len() - 1;
-    cost *= batch_size;
+    cost *= (batch_size+1);
 
     cost += accepting_circuit(dfa, is_match);
 

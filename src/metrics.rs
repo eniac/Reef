@@ -104,8 +104,9 @@ impl Timer {
         }
     }
 
-    pub fn stop(&mut self) {
-        self.time_log.alter_all(|_, v| match v {
+    pub fn stop(&mut self, comp: Component, test: &str, subtest: &str) {
+        self.time_log.alter(&(comp, test.to_string(), subtest.to_string()),
+        |_, v| match v{
             Started(start_time) => Finished(start_time.elapsed()),
             Finished(duration) => Finished(duration),
             Restarted(duration, start_time) => Finished(duration + start_time.elapsed()),
@@ -115,7 +116,13 @@ impl Timer {
     pub fn write_csv(&mut self, out: &str) -> io::Result<()> {
         println!("Writing timer data to {}", out);
         let mut wtr = Writer::from_path(out)?;
-        self.stop();
+        
+        self.time_log.alter_all(|_, v| match v {
+            Started(start_time) => Finished(start_time.elapsed()),
+            Finished(duration) => Finished(duration),
+            Restarted(duration, start_time) => Finished(duration + start_time.elapsed()),
+        });
+
         wtr.write_record(&["Component", "test", "subtest", "metric", "metric_type"])?;
         for ((c, test, subtest), value) in self.time_log.clone().into_iter() {
             if let Finished(duration) = value {

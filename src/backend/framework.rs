@@ -31,6 +31,7 @@ use nova_snark::{
 };
 use core::time;
 use std::time::Instant;
+use serde_json::{Result, Value};
 
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(
@@ -43,7 +44,7 @@ pub fn run_backend(
 ) {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
-    timer.tic(Component::Compiler, "test", "Optimization Selection");
+    timer.tic(Component::Compiler, "R1CS", "Optimization Selection");
     let mut r1cs_converter = R1CS::new(
         dfa,
         &doc,
@@ -52,22 +53,24 @@ pub fn run_backend(
         batching_type,
         commit_doctype,
     );
-    timer.stop();
+    timer.stop(Component::Compiler, "R1CS", "Optimization Selection");
     println!("generate commitment");
 
     // to get rid clone
-    timer.tic(Component::Compiler, "test", "Commitment Generations");
+    timer.tic(Component::Compiler, "R1CS", "Commitment Generations");
     let reef_commit = gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
     // todo clone
     r1cs_converter.set_commitment(reef_commit.clone());
-    timer.stop();
+    timer.stop(Component::Compiler, "R1CS", "Commitment Generations");
 
     //let r_time = Instant::now();
-    timer.tic(Component::Compiler, "test", "Circuit Generation");
+    timer.tic(Component::Compiler, "R1CS", "To Circuit and Setup");
     let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
 
     let (z0_primary, z0_secondary, pp) = setup(&r1cs_converter, &prover_data,timer);
-    timer.stop();
+    timer.stop(Component::Compiler, "R1CS", "To Circuit and Setup");
+
+    timer.stop(Component::Compiler, "Compiler", "Full");
 
     let proof = solve_and_prove(
         &r1cs_converter,
@@ -77,9 +80,13 @@ pub fn run_backend(
         &pp,
         timer
     );
-    timer.tic(Component::Prover, "add test", "Verify");
+
+    timer.space(Component::Prover, "add test", "Compressed SNARK size", serde_json::to_string(&proof).unwrap().len());
+
+    timer.tic(Component::Verifier, "Verification", "Full");
     verify(proof, r1cs_converter, z0_primary, z0_secondary, &pp);
-    timer.stop();
+    timer.stop(Component::Verifier, "Verification", "Full");
+
 }
 
 fn setup<'a>(
@@ -321,8 +328,10 @@ fn solve_and_prove<'a>(
 
     for i in 0..num_steps {
         println!("STEP {}", i);
+        let test = format!("step {}",i);
 
         // allocate real witnesses for round i
+        timer.tic(Component::Solver,&test, "witness generation");
         (
             wits,
             next_state,
@@ -339,11 +348,13 @@ fn solve_and_prove<'a>(
             doc_running_q.clone(),
             doc_running_v.clone(),
         );
+        timer.stop(Component::Solver,&test, "witness generation");
 
         //circ_data.check_all(&wits);
 
         let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
             (JBatching::NaivePolys, JCommit::HashChain) => {
+                timer.tic(Component::Solver,&test, "calculate hash");
                 let next_hash = r1cs_converter.prover_calc_hash(
                     prev_hash,
                     false,
@@ -360,10 +371,12 @@ fn solve_and_prove<'a>(
                     GlueOpts::PolyHash((i_last, next_hash)),
                 ];
                 prev_hash = next_hash;
+                timer.stop(Component::Solver,&test, "calculate hash");
                 // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
                 g
             }
             (JBatching::Nlookup, JCommit::HashChain) => {
+                timer.tic(Component::Solver,&test, "calculate hash");
                 let next_hash = r1cs_converter.prover_calc_hash(
                     prev_hash,
                     false,
@@ -398,10 +411,11 @@ fn solve_and_prove<'a>(
                     GlueOpts::NlHash((i_last, next_hash, next_q, next_v)),
                 ];
                 prev_hash = next_hash;
-
+                timer.stop(Component::Solver,&test, "calculate hash");
                 g
             }
             (JBatching::NaivePolys, JCommit::Nlookup) => {
+                timer.tic(Component::Solver,&test, "calculate running claim");
                 let doc_q = match doc_running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
                     None => vec![<G1 as Group>::Scalar::from(0); qd_len],
@@ -419,13 +433,14 @@ fn solve_and_prove<'a>(
                     .map(|x| int_to_ff(x))
                     .collect();
                 let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
-
+                timer.stop(Component::Solver,&test, "calculate running claim");
                 vec![
                     GlueOpts::PolyNL((doc_q, doc_v)),
                     GlueOpts::PolyNL((next_doc_q, next_doc_v)),
                 ]
             }
             (JBatching::Nlookup, JCommit::Nlookup) => {
+                timer.tic(Component::Solver,&test, "calculate running claim");
                 let q = match running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
                     None => vec![<G1 as Group>::Scalar::from(0); q_len],
@@ -460,7 +475,7 @@ fn solve_and_prove<'a>(
                     .map(|x| int_to_ff(x))
                     .collect();
                 let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
-
+                timer.stop(Component::Solver,&test, "calculate running claim");
                 vec![
                     GlueOpts::NlNl((q, v, doc_q, doc_v)),
                     GlueOpts::NlNl((next_q, next_v, next_doc_q, next_doc_v)),
@@ -498,6 +513,7 @@ fn solve_and_prove<'a>(
         let start = Instant::now();
         //println!("STEP CIRC WIT for i={}: {:#?}", i, circuit_primary);
         // snark
+        timer.tic(Component::Prover,&test, "prove step");
         let result = RecursiveSNARK::prove_step(
             pp,
             recursive_snark,
@@ -506,6 +522,7 @@ fn solve_and_prove<'a>(
             z0_primary.clone(),
             z0_secondary.clone(),
         );
+        timer.stop(Component::Prover,&test, "prove step");
         //println!("prove step {:#?}", result);
 
         assert!(result.is_ok());
@@ -545,7 +562,10 @@ fn solve_and_prove<'a>(
     type S1 = nova_snark::spartan::RelaxedR1CSSNARK<<G1 as Group>, EE1>;
     type S2 = nova_snark::spartan::RelaxedR1CSSNARK<<G2 as Group>, EE2>;
     */
+    timer.tic(Component::Prover,"Proof", "Compressed SNARK");
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
+    timer.stop(Component::Prover,"Proof", "Compressed SNARK");
+
     assert!(res.is_ok());
     res.unwrap()
 }
@@ -650,122 +670,8 @@ mod tests {
 
         init();
         for b in batch_sizes {
-            let sc =
-                Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-
-            let mut r1cs_converter =
-                R1CS::new(&dfa, &doc, b, sc.clone(), batching_type, commit_docype);
-
-            ////let c_time = Instant::now();
-            println!("generate commitment");
-            // to get rid clone
-            let reef_commit =
-                gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
-            r1cs_converter.set_commitment(reef_commit.clone());
-            //let commit_ms = c_time.elapsed().as_millis();
-
-            //let parse_ms = p_time.elapsed().as_millis();
-            let q_len = logmn(r1cs_converter.table.len());
-            let qd_len = logmn(r1cs_converter.udoc.len());
-
-            //let r_time = Instant::now();
-            let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
-            //let r1cs_ms = r_time.elapsed().as_millis();
-
-            //let s_time = Instant::now();
-            // use "empty" (witness-less) circuit to generate nova F
-            let empty_glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
-                (JBatching::NaivePolys, JCommit::HashChain) => {
-                    vec![
-                        GlueOpts::PolyHash((
-                            <G1 as Group>::Scalar::from(0),
-                            <G1 as Group>::Scalar::from(0),
-                        )),
-                        GlueOpts::PolyHash((
-                            <G1 as Group>::Scalar::from(0),
-                            <G1 as Group>::Scalar::from(0),
-                        )),
-                    ]
-                }
-                (JBatching::Nlookup, JCommit::HashChain) => {
-                    let zero = <G1 as Group>::Scalar::from(0);
-
-                    let q = vec![<G1 as Group>::Scalar::from(0); q_len];
-
-                    vec![
-                        GlueOpts::NlHash((zero.clone(), zero.clone(), q.clone(), zero.clone())),
-                        GlueOpts::NlHash((zero.clone(), zero.clone(), q, zero.clone())),
-                    ]
-                }
-                (JBatching::NaivePolys, JCommit::Nlookup) => {
-                    let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
-
-                    let doc_v = <G1 as Group>::Scalar::from(0);
-
-                    vec![
-                        GlueOpts::PolyNL((doc_q.clone(), doc_v.clone())),
-                        GlueOpts::PolyNL((doc_q, doc_v)),
-                    ]
-                }
-                (JBatching::Nlookup, JCommit::Nlookup) => {
-                    let q = vec![<G1 as Group>::Scalar::from(0); q_len];
-
-                    let v = <G1 as Group>::Scalar::from(0);
-                    let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
-
-                    let doc_v = <G1 as Group>::Scalar::from(0);
-                    vec![
-                        GlueOpts::NlNl((q.clone(), v.clone(), doc_q.clone(), doc_v.clone())),
-                        GlueOpts::NlNl((q, v, doc_q, doc_v)),
-                    ]
-                }
-            };
-
-            let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
-                &prover_data,
-                None,
-                vec![<G1 as Group>::Scalar::from(0); 2],
-                empty_glue,
-                <G1 as Group>::Scalar::from(0),
-                true, //false,
-                <G1 as Group>::Scalar::from(dfa.nchars() as u64),
-                0, //dfa.nchars as isize,
-                vec![<G1 as Group>::Scalar::from(0); 2],
-                r1cs_converter.batch_size,
-                sc.clone(),
-            );
-
-            // trivial circuit
-            let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
-
-            // produce public parameters
-            println!("Producing public parameters...");
-            let pp = PublicParams::<
-                G1,
-                G2,
-                NFAStepCircuit<<G1 as Group>::Scalar>,
-                TrivialTestCircuit<<G2 as Group>::Scalar>,
-            >::setup(circuit_primary.clone(), circuit_secondary.clone())
-            .unwrap();
-            println!(
-                "Number of constraints (primary circuit): {}",
-                pp.num_constraints().0
-            );
-            println!(
-                "Number of constraints (secondary circuit): {}",
-                pp.num_constraints().1
-            );
-
-            println!(
-                "Number of variables (primary circuit): {}",
-                pp.num_variables().0
-            );
-            println!(
-                "Number of variables (secondary circuit): {}",
-                pp.num_variables().1
-            );
-
-            run_backend(&dfa, doc, batching_type.clone(), commit_docype.clone(), b);
+            let mut timer = Timer::new();
+            run_backend(&dfa, doc, batching_type.clone(), commit_docype.clone(), b, &mut timer);
         }
     }
 

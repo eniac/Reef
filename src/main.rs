@@ -26,16 +26,17 @@ fn main() {
         .map(|c| c.to_string())
         .collect();
 
-    timer.tic(Component::Compiler, "add test name","DFA compilation");
+    timer.tic(Component::Compiler, "Compiler", "Full");
+    timer.tic(Component::Compiler, "DFA","DFA");
     let mut nfa = NFA::new(&ab, opt.re);
-    timer.stop();
+    timer.stop(Component::Compiler, "DFA","DFA");
 
     // Try to use k-stride
-    timer.tic(Component::Compiler, "add test name","K Stride compilation");
+    timer.tic(Component::Compiler, "DFA","K Stride");
     opt.k_stride.map(|k| {
         doc = nfa.k_stride(k, &doc);
     });
-    timer.stop();
+    timer.stop(Component::Compiler, "DFA","K Stride");
 
     // Is document well-formed
     nfa.well_formed(&doc);
@@ -47,14 +48,14 @@ fn main() {
 
     println!("Doc len is {}", doc.len());
 
-    timer.tic(Component::Solver, "add test name","Clear Match");
+    timer.tic(Component::Solver, "DFA Solving","Clear Match");
     println!(
         "Match: {}",
         nfa.is_match(&doc)
             .map(|c| format!("{:?}", c))
             .unwrap_or(String::from("NONE"))
     );
-    timer.stop();
+    timer.stop(Component::Solver, "DFA Solving","Clear Match");
     init();
 
     run_backend(&nfa, &doc, opt.eval_type, opt.commit_type, opt.batch_size,&mut timer); // auto select batching/commit

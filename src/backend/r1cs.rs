@@ -1654,17 +1654,18 @@ mod tests {
                         )
                     );
                     println!("actual cost: {:#?}", pd.r1cs.constraints.len());
-                    /*assert!(
-                        prover_data.r1cs.constraints.len() as usize
-                            == costs::full_round_cost_model_nohash(
+                    assert!(
+                        pd.r1cs.constraints.len() as usize
+                            <= costs::full_round_cost_model_nohash(
                                 &dfa,
                                 r1cs_converter.batch_size,
                                 b.clone(),
                                 dfa.is_match(&chars),
                                 doc.len(),
                                 c
-                            )
-                    );*/ // deal with later TODO
+                            ) + 30 
+                    );
+                     // deal with later TODO
                 }
             }
         }
