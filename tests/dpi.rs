@@ -1,5 +1,4 @@
-pub mod timer;
-use timer::{Timer, Component};
+use reef::metrics::{Timer, Component};
 
 #[test]
 fn e2e_dpi() {
@@ -7,6 +6,9 @@ fn e2e_dpi() {
     timer.tic(Component::Compiler, "bs test", "foo");
     println!("Write this line");
     timer.stop();
+
+    timer.r1cs(Component::Compiler, "bs test", "foo",100);
+    println!("Write this line");
 
     if let Err(e) = timer.write_csv("foo.csv") {
         eprintln!("Error writing to file: {}", e);
