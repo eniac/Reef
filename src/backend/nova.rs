@@ -13,10 +13,10 @@ use generic_array::typenum;
 use gmp_mpfr_sys::gmp::limb_t;
 use neptune::{
     circuit2::Elt,
-    poseidon::{Arity, HashMode, Poseidon, PoseidonConstants},
+    poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::circuit::SpongeCircuit,
-    sponge::vanilla::{Mode, Sponge, SpongeTrait},
+    sponge::vanilla::{Mode, SpongeTrait},
 };
 use nova_snark::{
     traits::{circuit::StepCircuit, Group},
@@ -25,15 +25,10 @@ use nova_snark::{
 use rug::integer::{IsPrime, Order};
 use rug::Integer;
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
-
-fn type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
+use std::time::Instant;
 
 /// Convert a (rug) integer to a prime field element.
 pub fn int_to_ff<F: PrimeField>(i: Integer) -> F {
-    let time = Instant::now();
     let mut accumulator = F::from(0);
     let limb_bits = (std::mem::size_of::<limb_t>() as u64) << 3;
     let limb_base = F::from(2).pow_vartime([limb_bits]);
@@ -176,7 +171,7 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
             !matches!(var.ty(), VarType::RoundWit | VarType::Chall),
             "Nova doesn't support rounds"
         );
-        let public = matches!(var.ty(), VarType::Inst); // but we really dont care
+        //let public = matches!(var.ty(), VarType::Inst); // but we really dont care
         let name_f = format!("{var:?}");
 
         let s = self.r1cs.names[&var].clone();
@@ -438,8 +433,7 @@ where {
             let comp_inv;
             let ep_sel;
 
-            let mut ep_num =
-                AllocatedNum::alloc(hash_ns.namespace(|| "epsilon"), || Ok(epsilon_num))?;
+            let ep_num = AllocatedNum::alloc(hash_ns.namespace(|| "epsilon"), || Ok(epsilon_num))?;
 
             if (i as isize) >= start_of_ep && start_of_ep != -1 {
                 // println!("STARTING EPS");
@@ -740,7 +734,7 @@ where {
             ],
             _ => panic!("weird tag"),
         };
-        for i in 0..sc_l {
+        for _i in 0..sc_l {
             // sum check rounds
             pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
         }
@@ -1490,7 +1484,7 @@ where
         );
 
         println!("SYNTHESIZE TIME {:#?}", time.elapsed().as_millis());
-        Ok((out))
+        Ok(out)
         //Ok(vec![last_state.unwrap(), last_char, last_hash.unwrap()])
     }
 }

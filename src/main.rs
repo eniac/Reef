@@ -1,6 +1,5 @@
 #![allow(missing_docs, non_snake_case)]
-use clap::{Args, Parser};
-use std::time::{Duration, Instant};
+use clap::Parser;
 
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
@@ -11,7 +10,6 @@ use reef::plot;
 use reef::dfa::NFA;
 
 fn main() {
-    let p_time = Instant::now();
     let opt = Options::parse();
 
     // Alphabet

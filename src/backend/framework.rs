@@ -13,20 +13,15 @@ use crate::backend::{
     nova::*,
     r1cs::*,
 };
-use crate::dfa::{EPSILON, NFA};
+use crate::dfa::NFA;
 use circ::target::r1cs::ProverData;
-use ff::Field;
 use generic_array::typenum;
 use neptune::{
     sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
 use nova_snark::{
-    traits::{
-        circuit::{StepCircuit, TrivialTestCircuit},
-        snark::RelaxedR1CSSNARKTrait,
-        Group,
-    },
+    traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 use std::time::Instant;
@@ -183,14 +178,14 @@ fn setup<'a>(
         ReefCommitment::Nlookup(dcs) => dcs.commit_doc_hash,
     };
     // TODO only do this for HC
-    let mut prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
-        ReefCommitment::HashChain(hcs) => {
+    let prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
+        ReefCommitment::HashChain(_) => {
             r1cs_converter.prover_calc_hash(blind, true, 0, r1cs_converter.substring.0)
         }
-        ReefCommitment::Nlookup(dcs) => <G1 as Group>::Scalar::from(0),
+        ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
     };
 
-    let mut current_state = r1cs_converter.dfa.get_init_state();
+    let current_state = r1cs_converter.dfa.get_init_state();
     let z0_primary = match (r1cs_converter.batching, r1cs_converter.commit_type) {
         (JBatching::NaivePolys, JCommit::HashChain) => {
             vec![
@@ -268,7 +263,7 @@ fn solve_and_prove<'a>(
     let mut recursive_snark: Option<RecursiveSNARK<G1, G2, C1, C2>> = None;
 
     let num_steps = ceil_div(
-        (r1cs_converter.substring.1 - r1cs_converter.substring.0),
+        r1cs_converter.substring.1 - r1cs_converter.substring.0,
         r1cs_converter.batch_size,
     );
     println!("NUM STEPS {}", num_steps);
@@ -291,14 +286,14 @@ fn solve_and_prove<'a>(
     let mut next_doc_running_q;
     let mut next_doc_running_v;
 
-    let mut start_of_epsilons = -1;
+    let mut start_of_epsilons;
 
     // TODO only do this for HC
     let mut prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
-        ReefCommitment::HashChain(hcs) => {
+        ReefCommitment::HashChain(_) => {
             r1cs_converter.prover_calc_hash(blind, true, 0, r1cs_converter.substring.0)
         }
-        ReefCommitment::Nlookup(dcs) => <G1 as Group>::Scalar::from(0),
+        ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
     };
 
     let mut current_state = r1cs_converter.dfa.get_init_state();
