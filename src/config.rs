@@ -17,6 +17,8 @@ pub struct Options {
     pub config: Config,
     #[arg(short = 'i', long, value_name = "FILE")]
     pub input: PathBuf,
+    #[arg(short = 'o', long, value_name = "FILE")]
+    pub output: PathBuf,
     #[arg(short = 'r', long, help = "Perl-style regular expression", value_parser = clap::value_parser!(Regex))]
     pub re: Regex,
     #[arg(

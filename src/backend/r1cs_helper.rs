@@ -149,11 +149,11 @@ pub(crate) fn gen_eq_table(
             //println!("{:#?}", term);
         }
 
-        println!("{:#?}", term);
+        // println!("{:#?}", term);
 
         eq_t[i] += term;
 
-        println!("{:#?}", eq_t[i]);
+        // println!("{:#?}", eq_t[i]);
     }
 
     eq_t

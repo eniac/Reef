@@ -614,6 +614,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // note that the running claim q is not included
     fn combined_q_circuit(&mut self, num_eqs: usize, num_q_bits: usize, id: &str) {
+        // println!("Num eq: {:#?}, num_q_bits: {:#?}");
         assert!(
             num_eqs * num_q_bits < 256,
             "may have field overflow when combining q bits for fiat shamir"
@@ -1026,7 +1027,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             v.push(self.idoc[access_at].clone());
         }
 
-        println!("Qs {:#?}, Vs {:#?}", q, v);
+        // println!("Qs {:#?}, Vs {:#?}", q, v);
 
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
@@ -1046,7 +1047,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let sc_l = logmn(table.len()); // sum check rounds
-        println!("WIT GADGET {:#?}, {:#?}", table.len(), sc_l);
+        // println!("WIT GADGET {:#?}, {:#?}", table.len(), sc_l);
 
         // running claim about T (optimization)
         // if first (not yet generated)
@@ -1171,7 +1172,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
             _ => panic!("weird tag"),
         };
-        println!("table {:#?}, {:#?}", sc_table.clone(), sc_l);
+        // println!("table {:#?}, {:#?}", sc_table.clone(), sc_l);
 
         // generate polynomial g's for sum check
         let mut sc_rs = vec![];
@@ -1181,7 +1182,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut g_const = Integer::from(0);
 
         for i in 1..=sc_l {
-            println!("SUM CHECK ROUND");
+            // println!("SUM CHECK ROUND");
             (sc_r, g_xsq, g_x, g_const) =
                 linear_mle_product(&mut sc_table, &mut eq_table, sc_l, i, &mut sponge);
             //prover_mle_sum_eval(table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
@@ -1411,14 +1412,14 @@ mod tests {
 
             sponge.start(IOPattern(pattern), None, acc);
 
-            println!("t {:#?}, eqs {:#?}", evals, eq_a);
+            // println!("t {:#?}, eqs {:#?}", evals, eq_a);
             let mut sc_rs = vec![];
             for i in 1..=3 {
                 let (r_i, xsq, x, con) =
                     linear_mle_product(&mut evals, &mut eq_a, 3, i, &mut sponge);
 
-                println!("message {:#?} * x^2 + {:#?} * x + {:#?}", xsq, x, con);
-                println!("t {:#?}, eqs {:#?}", evals, eq_a);
+                // println!("message {:#?} * x^2 + {:#?} * x + {:#?}", xsq, x, con);
+                // println!("t {:#?}, eqs {:#?}", evals, eq_a);
 
                 let g0_g1 = Integer::from(2) * &con + &x + &xsq;
                 assert_eq!(
@@ -1973,7 +1974,7 @@ mod tests {
         let preamble: String = "ffffabcdffffabcd".to_string();
         let ab = "abcdef".to_string();
         for i in 0..9 {
-            println!("K:{:#?}", i);
+            // println!("K:{:#?}", i);
             test_func_no_hash_kstride(
                 ab.clone(),
                 "^hello.*$".to_string(),
@@ -1990,7 +1991,7 @@ mod tests {
         let preamble: String = "we the people in order to form a more perfect union, establish justic ensure domestic tranquility, provide for the common defense, promote the general welfare and procure the blessings of liberty to ourselves and our posterity do ordain and establish this ".to_string();
         let ab = " ,abcdefghijlmnopqrstuvwy".to_string();
         for i in 0..9 {
-            println!("K:{:#?}", i);
+            // println!("K:{:#?}", i);
             test_func_no_hash_kstride(
                 ab.clone(),
                 "^.*order.to.*$".to_string(),

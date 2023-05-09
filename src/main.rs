@@ -60,7 +60,7 @@ fn main() {
 
     run_backend(&nfa, &doc, opt.eval_type, opt.commit_type, opt.batch_size,&mut timer); // auto select batching/commit
 
-    if let Err(e) = timer.write_csv("out.csv") {
+    if let Err(e) = timer.write_csv(opt.output.to_str().unwrap()) {
         eprintln!("Error writing to file: {}", e);
         panic!("exiting");
     }
