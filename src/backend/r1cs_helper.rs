@@ -74,7 +74,6 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
         let ti_1 = &table_t[b + pow];
         let ei_0 = &table_eq[b];
         let ei_1 = &table_eq[b + pow];
-        //println!("add ({:#?}, {:#?})", ai_0, ai_1);
 
         let t_slope = ti_1.clone() - ti_0;
         let e_slope = ei_1.clone() - ei_0;
@@ -311,7 +310,6 @@ pub(crate) fn prover_mle_sum_eval(
 // coeffs = [constant, x, x^2 ...]
 pub(crate) fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
     let num_c = coeffs.len();
-    //println!("coeffs = {:#?}", coeffs);
 
     let mut horners = term(
         Op::PfNaryOp(PfNaryOp::Mul),

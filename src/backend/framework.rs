@@ -18,12 +18,9 @@ use crate::metrics::{log, log::Component};
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::ProverData;
 use circ::{ir::term::Value, target::r1cs::*};
-use core::time;
 use ff::PrimeField;
-use fxhash::FxHashMap;
 use generic_array::typenum;
 use neptune::{
-    poseidon::PoseidonConstants,
     sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
@@ -32,13 +29,10 @@ use nova_snark::{
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 use rug::Integer;
-use serde_json::{Result, Value as SerdeValue};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
-use std::time::Instant;
 
 struct ProofInfo {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
@@ -223,13 +217,13 @@ fn setup<'a>(
 
     log::r1cs(
         Component::Prover,
-        "add test",
+        "Number Constraints",
         "Primary Circuit",
         pp.num_constraints().0,
     );
     log::r1cs(
         Component::Prover,
-        "add test",
+        "Number Constraints",
         "Secondary Circuit",
         pp.num_constraints().1,
     );
@@ -635,7 +629,7 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
 
     log::space(
         Component::Prover,
-        "add test",
+        "Proof Size",
         "Compressed SNARK size",
         serde_json::to_string(&compressed_snark).unwrap().len(),
     );

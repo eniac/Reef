@@ -120,7 +120,6 @@ impl<F: PrimeField> NFAStepCircuit<F> {
     ) -> Self {
         // todo check wits line up with the non det advice
 
-        // println!("ACCEPTING VEC {:#?}", accepting);
         assert_eq!(states.len(), 2);
         assert_eq!(glue.len(), 2);
         assert_eq!(accepting.len(), 2);
@@ -220,7 +219,6 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             let s_sub: Vec<&str> = s.split("_").collect();
             let q: usize = s_sub[4].parse().unwrap();
 
-            // println!("q prev {:#?}", q);
             vars.insert(var, prev_q[q].get_variable());
             alloc_prev_rc[q] = Some(prev_q[q].clone());
 
@@ -242,7 +240,6 @@ where {
             *last_state = Some(alloc_v.clone()); //.get_variable();
         } else if s.starts_with(&format!("accepting")) {
             *accepting = Some(alloc_v.clone());
-            // println!("get alloc v accepting {:#?}", alloc_v.clone().get_value());
         }
         Ok(())
     }
@@ -341,7 +338,6 @@ where {
 
         match first {
             true => {
-                // println!("SET WITNESSES FOR i_0 = 0");
                 start_hash = AllocatedNum::alloc(ns.namespace(|| "start_hash"), || {
                     Ok(random_hash.get_value().unwrap())
                 })?;
@@ -367,7 +363,6 @@ where {
         for i in 0..(self.batch_size) {
             let unwrap_alloc_char = alloc_chars[i].clone().unwrap();
             let mut hash_ns = ns.namespace(|| format!("poseidon hash batch {}", i));
-            // println!("i {:#?}, start eps {:#?}", i, start_of_ep);
             let hashed = {
                 let acc = &mut hash_ns;
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
@@ -425,7 +420,6 @@ where {
             let ep_num = AllocatedNum::alloc(hash_ns.namespace(|| "epsilon"), || Ok(epsilon_num))?;
 
             if (i as isize) >= start_of_ep && start_of_ep != -1 {
-                // println!("STARTING EPS");
                 next_hash = AllocatedNum::alloc(hash_ns.namespace(|| "next_hash"), || {
                     Ok(prev_hash.get_value().unwrap())
                 })?;
@@ -453,8 +447,6 @@ where {
                 ep_sel = AllocatedNum::alloc(hash_ns.namespace(|| "ep_sel"), || Ok(F::from(1)))?;
             }
 
-            // println!("OUT HASH: {:#?}", next_hash.get_value());
-
             // sanity - get rid of
             if i_0.get_value().is_some() {
                 assert_eq!(
@@ -473,7 +465,7 @@ where {
                     F::from(1) - F::from(1)
                 );
             } else {
-                println!("NO SANITY CHECK");
+                //println!("NO SANITY CHECK");
             }
 
             hash_ns.enforce(
@@ -523,14 +515,7 @@ where {
                 (F::from(1) - first_sel.get_value().unwrap()) * i_0.get_value().unwrap(),
                 F::from(1) - F::from(1)
             );
-
-            // println!("BLIND NOVA: {:#?}", blind);
-            // println!("RANDOM NOVA: {:#?}", random_hash.get_value().unwrap());
-            // println!("OUT HASH: {:#?}", next_hash.get_value().unwrap());
-        } else {
-            println!("NO SANITY CHECK");
         }
-        // println!("ITE CS");
 
         ns.enforce(
             || format!("ite"),
@@ -574,7 +559,6 @@ where {
             || (is_doc_nl && s.starts_with("nldoc_combined_q"))
         {
             alloc_qv[0] = Some(alloc_v.clone());
-            // println!("ALLOC QV PARSING {:#?}: {:#?}", 0, alloc_v.get_value());
 
             return Ok(true);
         } else if !is_doc_nl && s.starts_with("v_") {
@@ -582,13 +566,6 @@ where {
 
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
-            /*
-                      println!(
-                          "ALLOC QV PARSING {:#?}: {:#?}",
-                          j,
-                          v_j.clone().unwrap().get_value()
-                      );
-            */
             alloc_qv[j] = v_j; // TODO check
 
             return Ok(true);
@@ -598,12 +575,7 @@ where {
             //let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
-            /*        println!(
-                      "ALLOC QV PARSING CHAR {:#?}: {:#?}",
-                      j,
-                      v_j.clone().unwrap().get_value()
-                  );
-            */
+
             if j < self.batch_size {
                 alloc_qv[j + 1] = v_j;
             } // don't add the last one
@@ -612,8 +584,6 @@ where {
         } else if (!is_doc_nl && s.starts_with("nl_claim_r"))
             || (is_doc_nl && s.starts_with("nldoc_claim_r"))
         {
-            // println!("NL CLAIM R PARSING");
-
             *alloc_claim_r = Some(alloc_v.clone());
         } else if (!is_doc_nl && s.starts_with("nl_sc_g"))
             || (is_doc_nl && s.starts_with("nldoc_sc_g"))
@@ -626,15 +596,12 @@ where {
             match s_sub[4] {
                 "const" => {
                     alloc_gs[j - 1][0] = gij;
-                    // println!("CONST found");
                 }
                 "x" => {
                     alloc_gs[j - 1][1] = gij;
-                    // println!("X found");
                 }
                 "xsq" => {
                     alloc_gs[j - 1][2] = gij;
-                    // println!("X SQ found");
                 }
                 _ => {
                     panic!("weird variable name for sumcheck polys");
@@ -674,7 +641,6 @@ where {
             )?
         };
 
-        //println!("SQUEEZE {:#?}", new_pos.clone().get_value());
         assert_eq!(new_pos.clone().get_value(), input_eq.clone().get_value());
 
         sponge_ns.enforce(
@@ -709,7 +675,6 @@ where {
         let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
         let mut sponge_ns = cs.namespace(|| format!("{} sponge", tag));
 
-        println!("b:{:#?}, sc_l: {:#?}", self.batch_size, sc_l);
         let mut pattern = match tag {
             "eval" => vec![
                 SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs,
@@ -734,22 +699,17 @@ where {
         let mut elts = vec![];
         // if DOC
         if matches!(tag, "doc") {
-            // println!("DOC TAG");
             let e = AllocatedNum::alloc(sponge_ns.namespace(|| "doc commit hash start"), || {
                 Ok(vesta_hash)
             })?;
             elts.push(Elt::Allocated(e));
         }
         for e in alloc_qv {
-            //println!("alloc qv eval {:#?}", e.clone().unwrap().get_value());
-
             elts.push(Elt::Allocated(e.clone().unwrap()));
         }
         for e in alloc_prev_rc {
-            //println!("alloc rc eval {:#?}", e.clone().unwrap().get_value());
             elts.push(Elt::Allocated(e.clone().unwrap()));
         }
-        //println!("ELTS {:#?}", elts.len());
 
         self.fiatshamir_circuit(
             &elts,
@@ -764,12 +724,9 @@ where {
             for coeffs in &alloc_gs[j] {
                 for e in coeffs {
                     elts.push(Elt::Allocated(e.clone()));
-                    //println!("alloc gs {:#?}", e.clone().get_value());
                 }
             }
 
-            //println!("ELTS {:#?}", elts.len());
-            // println!("alloc rc issue j {:#?}", j);
             self.fiatshamir_circuit(
                 &elts,
                 &mut sponge,
@@ -797,7 +754,6 @@ where {
 
             alloc_rc[sc_l] = Some(alloc_v.clone());
 
-            //println!("ALLOC_RC: {:#?}", alloc_v.get_value());
             return Ok(true);
         } else if s.starts_with(&format!("{}_sc_r_", tag)) {
             // TODO move, do this in order
@@ -932,7 +888,6 @@ where
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,
     {
-        let time = Instant::now();
         // inputs
         let state_0 = z[0].clone();
 
@@ -942,7 +897,6 @@ where
         let mut accepting = None;
         let mut out = vec![];
 
-        //println!("BATCH SIZE IN NOVA {:#?}", self.batch_size);
         // intms
         let mut alloc_chars = vec![None; self.batch_size];
         //alloc_chars[0] = Some(char_0.clone());
@@ -983,7 +937,6 @@ where
                             ff_val
                         })
                     };
-                    //println!("Var (name?) {:#?}", self.r1cs.names[&var]);
 
                     let mut matched = self
                         .input_variable_parsing(
@@ -1044,8 +997,6 @@ where
                 let sc_l = q.len();
                 let prev_q = z[3..(3 + sc_l)].to_vec(); //.clone();
                 let prev_v = z[3 + sc_l].clone();
-
-                //println!("glue1 q, v: {:#?}, {:#?}", q, v);
 
                 let mut alloc_rc = vec![None; sc_l + 1];
                 let mut alloc_prev_rc = vec![None; sc_l + 1];
@@ -1445,7 +1396,6 @@ where
                 )?;
 
                 out.push(last_state.unwrap());
-                //println!("full alloc len {:#?}", alloc_rc.len());
 
                 for qv in alloc_rc {
                     out.push(qv.unwrap()); // better way to do this?
@@ -1466,14 +1416,12 @@ where
             );
         }
 
-        println!(
+        /*println!(
             "done with synth: {} vars {} cs",
             vars.len(),
             self.r1cs.constraints.len()
-        );
+        );*/
 
-        println!("SYNTHESIZE TIME {:#?}", time.elapsed().as_millis());
         Ok(out)
-        //Ok(vec![last_state.unwrap(), last_char, last_hash.unwrap()])
     }
 }
