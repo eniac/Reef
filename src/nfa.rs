@@ -189,8 +189,15 @@ impl NFA {
 
     pub fn scc(&self) -> Vec<Self> {
         let  sccs = tarjan_scc(&self.g);
-        sccs.into_iter().map(|v| NFA::new(&self.ab.join(""),
-            self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone())).collect()
+        sccs.into_iter()
+            .map(|v| NFA::new(&self.ab.join(""),
+                self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone()))
+            .filter(|v| !v.is_sink())
+            .collect()
+    }
+
+    pub fn is_sink(&self) -> bool {
+        self.accepting.is_empty()
     }
 
     pub fn any_prefix_accepting(&self) -> bool {
@@ -450,7 +457,7 @@ mod tests {
 
     #[test]
     fn test_nfa_split() {
-        let mut nfa = setup_nfa("(c | (a.*b))", "abc");
+        let mut nfa = setup_nfa("((c.*b) | (a.*b))*", "abc");
         nfa.split_dot_star().unwrap();
     }
 }
