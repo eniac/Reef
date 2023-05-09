@@ -2,11 +2,11 @@ use csv::Writer;
 use dashmap::DashMap;
 use core::panic;
 use std::fmt::Display;
-use std::fs::File;
-use std::io::{self, prelude::*};
+use std::io::Result;
+use std::sync::Arc;
 
 lazy_static! {
-    pub static ref TIMER:Timer = Timer::new();
+    pub static ref TIMER:Arc<Timer> = Arc::new(Timer::new());
 }
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
@@ -55,7 +55,7 @@ impl Timer {
         }
     }
 
-    pub fn r1cs(&mut self, comp: Component, test: &str, subtest: &str, nR1cs:usize) {
+    pub fn r1cs(&mut self, comp: Component, test: &str, subtest: &str, num_constraints:usize) {
         if self
             .r1cs_log
             .contains_key(&(comp.clone(), test.to_string(), subtest.to_string()))
@@ -64,7 +64,7 @@ impl Timer {
         } else {
             self.r1cs_log.insert(
                 (comp, test.to_string(), subtest.to_string()),
-                nR1cs,
+                num_constraints,
             );
         }
     }
@@ -113,10 +113,10 @@ impl Timer {
         });
     }
 
-    pub fn write_csv(&mut self, out: &str) -> io::Result<()> {
+    pub fn write_csv(&mut self, out: &str) -> Result<()> {
         println!("Writing timer data to {}", out);
         let mut wtr = Writer::from_path(out)?;
-        
+
         self.time_log.alter_all(|_, v| match v {
             Started(start_time) => Finished(start_time.elapsed()),
             Finished(duration) => Finished(duration),
