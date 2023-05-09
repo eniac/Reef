@@ -104,8 +104,10 @@ pub struct NFAStepCircuit<'a, F: PrimeField> {
 // witness and loops will happen at higher level as to put as little as possible deep in circ
 impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
     pub fn new(
-        prover_data: &'a ProverData,
-        wits: Option<FxHashMap<String, Value>>, //Option<&'a FxHashMap<String, Value>>,
+        //        prover_data: &'a ProverData,
+        //        wits: Option<FxHashMap<String, Value>>, //Option<&'a FxHashMap<String, Value>>,
+        r1cs: &'a R1csFinal,
+        values: Option<Vec<Value>>,
         states: Vec<F>,
         glue: Vec<GlueOpts<F>>,
         commit_blind: F,
@@ -134,21 +136,8 @@ impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
         }
         // todo blind, first checking here
 
-        let values: Option<Vec<_>> = wits.map(|values| {
-            let mut evaluator = StagedWitCompEvaluator::new(&prover_data.precompute);
-            let mut ffs = Vec::new();
-            ffs.extend(evaluator.eval_stage(values.clone()).into_iter().cloned());
-            ffs.extend(
-                evaluator
-                    .eval_stage(Default::default())
-                    .into_iter()
-                    .cloned(),
-            );
-            ffs
-        });
-
         NFAStepCircuit {
-            r1cs: &prover_data.r1cs, // def get rid of this crap
+            r1cs: r1cs, //&prover_data.r1cs, // def get rid of this crap
             values: values,
             batch_size: batch_size,
             states: states,

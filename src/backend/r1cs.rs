@@ -301,7 +301,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
         }
 
-        // println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
+        println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
 
         // sanity
         if (batch_num + 1) * self.batch_size - 1 >= self.udoc.len() {
