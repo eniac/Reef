@@ -566,7 +566,17 @@ pub fn opt_cost_model_select<'a>(
     );
     cost = get_folded_cost(cost, doc_length + get_padding(doc_length, opt_batch_size, opt_commit), 1);
 
-    for n in 1..=doc_length {
+    let mut range_list = vec![];
+
+    if doc_length < 100000 {
+        range_list = (1..=doc_length).collect();
+    } else {
+        for n in batch_range_lower..=batch_range_upper {
+            range_list.push(1<<n);
+        }
+    }
+
+    for n in range_list.into_iter() {
         println!("i:{:#?}",n);
         let batching_and_cost: (JBatching, JCommit, usize, usize) =
             match (batching.clone(), commit.clone(), can_hashcahin) {
@@ -601,7 +611,7 @@ pub fn opt_cost_model_select<'a>(
             cost = batching_and_cost.3;
             opt_commit = batching_and_cost.1;
             opt_batching = batching_and_cost.0;
-            opt_batch_size =  n;
+            opt_batch_size =  n.clone();
         }
     }
     (

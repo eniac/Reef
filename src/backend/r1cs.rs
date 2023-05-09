@@ -1620,7 +1620,7 @@ mod tests {
                     println!("Doc:{:#?}", doc);
                     let mut r1cs_converter = R1CS::new(
                         &dfa,
-                        &chars_clone,
+                        &chars,
                         s,
                         sc.clone(),
                         Some(b.clone()),
