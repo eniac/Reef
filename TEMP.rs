@@ -33,7 +33,6 @@ use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
-use rug::Integer;
 use serde_json::{Result, Value as SerdeValue};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -42,15 +41,10 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
-struct ProofInfo {
+struct SetupParams {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
     num_steps: usize,
-    commit: ReefCommitment<<G1 as Group>::Scalar>,
-    table: Vec<Integer>,
-    doc_len: usize,
-    eval_type: JBatching,
-    commit_type: JCommit,
 }
 
 // gen R1CS object, commitment, make step circuit for nova
@@ -67,7 +61,7 @@ pub fn run_backend(
         Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>,
     ) = mpsc::channel();
 
-    let (send_setup, recv_setup): (Sender<ProofInfo>, Receiver<ProofInfo>) = mpsc::channel();
+    let (send_setup, recv_setup): (Sender<SetupParams>, Receiver<SetupParams>) = mpsc::channel();
 
     let solver_thread = thread::spawn(move || {
         // we do setup here to avoid unsafe passing
@@ -98,15 +92,10 @@ pub fn run_backend(
 
         let (num_steps, z0_primary, pp) = setup(&r1cs_converter, &prover_data); //, timer);
         send_setup
-            .send(ProofInfo {
+            .send(SetupParams {
                 pp: Arc::new(Mutex::new(pp)),
                 z0_primary,
                 num_steps,
-                commit: reef_commit,
-                table: r1cs_converter.table.clone(),
-                doc_len: r1cs_converter.udoc.len(),
-                eval_type: r1cs_converter.batching,
-                commit_type: r1cs_converter.commit_type,
             })
             .unwrap();
         //timer.stop(Component::Compiler, "R1CS", "To Circuit and Setup");
@@ -118,12 +107,23 @@ pub fn run_backend(
     });
 
     //get args
-    let proof_info = recv_setup.recv().unwrap();
+    let setup = recv_setup.recv().unwrap();
 
-    prove_and_verify(recv, proof_info, timer);
+    let proof = prove(recv, setup.pp, &setup.z0_primary, setup.num_steps, timer);
 
     // rejoin child
     solver_thread.join().expect("setup/solver thread panicked");
+
+    timer.space(
+        Component::Prover,
+        "add test",
+        "Compressed SNARK size",
+        serde_json::to_string(&proof).unwrap().len(),
+    );
+
+    timer.tic(Component::Verifier, "Verification", "Full");
+    //verify(proof, r1cs_converter, setup.z0_primary, setup.pp);
+    timer.stop(Component::Verifier, "Verification", "Full");
 }
 
 fn setup<'a>(
@@ -556,7 +556,7 @@ fn solve<'a>(
             r1cs_converter.pc.clone(),
         );
 
-        //thread::sleep(Duration::from_millis(10000));
+        thread::sleep(Duration::from_millis(10000));
         println!("FINISHED WIT STEP {}", i);
 
         sender.send(circuit_primary).unwrap(); //witness_i).unwrap();
@@ -570,14 +570,13 @@ fn solve<'a>(
     }
 }
 
-fn prove_and_verify(
+fn prove(
     recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, //itness<<G1 as Group>::Scalar>>,
-    //pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,          //&'a PublicParams<G1, G2, C1, C2>,
-    //z0_primary: &Vec<<G1 as Group>::Scalar>,
-    //num_steps: usize,
-    proof_info: ProofInfo,
+    pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,          //&'a PublicParams<G1, G2, C1, C2>,
+    z0_primary: &Vec<<G1 as Group>::Scalar>,
+    num_steps: usize,
     timer: &mut Timer,
-) {
+) -> CompressedSNARK<G1, G2, C1, C2, S1, S2> {
     println!("Proving thread starting...");
 
     // recursive SNARK
@@ -586,7 +585,7 @@ fn prove_and_verify(
     let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
-    for i in 0..proof_info.num_steps {
+    for i in 0..num_steps {
         println!("PROVING STEP {}", i);
         let test = format!("step {}", i);
 
@@ -595,11 +594,11 @@ fn prove_and_verify(
 
         timer.tic(Component::Prover, &test, "prove step");
         let result = RecursiveSNARK::prove_step(
-            &proof_info.pp.lock().unwrap(),
+            &pp.lock().unwrap(),
             recursive_snark,
             circuit_primary.clone(),
             circuit_secondary.clone(),
-            proof_info.z0_primary.clone(),
+            z0_primary.clone(),
             z0_secondary.clone(),
         );
         timer.stop(Component::Prover, &test, "prove step");
@@ -633,48 +632,21 @@ fn prove_and_verify(
 
     // compressed SNARK
     timer.tic(Component::Prover, "Proof", "Compressed SNARK");
-    let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(
-        &proof_info.pp.lock().unwrap(),
-        &recursive_snark,
-    );
+    let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp.lock().unwrap(), &recursive_snark);
     timer.stop(Component::Prover, "Proof", "Compressed SNARK");
 
     assert!(res.is_ok());
-    let compressed_snark = res.unwrap();
-
-    timer.space(
-        Component::Prover,
-        "add test",
-        "Compressed SNARK size",
-        serde_json::to_string(&compressed_snark).unwrap().len(),
-    );
-
-    timer.tic(Component::Verifier, "Verification", "Full");
-    verify(
-        compressed_snark,
-        proof_info.z0_primary,
-        proof_info.pp,
-        proof_info.commit,
-        proof_info.table,
-        proof_info.doc_len,
-        proof_info.eval_type,
-        proof_info.commit_type,
-    );
-    timer.stop(Component::Verifier, "Verification", "Full");
+    res.unwrap()
 }
 
 fn verify(
     compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
+    r1cs_converter: R1CS<<G1 as Group>::Scalar>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
-    reef_commit: ReefCommitment<<G1 as Group>::Scalar>,
-    table: Vec<Integer>,
-    doc_len: usize,
-    eval_type: JBatching,
-    commit_type: JCommit,
 ) {
-    let q_len = logmn(table.len());
-    let qd_len = logmn(doc_len);
+    let q_len = logmn(r1cs_converter.table.len());
+    let qd_len = logmn(r1cs_converter.udoc.len());
 
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
     let res = compressed_snark.verify(
@@ -691,14 +663,14 @@ fn verify(
 
     // eval type, reef commitment, accepting state bool, table, doc, final_q, final_v, final_hash,
     // final_doc_q, final_doc_v
-    match (eval_type, commit_type) {
+    match (r1cs_converter.batching, r1cs_converter.commit_type) {
         (JBatching::NaivePolys, JCommit::HashChain) => {
             final_clear_checks(
-                eval_type,
-                reef_commit,
+                r1cs_converter.batching,
+                r1cs_converter.reef_commit.unwrap(),
                 zn[3],
-                &table, // clones in function?
-                doc_len,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
                 None,
                 None,
                 Some(zn[2]),
@@ -708,11 +680,11 @@ fn verify(
         }
         (JBatching::NaivePolys, JCommit::Nlookup) => {
             final_clear_checks(
-                eval_type,
-                reef_commit,
+                r1cs_converter.batching,
+                r1cs_converter.reef_commit.unwrap(),
                 zn[2 + qd_len],
-                &table,
-                doc_len,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
                 None,
                 None,
                 None,
@@ -722,11 +694,11 @@ fn verify(
         }
         (JBatching::Nlookup, JCommit::HashChain) => {
             final_clear_checks(
-                eval_type,
-                reef_commit,
+                r1cs_converter.batching,
+                r1cs_converter.reef_commit.unwrap(),
                 zn[3 + q_len + 1],
-                &table,
-                doc_len,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
                 Some(zn[3..(3 + q_len)].to_vec()),
                 Some(zn[3 + q_len]),
                 Some(zn[2]),
@@ -736,11 +708,11 @@ fn verify(
         }
         (JBatching::Nlookup, JCommit::Nlookup) => {
             final_clear_checks(
-                eval_type,
-                reef_commit,
+                r1cs_converter.batching,
+                r1cs_converter.reef_commit.unwrap(),
                 zn[1 + q_len + 1 + qd_len + 1],
-                &table,
-                doc_len,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
                 Some(zn[1..(q_len + 1)].to_vec()),
                 Some(zn[q_len + 1]),
                 None,
