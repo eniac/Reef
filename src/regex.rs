@@ -224,7 +224,7 @@ impl Regex {
     }
 
     pub fn deriv(&self, c: &char) -> Regex {
-        let r = match *self.0 {
+        match *self.0 {
             RegexF::Nil => Regex::empty(),
             RegexF::Empty => Regex::empty(),
             RegexF::Dot => Regex::nil(),
@@ -242,11 +242,7 @@ impl Regex {
             RegexF::Range(ref a, i, j) if i == j => Regex::app(a.deriv(c), Regex::range(a.clone(), i-1, j-1)),
             RegexF::Range(ref a, i, j) => Regex::app(a.deriv(c), Regex::range(a.clone(), i+1, j)),
             RegexF::LineStart | RegexF::LineEnd => panic!("No derivatives for ^, $")
-        };
-
-        println!("d_{}({}) = {}", c, self, r);
-        println!("d_{}({:?}) = {:?}", c, self, r);
-        r
+        }
     }
 }
 

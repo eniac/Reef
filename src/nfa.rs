@@ -7,7 +7,7 @@ use petgraph::{Direction, Graph};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::*;
 use petgraph::dot::Dot;
-use petgraph::algo::{ tarjan_scc, kosaraju_scc, condensation };
+use petgraph::algo;
 
 use crate::regex::Regex;
 
@@ -27,6 +27,14 @@ pub struct NFA {
 
 // Null transition character
 pub const EPSILON: &String = &String::new();
+
+
+impl PartialEq for NFA {
+    fn eq(&self, other: &Self) -> bool {
+        self.ab == other.ab &&
+            self.g[self.get_init_nodeidx()] == other.g[other.get_init_nodeidx()]
+    }
+}
 
 impl NFA {
     pub fn new<'a>(alphabet: &'a str, re: Regex) -> Self {
@@ -117,6 +125,10 @@ impl NFA {
         0
     }
 
+    pub fn get_init_nodeidx(&self) -> NodeIndex<u32> {
+        NodeIndex::new(0)
+    }
+
     /// All states
     pub fn get_states(&self) -> HashSet<usize> {
         self.g.node_indices().map(|i|i.index()).collect()
@@ -187,40 +199,105 @@ impl NFA {
         })
     }
 
-    pub fn scc(&self) -> Vec<Self> {
-        let  sccs = tarjan_scc(&self.g);
-        sccs.into_iter()
+    /// Compute the strongly connected components of the DFA
+    pub fn scc_loops(&self) -> Vec<Self> {
+        algo::tarjan_scc(&self.g)
+            .into_iter()
             .map(|v| NFA::new(&self.ab.join(""),
                 self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone()))
-            .filter(|v| !v.is_sink())
+            .filter(|v| v.has_accepting_cycle() && v != self)
             .collect()
     }
 
+    /// Is the DFA a sink (has no accepting states)
     pub fn is_sink(&self) -> bool {
         self.accepting.is_empty()
     }
 
-    pub fn any_prefix_accepting(&self) -> bool {
-        let mut chars_accepted = self.ab.clone();
-        let mut dfs = Dfs::new(&self.g, NodeIndex::new(self.get_init_state()));
-        while let Some(nx) = dfs.next(&self.g) {
-            // we can access `graph` mutably here still
-        }
-        true
+    pub fn find_node(&self, r: &Regex) -> Option<NodeIndex<u32>> {
+        self.g.node_indices().find(|i| &self.g[*i] == r)
     }
+
+    pub fn to_regex(&self) -> Regex {
+        self.g[self.get_init_nodeidx()].clone()
+    }
+
+    /// Does this DFA has an infintely accepting cycle - or - does this DFA accept arbitrary length prefixes
+    pub fn has_accepting_cycle(&self) -> bool {
+        fn is_cycle(p: &Vec<NodeIndex<u32>>) -> bool {
+            let s: HashSet<&NodeIndex<u32>> = p.into_iter().collect();
+            println!("SET {:?} and VEC {:?}", s, p);
+            s.len() != p.len()
+        }
+        fn has_accepting(g: &Graph<Regex, String>, p: &Vec<NodeIndex<u32>>) -> bool {
+            p.into_iter().any(|i| g[*i].nullable())
+        }
+
+        // algo::is_cyclic_directed(&self.g)
+        let mut dfs = Dfs::new(&self.g, self.get_init_nodeidx());
+        while let Some(node) = dfs.next(&self.g) {
+            println!("Visiting node {}", self.g[node]);
+            if algo::all_simple_paths::<Vec<_>, _>(&self.g, node, node, 1, None)
+                .any(|p| is_cycle(&p) && has_accepting(&self.g, &p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Remove all outgoing edges and visited nodes out of [i]
+    pub fn remove_outgoing_edges(&mut self, i: NodeIndex<u32>) {
+        let mut dfs = Dfs::new(&self.g, i);
+        let mut nodes = HashSet::new();
+        while let Some(node) = dfs.next(&self.g) {
+            // use a detached neighbors walker
+            let mut edges = self.g.neighbors_directed(node, Direction::Outgoing).detach();
+            while let Some(edge) = edges.next_edge(&self.g) {
+                if let Some((_, dst)) = self.g.edge_endpoints(edge) {
+                    if dst != i {
+                        nodes.insert(dst);
+                    }
+                }
+                self.g.remove_edge(edge);
+            }
+        }
+        for n in nodes {
+            self.g.remove_node(n);
+        }
+    }
+
+    /// Substitute any sub-DFA with another DFA while maintaining transitions
+    pub fn to_epsilon(&mut self, i: NodeIndex<u32>) -> bool {
+        // Remove children
+        self.remove_outgoing_edges(i);
+
+        // Update node to epsilon
+        self.g.add_edge(i, i, EPSILON.clone());
+        if let Some(xr) = self.g.node_weight_mut(i) {
+            *xr = Regex::nil();
+            true
+        } else {
+            false
+        }
+    }
+
     /// Split NFA in .*
-    pub fn split_dot_star(&self) -> std::io::Result<()> {
+    pub fn split_dot_star(&mut self) -> std::io::Result<()> {
+
         self.write_pdf("original")?;
+        let sccs = self.scc_loops();
 
-        let sccs = self.scc();
+        let mut files: Vec<String> = Vec::from(["original.pdf".to_string(), "reduced.pdf".to_string()]);
 
-        let mut files = Vec::new();
         for i in 0..sccs.len() {
             let fout = format!("scc-{}", i);
+            let xi = self.find_node(&sccs[i].to_regex()).unwrap();
+            self.to_epsilon(xi);
             sccs[i].write_pdf(fout.as_str())?;
-            files.push(fout.to_string() + ".pdf");
+            files.push(format!("{}.pdf", fout));
         }
 
+        self.write_pdf("reduced")?;
         Command::new("pdfjam")
             .args(files.clone())
             .arg("-o")
@@ -232,7 +309,6 @@ impl NFA {
         for fout in files.clone() {
             std::fs::remove_file(fout)?;
         }
-
 
         Ok(())
     }
@@ -457,7 +533,7 @@ mod tests {
 
     #[test]
     fn test_nfa_split() {
-        let mut nfa = setup_nfa("((c.*b) | (a.*b))*", "abc");
+        let mut nfa = setup_nfa("((c.*b) | (a.*b))*b", "abc");
         nfa.split_dot_star().unwrap();
     }
 }
