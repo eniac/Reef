@@ -1023,8 +1023,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             v.push(self.idoc[access_at].clone());
         }
 
-        println!("Qs {:#?}, Vs {:#?}", q, v);
-
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
         wits = w;
@@ -1043,7 +1041,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let sc_l = logmn(table.len()); // sum check rounds
-        println!("WIT GADGET {:#?}, {:#?}", table.len(), sc_l);
 
         // running claim about T (optimization)
         // if first (not yet generated)
@@ -1168,7 +1165,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
             _ => panic!("weird tag"),
         };
-        println!("table {:#?}, {:#?}", sc_table.clone(), sc_l);
 
         // generate polynomial g's for sum check
         let mut sc_rs = vec![];
@@ -1178,7 +1174,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut g_const = Integer::from(0);
 
         for i in 1..=sc_l {
-            println!("SUM CHECK ROUND");
             (sc_r, g_xsq, g_x, g_const) =
                 linear_mle_product(&mut sc_table, &mut eq_table, sc_l, i, &mut sponge);
             //prover_mle_sum_eval(table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
@@ -1193,7 +1188,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         sponge.finish(acc).unwrap();
 
         // last claim = g_v(r_v)
-        //println!("sc rs {:#?}", sc_rs.clone());
         let mut last_claim = g_xsq * &sc_r * &sc_r + g_x * &sc_r + g_const;
         last_claim = last_claim.rem_floor(cfg().field().modulus());
         wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
@@ -1226,7 +1220,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         );
 
         // return
-        // println!("wits: {:#?}", wits);
 
         (wits, next_running_q, next_running_v)
     }
@@ -1394,14 +1387,10 @@ mod tests {
 
             sponge.start(IOPattern(pattern), None, acc);
 
-            println!("t {:#?}, eqs {:#?}", evals, eq_a);
             let mut sc_rs = vec![];
             for i in 1..=3 {
                 let (r_i, xsq, x, con) =
                     linear_mle_product(&mut evals, &mut eq_a, 3, i, &mut sponge);
-
-                println!("message {:#?} * x^2 + {:#?} * x + {:#?}", xsq, x, con);
-                println!("t {:#?}, eqs {:#?}", evals, eq_a);
 
                 let g0_g1 = Integer::from(2) * &con + &x + &xsq;
                 assert_eq!(

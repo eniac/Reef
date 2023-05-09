@@ -1,12 +1,12 @@
+use core::panic;
 use csv::Writer;
 use dashmap::DashMap;
-use core::panic;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::{self, prelude::*};
 
 lazy_static! {
-    pub static ref TIMER:Timer = Timer::new();
+    pub static ref TIMER: Timer = Timer::new();
 }
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
@@ -42,7 +42,7 @@ enum Time {
 pub struct Timer {
     time_log: DashMap<Test, Time>,
     r1cs_log: DashMap<Test, usize>,
-    space_log: DashMap<Test, usize>
+    space_log: DashMap<Test, usize>,
 }
 
 use Time::*;
@@ -55,31 +55,27 @@ impl Timer {
         }
     }
 
-    pub fn r1cs(&mut self, comp: Component, test: &str, subtest: &str, nR1cs:usize) {
+    pub fn r1cs(&mut self, comp: Component, test: &str, subtest: &str, nR1cs: usize) {
         if self
             .r1cs_log
             .contains_key(&(comp.clone(), test.to_string(), subtest.to_string()))
         {
-           panic!("Trying to write multiple r1cs for same test")
+            panic!("Trying to write multiple r1cs for same test")
         } else {
-            self.r1cs_log.insert(
-                (comp, test.to_string(), subtest.to_string()),
-                nR1cs,
-            );
+            self.r1cs_log
+                .insert((comp, test.to_string(), subtest.to_string()), nR1cs);
         }
     }
 
-    pub fn space(&mut self, comp: Component, test: &str, subtest: &str, sz_bytes:usize) {
+    pub fn space(&mut self, comp: Component, test: &str, subtest: &str, sz_bytes: usize) {
         if self
             .space_log
             .contains_key(&(comp.clone(), test.to_string(), subtest.to_string()))
         {
-           panic!("Trying to write multiple sizes for same test")
+            panic!("Trying to write multiple sizes for same test")
         } else {
-            self.space_log.insert(
-                (comp, test.to_string(), subtest.to_string()),
-                sz_bytes,
-            );
+            self.space_log
+                .insert((comp, test.to_string(), subtest.to_string()), sz_bytes);
         }
     }
 
@@ -105,18 +101,20 @@ impl Timer {
     }
 
     pub fn stop(&mut self, comp: Component, test: &str, subtest: &str) {
-        self.time_log.alter(&(comp, test.to_string(), subtest.to_string()),
-        |_, v| match v{
-            Started(start_time) => Finished(start_time.elapsed()),
-            Finished(duration) => Finished(duration),
-            Restarted(duration, start_time) => Finished(duration + start_time.elapsed()),
-        });
+        self.time_log.alter(
+            &(comp, test.to_string(), subtest.to_string()),
+            |_, v| match v {
+                Started(start_time) => Finished(start_time.elapsed()),
+                Finished(duration) => Finished(duration),
+                Restarted(duration, start_time) => Finished(duration + start_time.elapsed()),
+            },
+        );
     }
 
     pub fn write_csv(&mut self, out: &str) -> io::Result<()> {
         println!("Writing timer data to {}", out);
         let mut wtr = Writer::from_path(out)?;
-        
+
         self.time_log.alter_all(|_, v| match v {
             Started(start_time) => Finished(start_time.elapsed()),
             Finished(duration) => Finished(duration),

@@ -84,8 +84,8 @@ pub enum GlueOpts<F: PrimeField> {
 }
 
 #[derive(Clone, Debug)]
-pub struct NFAStepCircuit<'a, F: PrimeField> {
-    r1cs: &'a R1csFinal, // TODO later ref
+pub struct NFAStepCircuit<F: PrimeField> {
+    r1cs: R1csFinal, // TODO later ref
     values: Option<Vec<Value>>,
     //prover_data: &'a ProverData,
     //wits: Option<'a FxHashMap<String, Value>>,
@@ -102,11 +102,11 @@ pub struct NFAStepCircuit<'a, F: PrimeField> {
 
 // note that this will generate a single round, and no witnesses, unlike nova example code
 // witness and loops will happen at higher level as to put as little as possible deep in circ
-impl<'a, F: PrimeField> NFAStepCircuit<'a, F> {
+impl<F: PrimeField> NFAStepCircuit<F> {
     pub fn new(
         //        prover_data: &'a ProverData,
         //        wits: Option<FxHashMap<String, Value>>, //Option<&'a FxHashMap<String, Value>>,
-        r1cs: &'a R1csFinal,
+        r1cs: R1csFinal,
         values: Option<Vec<Value>>,
         states: Vec<F>,
         glue: Vec<GlueOpts<F>>,
@@ -814,7 +814,7 @@ where {
     }
 }
 
-impl<'a, F> StepCircuit<F> for NFAStepCircuit<'a, F>
+impl<F> StepCircuit<F> for NFAStepCircuit<F>
 where
     F: PrimeField,
 {

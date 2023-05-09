@@ -64,9 +64,6 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     assert_eq!(table_t.len(), base.pow(ell as u32));
     assert_eq!(table_eq.len(), base.pow(ell as u32));
 
-    //    println!("ell {:#?}, i {:#?}", ell, i);
-    //    println!("pow {:#?}", pow);
-
     let mut xsq = Integer::from(0);
     let mut x = Integer::from(0);
     let mut con = Integer::from(0);
@@ -130,12 +127,9 @@ pub(crate) fn gen_eq_table(
     for i in 0..qs.len() {
         eq_t[qs[i]] += &rs[i];
         //term += evals[qs[i]].clone() * &claims[i];
-        //println!("term: {:#?}", term);
     }
 
     for i in 0..eq_t.len() {
-        println!("start");
-
         // eq_t
         let mut term = rs[qs.len()].clone(); //Integer::from(1);
 
@@ -144,15 +138,9 @@ pub(crate) fn gen_eq_table(
 
             term *= Integer::from(xi) * &last_q[j]
                 + Integer::from(1 - xi) * (Integer::from(1) - &last_q[j]);
-
-            //println!("{:#?}", term);
         }
 
-        println!("{:#?}", term);
-
         eq_t[i] += term;
-
-        println!("{:#?}", eq_t[i]);
     }
 
     eq_t
@@ -187,7 +175,6 @@ pub(crate) fn prover_mle_partial_eval(
     for i in 0..es.len() + 1 {
         //e in 0..table.len() {
 
-        //println!("\ni = {:#?}", i);
         // ~eq(x,e)
         if i < es.len() {
             let mut prod = prods[i].clone();
