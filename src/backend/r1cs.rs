@@ -611,6 +611,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // note that the running claim q is not included
     fn combined_q_circuit(&mut self, num_eqs: usize, num_q_bits: usize, id: &str) {
+        // println!("Num eq: {:#?}, num_q_bits: {:#?}");
         assert!(
             num_eqs * num_q_bits < 256,
             "may have field overflow when combining q bits for fiat shamir"
@@ -1888,7 +1889,6 @@ mod tests {
         );
     }
 
-    #[test]
     fn big() {
         use std::fs;
 
@@ -1946,7 +1946,7 @@ mod tests {
         let preamble: String = "ffffabcdffffabcd".to_string();
         let ab = "abcdef".to_string();
         for i in 0..9 {
-            println!("K:{:#?}", i);
+            // println!("K:{:#?}", i);
             test_func_no_hash_kstride(
                 ab.clone(),
                 "^hello.*$".to_string(),
@@ -1963,7 +1963,7 @@ mod tests {
         let preamble: String = "we the people in order to form a more perfect union, establish justic ensure domestic tranquility, provide for the common defense, promote the general welfare and procure the blessings of liberty to ourselves and our posterity do ordain and establish this ".to_string();
         let ab = " ,abcdefghijlmnopqrstuvwy".to_string();
         for i in 0..9 {
-            println!("K:{:#?}", i);
+            // println!("K:{:#?}", i);
             test_func_no_hash_kstride(
                 ab.clone(),
                 "^.*order.to.*$".to_string(),

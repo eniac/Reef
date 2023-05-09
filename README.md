@@ -1,3 +1,6 @@
+
+[![CircleCI](https://circleci.com/gh/elefthei/rezk.svg?style=svg&circle-token=88c4900395a0fc7ac7d9d63b3186d31c9d840ef2)](https://dl.circleci.com/status-badge/redirect/gh/elefthei/rezk/tree/main)
+
 # Reef
 
 ## Authors

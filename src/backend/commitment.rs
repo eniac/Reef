@@ -1,7 +1,6 @@
 use crate::backend::costs::{JBatching, JCommit};
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::verifier_mle_eval;
-use crate::metrics::Timer;
 use circ::cfg::cfg;
 use ff::{Field, PrimeField};
 use generic_array::typenum;
