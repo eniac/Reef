@@ -143,6 +143,7 @@ where
 }
 
 /// Compose encoders (ctor)
+#[allow(dead_code)]
 impl<'a, A, B, C, F, G> Compose<'a, A, B, C, F, G>
 where
     F: Encoder<A, B>,
@@ -261,7 +262,7 @@ impl BaseParser<char> for DnaParser {
 /// Only accept alphanumeric ASCII and UTF8
 struct AlphaNumericEncoder;
 impl Encoder<char, char> for AlphaNumericEncoder {
-    fn alphabet(&self, s: &Vec<char>) -> Vec<char> {
+    fn alphabet(&self, _: &Vec<char>) -> Vec<char> {
         let lower = 'a'..='z';
         let upper = 'A'..='Z';
         let numbers = '0'..='9';
@@ -324,7 +325,7 @@ impl Encoder<char, char> for CaseInsensitiveEncoder {
 /// Basic english alphabet + symbols [,.!?;:-'$&*+@"]
 struct BasicEnglishEncoder;
 impl Encoder<char, char> for BasicEnglishEncoder {
-    fn alphabet(&self, s: &Vec<char>) -> Vec<char> {
+    fn alphabet(&self, _: &Vec<char>) -> Vec<char> {
         let lower = 'a'..='z';
         let upper = 'A'..='Z';
         let numbers = '0'..='9';

@@ -3,7 +3,7 @@ use clap::Parser;
 
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
-use reef::metrics::*;
+use reef::metrics::{log, log::Component};
 
 #[cfg(feature = "plot")]
 use reef::plot;
@@ -11,7 +11,6 @@ use reef::plot;
 use reef::dfa::NFA;
 
 fn main() {
-    let mut timer: Timer = Timer::new();
     let opt = Options::parse();
 
     // Alphabet
@@ -25,17 +24,17 @@ fn main() {
         .map(|c| c.to_string())
         .collect();
 
-    timer.tic(Component::Compiler, "Compiler", "Full");
-    timer.tic(Component::Compiler, "DFA", "DFA");
+    log::tic(Component::Compiler, "Compiler", "Full");
+    log::tic(Component::Compiler, "DFA", "DFA");
     let mut nfa = NFA::new(&ab, opt.re);
-    timer.stop(Component::Compiler, "DFA", "DFA");
+    log::stop(Component::Compiler, "DFA", "DFA");
 
     // Try to use k-stride
-    timer.tic(Component::Compiler, "DFA", "K Stride");
+    log::tic(Component::Compiler, "DFA", "K Stride");
     opt.k_stride.map(|k| {
         doc = nfa.k_stride(k, &doc);
     });
-    timer.stop(Component::Compiler, "DFA", "K Stride");
+    log::stop(Component::Compiler, "DFA", "K Stride");
 
     // Is document well-formed
     nfa.well_formed(&doc);
@@ -47,14 +46,14 @@ fn main() {
 
     println!("Doc len is {}", doc.len());
 
-    timer.tic(Component::Solver, "DFA Solving", "Clear Match");
+    log::tic(Component::Solver, "DFA Solving", "Clear Match");
     println!(
         "Match: {}",
         nfa.is_match(&doc)
             .map(|c| format!("{:?}", c))
             .unwrap_or(String::from("NONE"))
     );
-    timer.stop(Component::Solver, "DFA Solving", "Clear Match");
+    log::stop(Component::Solver, "DFA Solving", "Clear Match");
     init();
 
     run_backend(
@@ -63,10 +62,9 @@ fn main() {
         opt.eval_type,
         opt.commit_type,
         opt.batch_size,
-        &mut timer,
     ); // auto select batching/commit
 
-    if let Err(e) = timer.write_csv(opt.output.to_str().unwrap()) {
+    if let Err(e) = log::write_csv(opt.output.to_str().unwrap()) {
         eprintln!("Error writing to file: {}", e);
         panic!("exiting");
     }
