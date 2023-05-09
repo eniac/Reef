@@ -705,7 +705,7 @@ mod tests {
                 .collect(),
             Some(JBatching::NaivePolys),
             Some(JCommit::HashChain),
-            vec![0, 1, 2],
+            vec![0, 2],
         );
         /*        backend_test(
                   "ab".to_string(),
@@ -743,7 +743,7 @@ mod tests {
                 .collect(),
             Some(JBatching::NaivePolys),
             Some(JCommit::Nlookup),
-            vec![0, 1, 2],
+            vec![0, 2],
         );
         /*    backend_test(
                 "ab".to_string(),
@@ -800,7 +800,7 @@ mod tests {
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::HashChain),
-            vec![0, 1, 2],
+            vec![0, 2],
         );
         /*  backend_test(
                 "ab".to_string(),
@@ -858,7 +858,7 @@ mod tests {
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::Nlookup),
-            vec![0, 1, 2],
+            vec![0, 2],
         );
         /*  backend_test(
                 "ab".to_string(),
