@@ -1,5 +1,5 @@
 
-[![CircleCI](https://circleci.com/gh/elefthei/rezk.svg?style=svg&circle-token=88c4900395a0fc7ac7d9d63b3186d31c9d840ef2)](https://dl.circleci.com/status-badge/redirect/gh/elefthei/rezk/tree/main)
+[![CircleCI](https://circleci.com/gh/elefthei/rezk.svg?style=svg&circle-token=88c4900395a0fc7ac7d9d63b3186d31c9d840ef2)](https://app.circleci.com/pipelines/github/elefthei/rezk?branch=main&circle-token=88c4900395a0fc7ac7d9d63b3186d31c9d840ef2)
 
 # Reef
 
@@ -22,7 +22,6 @@ Commands:
   ascii  Accepts ASCII regular-expressions and documents
   utf8   Accepts UTF8 regular-expressions and documents
   dna    Accepts DNA base encoded binary files (2-bits/base)
-  auto   Infer the smallest alphabet that works from the regular expression and document
   help   Print this message or the help of the given subcommand(s)
 
 Options:
@@ -34,7 +33,7 @@ A good starting point is to generate the proof that `aaaaaaaab` matches the rege
 
 ```
 $ echo aaaaaaaab > input.txt
-$ reef auto -i input.txt -r ".*b"
+$ reef ascii -t basic-english -i input.txt -r ".*b"
 ```
 
 For ASCII and UTF8 documents, Reef supports any subset of the following rules
@@ -42,6 +41,7 @@ For ASCII and UTF8 documents, Reef supports any subset of the following rules
 - `ignore-whitespace` ignore space, tabs, carriage returns and newlines in the input document.
 - `alpha-numeric` reduce the alphabet to the alphanumeric charset of ASCII.
 - `case-insensitive` ignore upper/lowercasing in the document (regex must be uppercase).
+- `basic-english` Upper/lowercase latin characters and basic punctuation.
 
 For example, Reef runs all the rules in an input with mixed casing, whitespace, alphanumeric characters
 

@@ -7,6 +7,7 @@ fn e2e_dpi() {
     log::stop(Component::Compiler, "bs test", "foo");
 
     log::r1cs(Component::Compiler, "bs test", "foo", 100);
+
     println!("Write this line");
 
     if let Err(e) = log::write_csv("foo.csv") {
