@@ -3,6 +3,8 @@ use clap::Parser;
 
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
+
+#[cfg(feature = "metrics")]
 use reef::metrics::{log, log::Component};
 
 #[cfg(feature = "plot")]
@@ -24,28 +26,37 @@ fn main() {
         .map(|c| c.to_string())
         .collect();
 
+    #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "Compiler", "Full");
+
+    #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA", "DFA");
+
     let mut nfa = NFA::new(&ab, opt.re);
+
+    #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA", "DFA");
 
     // Try to use k-stride
-    log::tic(Component::Compiler, "DFA", "K Stride");
-    opt.k_stride.map(|k| {
+    if let Some(k) = opt.k_stride {
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Compiler, "DFA", "K Stride");
+
         doc = nfa.k_stride(k, &doc);
-    });
-    log::stop(Component::Compiler, "DFA", "K Stride");
+
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Compiler, "DFA", "K Stride");
+    };
 
     // Is document well-formed
     nfa.well_formed(&doc);
-
-    // println!("NFA: {:#?}", nfa);
 
     #[cfg(feature = "plot")]
     plot::plot_nfa(&nfa).expect("Failed to plot NFA to a pdf file");
 
     println!("Doc len is {}", doc.len());
 
+    #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "DFA Solving", "Clear Match");
     println!(
         "Match: {}",
@@ -53,6 +64,8 @@ fn main() {
             .map(|c| format!("{:?}", c))
             .unwrap_or(String::from("NONE"))
     );
+
+    #[cfg(feature = "metrics")]
     log::stop(Component::Solver, "DFA Solving", "Clear Match");
     init();
 
@@ -61,14 +74,11 @@ fn main() {
         doc,
         opt.eval_type,
         opt.commit_type,
-        opt.batch_size,
-        true,
+        opt.batch_size
     ); // auto select batching/commit
 
-    if let Err(e) = log::write_csv(opt.output.to_str().unwrap()) {
-        eprintln!("Error writing to file: {}", e);
-        panic!("exiting");
-    }
+    #[cfg(feature = "metrics")]
+    log::write_csv(opt.output.to_str().unwrap()).unwrap();
 
     //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }

@@ -991,11 +991,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dot"
-version = "0.1.4-dev"
-source = "git+https://github.com/elefthei/dot-rust?branch=utf8#26db403ec46321b1888f8af8e50f0eb999507df8"
-
-[[package]]
 name = "ec-gpu"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2160,7 +2155,6 @@ dependencies = [
  "criterion",
  "csv",
  "dashmap",
- "dot",
  "ff",
  "fil_pasta_curves",
  "fxhash",
