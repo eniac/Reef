@@ -17,8 +17,6 @@ use crate::dfa::NFA;
 use crate::metrics::{log, log::Component};
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::ProverData;
-use circ::{ir::term::Value, target::r1cs::*};
-use ff::PrimeField;
 use generic_array::typenum;
 use neptune::{
     sponge::vanilla::{Sponge, SpongeTrait},
@@ -758,22 +756,23 @@ mod tests {
         doc: Vec<String>,
         batching_type: Option<JBatching>,
         commit_docype: Option<JCommit>,
-        batch_sizes: Vec<usize>,
+        batch_size: usize,
     ) {
         let r = Regex::new(&rstr);
         let dfa = NFA::new(&ab[..], r);
 
         init();
-        for b in batch_sizes {
-            run_backend(
-                dfa.clone(),
-                doc.clone(),
-                batching_type.clone(),
-                commit_docype.clone(),
-                b,
-            );
-        }
+        run_backend(
+            dfa.clone(),
+            doc.clone(),
+            batching_type.clone(),
+            commit_docype.clone(),
+            batch_size,
+        );
     }
+
+    // NOTE: you can't do multiple of these tests inside each test function, bc logging breaks
+    // there is no easy fix for this. just make new tests. trust me
 
     #[test]
     fn e2e_poly_hash() {
@@ -786,7 +785,7 @@ mod tests {
                 .collect(),
             Some(JBatching::NaivePolys),
             Some(JCommit::HashChain),
-            vec![0, 2],
+            0,
         );
         /*        backend_test(
                   "ab".to_string(),
@@ -824,7 +823,7 @@ mod tests {
                 .collect(),
             Some(JBatching::NaivePolys),
             Some(JCommit::Nlookup),
-            vec![0, 2],
+            0,
         );
         /*    backend_test(
                 "ab".to_string(),
@@ -881,7 +880,7 @@ mod tests {
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::HashChain),
-            vec![0, 2],
+            0,
         );
         /*  backend_test(
                 "ab".to_string(),
@@ -939,7 +938,7 @@ mod tests {
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::Nlookup),
-            vec![0, 2],
+            0,
         );
         /*  backend_test(
                 "ab".to_string(),

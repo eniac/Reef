@@ -5,10 +5,8 @@ use ::bellperson::{
     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
     Variable,
 };
-use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::{ir::term::Value, target::r1cs::*};
 use ff::{Field, PrimeField};
-use fxhash::FxHashMap;
 use generic_array::typenum;
 use gmp_mpfr_sys::gmp::limb_t;
 use neptune::{
@@ -25,7 +23,6 @@ use nova_snark::{
 use rug::integer::{IsPrime, Order};
 use rug::Integer;
 use std::collections::HashMap;
-use std::time::Instant;
 
 /// Convert a (rug) integer to a prime field element.
 pub fn int_to_ff<F: PrimeField>(i: Integer) -> F {

@@ -13,7 +13,6 @@ use neptune::{
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
 };
 use rug::{integer::Order, ops::RemRounding, Integer};
-use std::time::Instant;
 
 pub struct R1CS<'a, F: PrimeField> {
     pub dfa: &'a NFA,
