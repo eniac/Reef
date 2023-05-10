@@ -1,6 +1,6 @@
 Qakbot 
-"HTTP /1.1 200 OK.*MZ.*This program cannont be run in DOS mode."
-"GET (/.*/){2,}4{5,6}\.png"
+"HTTP\ /1.1\ 200\ OK.*MZ.*This\ program\ cannont\ be\ run\ in\ DOS\ mode\."
+"GET\ (/.*/){2,}4{5,6}\.png"
 
 
 
