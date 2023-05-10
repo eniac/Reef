@@ -8,6 +8,7 @@ use petgraph::graph::NodeIndex;
 use petgraph::visit::*;
 use petgraph::dot::Dot;
 use petgraph::algo;
+use rayon::iter::*;
 
 use crate::regex::Regex;
 
