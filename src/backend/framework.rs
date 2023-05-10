@@ -360,7 +360,7 @@ fn solve<'a>(
     let mut next_state = current_state;
 
     for i in 0..num_steps {
-        println!("WIT GEN STEP {}", i);
+        // println!("WIT GEN STEP {}", i);
         let test = format!("step {}", i);
 
         #[cfg(feature = "metrics")]

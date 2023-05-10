@@ -91,7 +91,7 @@ pub mod log {
     }
 
     pub fn write_csv(out: &str) -> Result<()> {
-        println!("Writing timer data to {}", out);
+      println!("Writing timer data to {}", out);
       let file = OpenOptions::new().write(true).append(true).create(true).open(out).unwrap();
         let mut wtr = Writer::from_writer(file);
 

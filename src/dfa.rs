@@ -1,85 +1,77 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::{BTreeSet, HashSet};
-use std::process::Command;
-
-use petgraph::{Direction, Graph};
-use petgraph::graph::NodeIndex;
-use petgraph::visit::*;
-use petgraph::dot::Dot;
-use petgraph::algo;
-use rayon::iter::*;
 
 use crate::regex::Regex;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NFA {
     /// Alphabet
     pub ab: Vec<String>,
+    /// Set of states (and their index)
+    pub n: usize,
     /// Accepting states
-    accepting: HashSet<usize>,
+    pub accepting: HashSet<usize>,
+    /// Regular expressions (for printing)
+    pub expressions: HashMap<usize, Regex>,
     /// Transition relation from [state -> char -> state] given an input
-    g: Graph<Regex, String>,
+    pub trans: HashMap<(usize, String), usize>,
     /// Must match from the begining of the document (default: false)
-    anchor_start: bool,
+    pub anchor_start: bool,
     /// Must match until the end of the document (default: false)
-    anchor_end: bool,
+    pub anchor_end: bool,
 }
 
 // Null transition character
 pub const EPSILON: &String = &String::new();
 
-
-impl PartialEq for NFA {
-    fn eq(&self, other: &Self) -> bool {
-        self.ab == other.ab &&
-            self.g[self.get_init_nodeidx()] == other.g[other.get_init_nodeidx()]
-    }
-}
-
 impl NFA {
     pub fn new<'a>(alphabet: &'a str, re: Regex) -> Self {
         let ab = alphabet.chars().sorted().collect();
-        let mut graph: Graph<Regex, String> = Graph::new();
 
+        let mut trans = HashMap::new();
+        let mut states: HashMap<Regex, usize> = HashMap::new();
         // Recursive funtion
         fn build_trans(
-            g: &mut Graph<Regex, String>,
+            states: &mut HashMap<Regex, usize>,
+            trans: &mut HashMap<(usize, String), usize>,
             ab: &Vec<char>,
             q: &Regex,
-            n: NodeIndex<u32>) {
+            n: usize,
+        ) {
+            // Add to DFA if not already there
+            states.insert(q.clone(), n);
+            // The reflexive step
+            trans.insert((states[q], EPSILON.clone()), states[q]);
 
-            // println!("Adding trans {}, {}", q, n.index());
             // Explore derivatives
             for c in &ab[..] {
                 let q_c = q.deriv(&c);
-
-                if let Some(n_c) = g.node_indices().find(|i| g[*i] == q_c) {
-                    g.add_edge(n, n_c, c.to_string());
+                // Non-reflexive step
+                if states.contains_key(&q_c) {
+                    trans.insert((states[q], c.to_string()), states[&q_c]);
                 } else {
-                    // Add to DFA if not already there
-                    let n_c = g.add_node(q_c.clone());
-                    // Reflexive step
-                    g.add_edge(n_c, n_c, EPSILON.clone());
-                    g.add_edge(n, n_c, c.to_string());
-                    build_trans(g, ab, &q_c, n_c);
+                    let n_c = states.len();
+                    trans.insert((states[q], c.to_string()), n_c);
+                    build_trans(states, trans, ab, &q_c, n_c);
                 }
             }
         }
 
-        let n = graph.add_node(re.clone());
-        graph.add_edge(n, n, EPSILON.clone());
         // Recursively build transitions
-        build_trans(&mut graph, &ab, &re, n);
+        build_trans(&mut states, &mut trans, &ab, &re, 0);
 
         // Return DFA
         Self {
             ab: ab.into_iter().map(|c| c.to_string()).collect(),
-            accepting: graph.node_indices()
-                .filter(|&k| graph[k].nullable())
-                .map(|i| i.index())
+            n: states.len(),
+            accepting: states
+                .clone()
+                .into_iter()
+                .filter_map(|(k, v)| if k.nullable() { Some(v) } else { None })
                 .collect(),
-            g: graph,
+            expressions: states.into_iter().map(|(k, v)| (v, k)).collect(),
+            trans,
             anchor_start: re.is_start_anchored(),
             anchor_end: re.is_end_anchored(),
         }
@@ -106,15 +98,11 @@ impl NFA {
     }
 
     pub fn nstates(&self) -> usize {
-        self.g.node_count()
+        self.n
     }
 
     pub fn nchars(&self) -> usize {
         self.ab.len()
-    }
-
-    pub fn nedges(&self) -> usize {
-        self.g.edge_count()
     }
 
     pub fn is_exact_match(&self) -> bool {
@@ -126,13 +114,9 @@ impl NFA {
         0
     }
 
-    pub fn get_init_nodeidx(&self) -> NodeIndex<u32> {
-        NodeIndex::new(0)
-    }
-
     /// All states
     pub fn get_states(&self) -> HashSet<usize> {
-        self.g.node_indices().map(|i|i.index()).collect()
+        (0..self.n).collect()
     }
 
     /// Final states
@@ -148,21 +132,19 @@ impl NFA {
             .collect()
     }
 
-    /// Single step transition
     pub fn delta(&self, state: usize, c: &String) -> Option<usize> {
-        let res = self.g.edges_directed(NodeIndex::new(state), Direction::Outgoing)
-                        .find(|e| e.weight() == c)
-                        .map(|e| e.target().index());
+        let res = self.trans.get(&(state, c.clone())).map(|c| c.clone());
 
         // println!("{} --[ {} ]--> {}", state, c, res.map(|c|c.to_string()).unwrap_or(String::from("NONE")));
         res
     }
 
     /// Transition relation as a vector
-    pub fn deltas(&self) -> HashSet<(usize, String, usize)> {
-        self.g.node_indices()
-            .flat_map(|i| self.g.edges(i))
-            .map(|e| (e.source().index(), e.weight().clone(), e.target().index()))
+    pub fn deltas(&self) -> Vec<(usize, String, usize)> {
+        self.trans
+            .clone()
+            .into_iter()
+            .map(|((a, b), c)| (a, b, c))
             .collect()
     }
 
@@ -185,7 +167,9 @@ impl NFA {
             return Some((0, 0));
         }
         // For every postfix of doc (O(n^2))
-        start_idxs.into_par_iter().find_map_any(|i| {
+        start_idxs.into_iter().find_map(|i| {
+            // .into_par_iter()
+            // .find_map_any(|i| {
             let mut s = self.get_init_state();
             for j in i..doc.len() {
                 // Apply transition relation
@@ -200,145 +184,6 @@ impl NFA {
         })
     }
 
-    /// Compute the strongly connected components of the DFA
-    pub fn scc_loops(&self) -> Vec<Self> {
-        algo::tarjan_scc(&self.g)
-            .into_iter()
-            .map(|v| NFA::new(&self.ab.join(""),
-                self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone()))
-            .filter(|v| v.has_accepting_cycle() && v != self)
-            .collect()
-    }
-
-    /// Is the DFA a sink (has no accepting states)
-    pub fn is_sink(&self) -> bool {
-        self.accepting.is_empty()
-    }
-
-    pub fn find_node(&self, r: &Regex) -> Option<NodeIndex<u32>> {
-        self.g.node_indices().find(|i| &self.g[*i] == r)
-    }
-
-    pub fn to_regex(&self) -> Regex {
-        self.g[self.get_init_nodeidx()].clone()
-    }
-
-    /// Does this DFA has an infintely accepting cycle - or - does this DFA accept arbitrary length prefixes
-    pub fn has_accepting_cycle(&self) -> bool {
-        fn is_cycle(p: &Vec<NodeIndex<u32>>) -> bool {
-            let s: HashSet<&NodeIndex<u32>> = p.into_iter().collect();
-            // println!("SET {:?} and VEC {:?}", s, p);
-            s.len() != p.len()
-        }
-        fn has_accepting(g: &Graph<Regex, String>, p: &Vec<NodeIndex<u32>>) -> bool {
-            p.into_iter().any(|i| g[*i].nullable())
-        }
-
-        // algo::is_cyclic_directed(&self.g)
-        let mut dfs = Dfs::new(&self.g, self.get_init_nodeidx());
-        while let Some(node) = dfs.next(&self.g) {
-            // println!("Visiting node {}", self.g[node]);
-            if algo::all_simple_paths::<Vec<_>, _>(&self.g, node, node, 1, None)
-                .any(|p| is_cycle(&p) && has_accepting(&self.g, &p)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /// Remove all outgoing edges and visited nodes out of [i]
-    pub fn remove_outgoing_edges(&mut self, i: NodeIndex<u32>) {
-        let mut dfs = Dfs::new(&self.g, i);
-        let mut nodes = HashSet::new();
-        while let Some(node) = dfs.next(&self.g) {
-            // use a detached neighbors walker
-            let mut edges = self.g.neighbors_directed(node, Direction::Outgoing).detach();
-            while let Some(edge) = edges.next_edge(&self.g) {
-                if let Some((_, dst)) = self.g.edge_endpoints(edge) {
-                    if dst != i {
-                        nodes.insert(dst);
-                    }
-                }
-                self.g.remove_edge(edge);
-            }
-        }
-        for n in nodes {
-            self.g.remove_node(n);
-        }
-    }
-
-    /// Substitute any sub-DFA with another DFA while maintaining transitions
-    pub fn to_epsilon(&mut self, i: NodeIndex<u32>) -> bool {
-        // Remove children
-        self.remove_outgoing_edges(i);
-
-        // Update node to epsilon
-        self.g.add_edge(i, i, EPSILON.clone());
-        if let Some(xr) = self.g.node_weight_mut(i) {
-            *xr = Regex::nil();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Split NFA in .*
-    pub fn split_dot_star(&mut self) -> std::io::Result<()> {
-
-        self.write_pdf("original")?;
-        let sccs = self.scc_loops();
-
-        let mut files: Vec<String> = Vec::from(["original.pdf".to_string(), "reduced.pdf".to_string()]);
-
-        for i in 0..sccs.len() {
-            let fout = format!("scc-{}", i);
-            let xi = self.find_node(&sccs[i].to_regex()).unwrap();
-            self.to_epsilon(xi);
-            sccs[i].write_pdf(fout.as_str())?;
-            files.push(format!("{}.pdf", fout));
-        }
-
-        self.write_pdf("reduced")?;
-        Command::new("pdfjam")
-            .args(files.clone())
-            .arg("-o")
-            .arg("scc.pdf")
-            .spawn()
-            .expect("[dot] CLI failed to convert dfa to [pdf] file")
-            .wait()?;
-
-        for fout in files.clone() {
-            std::fs::remove_file(fout)?;
-        }
-
-        Ok(())
-    }
-
-    /// Dot file
-    pub fn write_dot(&self, filename: &str) -> std::io::Result<()> {
-        let s: String = Dot::new(&self.g).to_string();
-        let fout = filename.to_string() + ".dot";
-        println!("Wrote DOT file {}.", fout);
-        std::fs::write(fout, s)
-    }
-
-    /// PDF file
-    pub fn write_pdf(&self, filename: &str) -> std::io::Result<()> {
-        self.write_dot(filename)?;
-
-        // Convert to pdf
-        Command::new("dot")
-            .arg("-Tpdf")
-            .arg(filename.to_string() + ".dot")
-            .arg("-o")
-            .arg(filename.to_string() + ".pdf")
-            .spawn()
-            .expect("[dot] CLI failed to convert dfa to [pdf] file")
-            .wait()?;
-
-        Ok(())
-    }
-
     /// Get the 2^k stride DFA
     pub fn k_stride(&mut self, k: usize, doc: &Vec<String>) -> Vec<String> {
         let mut d = doc.clone();
@@ -349,8 +194,7 @@ impl NFA {
     }
 
     /// Double the stride of the DFA
-    fn double_stride(&mut self, doc: &Vec<String>) -> Vec<String> {
-        assert!(self.anchor_start && self.anchor_end, "k-stride only works for exact match");
+    pub fn double_stride(&mut self, doc: &Vec<String>) -> Vec<String> {
         let mut ab: HashSet<(String, String)> = HashSet::new();
         let mut classes: HashMap<BTreeSet<(usize, usize)>, BTreeSet<String>> = HashMap::new();
         // S' := S + S*S (cartesian product)
@@ -400,7 +244,6 @@ impl NFA {
                 .expect("No equivalence classes found")
         }
 
-        // ((a | b) .* c) | d) =
         // Find a equivalent string from an eqivalence class
         fn find_equivalent(c: String, classes: &Vec<BTreeSet<String>>) -> String {
             let mut rep = None;
@@ -419,20 +262,20 @@ impl NFA {
         let mut abset = HashSet::new();
 
         // Build transition relation from classes
-        self.g.clear_edges();
+        self.trans = self
+            .trans
+            .clone()
+            .into_iter()
+            .filter(|((t, c), u)| if t == u && c == EPSILON { true } else { false })
+            .collect();
 
         for (set, class) in classes {
             for (t, u) in set {
-                self.g.add_edge(NodeIndex::new(t), NodeIndex::new(u), find_representative(&class));
+                self.trans.insert((t, find_representative(&class)), u);
                 abset.insert(find_representative(&class));
             }
         }
         self.ab = abset.into_iter().collect();
-
-        // Add reflexive steps again
-        for i in self.g.node_indices() {
-            self.g.add_edge(i, i, EPSILON.clone());
-        }
 
         // Return new document (modulo equiv classes)
         doc.chunks(2)
@@ -447,13 +290,14 @@ impl NFA {
 
 #[cfg(test)]
 mod tests {
-    use crate::nfa::NFA;
+    use crate::dfa::NFA;
     use crate::regex::Regex;
 
     fn setup_nfa(r: &str, alpha: &str) -> NFA {
         let ab = String::from(alpha);
         let regex = Regex::new(r);
-        NFA::new(&ab[..], regex)
+        let nfa = NFA::new(&ab[..], regex);
+        nfa
     }
 
     fn vs(s: &str) -> Vec<String> {
@@ -521,20 +365,14 @@ mod tests {
     #[test]
     fn test_nfa_double_stride() {
         let mut nfa = setup_nfa("a.*a", "ab");
-        let doc = nfa.k_stride(1, &vs("abbbba"));
+        let doc = nfa.double_stride(&vs("abbbba"));
         check(&nfa, &doc, Some((0, 3)))
     }
 
     #[test]
     fn test_nfa_double_stride_2() {
         let mut nfa = setup_nfa("^.*a$", "ab");
-        let doc = nfa.k_stride(1, &vs("aabbaaa"));
+        let doc = nfa.double_stride(&vs("aabbaaa"));
         check(&nfa, &doc, Some((0, 4)))
-    }
-
-    #[test]
-    fn test_nfa_split() {
-        let mut nfa = setup_nfa("((c.*b) | (a.*b))*b", "abc");
-        nfa.split_dot_star().unwrap();
     }
 }

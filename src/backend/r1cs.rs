@@ -97,15 +97,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let mut batch_doc = doc.clone();
 
-        println!("batch doc len {}", batch_doc.len());
-        println!("{:#?}", batch_doc);
-
         if matches!(commit, JCommit::Nlookup) {
             batch_doc.push(EPSILON.clone()); // MUST do to make batching work w/commitments
         }
-
-        println!("batch doc len {}", batch_doc.len());
-        println!("{:#?}", batch_doc);
 
         let mut epsilon_to_add = sel_batch_size - (batch_doc.len() % sel_batch_size);
 
@@ -113,11 +107,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             epsilon_to_add = 0;
         }
 
-        println!(
-            "Doc len: {:#?} +1, Epsilon to Add: {:#?}",
-            doc.len(),
-            epsilon_to_add
-        );
+        // println!(
+        //     "Doc len: {:#?} +1, Epsilon to Add: {:#?}",
+        //     doc.len(),
+        //     epsilon_to_add
+        // );
 
         let mut substring = (0, batch_doc.len());
 
@@ -1859,13 +1853,13 @@ mod tests {
         let mut d = doc.chars().map(|c| c.to_string()).collect();
         d = nfa.k_stride(k, &d);
         let nfa_match = nfa.is_match(&d);
-        println!(
-            "DFA Size: {:#?}, |doc| : {}, |ab| : {}, match: {:?}",
-            nfa.nedges(),
-            d.len(),
-            nfa.ab.len(),
-            nfa_match
-        );
+        // println!(
+        //     "DFA Size: {:#?}, |doc| : {}, |ab| : {}, match: {:?}",
+        //     nfa.nedges(),
+        //     d.len(),
+        //     nfa.ab.len(),
+        //     nfa_match
+        // );
 
         //let chars: Vec<String> = d.clone();
         //.chars().map(|c| c.to_string()).collect();

@@ -78,7 +78,7 @@ impl Timer {
     pub fn write_csv(&mut self, out: &str) -> io::Result<()> {
         println!("Writing timer data to {}", out);
         let mut file = OpenOptions::new().write(true).append(true).open(out).unwrap();
-        let mut wtr = Writer::from_writer(file)?;
+        let mut wtr = Writer::from_writer(file);
         self.stop();
         wtr.write_record(&["Component", "test", "subtest", "time (μs)"])?;
         for ((c, test, subtest), value) in self.log.clone().into_iter() {
