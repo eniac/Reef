@@ -4,6 +4,8 @@ pub mod log {
     use std::fmt::Display;
     use std::io::Result;
     use std::time::{Duration, Instant};
+  use std::fs::OpenOptions;
+
 
     lazy_static! {
         pub static ref TIMER: DashMap<Test, Time> = DashMap::new();
@@ -90,7 +92,8 @@ pub mod log {
 
     pub fn write_csv(out: &str) -> Result<()> {
         println!("Writing timer data to {}", out);
-        let mut wtr = Writer::from_path(out)?;
+      let file = OpenOptions::new().write(true).append(true).create(true).open(out).unwrap();
+        let mut wtr = Writer::from_writer(file);
 
         TIMER.alter_all(|_, v| match v {
             Started(start_time) => Finished(start_time.elapsed()),
