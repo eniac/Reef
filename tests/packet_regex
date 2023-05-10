@@ -5,7 +5,7 @@ Qakbot
 
 
 DNS Regexs 
-"(porn|sex|xxx).*\..*"
-"[^you]tube\..*"
-".*\.ir$"
+"(porn|sex|xxx).*\..*" --> porn|sex|xxx
+"[^you]tube\..*" --> "(!(you))tube\."
+".*\.ir$" --> "\.ir$"
 
