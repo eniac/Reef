@@ -50,6 +50,7 @@ pub fn run_backend(
     batching_type: Option<JBatching>,
     commit_doctype: Option<JCommit>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
+    logging: bool,
 ) {
     let (sender, recv): (
         Sender<NFAStepCircuit<<G1 as Group>::Scalar>>,
@@ -62,11 +63,13 @@ pub fn run_backend(
         // we do setup here to avoid unsafe passing
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
-        log::tic(
-            Component::Compiler,
-            "R1CS",
-            "Optimization Selection, R1CS precomputations",
-        );
+        if logging {
+            log::tic(
+                Component::Compiler,
+                "R1CS",
+                "Optimization Selection, R1CS precomputations",
+            );
+        }
         let mut r1cs_converter = R1CS::new(
             &dfa,
             &doc,
@@ -75,29 +78,43 @@ pub fn run_backend(
             batching_type,
             commit_doctype,
         );
-        log::stop(
-            Component::Compiler,
-            "R1CS",
-            "Optimization Selection, R1CS precomputations",
-        );
+        if logging {
+            log::stop(
+                Component::Compiler,
+                "R1CS",
+                "Optimization Selection, R1CS precomputations",
+            );
+        }
 
         println!("generate commitment");
 
         // to get rid clone
-        log::tic(Component::Compiler, "R1CS", "Commitment Generations");
+        if logging {
+            log::tic(Component::Compiler, "R1CS", "Commitment Generations");
+        }
         let reef_commit =
             gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
         // todo clone
         r1cs_converter.set_commitment(reef_commit.clone());
-        log::stop(Component::Compiler, "R1CS", "Commitment Generations");
+        if logging {
+            log::stop(Component::Compiler, "R1CS", "Commitment Generations");
+        }
 
-        log::tic(Component::Compiler, "R1CS", "To Circuit");
+        if logging {
+            log::tic(Component::Compiler, "R1CS", "To Circuit");
+        }
         let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
-        log::stop(Component::Compiler, "R1CS", "To Circuit");
+        if logging {
+            log::stop(Component::Compiler, "R1CS", "To Circuit");
+        }
 
-        log::tic(Component::Compiler, "R1CS", "Proof Setup");
-        let (num_steps, z0_primary, pp) = setup(&r1cs_converter, &prover_data);
-        log::stop(Component::Compiler, "R1CS", "Proof Setup");
+        if logging {
+            log::tic(Component::Compiler, "R1CS", "Proof Setup");
+        }
+        let (num_steps, z0_primary, pp) = setup(&r1cs_converter, &prover_data, logging);
+        if logging {
+            log::stop(Component::Compiler, "R1CS", "Proof Setup");
+        }
 
         send_setup
             .send(ProofInfo {
@@ -112,16 +129,18 @@ pub fn run_backend(
             })
             .unwrap();
 
-        log::stop(Component::Compiler, "Compiler", "Full");
+        if logging {
+            log::stop(Component::Compiler, "Compiler", "Full");
+        }
 
-        solve(sender, &r1cs_converter, &prover_data, num_steps); //, timer);
+        solve(sender, &r1cs_converter, &prover_data, num_steps, logging); //, timer);
         println!("solver thread finished");
     });
 
     //get args
     let proof_info = recv_setup.recv().unwrap();
 
-    prove_and_verify(recv, proof_info);
+    prove_and_verify(recv, proof_info, logging);
 
     // rejoin child
     solver_thread.join().expect("setup/solver thread panicked");
@@ -130,6 +149,7 @@ pub fn run_backend(
 fn setup<'a>(
     r1cs_converter: &R1CS<<G1 as Group>::Scalar>,
     circ_data: &'a ProverData,
+    logging: bool,
 ) -> (
     usize,
     Vec<<G1 as Group>::Scalar>,
@@ -213,18 +233,22 @@ fn setup<'a>(
     >::setup(circuit_primary.clone(), circuit_secondary.clone())
     .unwrap();
 
-    log::r1cs(
-        Component::Prover,
-        "Number Constraints",
-        "Primary Circuit",
-        pp.num_constraints().0,
-    );
-    log::r1cs(
-        Component::Prover,
-        "Number Constraints",
-        "Secondary Circuit",
-        pp.num_constraints().1,
-    );
+    if logging {
+        log::r1cs(
+            Component::Prover,
+            "Number Constraints",
+            "Primary Circuit",
+            pp.num_constraints().0,
+        );
+    }
+    if logging {
+        log::r1cs(
+            Component::Prover,
+            "Number Constraints",
+            "Secondary Circuit",
+            pp.num_constraints().1,
+        );
+    }
 
     println!(
         "Number of constraints (primary circuit): {}",
@@ -327,6 +351,7 @@ fn solve<'a>(
     r1cs_converter: &R1CS<<G1 as Group>::Scalar>,
     circ_data: &'a ProverData,
     num_steps: usize,
+    logging: bool,
 ) {
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());
@@ -369,7 +394,9 @@ fn solve<'a>(
         let test = format!("step {}", i);
 
         // allocate real witnesses for round i
-        log::tic(Component::Solver, &test, "witness generation");
+        if logging {
+            log::tic(Component::Solver, &test, "witness generation");
+        }
         (
             wits,
             next_state,
@@ -546,7 +573,9 @@ fn solve<'a>(
             r1cs_converter.pc.clone(),
         );
 
-        log::stop(Component::Solver, &test, "witness generation");
+        if logging {
+            log::stop(Component::Solver, &test, "witness generation");
+        }
         println!("FINISHED WIT STEP {}", i);
 
         sender.send(circuit_primary).unwrap(); //witness_i).unwrap();
@@ -560,7 +589,11 @@ fn solve<'a>(
     }
 }
 
-fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof_info: ProofInfo) {
+fn prove_and_verify(
+    recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>,
+    proof_info: ProofInfo,
+    logging: bool,
+) {
     println!("Proving thread starting...");
 
     // recursive SNARK
@@ -576,7 +609,9 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
         // blocks until we receive first witness
         let circuit_primary = recv.recv().unwrap();
 
-        log::tic(Component::Prover, &test, "prove step");
+        if logging {
+            log::tic(Component::Prover, &test, "prove step");
+        }
 
         let result = RecursiveSNARK::prove_step(
             &proof_info.pp.lock().unwrap(),
@@ -587,7 +622,9 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
             z0_secondary.clone(),
         );
 
-        log::stop(Component::Prover, &test, "prove step");
+        if logging {
+            log::stop(Component::Prover, &test, "prove step");
+        }
 
         assert!(result.is_ok());
         println!(
@@ -615,24 +652,32 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
     */
 
     // compressed SNARK
-    log::tic(Component::Prover, "Proof", "Compressed SNARK");
+    if logging {
+        log::tic(Component::Prover, "Proof", "Compressed SNARK");
+    }
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(
         &proof_info.pp.lock().unwrap(),
         &recursive_snark,
     );
-    log::stop(Component::Prover, "Proof", "Compressed SNARK");
+    if logging {
+        log::stop(Component::Prover, "Proof", "Compressed SNARK");
+    }
 
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
 
-    log::space(
-        Component::Prover,
-        "Proof Size",
-        "Compressed SNARK size",
-        serde_json::to_string(&compressed_snark).unwrap().len(),
-    );
+    if logging {
+        log::space(
+            Component::Prover,
+            "Proof Size",
+            "Compressed SNARK size",
+            serde_json::to_string(&compressed_snark).unwrap().len(),
+        );
+    }
 
-    log::tic(Component::Verifier, "Verification", "Full");
+    if logging {
+        log::tic(Component::Verifier, "Verification", "Full");
+    }
 
     verify(
         compressed_snark,
@@ -643,8 +688,11 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
         proof_info.doc_len,
         proof_info.eval_type,
         proof_info.commit_type,
+        logging,
     );
-    log::stop(Component::Verifier, "Verification", "Full");
+    if logging {
+        log::stop(Component::Verifier, "Verification", "Full");
+    }
 }
 
 fn verify(
@@ -656,25 +704,32 @@ fn verify(
     doc_len: usize,
     eval_type: JBatching,
     commit_type: JCommit,
+    logging: bool,
 ) {
     let q_len = logmn(table.len());
     let qd_len = logmn(doc_len);
 
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
-    log::tic(Component::Verifier, "Verification", "Nova Verification");
+    if logging {
+        log::tic(Component::Verifier, "Verification", "Nova Verification");
+    }
     let res = compressed_snark.verify(
         &pp.lock().unwrap(),
         FINAL_EXTERNAL_COUNTER,
         z0_primary,
         z0_secondary,
     );
-    log::stop(Component::Verifier, "Verification", "Nova Verification");
+    if logging {
+        log::stop(Component::Verifier, "Verification", "Nova Verification");
+    }
 
     assert!(res.is_ok());
 
     // final "in the clear" V checks
-    log::tic(Component::Verifier, "Verification", "Final Clear Checks");
+    if logging {
+        log::tic(Component::Verifier, "Verification", "Final Clear Checks");
+    }
 
     // state, char, opt<hash>, opt<v,q for eval>, opt<v,q for doc>, accepting
     let zn = res.unwrap().0;
@@ -739,7 +794,9 @@ fn verify(
             );
         }
     }
-    log::stop(Component::Verifier, "Verification", "Final Clear Checks");
+    if logging {
+        log::stop(Component::Verifier, "Verification", "Final Clear Checks");
+    }
 }
 
 #[cfg(test)]
@@ -768,11 +825,9 @@ mod tests {
             batching_type.clone(),
             commit_docype.clone(),
             batch_size,
+            false,
         );
     }
-
-    // NOTE: you can't do multiple of these tests inside each test function, bc logging breaks
-    // there is no easy fix for this. just make new tests. trust me
 
     #[test]
     fn e2e_poly_hash() {
