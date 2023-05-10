@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashSet};
 
 use crate::regex::Regex;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NFA {
     /// Alphabet
     pub ab: Vec<String>,

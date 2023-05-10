@@ -64,9 +64,6 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     assert_eq!(table_t.len(), base.pow(ell as u32));
     assert_eq!(table_eq.len(), base.pow(ell as u32));
 
-    //    println!("ell {:#?}, i {:#?}", ell, i);
-    //    println!("pow {:#?}", pow);
-
     let mut xsq = Integer::from(0);
     let mut x = Integer::from(0);
     let mut con = Integer::from(0);
@@ -77,7 +74,6 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
         let ti_1 = &table_t[b + pow];
         let ei_0 = &table_eq[b];
         let ei_1 = &table_eq[b + pow];
-        //println!("add ({:#?}, {:#?})", ai_0, ai_1);
 
         let t_slope = ti_1.clone() - ti_0;
         let e_slope = ei_1.clone() - ei_0;
@@ -130,12 +126,9 @@ pub(crate) fn gen_eq_table(
     for i in 0..qs.len() {
         eq_t[qs[i]] += &rs[i];
         //term += evals[qs[i]].clone() * &claims[i];
-        //println!("term: {:#?}", term);
     }
 
     for i in 0..eq_t.len() {
-        println!("start");
-
         // eq_t
         let mut term = rs[qs.len()].clone(); //Integer::from(1);
 
@@ -144,15 +137,9 @@ pub(crate) fn gen_eq_table(
 
             term *= Integer::from(xi) * &last_q[j]
                 + Integer::from(1 - xi) * (Integer::from(1) - &last_q[j]);
-
-            //println!("{:#?}", term);
         }
 
-        // println!("{:#?}", term);
-
         eq_t[i] += term;
-
-        // println!("{:#?}", eq_t[i]);
     }
 
     eq_t
@@ -187,7 +174,6 @@ pub(crate) fn prover_mle_partial_eval(
     for i in 0..es.len() + 1 {
         //e in 0..table.len() {
 
-        //println!("\ni = {:#?}", i);
         // ~eq(x,e)
         if i < es.len() {
             let mut prod = prods[i].clone();
@@ -324,7 +310,6 @@ pub(crate) fn prover_mle_sum_eval(
 // coeffs = [constant, x, x^2 ...]
 pub(crate) fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
     let num_c = coeffs.len();
-    //println!("coeffs = {:#?}", coeffs);
 
     let mut horners = term(
         Op::PfNaryOp(PfNaryOp::Mul),

@@ -57,11 +57,12 @@ fn main() {
     init();
 
     run_backend(
-        &nfa,
-        &doc,
+        nfa,
+        doc,
         opt.eval_type,
         opt.commit_type,
         opt.batch_size,
+        true,
     ); // auto select batching/commit
 
     if let Err(e) = log::write_csv(opt.output.to_str().unwrap()) {

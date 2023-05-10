@@ -7,18 +7,25 @@ type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
 type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
-use crate::backend::{
-    commitment::*,
-    costs::{logmn, JBatching, JCommit},
-    nova::*,
-    r1cs::*,
-};
 use crate::dfa::NFA;
-use crate::metrics::{log, log::Component};
+use crate::{
+    backend::{
+        commitment::*,
+        costs::{logmn, JBatching, JCommit},
+        nova::*,
+        r1cs::*,
+    },
+    metrics::*,
+};
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::ProverData;
+use circ::{ir::term::Value, target::r1cs::*};
+use core::time;
+use ff::PrimeField;
+use fxhash::FxHashMap;
 use generic_array::typenum;
 use neptune::{
+    poseidon::PoseidonConstants,
     sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
@@ -26,21 +33,18 @@ use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
-use rug::Integer;
+use serde_json::{Result, Value as SerdeValue};
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
+use std::time::Instant;
 
-struct ProofInfo {
+struct SetupParams {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
     num_steps: usize,
-    commit: ReefCommitment<<G1 as Group>::Scalar>,
-    table: Vec<Integer>,
-    doc_len: usize,
-    eval_type: JBatching,
-    commit_type: JCommit,
 }
 
 // gen R1CS object, commitment, make step circuit for nova
@@ -50,26 +54,20 @@ pub fn run_backend(
     batching_type: Option<JBatching>,
     commit_doctype: Option<JCommit>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
-    logging: bool,
+    timer: &mut Timer,
 ) {
     let (sender, recv): (
         Sender<NFAStepCircuit<<G1 as Group>::Scalar>>,
         Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>,
     ) = mpsc::channel();
 
-    let (send_setup, recv_setup): (Sender<ProofInfo>, Receiver<ProofInfo>) = mpsc::channel();
+    let (send_setup, recv_setup): (Sender<SetupParams>, Receiver<SetupParams>) = mpsc::channel();
 
     let solver_thread = thread::spawn(move || {
         // we do setup here to avoid unsafe passing
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
-        if logging {
-            log::tic(
-                Component::Compiler,
-                "R1CS",
-                "Optimization Selection, R1CS precomputations",
-            );
-        }
+        //timer.tic(Component::Compiler, "R1CS", "Optimization Selection");
         let mut r1cs_converter = R1CS::new(
             &dfa,
             &doc,
@@ -78,78 +76,60 @@ pub fn run_backend(
             batching_type,
             commit_doctype,
         );
-        if logging {
-            log::stop(
-                Component::Compiler,
-                "R1CS",
-                "Optimization Selection, R1CS precomputations",
-            );
-        }
-
+        //timer.stop(Component::Compiler, "R1CS", "Optimization Selection");
         println!("generate commitment");
 
         // to get rid clone
-        if logging {
-            log::tic(Component::Compiler, "R1CS", "Commitment Generations");
-        }
+        //timer.tic(Component::Compiler, "R1CS", "Commitment Generations");
         let reef_commit =
             gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
         // todo clone
         r1cs_converter.set_commitment(reef_commit.clone());
-        if logging {
-            log::stop(Component::Compiler, "R1CS", "Commitment Generations");
-        }
+        //timer.stop(Component::Compiler, "R1CS", "Commitment Generations");
 
-        if logging {
-            log::tic(Component::Compiler, "R1CS", "To Circuit");
-        }
+        //timer.tic(Component::Compiler, "R1CS", "To Circuit and Setup");
         let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
-        if logging {
-            log::stop(Component::Compiler, "R1CS", "To Circuit");
-        }
 
-        if logging {
-            log::tic(Component::Compiler, "R1CS", "Proof Setup");
-        }
-        let (num_steps, z0_primary, pp) = setup(&r1cs_converter, &prover_data, logging);
-        if logging {
-            log::stop(Component::Compiler, "R1CS", "Proof Setup");
-        }
-
+        let (num_steps, z0_primary, pp) = setup(&r1cs_converter, &prover_data); //, timer);
         send_setup
-            .send(ProofInfo {
+            .send(SetupParams {
                 pp: Arc::new(Mutex::new(pp)),
                 z0_primary,
                 num_steps,
-                commit: reef_commit,
-                table: r1cs_converter.table.clone(),
-                doc_len: r1cs_converter.udoc.len(),
-                eval_type: r1cs_converter.batching,
-                commit_type: r1cs_converter.commit_type,
             })
             .unwrap();
+        //timer.stop(Component::Compiler, "R1CS", "To Circuit and Setup");
 
-        if logging {
-            log::stop(Component::Compiler, "Compiler", "Full");
-        }
+        //timer.stop(Component::Compiler, "Compiler", "Full");
 
-        solve(sender, &r1cs_converter, &prover_data, num_steps, logging); //, timer);
+        solve(sender, &r1cs_converter, &prover_data, num_steps); //, timer);
         println!("solver thread finished");
     });
 
     //get args
-    let proof_info = recv_setup.recv().unwrap();
+    let setup = recv_setup.recv().unwrap();
 
-    prove_and_verify(recv, proof_info, logging);
+    let proof = prove(recv, setup.pp, &setup.z0_primary, setup.num_steps, timer);
 
     // rejoin child
     solver_thread.join().expect("setup/solver thread panicked");
+
+    timer.space(
+        Component::Prover,
+        "add test",
+        "Compressed SNARK size",
+        serde_json::to_string(&proof).unwrap().len(),
+    );
+
+    timer.tic(Component::Verifier, "Verification", "Full");
+    //verify(proof, r1cs_converter, setup.z0_primary, setup.pp);
+    timer.stop(Component::Verifier, "Verification", "Full");
 }
 
 fn setup<'a>(
     r1cs_converter: &R1CS<<G1 as Group>::Scalar>,
     circ_data: &'a ProverData,
-    logging: bool,
+    //    timer: &mut Timer,
 ) -> (
     usize,
     Vec<<G1 as Group>::Scalar>,
@@ -232,24 +212,19 @@ fn setup<'a>(
         TrivialTestCircuit<<G2 as Group>::Scalar>,
     >::setup(circuit_primary.clone(), circuit_secondary.clone())
     .unwrap();
-
-    if logging {
-        log::r1cs(
-            Component::Prover,
-            "Number Constraints",
-            "Primary Circuit",
-            pp.num_constraints().0,
-        );
-    }
-    if logging {
-        log::r1cs(
-            Component::Prover,
-            "Number Constraints",
-            "Secondary Circuit",
-            pp.num_constraints().1,
-        );
-    }
-
+    /*timer.r1cs(
+        Component::Prover,
+        "add test",
+        "Primary Circuit",
+        pp.num_constraints().0,
+    );
+    timer.r1cs(
+        Component::Prover,
+        "add test",
+        "Secondary Circuit",
+        pp.num_constraints().1,
+    );
+    */
     println!(
         "Number of constraints (primary circuit): {}",
         pp.num_constraints().0
@@ -351,7 +326,7 @@ fn solve<'a>(
     r1cs_converter: &R1CS<<G1 as Group>::Scalar>,
     circ_data: &'a ProverData,
     num_steps: usize,
-    logging: bool,
+    //    timer: &mut Timer,
 ) {
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());
@@ -394,9 +369,7 @@ fn solve<'a>(
         let test = format!("step {}", i);
 
         // allocate real witnesses for round i
-        if logging {
-            log::tic(Component::Solver, &test, "witness generation");
-        }
+        //timer.tic(Component::Solver, &test, "witness generation");
         (
             wits,
             next_state,
@@ -413,10 +386,13 @@ fn solve<'a>(
             doc_running_q.clone(),
             doc_running_v.clone(),
         );
+        //timer.stop(Component::Solver, &test, "witness generation");
+
         //circ_data.check_all(&wits);
 
         let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
             (JBatching::NaivePolys, JCommit::HashChain) => {
+                //timer.tic(Component::Solver, &test, "calculate hash");
                 let next_hash = r1cs_converter.prover_calc_hash(
                     prev_hash,
                     false,
@@ -433,10 +409,12 @@ fn solve<'a>(
                     GlueOpts::PolyHash((i_last, next_hash)),
                 ];
                 prev_hash = next_hash;
+                //timer.stop(Component::Solver, &test, "calculate hash");
                 // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
                 g
             }
             (JBatching::Nlookup, JCommit::HashChain) => {
+                //timer.tic(Component::Solver, &test, "calculate hash");
                 let next_hash = r1cs_converter.prover_calc_hash(
                     prev_hash,
                     false,
@@ -471,9 +449,11 @@ fn solve<'a>(
                     GlueOpts::NlHash((i_last, next_hash, next_q, next_v)),
                 ];
                 prev_hash = next_hash;
+                //timer.stop(Component::Solver, &test, "calculate hash");
                 g
             }
             (JBatching::NaivePolys, JCommit::Nlookup) => {
+                //timer.tic(Component::Solver, &test, "calculate running claim");
                 let doc_q = match doc_running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
                     None => vec![<G1 as Group>::Scalar::from(0); qd_len],
@@ -491,12 +471,14 @@ fn solve<'a>(
                     .map(|x| int_to_ff(x))
                     .collect();
                 let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
+                //timer.stop(Component::Solver, &test, "calculate running claim");
                 vec![
                     GlueOpts::PolyNL((doc_q, doc_v)),
                     GlueOpts::PolyNL((next_doc_q, next_doc_v)),
                 ]
             }
             (JBatching::Nlookup, JCommit::Nlookup) => {
+                //timer.tic(Component::Solver, &test, "calculate running claim");
                 let q = match running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
                     None => vec![<G1 as Group>::Scalar::from(0); q_len],
@@ -531,6 +513,7 @@ fn solve<'a>(
                     .map(|x| int_to_ff(x))
                     .collect();
                 let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
+                // timer.stop(Component::Solver, &test, "calculate running claim");
                 vec![
                     GlueOpts::NlNl((q, v, doc_q, doc_v)),
                     GlueOpts::NlNl((next_q, next_v, next_doc_q, next_doc_v)),
@@ -573,9 +556,7 @@ fn solve<'a>(
             r1cs_converter.pc.clone(),
         );
 
-        if logging {
-            log::stop(Component::Solver, &test, "witness generation");
-        }
+        thread::sleep(Duration::from_millis(10000));
         println!("FINISHED WIT STEP {}", i);
 
         sender.send(circuit_primary).unwrap(); //witness_i).unwrap();
@@ -589,11 +570,13 @@ fn solve<'a>(
     }
 }
 
-fn prove_and_verify(
-    recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>,
-    proof_info: ProofInfo,
-    logging: bool,
-) {
+fn prove(
+    recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, //itness<<G1 as Group>::Scalar>>,
+    pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,          //&'a PublicParams<G1, G2, C1, C2>,
+    z0_primary: &Vec<<G1 as Group>::Scalar>,
+    num_steps: usize,
+    timer: &mut Timer,
+) -> CompressedSNARK<G1, G2, C1, C2, S1, S2> {
     println!("Proving thread starting...");
 
     // recursive SNARK
@@ -602,29 +585,24 @@ fn prove_and_verify(
     let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
-    for i in 0..proof_info.num_steps {
+    for i in 0..num_steps {
         println!("PROVING STEP {}", i);
         let test = format!("step {}", i);
 
         // blocks until we receive first witness
         let circuit_primary = recv.recv().unwrap();
 
-        if logging {
-            log::tic(Component::Prover, &test, "prove step");
-        }
-
+        timer.tic(Component::Prover, &test, "prove step");
         let result = RecursiveSNARK::prove_step(
-            &proof_info.pp.lock().unwrap(),
+            &pp.lock().unwrap(),
             recursive_snark,
             circuit_primary.clone(),
             circuit_secondary.clone(),
-            proof_info.z0_primary.clone(),
+            z0_primary.clone(),
             z0_secondary.clone(),
         );
-
-        if logging {
-            log::stop(Component::Prover, &test, "prove step");
-        }
+        timer.stop(Component::Prover, &test, "prove step");
+        //println!("prove step {:#?}", result);
 
         assert!(result.is_ok());
         println!(
@@ -634,6 +612,7 @@ fn prove_and_verify(
             //start.elapsed()
         );
         recursive_snark = Some(result.unwrap());
+        println!("PROVING FINSIHED STEP {}", i);
     }
 
     assert!(recursive_snark.is_some());
@@ -652,98 +631,46 @@ fn prove_and_verify(
     */
 
     // compressed SNARK
-    if logging {
-        log::tic(Component::Prover, "Proof", "Compressed SNARK");
-    }
-    let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(
-        &proof_info.pp.lock().unwrap(),
-        &recursive_snark,
-    );
-    if logging {
-        log::stop(Component::Prover, "Proof", "Compressed SNARK");
-    }
+    timer.tic(Component::Prover, "Proof", "Compressed SNARK");
+    let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp.lock().unwrap(), &recursive_snark);
+    timer.stop(Component::Prover, "Proof", "Compressed SNARK");
 
     assert!(res.is_ok());
-    let compressed_snark = res.unwrap();
-
-    if logging {
-        log::space(
-            Component::Prover,
-            "Proof Size",
-            "Compressed SNARK size",
-            serde_json::to_string(&compressed_snark).unwrap().len(),
-        );
-    }
-
-    if logging {
-        log::tic(Component::Verifier, "Verification", "Full");
-    }
-
-    verify(
-        compressed_snark,
-        proof_info.z0_primary,
-        proof_info.pp,
-        proof_info.commit,
-        proof_info.table,
-        proof_info.doc_len,
-        proof_info.eval_type,
-        proof_info.commit_type,
-        logging,
-    );
-    if logging {
-        log::stop(Component::Verifier, "Verification", "Full");
-    }
+    res.unwrap()
 }
 
 fn verify(
     compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
+    r1cs_converter: R1CS<<G1 as Group>::Scalar>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
-    reef_commit: ReefCommitment<<G1 as Group>::Scalar>,
-    table: Vec<Integer>,
-    doc_len: usize,
-    eval_type: JBatching,
-    commit_type: JCommit,
-    logging: bool,
 ) {
-    let q_len = logmn(table.len());
-    let qd_len = logmn(doc_len);
+    let q_len = logmn(r1cs_converter.table.len());
+    let qd_len = logmn(r1cs_converter.udoc.len());
 
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
-
-    if logging {
-        log::tic(Component::Verifier, "Verification", "Nova Verification");
-    }
     let res = compressed_snark.verify(
         &pp.lock().unwrap(),
         FINAL_EXTERNAL_COUNTER,
         z0_primary,
         z0_secondary,
     );
-    if logging {
-        log::stop(Component::Verifier, "Verification", "Nova Verification");
-    }
-
     assert!(res.is_ok());
 
     // final "in the clear" V checks
-    if logging {
-        log::tic(Component::Verifier, "Verification", "Final Clear Checks");
-    }
-
-    // state, char, opt<hash>, opt<v,q for eval>, opt<v,q for doc>, accepting
+    // // state, char, opt<hash>, opt<v,q for eval>, opt<v,q for doc>, accepting
     let zn = res.unwrap().0;
 
     // eval type, reef commitment, accepting state bool, table, doc, final_q, final_v, final_hash,
     // final_doc_q, final_doc_v
-    match (eval_type, commit_type) {
+    match (r1cs_converter.batching, r1cs_converter.commit_type) {
         (JBatching::NaivePolys, JCommit::HashChain) => {
             final_clear_checks(
-                eval_type,
-                reef_commit,
+                r1cs_converter.batching,
+                r1cs_converter.reef_commit.unwrap(),
                 zn[3],
-                &table, // clones in function?
-                doc_len,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
                 None,
                 None,
                 Some(zn[2]),
@@ -753,11 +680,11 @@ fn verify(
         }
         (JBatching::NaivePolys, JCommit::Nlookup) => {
             final_clear_checks(
-                eval_type,
-                reef_commit,
+                r1cs_converter.batching,
+                r1cs_converter.reef_commit.unwrap(),
                 zn[2 + qd_len],
-                &table,
-                doc_len,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
                 None,
                 None,
                 None,
@@ -767,11 +694,11 @@ fn verify(
         }
         (JBatching::Nlookup, JCommit::HashChain) => {
             final_clear_checks(
-                eval_type,
-                reef_commit,
+                r1cs_converter.batching,
+                r1cs_converter.reef_commit.unwrap(),
                 zn[3 + q_len + 1],
-                &table,
-                doc_len,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
                 Some(zn[3..(3 + q_len)].to_vec()),
                 Some(zn[3 + q_len]),
                 Some(zn[2]),
@@ -781,11 +708,11 @@ fn verify(
         }
         (JBatching::Nlookup, JCommit::Nlookup) => {
             final_clear_checks(
-                eval_type,
-                reef_commit,
+                r1cs_converter.batching,
+                r1cs_converter.reef_commit.unwrap(),
                 zn[1 + q_len + 1 + qd_len + 1],
-                &table,
-                doc_len,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
                 Some(zn[1..(q_len + 1)].to_vec()),
                 Some(zn[q_len + 1]),
                 None,
@@ -793,9 +720,6 @@ fn verify(
                 Some(zn[1 + q_len + 1 + qd_len]),
             );
         }
-    }
-    if logging {
-        log::stop(Component::Verifier, "Verification", "Final Clear Checks");
     }
 }
 
@@ -813,20 +737,23 @@ mod tests {
         doc: Vec<String>,
         batching_type: Option<JBatching>,
         commit_docype: Option<JCommit>,
-        batch_size: usize,
+        batch_sizes: Vec<usize>,
     ) {
         let r = Regex::new(&rstr);
         let dfa = NFA::new(&ab[..], r);
 
         init();
-        run_backend(
-            dfa.clone(),
-            doc.clone(),
-            batching_type.clone(),
-            commit_docype.clone(),
-            batch_size,
-            false,
-        );
+        for b in batch_sizes {
+            let mut timer = Timer::new();
+            run_backend(
+                dfa.clone(),
+                doc.clone(),
+                batching_type.clone(),
+                commit_docype.clone(),
+                b,
+                &mut timer,
+            );
+        }
     }
 
     #[test]
@@ -840,7 +767,7 @@ mod tests {
                 .collect(),
             Some(JBatching::NaivePolys),
             Some(JCommit::HashChain),
-            0,
+            vec![0, 1, 2],
         );
         /*        backend_test(
                   "ab".to_string(),
@@ -878,7 +805,7 @@ mod tests {
                 .collect(),
             Some(JBatching::NaivePolys),
             Some(JCommit::Nlookup),
-            0,
+            vec![0, 1, 2],
         );
         /*    backend_test(
                 "ab".to_string(),
@@ -935,7 +862,7 @@ mod tests {
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::HashChain),
-            0,
+            vec![0, 1, 2],
         );
         /*  backend_test(
                 "ab".to_string(),
@@ -993,7 +920,7 @@ mod tests {
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::Nlookup),
-            0,
+            vec![0, 1, 2],
         );
         /*  backend_test(
                 "ab".to_string(),
