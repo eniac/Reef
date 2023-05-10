@@ -49,7 +49,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let nfa_match = nfa.is_match(doc);
         let is_match = nfa_match.is_some();
 
-        println!("Match? {:#?}", is_match);
         let batching;
         let commit;
         let opt_batch_size;
@@ -107,12 +106,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             epsilon_to_add = 0;
         }
 
-        // println!(
-        //     "Doc len: {:#?} +1, Epsilon to Add: {:#?}",
-        //     doc.len(),
-        //     epsilon_to_add
-        // );
-
         let mut substring = (0, batch_doc.len());
 
         match nfa_match {
@@ -134,8 +127,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             None => { // see above
             }
         }
-
-        println!("'substring': {:#?}", substring);
 
         // generate T
         let mut table = vec![];
@@ -278,8 +269,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
         }
 
-        //println!("ACCEPTING CHECK: state: {:#?} accepting? {:#?}", state, out);
-
         // sanity
         if (batch_num + 1) * self.batch_size - 1 >= self.udoc.len() {
             // todo check
@@ -380,8 +369,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.pub_inputs.clone(),
         );
 
-        //println!("assertions: {:#?}", self.assertions.clone());
-
         let mut css = Computations::new();
         css.comps.insert("main".to_string(), cs);
         let css = opt(
@@ -407,21 +394,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let final_cs = css.get("main");
 
         let mut circ_r1cs = to_r1cs(final_cs, cfg());
-
-        println!(
-            "Pre-opt R1cs size (no hashes): {}",
-            circ_r1cs.constraints().len()
-        );
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
-
-        // for r in circ_r1cs.constraints().clone() {
-        //             println!("{:#?}", circ_r1cs.format_qeq(&r));
-        //         }
-
-        println!(
-            "Final R1cs size (no hashes): {}",
-            circ_r1cs.constraints().len()
-        );
 
         circ_r1cs.finalize(&final_cs)
     }
@@ -440,7 +413,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let mut evals = vec![];
         for (si, c, so) in self.nfa.deltas() {
-            //println!("trans: {:#?},{:#?},{:#?}", si, c, so);
             evals.push(
                 Integer::from(
                     (si * self.nfa.nstates() * self.nfa.nchars())
@@ -1521,7 +1493,6 @@ mod tests {
     ) {
         let r = Regex::new(&rstr);
         let nfa = NFA::new(&ab[..], r);
-        println!("NFA Size: {:#?}", nfa.nedges());
 
         let chars: Vec<String> = doc.chars().map(|c| c.to_string()).collect();
 
@@ -1554,8 +1525,6 @@ mod tests {
                     let mut doc_running_q = None;
                     let mut doc_running_v = None;
 
-                    println!("Batching {:#?}", r1cs_converter.batching);
-                    println!("Commit {:#?}", r1cs_converter.commit_type);
                     let (pd, _vd) = r1cs_converter.to_circuit();
 
                     let mut current_state = nfa.get_init_state();
@@ -1569,7 +1538,6 @@ mod tests {
                         r1cs_converter.batch_size,
                     );
                     for i in 0..num_steps {
-                        println!("STEP {}", i);
                         (
                             values,
                             next_state,
@@ -1884,7 +1852,6 @@ mod tests {
         let preamble: String = "ffffabcdffffabcd".to_string();
         let ab = "abcdef".to_string();
         for i in 0..9 {
-            // println!("K:{:#?}", i);
             test_func_no_hash_kstride(
                 ab.clone(),
                 "^hello.*$".to_string(),
@@ -1901,7 +1868,6 @@ mod tests {
         let preamble: String = "we the people in order to form a more perfect union, establish justic ensure domestic tranquility, provide for the common defense, promote the general welfare and procure the blessings of liberty to ourselves and our posterity do ordain and establish this ".to_string();
         let ab = " ,abcdefghijlmnopqrstuvwy".to_string();
         for i in 0..9 {
-            // println!("K:{:#?}", i);
             test_func_no_hash_kstride(
                 ab.clone(),
                 "^.*order.to.*$".to_string(),

@@ -10,6 +10,10 @@ use petgraph::dot::Dot;
 use petgraph::algo;
 use rayon::iter::*;
 
+use printpdf::*;
+use std::fs::File;
+use std::io::BufWriter;
+
 use crate::regex::Regex;
 
 #[derive(Debug, Clone)]
@@ -18,6 +22,8 @@ pub struct NFA {
     pub ab: Vec<String>,
     /// Accepting states
     accepting: HashSet<usize>,
+    /// Teleporting states (can fast-forward)
+    teleporting: HashSet<usize>,
     /// Transition relation from [state -> char -> state] given an input
     g: Graph<Regex, String>,
     /// Must match from the begining of the document (default: false)
@@ -49,7 +55,6 @@ impl NFA {
             q: &Regex,
             n: NodeIndex<u32>) {
 
-            // println!("Adding trans {}, {}", q, n.index());
             // Explore derivatives
             for c in &ab[..] {
                 let q_c = q.deriv(&c);
@@ -79,6 +84,7 @@ impl NFA {
                 .filter(|&k| graph[k].nullable())
                 .map(|i| i.index())
                 .collect(),
+            teleporting: HashSet::new(),
             g: graph,
             anchor_start: re.is_start_anchored(),
             anchor_end: re.is_end_anchored(),
@@ -153,8 +159,7 @@ impl NFA {
         let res = self.g.edges_directed(NodeIndex::new(state), Direction::Outgoing)
                         .find(|e| e.weight() == c)
                         .map(|e| e.target().index());
-
-        // println!("{} --[ {} ]--> {}", state, c, res.map(|c|c.to_string()).unwrap_or(String::from("NONE")));
+        // println!("{} --[{}]--> {}", self.g[NodeIndex::new(state)], c, self.g[NodeIndex::new(res.unwrap())]);
         res
     }
 
@@ -185,7 +190,7 @@ impl NFA {
             return Some((0, 0));
         }
         // For every postfix of doc (O(n^2))
-        start_idxs.into_par_iter().find_map_any(|i| {
+        start_idxs.into_iter().find_map(|i| { //into_par_iter().find_map_any(|i| {
             let mut s = self.get_init_state();
             for j in i..doc.len() {
                 // Apply transition relation
@@ -201,12 +206,11 @@ impl NFA {
     }
 
     /// Compute the strongly connected components of the DFA
-    pub fn scc_loops(&self) -> Vec<Self> {
+    pub fn sccs(&self) -> Vec<Self> {
         algo::tarjan_scc(&self.g)
             .into_iter()
             .map(|v| NFA::new(&self.ab.join(""),
                 self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone()))
-            .filter(|v| v.has_accepting_cycle() && v != self)
             .collect()
     }
 
@@ -225,25 +229,25 @@ impl NFA {
 
     /// Does this DFA has an infintely accepting cycle - or - does this DFA accept arbitrary length prefixes
     pub fn has_accepting_cycle(&self) -> bool {
-        fn is_cycle(p: &Vec<NodeIndex<u32>>) -> bool {
-            let s: HashSet<&NodeIndex<u32>> = p.into_iter().collect();
-            // println!("SET {:?} and VEC {:?}", s, p);
-            s.len() != p.len()
-        }
-        fn has_accepting(g: &Graph<Regex, String>, p: &Vec<NodeIndex<u32>>) -> bool {
-            p.into_iter().any(|i| g[*i].nullable())
+        fn all_epsilon(g: &Graph<Regex, String>, p: &Vec<Vec<NodeIndex<u32>>>) -> bool {
+            let s: HashSet<&NodeIndex<u32>> = p.into_iter().flatten().collect();
+            s.len() == 1 && s.into_iter().all(|s| g.edges_connecting(*s, *s).all(|e| e.weight() == EPSILON))
         }
 
-        // algo::is_cyclic_directed(&self.g)
-        let mut dfs = Dfs::new(&self.g, self.get_init_nodeidx());
-        while let Some(node) = dfs.next(&self.g) {
-            // println!("Visiting node {}", self.g[node]);
-            if algo::all_simple_paths::<Vec<_>, _>(&self.g, node, node, 1, None)
-                .any(|p| is_cycle(&p) && has_accepting(&self.g, &p)) {
-                return true;
+        // For all accepting states
+        for acc in self.accepting.iter() {
+            let acc_idx = NodeIndex::new(*acc);
+            let start = self.get_init_nodeidx();
+            // From start -> accepting state, find all paths
+            let paths_fwd: Vec<_> = algo::all_simple_paths::<Vec<_>, _>(&self.g, start, acc_idx, 0, None).collect();
+            let paths_back: Vec<_> = algo::all_simple_paths::<Vec<_>, _>(&self.g, acc_idx, start, 0, None).collect();
+            if paths_fwd.len() > 0 && paths_back.len() > 0 && // path is a cycle
+                ! all_epsilon(&self.g, &paths_fwd) &&         // Not an epsilon transition
+                ! all_epsilon(&self.g, &paths_back) {
+                 return true;
             }
         }
-        return false;
+        false
     }
 
     /// Remove all outgoing edges and visited nodes out of [i]
@@ -268,37 +272,91 @@ impl NFA {
     }
 
     /// Substitute any sub-DFA with another DFA while maintaining transitions
-    pub fn to_epsilon(&mut self, i: NodeIndex<u32>) -> bool {
+    pub fn cut(&mut self, r: &Regex) {
         // Remove children
-        self.remove_outgoing_edges(i);
+        if let Some(i) = self.find_node(r) {
+          self.remove_outgoing_edges(i);
+          self.teleporting.insert(i.index());
+          self.g.add_edge(i, i, EPSILON.clone());
 
-        // Update node to epsilon
-        self.g.add_edge(i, i, EPSILON.clone());
-        if let Some(xr) = self.g.node_weight_mut(i) {
-            *xr = Regex::nil();
-            true
-        } else {
-            false
+          // Update node to epsilon
+          if let Some(xr) = self.g.node_weight_mut(i) {
+              *xr = Regex::nil();
+          }
+        }
+    }
+
+    pub fn print_states(&self) {
+        for n in self.g.node_indices() {
+            let i = n.index();
+            if self.accepting.contains(&i) && self.teleporting.contains(&i) {
+                println!("{} -> {} (ACCEPTING, TELEPORTING)", i, self.g[n]);
+            } else if self.accepting.contains(&i) {
+                println!("{} -> {} (ACCEPTING)", i, self.g[n]);
+            } else if self.teleporting.contains(&i) {
+                println!("{} -> {} (TELEPORTING)", i, self.g[n]);
+            } else {
+                println!("{} -> {}", i, self.g[n]);
+            }
         }
     }
 
     /// Split NFA in .*
     pub fn split_dot_star(&mut self) -> std::io::Result<()> {
+        fn write_to_pdf(s: &str, f: &str) {
+            let (doc, page1, layer1) = PdfDocument::new(s, Mm(210.0), Mm(297.0), "Layer 1");
+            let current_layer = doc.get_page(page1).get_layer(layer1);
 
+            // Add some text to the document
+            let font = doc.add_builtin_font(BuiltinFont::HelveticaBold).unwrap();
+            current_layer.set_font(&font, 32.0);
+            current_layer.set_line_height(20.0);
+            current_layer.use_text(s, 32.0, Mm(10.0), Mm(100.0), &font);
+            current_layer.end_text_section();
+
+            let file = File::create(f).unwrap();
+            let mut buf_writer = BufWriter::new(file);
+            doc.save(&mut buf_writer).unwrap();
+
+        }
+
+        let sccs = self.sccs();
+        let accepting_loops: Vec<_> = sccs.clone().into_iter()
+                                          .filter(|v| v.has_accepting_cycle() && v != self)
+                                          .collect();
+
+        // ORIGINAL graph
+        write_to_pdf("ORIGINAL graph", "text1.pdf");
         self.write_pdf("original")?;
-        let sccs = self.scc_loops();
+        let mut files: Vec<String> = Vec::from([
+            "text1.pdf".to_string(),
+            "original.pdf".to_string()]);
 
-        let mut files: Vec<String> = Vec::from(["original.pdf".to_string(), "reduced.pdf".to_string()]);
-
+        // SCCS
+        write_to_pdf("Strongly connected subgraphs", "text2.pdf");
+        files.push("text2.pdf".to_string());
         for i in 0..sccs.len() {
             let fout = format!("scc-{}", i);
-            let xi = self.find_node(&sccs[i].to_regex()).unwrap();
-            self.to_epsilon(xi);
             sccs[i].write_pdf(fout.as_str())?;
             files.push(format!("{}.pdf", fout));
         }
 
+        // FILTERED
+        write_to_pdf("Filtered subgraphs", "text3.pdf");
+        files.push("text3.pdf".to_string());
+        for i in 0..accepting_loops.len() {
+            let fout = format!("loops-{}", i);
+            self.cut(&accepting_loops[i].to_regex());
+            accepting_loops[i].write_pdf(fout.as_str())?;
+            files.push(format!("{}.pdf", fout));
+        }
+
+        // REDUCED
+        write_to_pdf("Reduced original graph", "text4.pdf");
+        files.push("text4.pdf".to_string());
         self.write_pdf("reduced")?;
+        files.push("reduced.pdf".to_string());
+
         Command::new("pdfjam")
             .args(files.clone())
             .arg("-o")
@@ -534,7 +592,7 @@ mod tests {
 
     #[test]
     fn test_nfa_split() {
-        let mut nfa = setup_nfa("((c.*b) | (a.*b))*b", "abc");
+        let mut nfa = setup_nfa("a.*b | b.*a", "ab");
         nfa.split_dot_star().unwrap();
     }
 }

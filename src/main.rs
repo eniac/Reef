@@ -9,9 +9,6 @@ use reef::nfa::NFA;
 #[cfg(feature = "metrics")]
 use reef::metrics::{log, log::Component};
 
-#[cfg(feature = "plot")]
-use reef::plot::*;
-
 fn main() {
     let opt = Options::parse();
 
@@ -51,9 +48,7 @@ fn main() {
         log::stop(Component::Compiler, "DFA", "K Stride");
     };
     #[cfg(feature = "plot")]
-    nfa.plot("nfa").expect("Failed to plot NFA to a pdf file");
-
-    println!("Doc len is {}", doc.len());
+    nfa.write_pdf("nfa").expect("Failed to plot NFA to a pdf file");
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "DFA Solving", "Clear Match");

@@ -69,8 +69,6 @@ where
 
             let blind = <G1 as Group>::Scalar::random(&mut OsRng);
 
-            // println!("HASH BLIND: {:#?}", blind.clone());
-
             SpongeAPI::absorb(
                 &mut sponge,
                 2,
@@ -80,8 +78,6 @@ where
             hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
             sponge.finish(acc).unwrap();
 
-            // println!("RANDOM HASH: {:#?}", hash[0].clone());
-
             let mut i = 0;
             // H_i = Hash(H_i-1, char, i)
             for c in doc.into_iter() {
@@ -90,13 +86,6 @@ where
 
                 let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
                 sponge.start(parameter, None, acc);
-
-                // println!(
-                //     "REAL HASH ELTS: {:#?}, {:#?}, {:#?}",
-                //     hash[0],
-                //     F::from(c as u64),
-                //     F::from(i)
-                // );
 
                 SpongeAPI::absorb(
                     &mut sponge,
@@ -110,13 +99,9 @@ where
                 );
                 hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
 
-                // println!("COM HASH {:#?}", hash.clone());
                 sponge.finish(acc).unwrap();
                 i += 1;
             }
-
-            // println!("commitment = {:#?}", hash.clone());
-            //self.hash_commitment = Some((start, hash[0]));
 
             return ReefCommitment::HashChain(HashCommitmentStruct {
                 commit: hash[0],
@@ -130,7 +115,6 @@ where
             doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
 
             let mle = mle_from_pts(doc_ext);
-            // println!("mle: {:#?}", mle);
 
             let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
             let blind = <G1 as Group>::Scalar::random(&mut OsRng);
@@ -258,11 +242,6 @@ pub fn final_clear_checks(
             // or - nlookup commitment check
             match (final_doc_q, final_doc_v) {
                 (Some(q), Some(v)) => {
-                    /*println!(
-                        "final doc check fixing q,v: {:#?}, {:#?}, dc: {:#?}",
-                        q, v, dc
-                    );*/
-
                     let doc_ext_len = doc_len.next_power_of_two();
 
                     // right form for inner product
@@ -287,14 +266,12 @@ pub fn final_clear_checks(
         }
     }
 
-    println!("Final values confirmed in the clear!");
 }
 
 // TODO test, TODO over ff, not Integers
 // calculate multilinear extension from evals of univariate
 // must "pad out" pts to power of 2 !
 fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
-    //println!("mle pts {:#?}", pts);
 
     let num_pts = pts.len();
     if num_pts == 1 {
@@ -302,7 +279,6 @@ fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
     }
 
     let h = num_pts / 2;
-    // println!("num_pts {}, h {}", num_pts, h);
 
     let mut l = mle_from_pts(pts[..h].to_vec());
     let mut r = mle_from_pts(pts[h..].to_vec());
@@ -326,7 +302,6 @@ fn q_to_mle_q<F: PrimeField>(q: &Vec<F>, mle_len: usize) -> Vec<F> {
             if (idx / base.pow(j as u32)) % 2 == 1 {
                 // is this var in this term?
                 new_term *= q[j].clone(); // todo?
-                                          //println!("new term after mul {:#?}", new_term);
                                           // note this loop is never triggered for constant :)
             }
         }
@@ -398,11 +373,9 @@ mod tests {
         // verify
         let num_vars = running_q.len();
 
-        // println!("ipa {:#?}", ipa.clone().unwrap());
         let res = ipa
             .unwrap()
             .verify(&gens_t, &gens_single, num_vars, &ipi, &mut v_transcript);
-        // println!("res {:#?}", res);
 
         // this doesn't pass
         assert!(res.is_ok());
@@ -423,7 +396,6 @@ mod tests {
         ];
 
         let mle = mle_from_pts(uni.clone());
-        // println!("mle coeffs: {:#?}", mle);
 
         // 011 = 6
         //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
@@ -440,7 +412,6 @@ mod tests {
 
         let q_ext = q_to_mle_q(&q, mle_f.len());
 
-        // println!("q_ext: {:#?}", q_ext);
 
         assert_eq!(mle_f.len(), q_ext.len());
         // inner product

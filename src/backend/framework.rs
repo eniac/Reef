@@ -77,7 +77,6 @@ pub fn run_backend(
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "R1CS", "Optimization Selection, R1CS precomputations");
 
-        println!("generate commitment");
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Commitment Generations");
@@ -119,7 +118,6 @@ pub fn run_backend(
         log::stop(Component::Compiler, "Compiler", "Full");
 
         solve(sender, &r1cs_converter, &prover_data, num_steps);
-        println!("solver thread finished");
     });
 
     //get args
@@ -208,7 +206,6 @@ fn setup<'a>(
     let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
 
     // produce public parameters
-    println!("Producing public parameters...");
     let pp = PublicParams::<
         G1,
         G2,
@@ -312,7 +309,6 @@ fn setup<'a>(
         r1cs_converter.substring.1 - r1cs_converter.substring.0,
         r1cs_converter.batch_size,
     );
-    println!("NUM STEPS {}", num_steps);
 
     (num_steps, z0_primary, pp)
 }
@@ -360,7 +356,6 @@ fn solve<'a>(
     let mut next_state = current_state;
 
     for i in 0..num_steps {
-        // println!("WIT GEN STEP {}", i);
         let test = format!("step {}", i);
 
         #[cfg(feature = "metrics")]
@@ -398,7 +393,6 @@ fn solve<'a>(
                     r1cs_converter.substring.0 + (i * r1cs_converter.batch_size),
                     r1cs_converter.batch_size,
                 );
-                // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
 
                 let i_0 = <G1 as Group>::Scalar::from((i * r1cs_converter.batch_size) as u64);
                 let i_last =
@@ -410,7 +404,6 @@ fn solve<'a>(
                 prev_hash = next_hash;
                 #[cfg(feature = "metrics")]
                 log::stop(Component::Solver, &test, "calculate hash");
-                // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
                 g
             }
             (JBatching::Nlookup, JCommit::HashChain) => {
@@ -422,7 +415,6 @@ fn solve<'a>(
                     r1cs_converter.substring.0 + (i * r1cs_converter.batch_size),
                     r1cs_converter.batch_size,
                 );
-                // println!("ph, nh: {:#?}, {:#?}", prev_hash.clone(), next_hash.clone());
 
                 let q = match running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
@@ -585,7 +577,6 @@ fn prove_and_verify(
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
     for i in 0..proof_info.num_steps {
-        println!("PROVING STEP {}", i);
         let test = format!("step {}", i);
 
         // blocks until we receive first witness
@@ -604,30 +595,11 @@ fn prove_and_verify(
         #[cfg(feature = "metrics")]
         log::stop(Component::Prover, &test, "prove step");
 
-        assert!(result.is_ok());
-        println!(
-            "RecursiveSNARK::prove_step {}: {:?} ",
-            i,
-            result.is_ok(),
-            //start.elapsed()
-        );
         recursive_snark = Some(result.unwrap());
     }
 
     assert!(recursive_snark.is_some());
     let recursive_snark = recursive_snark.unwrap();
-
-    // verify recursive - TODO we can get rid of this verify once everything works
-    /*    let res = recursive_snark.verify(
-            &pp,
-            FINAL_EXTERNAL_COUNTER,
-            z0_primary.clone(),
-            z0_secondary.clone(),
-        );
-        // println!("Recursive res: {:#?}", res);
-
-        assert!(res.is_ok()); // TODO delete
-    */
 
     // compressed SNARK
     #[cfg(feature = "metrics")]

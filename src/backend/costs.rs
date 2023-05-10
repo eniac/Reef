@@ -576,7 +576,6 @@ pub fn opt_cost_model_select<'a>(
     }
 
     for n in range_list.into_iter() {
-        // println!("i:{:#?}",n);
         let batching_and_cost: (JBatching, JCommit, usize, usize) =
             match (batching.clone(), commit.clone(), can_hashcahin) {
                 (None, None, _) => {
@@ -605,7 +604,6 @@ pub fn opt_cost_model_select<'a>(
                     )
                 }
             };
-        // println!("batching and cost:{:#?}",batching_and_cost);
         if batching_and_cost.3 < cost {
             cost = batching_and_cost.3;
             opt_commit = batching_and_cost.1;
