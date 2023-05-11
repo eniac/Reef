@@ -783,6 +783,33 @@ mod tests {
     }
 
     #[test]
+    fn e2e_substring() {
+        backend_test(
+            "ab".to_string(),
+            "bbb".to_string(),
+            ("aaabbbaaa".to_string())
+                .chars()
+                .map(|c| c.to_string())
+                .collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::Nlookup),
+            2,
+        );
+
+        backend_test(
+            "ab".to_string(),
+            "bbb".to_string(),
+            ("aaabbbaaa".to_string())
+                .chars()
+                .map(|c| c.to_string())
+                .collect(),
+            Some(JBatching::NaivePolys),
+            Some(JCommit::HashChain),
+            2,
+        );
+    }
+
+    #[test]
     fn e2e_poly_hash() {
         backend_test(
             "ab".to_string(),

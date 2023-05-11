@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use std::collections::{BTreeSet, HashSet};
 use std::process::Command;
 
-use petgraph::{Direction, Graph};
+use petgraph::algo;
+use petgraph::dot::Dot;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::*;
-use petgraph::dot::Dot;
-use petgraph::algo;
+use petgraph::{Direction, Graph};
 use rayon::iter::*;
 
 use printpdf::*;
@@ -35,11 +35,9 @@ pub struct NFA {
 // Null transition character
 pub const EPSILON: &String = &String::new();
 
-
 impl PartialEq for NFA {
     fn eq(&self, other: &Self) -> bool {
-        self.ab == other.ab &&
-            self.g[self.get_init_nodeidx()] == other.g[other.get_init_nodeidx()]
+        self.ab == other.ab && self.g[self.get_init_nodeidx()] == other.g[other.get_init_nodeidx()]
     }
 }
 
@@ -49,12 +47,7 @@ impl NFA {
         let mut graph: Graph<Regex, String> = Graph::new();
 
         // Recursive funtion
-        fn build_trans(
-            g: &mut Graph<Regex, String>,
-            ab: &Vec<char>,
-            q: &Regex,
-            n: NodeIndex<u32>) {
-
+        fn build_trans(g: &mut Graph<Regex, String>, ab: &Vec<char>, q: &Regex, n: NodeIndex<u32>) {
             // Explore derivatives
             for c in &ab[..] {
                 let q_c = q.deriv(&c);
@@ -80,7 +73,8 @@ impl NFA {
         // Return DFA
         Self {
             ab: ab.into_iter().map(|c| c.to_string()).collect(),
-            accepting: graph.node_indices()
+            accepting: graph
+                .node_indices()
                 .filter(|&k| graph[k].nullable())
                 .map(|i| i.index())
                 .collect(),
@@ -138,7 +132,7 @@ impl NFA {
 
     /// All states
     pub fn get_states(&self) -> HashSet<usize> {
-        self.g.node_indices().map(|i|i.index()).collect()
+        self.g.node_indices().map(|i| i.index()).collect()
     }
 
     /// Final states
@@ -156,16 +150,19 @@ impl NFA {
 
     /// Single step transition
     pub fn delta(&self, state: usize, c: &String) -> Option<usize> {
-        let res = self.g.edges_directed(NodeIndex::new(state), Direction::Outgoing)
-                        .find(|e| e.weight() == c)
-                        .map(|e| e.target().index());
+        let res = self
+            .g
+            .edges_directed(NodeIndex::new(state), Direction::Outgoing)
+            .find(|e| e.weight() == c)
+            .map(|e| e.target().index());
         // println!("{} --[{}]--> {}", self.g[NodeIndex::new(state)], c, self.g[NodeIndex::new(res.unwrap())]);
         res
     }
 
     /// Transition relation as a vector
     pub fn deltas(&self) -> HashSet<(usize, String, usize)> {
-        self.g.node_indices()
+        self.g
+            .node_indices()
             .flat_map(|i| self.g.edges(i))
             .map(|e| (e.source().index(), e.weight().clone(), e.target().index()))
             .collect()
@@ -190,7 +187,8 @@ impl NFA {
             return Some((0, 0));
         }
         // For every postfix of doc (O(n^2))
-        start_idxs.into_iter().find_map(|i| { //into_par_iter().find_map_any(|i| {
+        start_idxs.into_iter().find_map(|i| {
+            //into_par_iter().find_map_any(|i| {
             let mut s = self.get_init_state();
             for j in i..doc.len() {
                 // Apply transition relation
@@ -209,8 +207,12 @@ impl NFA {
     pub fn sccs(&self) -> Vec<Self> {
         algo::tarjan_scc(&self.g)
             .into_iter()
-            .map(|v| NFA::new(&self.ab.join(""),
-                self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone()))
+            .map(|v| {
+                NFA::new(
+                    &self.ab.join(""),
+                    self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone(),
+                )
+            })
             .collect()
     }
 
@@ -231,7 +233,9 @@ impl NFA {
     pub fn has_accepting_cycle(&self) -> bool {
         fn all_epsilon(g: &Graph<Regex, String>, p: &Vec<Vec<NodeIndex<u32>>>) -> bool {
             let s: HashSet<&NodeIndex<u32>> = p.into_iter().flatten().collect();
-            s.len() == 1 && s.into_iter().all(|s| g.edges_connecting(*s, *s).all(|e| e.weight() == EPSILON))
+            s.len() == 1
+                && s.into_iter()
+                    .all(|s| g.edges_connecting(*s, *s).all(|e| e.weight() == EPSILON))
         }
 
         // For all accepting states
@@ -239,12 +243,15 @@ impl NFA {
             let acc_idx = NodeIndex::new(*acc);
             let start = self.get_init_nodeidx();
             // From start -> accepting state, find all paths
-            let paths_fwd: Vec<_> = algo::all_simple_paths::<Vec<_>, _>(&self.g, start, acc_idx, 0, None).collect();
-            let paths_back: Vec<_> = algo::all_simple_paths::<Vec<_>, _>(&self.g, acc_idx, start, 0, None).collect();
+            let paths_fwd: Vec<_> =
+                algo::all_simple_paths::<Vec<_>, _>(&self.g, start, acc_idx, 0, None).collect();
+            let paths_back: Vec<_> =
+                algo::all_simple_paths::<Vec<_>, _>(&self.g, acc_idx, start, 0, None).collect();
             if paths_fwd.len() > 0 && paths_back.len() > 0 && // path is a cycle
                 ! all_epsilon(&self.g, &paths_fwd) &&         // Not an epsilon transition
-                ! all_epsilon(&self.g, &paths_back) {
-                 return true;
+                ! all_epsilon(&self.g, &paths_back)
+            {
+                return true;
             }
         }
         false
@@ -256,7 +263,10 @@ impl NFA {
         let mut nodes = HashSet::new();
         while let Some(node) = dfs.next(&self.g) {
             // use a detached neighbors walker
-            let mut edges = self.g.neighbors_directed(node, Direction::Outgoing).detach();
+            let mut edges = self
+                .g
+                .neighbors_directed(node, Direction::Outgoing)
+                .detach();
             while let Some(edge) = edges.next_edge(&self.g) {
                 if let Some((_, dst)) = self.g.edge_endpoints(edge) {
                     if dst != i {
@@ -275,14 +285,14 @@ impl NFA {
     pub fn cut(&mut self, r: &Regex) {
         // Remove children
         if let Some(i) = self.find_node(r) {
-          self.remove_outgoing_edges(i);
-          self.teleporting.insert(i.index());
-          self.g.add_edge(i, i, EPSILON.clone());
+            self.remove_outgoing_edges(i);
+            self.teleporting.insert(i.index());
+            self.g.add_edge(i, i, EPSILON.clone());
 
-          // Update node to epsilon
-          if let Some(xr) = self.g.node_weight_mut(i) {
-              *xr = Regex::nil();
-          }
+            // Update node to epsilon
+            if let Some(xr) = self.g.node_weight_mut(i) {
+                *xr = Regex::nil();
+            }
         }
     }
 
@@ -317,20 +327,20 @@ impl NFA {
             let file = File::create(f).unwrap();
             let mut buf_writer = BufWriter::new(file);
             doc.save(&mut buf_writer).unwrap();
-
         }
 
         let sccs = self.sccs();
-        let accepting_loops: Vec<_> = sccs.clone().into_iter()
-                                          .filter(|v| v.has_accepting_cycle() && v != self)
-                                          .collect();
+        let accepting_loops: Vec<_> = sccs
+            .clone()
+            .into_iter()
+            .filter(|v| v.has_accepting_cycle() && v != self)
+            .collect();
 
         // ORIGINAL graph
         write_to_pdf("ORIGINAL graph", "text1.pdf");
         self.write_pdf("original")?;
-        let mut files: Vec<String> = Vec::from([
-            "text1.pdf".to_string(),
-            "original.pdf".to_string()]);
+        let mut files: Vec<String> =
+            Vec::from(["text1.pdf".to_string(), "original.pdf".to_string()]);
 
         // SCCS
         write_to_pdf("Strongly connected subgraphs", "text2.pdf");
@@ -408,7 +418,10 @@ impl NFA {
 
     /// Double the stride of the DFA
     fn double_stride(&mut self, doc: &Vec<String>) -> Vec<String> {
-        assert!(self.anchor_start && self.anchor_end, "k-stride only works for exact match");
+        assert!(
+            self.anchor_start && self.anchor_end,
+            "k-stride only works for exact match"
+        );
         let mut ab: HashSet<(String, String)> = HashSet::new();
         let mut classes: HashMap<BTreeSet<(usize, usize)>, BTreeSet<String>> = HashMap::new();
         // S' := S + S*S (cartesian product)
@@ -481,7 +494,11 @@ impl NFA {
 
         for (set, class) in classes {
             for (t, u) in set {
-                self.g.add_edge(NodeIndex::new(t), NodeIndex::new(u), find_representative(&class));
+                self.g.add_edge(
+                    NodeIndex::new(t),
+                    NodeIndex::new(u),
+                    find_representative(&class),
+                );
                 abset.insert(find_representative(&class));
             }
         }
