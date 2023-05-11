@@ -554,7 +554,7 @@ fn solve<'a>(
             ],
             glue,
             blind,
-            i == 0,
+            i + r1cs_converter.substring.0 == 0,
             <G1 as Group>::Scalar::from(r1cs_converter.nfa.nchars() as u64),
             start_of_epsilons,
             vec![
