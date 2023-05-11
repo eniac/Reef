@@ -798,7 +798,7 @@ mod tests {
 
         backend_test(
             "ab".to_string(),
-            "bbb".to_string(),
+            "bbbaaa".to_string(),
             ("aaabbbaaa".to_string())
                 .chars()
                 .map(|c| c.to_string())

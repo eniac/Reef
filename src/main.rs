@@ -3,8 +3,8 @@ use clap::Parser;
 
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
-use reef::regex::Regex;
 use reef::nfa::NFA;
+use reef::regex::Regex;
 
 #[cfg(feature = "metrics")]
 use reef::metrics::{log, log::Component};
@@ -48,7 +48,8 @@ fn main() {
         log::stop(Component::Compiler, "DFA", "K Stride");
     };
     #[cfg(feature = "plot")]
-    nfa.write_pdf("nfa").expect("Failed to plot NFA to a pdf file");
+    nfa.write_pdf("nfa")
+        .expect("Failed to plot NFA to a pdf file");
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "DFA Solving", "Clear Match");
@@ -64,13 +65,7 @@ fn main() {
     log::stop(Component::Solver, "DFA Solving", "Clear Match");
     init();
 
-    run_backend(
-        nfa,
-        doc,
-        opt.eval_type,
-        opt.commit_type,
-        opt.batch_size
-    ); // auto select batching/commit
+    run_backend(nfa, doc, opt.eval_type, opt.commit_type, opt.batch_size); // auto select batching/commit
 
     #[cfg(feature = "metrics")]
     log::write_csv(opt.output.to_str().unwrap()).unwrap();
