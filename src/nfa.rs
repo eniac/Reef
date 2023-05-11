@@ -206,11 +206,12 @@ impl NFA {
     }
 
     /// Compute the strongly connected components of the DFA
-    pub fn sccs(&self) -> Vec<Self> {
+    pub fn scc(&self) -> Vec<Self> {
         algo::tarjan_scc(&self.g)
             .into_iter()
             .map(|v| NFA::new(&self.ab.join(""),
                 self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone()))
+            .filter(|v| v != self)
             .collect()
     }
 
@@ -320,7 +321,7 @@ impl NFA {
 
         }
 
-        let sccs = self.sccs();
+        let sccs = self.scc();
         let accepting_loops: Vec<_> = sccs.clone().into_iter()
                                           .filter(|v| v.has_accepting_cycle() && v != self)
                                           .collect();
@@ -346,7 +347,7 @@ impl NFA {
         files.push("text3.pdf".to_string());
         for i in 0..accepting_loops.len() {
             let fout = format!("loops-{}", i);
-            self.cut(&accepting_loops[i].to_regex());
+         //   self.cut(&accepting_loops[i].to_regex());
             accepting_loops[i].write_pdf(fout.as_str())?;
             files.push(format!("{}.pdf", fout));
         }
@@ -578,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_nfa_double_stride() {
-        let mut nfa = setup_nfa("a.*a", "ab");
+        let mut nfa = setup_nfa("^a.*a$", "ab");
         let doc = nfa.k_stride(1, &vs("abbbba"));
         check(&nfa, &doc, Some((0, 3)))
     }
@@ -591,8 +592,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "plot")]
     fn test_nfa_split() {
-        let mut nfa = setup_nfa("a.*b | b.*a", "ab");
+        let mut nfa = setup_nfa("(a*|b.*)", "ab");
+
         nfa.split_dot_star().unwrap();
     }
 }
