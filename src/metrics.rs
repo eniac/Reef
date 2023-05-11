@@ -4,7 +4,8 @@ pub mod log {
     use std::fmt::Display;
     use std::io::Result;
     use std::time::{Duration, Instant};
-  use std::fs::OpenOptions;
+    use std::fs::OpenOptions;
+    use std::path::PathBuf;
 
 
     lazy_static! {
