@@ -65,7 +65,11 @@ pub fn run_backend(
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
         #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "R1CS", "Optimization Selection, R1CS precomputations");
+        log::tic(
+            Component::Compiler,
+            "R1CS",
+            "Optimization Selection, R1CS precomputations",
+        );
         let mut r1cs_converter = R1CS::new(
             &nfa,
             &doc,
@@ -75,12 +79,16 @@ pub fn run_backend(
             commit_doctype,
         );
         #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "R1CS", "Optimization Selection, R1CS precomputations");
-
+        log::stop(
+            Component::Compiler,
+            "R1CS",
+            "Optimization Selection, R1CS precomputations",
+        );
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Commitment Generations");
-        let reef_commit = gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
+        let reef_commit =
+            gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
         r1cs_converter.set_commitment(reef_commit.clone());
 
         #[cfg(feature = "metrics")]
@@ -214,9 +222,19 @@ fn setup<'a>(
     >::setup(circuit_primary.clone(), circuit_secondary.clone())
     .unwrap();
     #[cfg(feature = "metrics")]
-    log::r1cs(Component::Prover, "add test", "Primary Circuit", pp.num_constraints().0);
+    log::r1cs(
+        Component::Prover,
+        "add test",
+        "Primary Circuit",
+        pp.num_constraints().0,
+    );
     #[cfg(feature = "metrics")]
-    log::r1cs(Component::Prover, "add test", "Secondary Circuit", pp.num_constraints().1);
+    log::r1cs(
+        Component::Prover,
+        "add test",
+        "Secondary Circuit",
+        pp.num_constraints().1,
+    );
 
     println!(
         "Number of constraints (primary circuit): {}",
@@ -384,7 +402,6 @@ fn solve<'a>(
 
         let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
             (JBatching::NaivePolys, JCommit::HashChain) => {
-
                 #[cfg(feature = "metrics")]
                 log::tic(Component::Solver, &test, "calculate hash");
                 let next_hash = r1cs_converter.prover_calc_hash(
@@ -564,10 +581,7 @@ fn solve<'a>(
     }
 }
 
-fn prove_and_verify(
-    recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>,
-    proof_info: ProofInfo,
-) {
+fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof_info: ProofInfo) {
     println!("Proving thread starting...");
 
     // recursive SNARK
@@ -764,7 +778,7 @@ mod tests {
             doc.clone(),
             batching_type.clone(),
             commit_docype.clone(),
-            batch_size
+            batch_size,
         );
     }
 

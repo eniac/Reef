@@ -269,11 +269,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
         }
 
-        // sanity
-        if (batch_num + 1) * self.batch_size - 1 >= self.udoc.len() {
-            // todo check
-            assert!(out);
-        }
+        //println!("ACCEPTING? {:#?}", out);
 
         if out {
             1
@@ -812,10 +808,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let access_at = batch_num * self.batch_size + i;
 
         match self.commit_type {
-            JCommit::HashChain => (access_at, access_at >= self.udoc.len()),
+            JCommit::HashChain => (access_at, access_at >= self.substring.1),
 
             JCommit::Nlookup => {
-                if access_at >= self.udoc.len() - 1 {
+                if access_at >= self.substring.1 {
+                    //self.udoc.len() - 1 {
                     (self.udoc.len() - 1, true)
                 } else {
                     (access_at, false)
@@ -855,6 +852,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
             let char_num;
 
+            //println!("is EPSILON? {:#?}", is_epsilon);
             if is_epsilon {
                 next_state = self.nfa.delta(state_i, EPSILON).unwrap();
                 char_num = self.nfa.nchars();
@@ -862,6 +860,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 next_state = self.nfa.delta(state_i, &self.cdoc[access_at]).unwrap();
                 char_num = self.udoc[access_at];
             }
+
+            //println!("Char {:#?}", char_num);
+            //println!("Next State {:#?}", next_state);
 
             wits.insert(format!("char_{}", i - 1), new_wit(char_num));
             wits.insert(format!("state_{}", i - 1), new_wit(state_i));
