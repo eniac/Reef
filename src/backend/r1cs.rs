@@ -1837,6 +1837,7 @@ mod tests {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
                     println!("Batching {:#?}", b.clone());
                     println!("Commit {:#?}", c);
+                    println!("K {:#?}", k);
                     println!(
                         "cost model: {:#?}",
                         costs::full_round_cost_model(&nfa, s, b.clone(), nfa_match, d.len(), c,)

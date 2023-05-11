@@ -8,6 +8,7 @@ use reef::nfa::NFA;
 use csv::Writer;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
+use std::path::Path;
 
 #[cfg(feature = "metrics")]
 use reef::metrics::{log, log::Component};
@@ -19,12 +20,16 @@ fn main() {
     let ab = String::from_iter(opt.config.alphabet());
 
     // Input document
-    let mut doc = opt
+    let mut doc = if Path::exists(Path::new(&opt.input)) {
+        opt
         .config
-        .read_file(&opt.input)
+        .read_file(&PathBuf::from(&opt.input))
         .iter()
         .map(|c| c.to_string())
-        .collect();
+        .collect()
+    } else {
+        opt.input.chars().map(|c| c.to_string()).collect()
+    };
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "Compiler", "Full");
@@ -79,7 +84,7 @@ fn main() {
 
     let file = OpenOptions::new().write(true).append(true).create(true).open(opt.output.clone()).unwrap();
     let mut wtr = Writer::from_writer(file);
-    let _ = wtr.write_record(&[opt.input.as_path().display().to_string(),opt.re,nfa.nedges().to_string(),nfa.nstates().to_string()]);
+    let _ = wtr.write_record(&[opt.input,opt.re,nfa.nedges().to_string(),nfa.nstates().to_string()]);
     let spacer = "---------";
     let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
     wtr.flush();

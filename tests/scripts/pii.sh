@@ -1,6 +1,6 @@
-./target/release/reef --input ../docs/nsf_data_clean.csv --output pii_clean -r ",[1-9][0-9]{9}," ascii
-./target/release/reef --input ../docs/nsf_data_clean.csv --output pii_clean -r "[0-9]{1,6}\ [a-zA-z\ ]*\ (CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\ ]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\ ]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8}," ascii
-./target/release/reef --input ../docs/nsf_data_bad_phone.csv --output pii_bad_phone -r ",[1-9][0-9]{9}," ascii
-./target/release/reef --input ../docs/nsf_data_bad_address.csv --output pii_bad_address -r "[0-9]{1,6}\ [a-zA-z\ ]*\ (CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\ ]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\ ]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8}," ascii
-./target/release/reef --input ../docs/nsf_data_original.csv --output pii_original -r ",[1-9][0-9]{9}," ascii
-./target/release/reef --input ../docs/nsf_data_original.csv --output pii_original -r "[0-9]{1,6}\ [a-zA-z\ ]*\ (CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\ ]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\ ]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8}," ascii
+./target/release/reef --input ./tests/docs/nsf_data_clean.csv --output ./tests/results/pii_clean -r ",[1-9][0-9]{9}," ascii
+./target/release/reef --input ./tests/docs/nsf_data_clean.csv --output ./tests/results/pii_clean -r "[0-9]{1,6}\ [a-zA-z\ ]*\ (CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\ ]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\ ]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8}," ascii
+./target/release/reef --input ./tests/docs/nsf_data_bad_phone.csv --output ./tests/results/pii_bad_phone -r ",[1-9][0-9]{9}," ascii
+./target/release/reef --input ./tests/docs/nsf_data_bad_address.csv --output ./tests/results/pii_bad_address -r "[0-9]{1,6}\ [a-zA-z\ ]*\ (CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\ ]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\ ]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8}," ascii
+./target/release/reef --input ./tests/docs/nsf_data_original.csv --output ./tests/results/pii_original -r ",[1-9][0-9]{9}," ascii
+./target/release/reef --input ./tests/docs/nsf_data_original.csv --output ./tests/results/pii_original -r "[0-9]{1,6}\ [a-zA-z\ ]*\ (CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\ ]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\ ]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8}," ascii
