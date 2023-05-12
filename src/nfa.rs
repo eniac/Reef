@@ -20,8 +20,6 @@ use crate::regex::Regex;
 pub struct NFA {
     /// Alphabet
     pub ab: Vec<String>,
-    /// Accepting states
-    accepting: HashSet<usize>,
     /// Teleporting states (can fast-forward)
     teleporting: HashSet<usize>,
     /// Transition relation from [state -> char -> state] given an input
@@ -73,11 +71,6 @@ impl NFA {
         // Return DFA
         Self {
             ab: ab.into_iter().map(|c| c.to_string()).collect(),
-            accepting: graph
-                .node_indices()
-                .filter(|&k| graph[k].nullable())
-                .map(|i| i.index())
-                .collect(),
             teleporting: HashSet::new(),
             g: graph,
             anchor_start: re.is_start_anchored(),
@@ -136,14 +129,18 @@ impl NFA {
     }
 
     /// Final states
-    pub fn get_final_states(&self) -> HashSet<usize> {
-        self.accepting.clone()
+    pub fn accepting(&self) -> HashSet<usize> {
+        self.g
+            .node_indices()
+            .filter(|i| self.g[*i].nullable())
+            .map(|v| v.index())
+            .collect()
     }
 
     /// Non final states
     pub fn get_non_final_states(&self) -> HashSet<usize> {
         self.get_states()
-            .difference(&self.accepting)
+            .difference(&self.accepting())
             .map(|c| c.clone())
             .collect()
     }
@@ -171,7 +168,7 @@ impl NFA {
     /// Returns (begin match index, end index) if a match is found in the doc
     pub fn is_match(&self, doc: &Vec<String>) -> Option<(usize, usize)> {
         let mut start_idxs = Vec::new();
-        let accepting = &self.get_final_states();
+        let accepting = &self.accepting();
 
         // Iterate over all postfixes of doc
         if self.anchor_start {
@@ -204,7 +201,7 @@ impl NFA {
     }
 
     /// Compute the strongly connected components of the DFA
-    pub fn sccs(&self) -> Vec<Self> {
+    pub fn scc(&self) -> Vec<Self> {
         algo::tarjan_scc(&self.g)
             .into_iter()
             .map(|v| {
@@ -213,12 +210,13 @@ impl NFA {
                     self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone(),
                 )
             })
+            .filter(|v| v != self)
             .collect()
     }
 
     /// Is the DFA a sink (has no accepting states)
     pub fn is_sink(&self) -> bool {
-        self.accepting.is_empty()
+        self.accepting().is_empty()
     }
 
     pub fn find_node(&self, r: &Regex) -> Option<NodeIndex<u32>> {
@@ -239,7 +237,7 @@ impl NFA {
         }
 
         // For all accepting states
-        for acc in self.accepting.iter() {
+        for acc in self.accepting().iter() {
             let acc_idx = NodeIndex::new(*acc);
             let start = self.get_init_nodeidx();
             // From start -> accepting state, find all paths
@@ -299,9 +297,9 @@ impl NFA {
     pub fn print_states(&self) {
         for n in self.g.node_indices() {
             let i = n.index();
-            if self.accepting.contains(&i) && self.teleporting.contains(&i) {
+            if self.accepting().contains(&i) && self.teleporting.contains(&i) {
                 println!("{} -> {} (ACCEPTING, TELEPORTING)", i, self.g[n]);
-            } else if self.accepting.contains(&i) {
+            } else if self.accepting().contains(&i) {
                 println!("{} -> {} (ACCEPTING)", i, self.g[n]);
             } else if self.teleporting.contains(&i) {
                 println!("{} -> {} (TELEPORTING)", i, self.g[n]);
@@ -329,11 +327,15 @@ impl NFA {
             doc.save(&mut buf_writer).unwrap();
         }
 
-        let sccs = self.sccs();
+        let sccs = self.scc();
         let accepting_loops: Vec<_> = sccs
             .clone()
             .into_iter()
-            .filter(|v| v.has_accepting_cycle() && v != self)
+            .filter(|v| {
+                v.g.node_indices()
+                    .any(|i| self.accepting().contains(&i.index()))
+                    && v != self
+            })
             .collect();
 
         // ORIGINAL graph
@@ -352,20 +354,20 @@ impl NFA {
         }
 
         // FILTERED
-        write_to_pdf("Filtered subgraphs", "text3.pdf");
+        write_to_pdf("All accepting SCC subgraphs", "text3.pdf");
         files.push("text3.pdf".to_string());
         for i in 0..accepting_loops.len() {
             let fout = format!("loops-{}", i);
-            self.cut(&accepting_loops[i].to_regex());
+            //   self.cut(&accepting_loops[i].to_regex());
             accepting_loops[i].write_pdf(fout.as_str())?;
             files.push(format!("{}.pdf", fout));
         }
 
         // REDUCED
-        write_to_pdf("Reduced original graph", "text4.pdf");
-        files.push("text4.pdf".to_string());
-        self.write_pdf("reduced")?;
-        files.push("reduced.pdf".to_string());
+        // write_to_pdf("Reduced original graph", "text4.pdf");
+        // files.push("text4.pdf".to_string());
+        // self.write_pdf("reduced")?;
+        // files.push("reduced.pdf".to_string());
 
         Command::new("pdfjam")
             .args(files.clone())
@@ -595,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_nfa_double_stride() {
-        let mut nfa = setup_nfa("a.*a", "ab");
+        let mut nfa = setup_nfa("^a.*a$", "ab");
         let doc = nfa.k_stride(1, &vs("abbbba"));
         check(&nfa, &doc, Some((0, 3)))
     }
@@ -608,8 +610,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "plot")]
     fn test_nfa_split() {
-        let mut nfa = setup_nfa("a.*b | b.*a", "ab");
+        let mut nfa = setup_nfa("(.*a|b.*)", "ab");
+
         nfa.split_dot_star().unwrap();
     }
 }

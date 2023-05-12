@@ -44,7 +44,7 @@ pub fn accepting_circuit<'a>(nfa: &'a NFA, is_match: Option<(usize, usize)>) -> 
     let cost: usize = 5; //constrain to boolean costs and bool accepting
     let nstate = match is_match {
         None => nfa.get_non_final_states().len() as usize - 1,
-        _ => nfa.get_final_states().len() as usize - 1,
+        _ => nfa.accepting().len() as usize - 1,
     };
     cost + nstate + 2
 }
@@ -270,7 +270,10 @@ pub fn get_folded_cost(cost: usize, doc_len: usize, batch_size: usize) -> usize 
     if cost == std::usize::MAX {
         return std::usize::MAX;
     }
-    let n_foldings = ((doc_len / batch_size) as f32).ceil() as usize;
+    // println!("Step Circuit Size: {:#?}",cost);
+    // println!("Doc len: {:#?}", doc_len);
+    let n_foldings = ((doc_len as f32) / (batch_size as f32) as f32).ceil() as usize;
+    // println!("N Folding: {:#?}", n_foldings);
     let final_circuit_size = cost + GLUE_NUMBER;
     let cost_folding = 2 * final_circuit_size * n_foldings;
     let cost_snark = (((final_circuit_size) as f32) * 128.0).log2().ceil() as usize;
@@ -296,7 +299,7 @@ pub fn opt_cost_model_select_with_commit<'a>(
 
     let match_len = match is_match {
         None => doc_length,
-        Some((start, end)) => end - start + 1,
+        Some((start, end)) => end - start,
     };
 
     let mut cost;
@@ -354,11 +357,7 @@ pub fn opt_cost_model_select_with_commit<'a>(
         opt_batching,
         commit.clone(),
         batch_size,
-        get_folded_cost(
-            cost,
-            mod_len + get_padding(mod_len, batch_size, commit),
-            batch_size,
-        ),
+        get_folded_cost(cost, mod_len, batch_size),
     )
 }
 
@@ -379,13 +378,13 @@ pub fn opt_cost_model_select_with_batch<'a>(
 
     let batch_v_match: bool = match is_match {
         None => true,
-        Some((start, end)) => (end - start + 1) >= batch_size,
+        Some((start, end)) => (end - start) >= batch_size,
     };
 
     let mut mod_len = doc_length;
     let match_len = match is_match {
         None => doc_length,
-        Some((start, end)) => end - start + 1,
+        Some((start, end)) => end - start,
     };
 
     let mut cost: usize = std::usize::MAX;
@@ -460,11 +459,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
         opt_batching,
         opt_commit.clone(),
         batch_size,
-        get_folded_cost(
-            cost,
-            mod_len + get_padding(mod_len, batch_size, opt_commit),
-            batch_size,
-        ),
+        get_folded_cost(cost, mod_len, batch_size),
     )
 }
 
@@ -483,13 +478,13 @@ pub fn opt_commit_select_with_batch<'a>(
 
     let batch_v_match: bool = match is_match {
         None => true,
-        Some((start, end)) => (end - start + 1) >= batch_size,
+        Some((start, end)) => (end - start) >= batch_size,
     };
 
     let mut mod_len = doc_length;
     let match_len = match is_match {
         None => doc_length,
-        Some((start, end)) => end - start + 1,
+        Some((start, end)) => end - start,
     };
 
     let opt_batching: JBatching = batching;
@@ -531,11 +526,7 @@ pub fn opt_commit_select_with_batch<'a>(
         opt_batching,
         opt_commit.clone(),
         batch_size,
-        get_folded_cost(
-            cost,
-            mod_len + get_padding(mod_len, batch_size, opt_commit),
-            batch_size,
-        ),
+        get_folded_cost(cost, mod_len, batch_size),
     )
 }
 
@@ -573,11 +564,7 @@ pub fn opt_cost_model_select<'a>(
         doc_length,
         opt_commit,
     );
-    cost = get_folded_cost(
-        cost,
-        doc_length + get_padding(doc_length, opt_batch_size, opt_commit),
-        1,
-    );
+    cost = get_folded_cost(cost, doc_length, 1);
 
     let mut range_list = vec![];
 
@@ -605,18 +592,11 @@ pub fn opt_cost_model_select<'a>(
                 (Some(b), None, _) => opt_commit_select_with_batch(nfa, n, is_match, doc_length, b),
                 (Some(b), Some(c), _) => {
                     let single_cost = full_round_cost_model(nfa, n, b, is_match, doc_length, c);
-                    (
-                        b,
-                        c,
-                        n,
-                        get_folded_cost(
-                            single_cost,
-                            doc_length + get_padding(doc_length, 1 << n, c),
-                            1 << n,
-                        ),
-                    )
+                    (b, c, n, get_folded_cost(single_cost, doc_length, 1 << n))
                 }
             };
+        println!("Batch size: {:#?}", n);
+        println!("{:#?}", batching_and_cost);
         if batching_and_cost.3 < cost {
             cost = batching_and_cost.3;
             opt_commit = batching_and_cost.1;

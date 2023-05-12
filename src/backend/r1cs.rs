@@ -259,7 +259,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         if self.is_match {
             // proof of membership
-            for xi in self.nfa.get_final_states().into_iter() {
+            for xi in self.nfa.accepting().into_iter() {
                 out = out || (state == xi);
             }
         } else {
@@ -328,7 +328,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     fn accepting_state_circuit(&mut self) {
         // final state (non) match check
         let vanishing_poly;
-        let final_states = self.nfa.get_final_states();
+        let final_states = self.nfa.accepting();
         let non_final_states = self.nfa.get_non_final_states();
         let mut vanish_on = vec![];
 
@@ -1843,6 +1843,7 @@ mod tests {
                 for c in vec![JCommit::HashChain, JCommit::Nlookup] {
                     println!("Batching {:#?}", b.clone());
                     println!("Commit {:#?}", c);
+                    println!("K {:#?}", k);
                     println!(
                         "cost model: {:#?}",
                         costs::full_round_cost_model(&nfa, s, b.clone(), nfa_match, d.len(), c,)

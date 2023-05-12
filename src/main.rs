@@ -7,6 +7,7 @@ use reef::config::*;
 use reef::nfa::NFA;
 use reef::regex::Regex;
 use std::fs::OpenOptions;
+use std::path::Path;
 use std::path::PathBuf;
 
 #[cfg(feature = "metrics")]
@@ -19,12 +20,15 @@ fn main() {
     let ab = String::from_iter(opt.config.alphabet());
 
     // Input document
-    let mut doc = opt
-        .config
-        .read_file(&opt.input)
-        .iter()
-        .map(|c| c.to_string())
-        .collect();
+    let mut doc = if Path::exists(Path::new(&opt.input)) {
+        opt.config
+            .read_file(&PathBuf::from(&opt.input))
+            .iter()
+            .map(|c| c.to_string())
+            .collect()
+    } else {
+        opt.input.chars().map(|c| c.to_string()).collect()
+    };
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "Compiler", "Full");
@@ -85,7 +89,7 @@ fn main() {
         .unwrap();
     let mut wtr = Writer::from_writer(file);
     let _ = wtr.write_record(&[
-        opt.input.as_path().display().to_string(),
+        opt.input,
         opt.re,
         nfa.nedges().to_string(),
         nfa.nstates().to_string(),

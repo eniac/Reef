@@ -15,7 +15,7 @@ pub struct Options {
     #[command(subcommand)]
     pub config: Config,
     #[arg(short = 'i', long, value_name = "FILE")]
-    pub input: PathBuf,
+    pub input: String,
     #[arg(short = 'o', long, value_name = "FILE")]
     pub output: PathBuf,
     #[arg(short = 'r', long, help = "Perl-style regular expression")]
