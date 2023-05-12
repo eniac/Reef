@@ -1,6 +1,5 @@
 use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
-use crate::config::*;
 use crate::nfa::{EPSILON, NFA};
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
@@ -227,7 +226,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         for b in 0..num_iters {
             //self.batch_size {
             let access_at = start + b;
-            if access_at < self.udoc.len() {
+            if access_at < self.substring.1 {
                 // else nothing
 
                 // expected poseidon
@@ -903,7 +902,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         match self.commit_type {
             JCommit::HashChain => {
                 for i in 0..=self.batch_size {
-                    wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
+                    wits.insert(
+                        format!("i_{}", i),
+                        new_wit(batch_num * self.batch_size + i + self.substring.0),
+                    );
                 }
                 (
                     wits,
@@ -1200,7 +1202,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         match self.commit_type {
             JCommit::HashChain => {
                 for i in 0..=self.batch_size {
-                    wits.insert(format!("i_{}", i), new_wit(batch_num * self.batch_size + i));
+                    wits.insert(
+                        format!("i_{}", i),
+                        new_wit(batch_num * self.batch_size + i + self.substring.0),
+                    );
                 }
                 // values not actually checked or used
                 (wits, next_state, None, None, start_epsilons)

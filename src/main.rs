@@ -1,10 +1,13 @@
 #![allow(missing_docs, non_snake_case)]
 use clap::Parser;
 
+use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
 use reef::nfa::NFA;
 use reef::regex::Regex;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
 
 #[cfg(feature = "metrics")]
 use reef::metrics::{log, log::Component};
@@ -63,10 +66,33 @@ fn main() {
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver, "DFA Solving", "Clear Match");
+
     init();
 
-    run_backend(nfa, doc, opt.eval_type, opt.commit_type, opt.batch_size); // auto select batching/commit
+    run_backend(
+        nfa.clone(),
+        doc,
+        opt.eval_type,
+        opt.commit_type,
+        opt.batch_size,
+    ); // auto select batching/commit
 
+    let file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(opt.output.clone())
+        .unwrap();
+    let mut wtr = Writer::from_writer(file);
+    let _ = wtr.write_record(&[
+        opt.input.as_path().display().to_string(),
+        opt.re,
+        nfa.nedges().to_string(),
+        nfa.nstates().to_string(),
+    ]);
+    let spacer = "---------";
+    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    wtr.flush();
     #[cfg(feature = "metrics")]
     log::write_csv(opt.output.to_str().unwrap()).unwrap();
 

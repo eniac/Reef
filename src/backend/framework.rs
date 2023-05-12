@@ -398,7 +398,7 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, &test, "witness generation");
 
-        //circ_data.check_all(&wits);
+        circ_data.check_all(&wits);
 
         let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
             (JBatching::NaivePolys, JCommit::HashChain) => {
@@ -411,9 +411,13 @@ fn solve<'a>(
                     r1cs_converter.batch_size,
                 );
 
-                let i_0 = <G1 as Group>::Scalar::from((i * r1cs_converter.batch_size) as u64);
-                let i_last =
-                    <G1 as Group>::Scalar::from(((i + 1) * r1cs_converter.batch_size) as u64);
+                let i_0 = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
+                );
+                let i_last = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
+                );
+                println!("i0 il {:#?} {:#?}", i_0, i_last);
                 let g = vec![
                     GlueOpts::PolyHash((i_0, prev_hash)),
                     GlueOpts::PolyHash((i_last, next_hash)),
@@ -451,9 +455,12 @@ fn solve<'a>(
                     .collect();
                 let next_v = int_to_ff(next_running_v.clone().unwrap());
 
-                let i_0 = <G1 as Group>::Scalar::from((i * r1cs_converter.batch_size) as u64);
-                let i_last =
-                    <G1 as Group>::Scalar::from(((i + 1) * r1cs_converter.batch_size) as u64);
+                let i_0 = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
+                );
+                let i_last = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
+                );
                 let g = vec![
                     GlueOpts::NlHash((i_0, prev_hash, q, v)),
                     GlueOpts::NlHash((i_last, next_hash, next_q, next_v)),
@@ -606,8 +613,22 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
             proof_info.z0_primary.clone(),
             z0_secondary.clone(),
         );
+        println!("prove step {:#?}", i);
+
         #[cfg(feature = "metrics")]
         log::stop(Component::Prover, &test, "prove step");
+
+        // verify recursive - TODO we can get rid of this verify once everything works
+        // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
+        let res = result.clone().unwrap().verify(
+            &proof_info.pp.lock().unwrap(),
+            FINAL_EXTERNAL_COUNTER,
+            proof_info.z0_primary.clone(),
+            z0_secondary.clone(),
+        );
+        //println!("Recursive res: {:#?}", res);
+
+        assert!(res.is_ok()); // TODO delete
 
         recursive_snark = Some(result.unwrap());
     }

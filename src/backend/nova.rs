@@ -970,8 +970,6 @@ where
                 }
                 out.push(last_state.unwrap());
                 out.push(last_i.unwrap());
-
-                //let last_hash = Some(hash_0.clone());
                 let last_hash = self.hash_circuit(
                     cs,
                     self.first,

@@ -265,14 +265,12 @@ pub fn final_clear_checks(
             }
         }
     }
-
 }
 
 // TODO test, TODO over ff, not Integers
 // calculate multilinear extension from evals of univariate
 // must "pad out" pts to power of 2 !
 fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
-
     let num_pts = pts.len();
     if num_pts == 1 {
         return vec![pts[0].clone()];
@@ -411,7 +409,6 @@ mod tests {
         }
 
         let q_ext = q_to_mle_q(&q, mle_f.len());
-
 
         assert_eq!(mle_f.len(), q_ext.len());
         // inner product
