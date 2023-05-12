@@ -65,7 +65,11 @@ pub fn run_backend(
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
         #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "R1CS", "Optimization Selection, R1CS precomputations");
+        log::tic(
+            Component::Compiler,
+            "R1CS",
+            "Optimization Selection, R1CS precomputations",
+        );
         let mut r1cs_converter = R1CS::new(
             &nfa,
             &doc,
@@ -75,12 +79,16 @@ pub fn run_backend(
             commit_doctype,
         );
         #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "R1CS", "Optimization Selection, R1CS precomputations");
-
+        log::stop(
+            Component::Compiler,
+            "R1CS",
+            "Optimization Selection, R1CS precomputations",
+        );
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Commitment Generations");
-        let reef_commit = gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
+        let reef_commit =
+            gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
         r1cs_converter.set_commitment(reef_commit.clone());
 
         #[cfg(feature = "metrics")]
@@ -214,9 +222,19 @@ fn setup<'a>(
     >::setup(circuit_primary.clone(), circuit_secondary.clone())
     .unwrap();
     #[cfg(feature = "metrics")]
-    log::r1cs(Component::Prover, "add test", "Primary Circuit", pp.num_constraints().0);
+    log::r1cs(
+        Component::Prover,
+        "add test",
+        "Primary Circuit",
+        pp.num_constraints().0,
+    );
     #[cfg(feature = "metrics")]
-    log::r1cs(Component::Prover, "add test", "Secondary Circuit", pp.num_constraints().1);
+    log::r1cs(
+        Component::Prover,
+        "add test",
+        "Secondary Circuit",
+        pp.num_constraints().1,
+    );
 
     println!(
         "Number of constraints (primary circuit): {}",
@@ -380,11 +398,10 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, &test, "witness generation");
 
-        //circ_data.check_all(&wits);
+        circ_data.check_all(&wits);
 
         let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
             (JBatching::NaivePolys, JCommit::HashChain) => {
-
                 #[cfg(feature = "metrics")]
                 log::tic(Component::Solver, &test, "calculate hash");
                 let next_hash = r1cs_converter.prover_calc_hash(
@@ -394,9 +411,13 @@ fn solve<'a>(
                     r1cs_converter.batch_size,
                 );
 
-                let i_0 = <G1 as Group>::Scalar::from((i * r1cs_converter.batch_size) as u64);
-                let i_last =
-                    <G1 as Group>::Scalar::from(((i + 1) * r1cs_converter.batch_size) as u64);
+                let i_0 = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
+                );
+                let i_last = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
+                );
+                println!("i0 il {:#?} {:#?}", i_0, i_last);
                 let g = vec![
                     GlueOpts::PolyHash((i_0, prev_hash)),
                     GlueOpts::PolyHash((i_last, next_hash)),
@@ -434,9 +455,12 @@ fn solve<'a>(
                     .collect();
                 let next_v = int_to_ff(next_running_v.clone().unwrap());
 
-                let i_0 = <G1 as Group>::Scalar::from((i * r1cs_converter.batch_size) as u64);
-                let i_last =
-                    <G1 as Group>::Scalar::from(((i + 1) * r1cs_converter.batch_size) as u64);
+                let i_0 = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
+                );
+                let i_last = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
+                );
                 let g = vec![
                     GlueOpts::NlHash((i_0, prev_hash, q, v)),
                     GlueOpts::NlHash((i_last, next_hash, next_q, next_v)),
@@ -537,7 +561,7 @@ fn solve<'a>(
             ],
             glue,
             blind,
-            i == 0,
+            i + r1cs_converter.substring.0 == 0,
             <G1 as Group>::Scalar::from(r1cs_converter.nfa.nchars() as u64),
             start_of_epsilons,
             vec![
@@ -564,10 +588,7 @@ fn solve<'a>(
     }
 }
 
-fn prove_and_verify(
-    recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>,
-    proof_info: ProofInfo,
-) {
+fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof_info: ProofInfo) {
     println!("Proving thread starting...");
 
     // recursive SNARK
@@ -592,8 +613,22 @@ fn prove_and_verify(
             proof_info.z0_primary.clone(),
             z0_secondary.clone(),
         );
+        println!("prove step {:#?}", i);
+
         #[cfg(feature = "metrics")]
         log::stop(Component::Prover, &test, "prove step");
+
+        // verify recursive - TODO we can get rid of this verify once everything works
+        // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
+        let res = result.clone().unwrap().verify(
+            &proof_info.pp.lock().unwrap(),
+            FINAL_EXTERNAL_COUNTER,
+            proof_info.z0_primary.clone(),
+            z0_secondary.clone(),
+        );
+        //println!("Recursive res: {:#?}", res);
+
+        assert!(res.is_ok()); // TODO delete
 
         recursive_snark = Some(result.unwrap());
     }
@@ -764,7 +799,34 @@ mod tests {
             doc.clone(),
             batching_type.clone(),
             commit_docype.clone(),
-            batch_size
+            batch_size,
+        );
+    }
+
+    #[test]
+    fn e2e_substring() {
+        backend_test(
+            "ab".to_string(),
+            "bbb".to_string(),
+            ("aaabbbaaa".to_string())
+                .chars()
+                .map(|c| c.to_string())
+                .collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::Nlookup),
+            2,
+        );
+
+        backend_test(
+            "ab".to_string(),
+            "bbbaaa".to_string(),
+            ("aaabbbaaa".to_string())
+                .chars()
+                .map(|c| c.to_string())
+                .collect(),
+            Some(JBatching::NaivePolys),
+            Some(JCommit::HashChain),
+            2,
         );
     }
 

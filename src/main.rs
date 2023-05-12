@@ -1,14 +1,14 @@
 #![allow(missing_docs, non_snake_case)]
 use clap::Parser;
 
+use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
-use reef::regex::Regex;
 use reef::nfa::NFA;
-use csv::Writer;
+use reef::regex::Regex;
 use std::fs::OpenOptions;
-use std::path::PathBuf;
 use std::path::Path;
+use std::path::PathBuf;
 
 #[cfg(feature = "metrics")]
 use reef::metrics::{log, log::Component};
@@ -21,12 +21,11 @@ fn main() {
 
     // Input document
     let mut doc = if Path::exists(Path::new(&opt.input)) {
-        opt
-        .config
-        .read_file(&PathBuf::from(&opt.input))
-        .iter()
-        .map(|c| c.to_string())
-        .collect()
+        opt.config
+            .read_file(&PathBuf::from(&opt.input))
+            .iter()
+            .map(|c| c.to_string())
+            .collect()
     } else {
         opt.input.chars().map(|c| c.to_string()).collect()
     };
@@ -56,7 +55,8 @@ fn main() {
         log::stop(Component::Compiler, "DFA", "K Stride");
     };
     #[cfg(feature = "plot")]
-    nfa.write_pdf("nfa").expect("Failed to plot NFA to a pdf file");
+    nfa.write_pdf("nfa")
+        .expect("Failed to plot NFA to a pdf file");
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "DFA Solving", "Clear Match");
@@ -78,13 +78,22 @@ fn main() {
         doc,
         opt.eval_type,
         opt.commit_type,
-        opt.batch_size
+        opt.batch_size,
     ); // auto select batching/commit
 
-
-    let file = OpenOptions::new().write(true).append(true).create(true).open(opt.output.clone()).unwrap();
+    let file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(opt.output.clone())
+        .unwrap();
     let mut wtr = Writer::from_writer(file);
-    let _ = wtr.write_record(&[opt.input,opt.re,nfa.nedges().to_string(),nfa.nstates().to_string()]);
+    let _ = wtr.write_record(&[
+        opt.input,
+        opt.re,
+        nfa.nedges().to_string(),
+        nfa.nstates().to_string(),
+    ]);
     let spacer = "---------";
     let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
     wtr.flush();
