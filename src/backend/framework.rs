@@ -620,12 +620,12 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
 
         // verify recursive - TODO we can get rid of this verify once everything works
         // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
-        let res = result.clone().unwrap().verify(
+        /*let res = result.clone().unwrap().verify(
             &proof_info.pp.lock().unwrap(),
             FINAL_EXTERNAL_COUNTER,
             proof_info.z0_primary.clone(),
             z0_secondary.clone(),
-        );
+        );*/
         //println!("Recursive res: {:#?}", res);
 
         assert!(res.is_ok()); // TODO delete

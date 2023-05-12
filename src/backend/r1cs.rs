@@ -548,39 +548,57 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // note that the running claim q is not included
     fn combined_q_circuit(&mut self, num_eqs: usize, num_q_bits: usize, id: &str) {
-        assert!(
-            num_eqs * num_q_bits < 256,
-            "may have field overflow when combining q bits for fiat shamir"
-        );
+        // 254 bits to work with
+        let num_cqs = ((num_eqs * num_q_bits) as f64 / 254.0).ceil() as usize;
 
+        let mut cq = 0;
+        let mut combined_qs = vec![];
         let mut combined_q = new_const(0); // dummy, not used
         let mut next_slot = Integer::from(1);
-        for i in 0..num_eqs {
-            for j in 0..num_q_bits {
-                combined_q = term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![
-                        combined_q,
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Mul),
+
+        while cq < num_cqs {
+            for i in 0..num_eqs {
+                for j in 0..num_q_bits {
+                    if (i * num_q_bits) + j >= 254 * cq {
+                        cq += 1;
+                        combined_qs.push(combined_q.clone());
+                        combined_q = new_const(0);
+                        next_slot = Integer::from(1);
+                    } else {
+                        combined_q = term(
+                            Op::PfNaryOp(PfNaryOp::Add),
                             vec![
-                                new_const(next_slot.clone()),
-                                new_var(format!("{}_eq_{}_q_{}", id, i, j)),
+                                combined_q,
+                                term(
+                                    Op::PfNaryOp(PfNaryOp::Mul),
+                                    vec![
+                                        new_const(next_slot.clone()),
+                                        new_var(format!("{}_eq_{}_q_{}", id, i, j)),
+                                    ],
+                                ),
                             ],
-                        ),
-                    ],
-                );
-                next_slot *= Integer::from(2);
+                        );
+                        next_slot *= Integer::from(2);
+                    }
+                }
             }
         }
 
-        let combined_q_eq = term(
-            Op::Eq,
-            vec![combined_q, new_var(format!("{}_combined_q", id))],
-        );
+        assert_eq!(num_cqs, combined_qs.len());
 
-        self.assertions.push(combined_q_eq);
-        self.pub_inputs.push(new_var(format!("{}_combined_q", id)));
+        for cq in 0..num_cqs {
+            let combined_q_eq = term(
+                Op::Eq,
+                vec![
+                    combined_qs[cq].clone(),
+                    new_var(format!("{}_combined_q_{}", id, cq)),
+                ],
+            );
+
+            self.assertions.push(combined_q_eq);
+            self.pub_inputs
+                .push(new_var(format!("{}_combined_q_{}", id, cq)));
+        }
     }
 
     // C_1 = LHS/"claim"
@@ -989,25 +1007,47 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // q.push(prev_running_q);
 
         // q processing
-        let mut combined_q = Integer::from(0);
-        let mut next_slot = Integer::from(1);
-        for i in 0..self.batch_size {
-            // regular
-            let mut qjs = vec![];
-            let q_name = format!("{}_eq_{}", id, i);
-            for j in 0..sc_l {
-                let qj = (q[i] >> j) & 1;
-                wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
-                qjs.push(qj);
-            }
+        let mut combined_qs = vec![];
+        let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
 
-            for qj in qjs.into_iter().rev() {
-                combined_q += Integer::from(qj) * &next_slot;
-                next_slot *= Integer::from(2);
+        let mut cq = 0;
+        while cq < num_cqs {
+            let mut combined_q = Integer::from(0);
+            let mut next_slot = Integer::from(1);
+            for i in 0..self.batch_size {
+                // regular
+                let mut qjs = vec![];
+                let q_name = format!("{}_eq_{}", id, i);
+                for j in 0..sc_l {
+                    let qj = (q[i] >> j) & 1;
+                    wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
+                    qjs.push(qj);
+                }
+
+                let mut j = 0;
+                for qj in qjs.into_iter().rev() {
+                    if (i * sc_l) + j >= 254 * cq {
+                        cq += 1;
+                        combined_qs.push(combined_q.clone());
+                        combined_q = Integer::from(0);
+                        next_slot = Integer::from(1);
+                    } else {
+                        combined_q += Integer::from(qj) * &next_slot;
+                        next_slot *= Integer::from(2);
+                    }
+
+                    j += 1;
+                }
             }
         }
 
-        wits.insert(format!("{}_combined_q", id), new_wit(combined_q.clone()));
+        assert_eq!(num_cqs, combined_qs.len());
+        for cq in 0..num_cqs {
+            wits.insert(
+                format!("{}_combined_q_{}", id, cq),
+                new_wit(combined_qs[cq].clone()),
+            );
+        }
 
         for j in 0..sc_l {
             // running
@@ -1025,11 +1065,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let mut pattern = match id {
             "nl" => vec![
-                SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs, combined_q, running q,v
+                SpongeOp::Absorb((self.batch_size + sc_l + 1 + num_cqs) as u32), // vs, combined_q, running q,v
                 SpongeOp::Squeeze(1),
             ],
             "nldoc" => vec![
-                SpongeOp::Absorb((self.batch_size + sc_l + 3) as u32), // doc commit, vs, combined_q, running q,v
+                SpongeOp::Absorb((self.batch_size + sc_l + 2 + num_cqs) as u32), // doc commit, vs, combined_q, running q,v
                 SpongeOp::Squeeze(1),
             ],
             _ => panic!("weird tag"),
@@ -1049,7 +1089,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             },
             _ => panic!("weird tag"),
         };
-        query.push(int_to_ff(combined_q)); // q_comb, v1,..., vm, running q, running v
+        for cq in combined_qs {
+            query.push(int_to_ff(cq)); // q_comb, v1,..., vm, running q, running v
+        }
         for vi in v.into_iter() {
             query.push(int_to_ff(vi));
         }
