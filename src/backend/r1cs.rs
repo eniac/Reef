@@ -1105,6 +1105,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         query.push(int_to_ff(prev_running_v.clone()));
         //let query_f: Vec<G1::Scalar> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
+        println!("FIAT SHAIMR R1CS QUERY {:#?}", query);
+
         SpongeAPI::absorb(&mut sponge, query.len() as u32, &query, acc);
 
         // TODO - what needs to be public?
