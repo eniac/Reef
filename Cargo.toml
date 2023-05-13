@@ -8,7 +8,6 @@ gmp-mpfr-sys = { version = "1.4" }
 hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch = "phash"}
 clap = "4.1.8"
 circ = { git = "https://github.com/jkwoods/circ", branch = "r1cs_pub", features = ["r1cs", "bellman"] }
-regex-syntax = "0.6"
 itertools = "0.10"
 nova-snark ={ git = "https://github.com/sga001/Nova"}
 bellperson = { version = "0.24", default-features = false }
@@ -31,6 +30,8 @@ serde_json = "1.0.96"
 rayon = "1.7"
 petgraph = "0.6"
 printpdf = "0.5.3"
+fancy-regex = "0.11.0"
+regex-syntax = "0.6.0"
 
 [target.'cfg(all(not(windows), not(target_env = "musl")))'.dependencies]
 jemallocator = "0.3.0"

@@ -41,8 +41,8 @@ pub fn accepting_circuit<'a>(nfa: &'a NFA, is_match: Option<(usize, usize)>) -> 
     // poly of degree (# final states - 1)
     // (alt, # non final states - 1)
     let cost: usize = 5; //constrain to boolean costs and bool accepting
-    let nstate = match is_match {
-        None => nfa.get_non_final_states().len() as usize - 1,
+    let nstate =  match is_match {
+        None => nfa.non_accepting().len() as usize - 1 ,
         _ => nfa.accepting().len() as usize - 1,
     };
     cost + nstate + 2
@@ -136,7 +136,7 @@ fn commit_circuit_hash(
                 }
                 cost += n_sponge * 288;
             }
-            
+
 
             //Sum check poseidon hashes
             cost += log_mn * 290;
@@ -271,7 +271,7 @@ pub fn full_round_cost_model<'a>(
         }
         JBatching::Nlookup => {
             nlookup_cost_model_hash(nfa, batch_size, is_match, doc_len, commit_type)
-        } 
+        }
     };
 
     cost += commit_circuit_hash(doc_len, batch_size, commit_type, is_match);

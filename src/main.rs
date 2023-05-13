@@ -39,6 +39,9 @@ fn main() {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA", "DFA");
 
+    println!("REGEX: {:#?}", Regex::new(&opt.re));
+    return;
+
     let mut nfa = NFA::new(&ab, Regex::new(&opt.re));
 
     // Is document well-formed
