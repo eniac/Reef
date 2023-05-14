@@ -829,6 +829,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         prev_running_claim_v: Option<Integer>,
         prev_doc_running_claim_q: Option<Vec<Integer>>,
         prev_doc_running_claim_v: Option<Integer>,
+        prev_doc_idx: Option<isize>,
     ) -> (
         FxHashMap<String, Value>,
         usize,
@@ -837,6 +838,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Option<Vec<Integer>>,
         Option<Integer>,
         isize,
+        Option<isize>,
     ) {
         match self.batching {
             JBatching::NaivePolys => {
@@ -846,11 +848,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     next_doc_running_claim_q,
                     next_doc_running_claim_v,
                     start_epsilons,
+                    next_doc_idx,
                 ) = self.gen_wit_i_polys(
                     batch_num,
                     current_state,
                     prev_doc_running_claim_q,
                     prev_doc_running_claim_v,
+                    prev_doc_idx,
                 );
                 (
                     wits,
@@ -860,6 +864,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     next_doc_running_claim_q,
                     next_doc_running_claim_v,
                     start_epsilons,
+                    next_doc_idx,
                 )
             }
             JBatching::Nlookup => self.gen_wit_i_nlookup(
@@ -869,8 +874,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 prev_running_claim_v,
                 prev_doc_running_claim_q,
                 prev_doc_running_claim_v,
+                prev_doc_idx,
             ),
-            //JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
@@ -899,6 +904,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         running_v: Option<Integer>,
         doc_running_q: Option<Vec<Integer>>,
         doc_running_v: Option<Integer>,
+        prev_doc_idx: Option<isize>,
     ) -> (
         FxHashMap<String, Value>,
         usize,
@@ -907,6 +913,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Option<Vec<Integer>>,
         Option<Integer>,
         isize,
+        Option<isize>,
     ) {
         let mut wits = FxHashMap::default();
 
@@ -986,13 +993,20 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     None,
                     None,
                     start_epsilons,
+                    None,
                 )
             }
             JCommit::Nlookup => {
                 assert!(doc_running_q.is_some() || batch_num == 0);
                 assert!(doc_running_v.is_some() || batch_num == 0);
-                let (w, next_doc_running_q, next_doc_running_v) =
-                    self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
+                let (w, next_doc_running_q, next_doc_running_v, next_doc_idx) = self
+                    .wit_nlookup_doc_commit(
+                        wits,
+                        batch_num,
+                        doc_running_q,
+                        doc_running_v,
+                        prev_doc_idx,
+                    );
                 wits = w;
                 (
                     wits,
@@ -1002,6 +1016,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Some(next_doc_running_q),
                     Some(next_doc_running_v),
                     start_epsilons,
+                    Some(next_doc_idx),
                 )
             }
         }
@@ -1013,7 +1028,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         batch_num: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
-    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
+        prev_idx: Option<isize>,
+    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer, isize) {
         let mut v = vec![];
         let mut q = vec![];
         for i in 0..self.batch_size {
@@ -1024,13 +1040,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
 
         // q relations
-
-        // we could pass this but come on
-        let prev_round_lookup = if batch_num == 0 {
+        let prev_round_lookup = if prev_idx.is_some() {
+            Integer::from(prev_idx.unwrap())
+        } else if self.substring.0 == 0 {
             Integer::from(-1)
         } else {
-            Integer::from(q[0] - 1)
+            Integer::from(self.substring.0 - 1)
         };
+
         println!("PREV ROUND Q LOOKUP {:#?}", prev_round_lookup.clone());
         wits.insert(
             format!("nldoc_full_prev_round_q"),
@@ -1039,16 +1056,17 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         for i in 0..q.len() {
             // not final q (running claim)
-            //println!("FULL Q {:#?} = {:#?}", i, q[i]);
+            println!("FULL Q {:#?} = {:#?}", i, q[i]);
 
             wits.insert(format!("nldoc_full_{}_q", i), new_wit(q[i]));
         }
+        let next_idx = q[q.len() - 1] as isize;
 
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
         wits = w;
 
-        (wits, next_running_q, next_running_v)
+        (wits, next_running_q, next_running_v, next_idx)
     }
 
     fn wit_nlookup_gadget(
@@ -1280,12 +1298,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // the hood
         doc_running_q: Option<Vec<Integer>>,
         doc_running_v: Option<Integer>,
+        prev_doc_idx: Option<isize>,
     ) -> (
         FxHashMap<String, Value>,
         usize,
         Option<Vec<Integer>>,
         Option<Integer>,
         isize,
+        Option<isize>,
     ) {
         let mut wits = FxHashMap::default();
         let mut state_i = current_state;
@@ -1330,13 +1350,19 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     );
                 }
                 // values not actually checked or used
-                (wits, next_state, None, None, start_epsilons)
+                (wits, next_state, None, None, start_epsilons, None)
             }
             JCommit::Nlookup => {
                 assert!(doc_running_q.is_some() || batch_num == 0);
                 assert!(doc_running_v.is_some() || batch_num == 0);
-                let (w, next_doc_running_q, next_doc_running_v) =
-                    self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
+                let (w, next_doc_running_q, next_doc_running_v, next_doc_idx) = self
+                    .wit_nlookup_doc_commit(
+                        wits,
+                        batch_num,
+                        doc_running_q,
+                        doc_running_v,
+                        prev_doc_idx,
+                    );
                 wits = w;
                 (
                     wits,
@@ -1344,6 +1370,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Some(next_doc_running_q),
                     Some(next_doc_running_v),
                     start_epsilons,
+                    Some(next_doc_idx),
                 )
             }
         }
@@ -1576,6 +1603,7 @@ mod tests {
                     let mut running_v = None;
                     let mut doc_running_q = None;
                     let mut doc_running_v = None;
+                    let mut doc_idx = None;
 
                     let (pd, _vd) = r1cs_converter.to_circuit();
 
@@ -1598,6 +1626,7 @@ mod tests {
                             doc_running_q,
                             doc_running_v,
                             _start_epsilons,
+                            doc_idx,
                         ) = r1cs_converter.gen_wit_i(
                             i,
                             current_state,
@@ -1605,6 +1634,7 @@ mod tests {
                             running_v.clone(),
                             doc_running_q.clone(),
                             doc_running_v.clone(),
+                            doc_idx,
                         );
 
                         pd.check_all(&values);

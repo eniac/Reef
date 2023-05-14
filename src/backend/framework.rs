@@ -308,7 +308,7 @@ fn setup<'a>(
                 z.push(<G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1));
             } else {
                 z.push(<G1 as Group>::Scalar::from(
-                    r1cs_converter.substring.0 as u64,
+                    (r1cs_converter.substring.0 - 1) as u64,
                 ));
             }
 
@@ -329,7 +329,7 @@ fn setup<'a>(
                 z.push(<G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1));
             } else {
                 z.push(<G1 as Group>::Scalar::from(
-                    r1cs_converter.substring.0 as u64,
+                    (r1cs_converter.substring.0 - 1) as u64,
                 ));
             }
 
@@ -386,6 +386,8 @@ fn solve<'a>(
     let mut next_doc_running_v;
 
     let mut start_of_epsilons;
+    let mut prev_doc_idx = None;
+    let mut next_doc_idx;
 
     // TODO only do this for HC
     let mut prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
@@ -415,6 +417,7 @@ fn solve<'a>(
             next_doc_running_q,
             next_doc_running_v,
             start_of_epsilons,
+            next_doc_idx,
         ) = r1cs_converter.gen_wit_i(
             i,
             next_state,
@@ -422,6 +425,7 @@ fn solve<'a>(
             running_v.clone(),
             doc_running_q.clone(),
             doc_running_v.clone(),
+            prev_doc_idx.clone(),
         );
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, &test, "witness generation");
@@ -496,12 +500,14 @@ fn solve<'a>(
                 g
             }
             (JBatching::NaivePolys, JCommit::Nlookup) => {
-                let q_idx = if r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) == 0 {
-                    <G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1)
-                } else {
+                let q_idx = if r1cs_converter.substring.0 + i != 0 {
                     <G1 as Group>::Scalar::from(
                         (r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) - 1) as u64,
                     )
+                } else if prev_doc_idx.is_none() {
+                    <G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1)
+                } else {
+                    <G1 as Group>::Scalar::from((prev_doc_idx.unwrap()) as u64)
                 };
                 println!("Q IDX {:#?}", q_idx);
 
@@ -515,9 +521,7 @@ fn solve<'a>(
                     None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
                 };
 
-                let next_q_idx = <G1 as Group>::Scalar::from(
-                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size - 1)) as u64,
-                );
+                let next_q_idx = <G1 as Group>::Scalar::from(next_doc_idx.unwrap() as u64);
 
                 println!("NEXT Q IDX {:#?}", next_q_idx);
                 let next_doc_q = next_doc_running_q
@@ -550,17 +554,20 @@ fn solve<'a>(
                     .map(|x| int_to_ff(x))
                     .collect();
                 let next_v = int_to_ff(next_running_v.clone().unwrap());
-                let q_idx = if r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) == 0 {
-                    <G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1)
-                } else {
+
+                let q_idx = if r1cs_converter.substring.0 + i != 0 {
                     <G1 as Group>::Scalar::from(
                         (r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) - 1) as u64,
                     )
+                } else if prev_doc_idx.is_none() {
+                    <G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1)
+                } else {
+                    <G1 as Group>::Scalar::from((prev_doc_idx.unwrap()) as u64)
                 };
+
+                let next_q_idx = <G1 as Group>::Scalar::from(next_doc_idx.unwrap() as u64);
+
                 println!("Q IDX {:#?}", q_idx);
-                let next_q_idx = <G1 as Group>::Scalar::from(
-                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size - 1)) as u64,
-                );
                 println!("NEXT Q IDX {:#?}", next_q_idx);
                 let doc_q = match doc_running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
@@ -631,6 +638,7 @@ fn solve<'a>(
         running_v = next_running_v;
         doc_running_q = next_doc_running_q;
         doc_running_v = next_doc_running_v;
+        prev_doc_idx = next_doc_idx;
     }
 }
 
