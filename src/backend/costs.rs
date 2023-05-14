@@ -68,7 +68,7 @@ pub fn commit_circuit_nohash(
         JCommit::Nlookup => {
             let match_len = match is_match {
                 None => doc_len,
-                Some((start, end)) => (end - start) + 1,
+                Some((start, end)) => end - start,
             };
             let mn: usize = match_len + get_padding(match_len, batch_size, JCommit::Nlookup);
             let log_mn: usize = logmn(mn);
@@ -76,30 +76,24 @@ pub fn commit_circuit_nohash(
 
             //Multiplications
             cost += batch_size + 1;
-            println!("adding {:#?}", batch_size + 1);
 
             //Sum-check additions
             cost += log_mn * 2;
-            println!("adding {:#?}", log_mn * 2);
 
             //eq calc
             cost += (batch_size + 1) * (2 * log_mn); //2 actual multiplication and 2 for the subtraction
-            println!("adding {:#?}", (batch_size + 1) * (2 * log_mn));
 
             //combine eqs
             cost += (batch_size + 1) * (log_mn - 1);
-            println!("adding {:#?}", (batch_size + 1) * (log_mn - 1));
 
             //horners
             cost += batch_size + 1;
-            println!("adding {:#?}", batch_size + 1);
 
             //mult by Tj
             cost += 1;
 
             // combine qs (for fiat shamir)
             let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
-            println!("COST MODEL num_cqs {:#?}", num_cqs);
             cost += num_cqs;
 
             // q ordering check
@@ -125,7 +119,7 @@ fn commit_circuit_hash(
         JCommit::Nlookup => {
             let mod_len = match is_match {
                 None => doc_len,
-                Some((start, end)) => (end - start) + 1,
+                Some((start, end)) => end - start,
             };
             let mn: usize = mod_len + get_padding(mod_len, batch_size, JCommit::Nlookup);
             let log_mn: usize = logmn(mn);
@@ -305,7 +299,7 @@ pub fn opt_cost_model_select_with_commit<'a>(
 
     let batch_size_v_match = match is_match {
         None => true,
-        Some((start, end)) => ((end - start) + 1) > batch_size,
+        Some((start, end)) => (end - start) > batch_size,
     };
 
     let mut mod_len = doc_length;

@@ -1105,7 +1105,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                         || (i == self.batch_size - 1 && j == sc_l - 1)
                     {
                         cq += 1;
-                        //println!("PUSH CQ");
                         combined_qs.push(combined_q.clone());
                         combined_q = Integer::from(0);
                         next_slot = Integer::from(1);
@@ -1672,7 +1671,6 @@ mod tests {
                                 c
                             )
                     );
-                    // deal with later TODO
                 }
             }
         }
