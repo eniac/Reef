@@ -716,14 +716,27 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.assertions.push(q_eq);
             self.pub_inputs.push(new_var(format!("nldoc_full_{}_q", i)));
 
+            // TODO make ep num = 0?
             if i > 0 {
                 let q_ordering = term(
-                    Op::Eq,
+                    Op::BoolNaryOp(BoolNaryOp::Or),
                     vec![
-                        new_var(format!("nldoc_full_{}_q", i)),
                         term(
-                            Op::PfNaryOp(PfNaryOp::Add),
-                            vec![new_var(format!("nldoc_full_{}_q", i - 1)), new_const(1)],
+                            Op::Eq,
+                            vec![
+                                new_const(self.udoc.len() - 1), // EPSILON num
+                                new_var(format!("nldoc_full_{}_q", i)),
+                            ],
+                        ),
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_var(format!("nldoc_full_{}_q", i)),
+                                term(
+                                    Op::PfNaryOp(PfNaryOp::Add),
+                                    vec![new_var(format!("nldoc_full_{}_q", i - 1)), new_const(1)],
+                                ),
+                            ],
                         ),
                     ],
                 );
