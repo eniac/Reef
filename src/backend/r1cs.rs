@@ -391,6 +391,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut circ_r1cs = to_r1cs(final_cs, cfg());
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
+        // LEAVE THIS IN HERE FOR DEBUGGING >:(
+        /*for r in circ_r1cs.constraints().clone() {
+            println!("{:#?}", circ_r1cs.format_qeq(&r));
+        }*/
+
         circ_r1cs.finalize(&final_cs)
     }
 
@@ -462,32 +467,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.assertions.push(i_plus);
             self.pub_inputs.push(new_var(format!("i_{}", idx)));
         }
-        /*
-              let ite = term(
-                  Op::Ite,
-                  vec![
-                      term(Op::Eq, vec![new_var(format!("i_0")), new_const(0)]),
-                      term(
-                          Op::Eq,
-                          vec![
-                              new_var(format!("first_hash_input")),
-                              new_var(format!("random_hash_result")),
-                          ],
-                      ),
-                      term(
-                          Op::Eq,
-                          vec![
-                              new_var(format!("first_hash_input")),
-                              new_var(format!("z_hash_input")),
-                          ],
-                      ),
-                  ],
-              );
-              self.assertions.push(ite);
-              self.pub_inputs.push(new_var(format!("first_hash_input")));
-              self.pub_inputs.push(new_var(format!("random_hash_result")));
-              self.pub_inputs.push(new_var(format!("z_hash_input")));
-        */
     }
 
     // for use at the end of sum check
@@ -711,7 +690,82 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     fn nlookup_doc_commit(&mut self) {
-        // start: usize, end: usize) {
+        // q relations
+        for i in 0..self.batch_size {
+            // not final q (running claim)
+
+            let mut full_q = new_const(0); // dummy
+            let mut next_slot = Integer::from(1);
+            let doc_l = logmn(self.udoc.len());
+            for j in (0..doc_l).rev() {
+                full_q = term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        full_q,
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Mul),
+                            vec![
+                                new_const(next_slot.clone()),
+                                new_var(format!("nldoc_eq_{}_q_{}", i, j)),
+                            ],
+                        ),
+                    ],
+                );
+                next_slot *= Integer::from(2);
+            }
+
+            let q_eq = term(
+                Op::Eq,
+                vec![full_q.clone(), new_var(format!("nldoc_full_{}_q", i))],
+            );
+            self.assertions.push(q_eq);
+            self.pub_inputs.push(new_var(format!("nldoc_full_{}_q", i)));
+
+            // TODO make ep num = 0?
+            if i > 0 {
+                let q_ordering = term(
+                    Op::BoolNaryOp(BoolNaryOp::Or),
+                    vec![
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_const(self.udoc.len() - 1), // EPSILON num
+                                new_var(format!("nldoc_full_{}_q", i)),
+                            ],
+                        ),
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_var(format!("nldoc_full_{}_q", i)),
+                                term(
+                                    Op::PfNaryOp(PfNaryOp::Add),
+                                    vec![new_var(format!("nldoc_full_{}_q", i - 1)), new_const(1)],
+                                ),
+                            ],
+                        ),
+                    ],
+                );
+
+                self.assertions.push(q_ordering);
+            } else {
+                let q_ordering = term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("nldoc_full_{}_q", i)),
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Add),
+                            vec![new_var(format!("nldoc_full_prev_round_q")), new_const(1)],
+                        ),
+                    ],
+                );
+
+                self.pub_inputs
+                    .push(new_var(format!("nldoc_full_prev_round_q")));
+                self.assertions.push(q_ordering);
+            }
+        }
+
+        // lookups and nl circuit
         let mut char_lookups = vec![];
         for c in 0..self.batch_size {
             char_lookups.push(new_var(format!("char_{}", c)));
@@ -775,6 +829,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         prev_running_claim_v: Option<Integer>,
         prev_doc_running_claim_q: Option<Vec<Integer>>,
         prev_doc_running_claim_v: Option<Integer>,
+        prev_doc_idx: Option<isize>,
     ) -> (
         FxHashMap<String, Value>,
         usize,
@@ -783,6 +838,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Option<Vec<Integer>>,
         Option<Integer>,
         isize,
+        Option<isize>,
     ) {
         match self.batching {
             JBatching::NaivePolys => {
@@ -792,11 +848,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     next_doc_running_claim_q,
                     next_doc_running_claim_v,
                     start_epsilons,
+                    next_doc_idx,
                 ) = self.gen_wit_i_polys(
                     batch_num,
                     current_state,
                     prev_doc_running_claim_q,
                     prev_doc_running_claim_v,
+                    prev_doc_idx,
                 );
                 (
                     wits,
@@ -806,6 +864,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     next_doc_running_claim_q,
                     next_doc_running_claim_v,
                     start_epsilons,
+                    next_doc_idx,
                 )
             }
             JBatching::Nlookup => self.gen_wit_i_nlookup(
@@ -815,8 +874,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 prev_running_claim_v,
                 prev_doc_running_claim_q,
                 prev_doc_running_claim_v,
+                prev_doc_idx,
             ),
-            //JBatching::Plookup => todo!(), //gen_wit_i_plookup(round_num, current_state, doc, batch_size),
         }
     }
 
@@ -845,6 +904,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         running_v: Option<Integer>,
         doc_running_q: Option<Vec<Integer>>,
         doc_running_v: Option<Integer>,
+        prev_doc_idx: Option<isize>,
     ) -> (
         FxHashMap<String, Value>,
         usize,
@@ -853,6 +913,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Option<Vec<Integer>>,
         Option<Integer>,
         isize,
+        Option<isize>,
     ) {
         let mut wits = FxHashMap::default();
 
@@ -932,13 +993,20 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     None,
                     None,
                     start_epsilons,
+                    None,
                 )
             }
             JCommit::Nlookup => {
                 assert!(doc_running_q.is_some() || batch_num == 0);
                 assert!(doc_running_v.is_some() || batch_num == 0);
-                let (w, next_doc_running_q, next_doc_running_v) =
-                    self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
+                let (w, next_doc_running_q, next_doc_running_v, next_doc_idx) = self
+                    .wit_nlookup_doc_commit(
+                        wits,
+                        batch_num,
+                        doc_running_q,
+                        doc_running_v,
+                        prev_doc_idx,
+                    );
                 wits = w;
                 (
                     wits,
@@ -948,6 +1016,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Some(next_doc_running_q),
                     Some(next_doc_running_v),
                     start_epsilons,
+                    Some(next_doc_idx),
                 )
             }
         }
@@ -959,7 +1028,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         batch_num: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
-    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
+        prev_idx: Option<isize>,
+    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer, isize) {
         let mut v = vec![];
         let mut q = vec![];
         for i in 0..self.batch_size {
@@ -969,11 +1039,34 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             v.push(self.idoc[access_at].clone());
         }
 
+        // q relations
+        let prev_round_lookup = if prev_idx.is_some() {
+            Integer::from(prev_idx.unwrap())
+        } else if self.substring.0 == 0 {
+            Integer::from(-1)
+        } else {
+            Integer::from(self.substring.0 - 1)
+        };
+
+        println!("PREV ROUND Q LOOKUP {:#?}", prev_round_lookup.clone());
+        wits.insert(
+            format!("nldoc_full_prev_round_q"),
+            new_wit(prev_round_lookup),
+        );
+
+        for i in 0..q.len() {
+            // not final q (running claim)
+            println!("FULL Q {:#?} = {:#?}", i, q[i]);
+
+            wits.insert(format!("nldoc_full_{}_q", i), new_wit(q[i]));
+        }
+        let next_idx = q[q.len() - 1] as isize;
+
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
         wits = w;
 
-        (wits, next_running_q, next_running_v)
+        (wits, next_running_q, next_running_v, next_idx)
     }
 
     fn wit_nlookup_gadget(
@@ -1009,7 +1102,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut combined_qs = vec![];
         let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
 
-        println!("num cqs {:#?}", num_cqs);
+        //println!("num cqs {:#?}", num_cqs);
 
         let mut cq = 0;
         while cq < num_cqs {
@@ -1031,7 +1124,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                         || (i == self.batch_size - 1 && j == sc_l - 1)
                     {
                         cq += 1;
-                        // println!("PUSH CQ");
                         combined_qs.push(combined_q.clone());
                         combined_q = Integer::from(0);
                         next_slot = Integer::from(1);
@@ -1053,7 +1145,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
         }
 
-        println!("combined_qs {:#?}", combined_qs);
+        //println!("combined_qs {:#?}", combined_qs);
 
         for j in 0..sc_l {
             // running
@@ -1206,12 +1298,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // the hood
         doc_running_q: Option<Vec<Integer>>,
         doc_running_v: Option<Integer>,
+        prev_doc_idx: Option<isize>,
     ) -> (
         FxHashMap<String, Value>,
         usize,
         Option<Vec<Integer>>,
         Option<Integer>,
         isize,
+        Option<isize>,
     ) {
         let mut wits = FxHashMap::default();
         let mut state_i = current_state;
@@ -1256,13 +1350,19 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     );
                 }
                 // values not actually checked or used
-                (wits, next_state, None, None, start_epsilons)
+                (wits, next_state, None, None, start_epsilons, None)
             }
             JCommit::Nlookup => {
                 assert!(doc_running_q.is_some() || batch_num == 0);
                 assert!(doc_running_v.is_some() || batch_num == 0);
-                let (w, next_doc_running_q, next_doc_running_v) =
-                    self.wit_nlookup_doc_commit(wits, batch_num, doc_running_q, doc_running_v);
+                let (w, next_doc_running_q, next_doc_running_v, next_doc_idx) = self
+                    .wit_nlookup_doc_commit(
+                        wits,
+                        batch_num,
+                        doc_running_q,
+                        doc_running_v,
+                        prev_doc_idx,
+                    );
                 wits = w;
                 (
                     wits,
@@ -1270,6 +1370,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     Some(next_doc_running_q),
                     Some(next_doc_running_v),
                     start_epsilons,
+                    Some(next_doc_idx),
                 )
             }
         }
@@ -1502,6 +1603,7 @@ mod tests {
                     let mut running_v = None;
                     let mut doc_running_q = None;
                     let mut doc_running_v = None;
+                    let mut doc_idx = None;
 
                     let (pd, _vd) = r1cs_converter.to_circuit();
 
@@ -1524,6 +1626,7 @@ mod tests {
                             doc_running_q,
                             doc_running_v,
                             _start_epsilons,
+                            doc_idx,
                         ) = r1cs_converter.gen_wit_i(
                             i,
                             current_state,
@@ -1531,6 +1634,7 @@ mod tests {
                             running_v.clone(),
                             doc_running_q.clone(),
                             doc_running_v.clone(),
+                            doc_idx,
                         );
 
                         pd.check_all(&values);
@@ -1587,18 +1691,17 @@ mod tests {
                     println!("actual cost: {:#?}", pd.r1cs.constraints.len());
                     println!("\n\n\n");
 
-                                   assert!(
-                                      pd.r1cs.constraints.len() as usize
-                                          == costs::full_round_cost_model_nohash(
-                                              &nfa,
-                                              r1cs_converter.batch_size,
-                                              b.clone(),
-                                              nfa.is_match(&chars),
-                                              doc.len(),
-                                              c
-                                          )
-                                  );
-                     // deal with later TODO
+                    assert!(
+                        pd.r1cs.constraints.len() as usize
+                            == costs::full_round_cost_model_nohash(
+                                &nfa,
+                                r1cs_converter.batch_size,
+                                b.clone(),
+                                nfa.is_match(&chars),
+                                doc.len(),
+                                c
+                            )
+                    );
                 }
             }
         }

@@ -96,6 +96,9 @@ pub fn commit_circuit_nohash(
             let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
             cost += num_cqs;
 
+            // q ordering check
+            cost += (batch_size + 1) + ((batch_size - 1) * (2 + 3));
+
             cost
         }
     }
