@@ -70,36 +70,33 @@ pub fn commit_circuit_nohash(
                 None => doc_len,
                 Some((start, end)) => (end - start) + 1,
             };
-            let mn: usize = match_len + get_padding(match_len, batch_size, JCommit::Nlookup);
+            let mn: usize = match_len; 
+            //+ get_padding(match_len, batch_size, JCommit::Nlookup);
+            println!("Padded: {:#?}", mn);
+            println!("Doc: {:#?}", match_len);
             let log_mn: usize = logmn(mn);
             let mut cost: usize = 0;
 
             //Multiplications
             cost += batch_size + 1;
-            println!("adding {:#?}", batch_size + 1);
 
             //Sum-check additions
             cost += log_mn * 2;
-            println!("adding {:#?}", log_mn * 2);
 
             //eq calc
             cost += (batch_size + 1) * (2 * log_mn); //2 actual multiplication and 2 for the subtraction
-            println!("adding {:#?}", (batch_size + 1) * (2 * log_mn));
 
             //combine eqs
             cost += (batch_size + 1) * (log_mn - 1);
-            println!("adding {:#?}", (batch_size + 1) * (log_mn - 1));
 
             //horners
             cost += batch_size + 1;
-            println!("adding {:#?}", batch_size + 1);
 
             //mult by Tj
             cost += 1;
 
             // combine qs (for fiat shamir)
             let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
-            println!("COST MODEL num_cqs {:#?}", num_cqs);
             cost += num_cqs;
 
             cost

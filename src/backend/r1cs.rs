@@ -1031,7 +1031,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                         || (i == self.batch_size - 1 && j == sc_l - 1)
                     {
                         cq += 1;
-                        println!("PUSH CQ");
+                        // println!("PUSH CQ");
                         combined_qs.push(combined_q.clone());
                         combined_q = Integer::from(0);
                         next_slot = Integer::from(1);
@@ -1587,7 +1587,7 @@ mod tests {
                     println!("actual cost: {:#?}", pd.r1cs.constraints.len());
                     println!("\n\n\n");
 
-                    /*                assert!(
+                                   assert!(
                                       pd.r1cs.constraints.len() as usize
                                           == costs::full_round_cost_model_nohash(
                                               &nfa,
@@ -1598,7 +1598,7 @@ mod tests {
                                               c
                                           )
                                   );
-                    */ // deal with later TODO
+                     // deal with later TODO
                 }
             }
         }
