@@ -76,24 +76,31 @@ pub fn commit_circuit_nohash(
 
             //Multiplications
             cost += batch_size + 1;
+            println!("adding {:#?}", batch_size + 1);
 
             //Sum-check additions
             cost += log_mn * 2;
+            println!("adding {:#?}", log_mn * 2);
 
             //eq calc
             cost += (batch_size + 1) * (2 * log_mn); //2 actual multiplication and 2 for the subtraction
+            println!("adding {:#?}", (batch_size + 1) * (2 * log_mn));
 
             //combine eqs
             cost += (batch_size + 1) * (log_mn - 1);
+            println!("adding {:#?}", (batch_size + 1) * (log_mn - 1));
 
             //horners
             cost += batch_size + 1;
+            println!("adding {:#?}", batch_size + 1);
 
             //mult by Tj
             cost += 1;
 
             // combine qs (for fiat shamir)
-            cost += 1;
+            let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
+            println!("COST MODEL num_cqs {:#?}", num_cqs);
+            cost += num_cqs;
 
             cost
         }
@@ -189,7 +196,10 @@ pub fn nlookup_cost_model_nohash<'a>(
     cost += batch_size;
 
     // combine qs (for fiat shamir)
-    cost += 1;
+    let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
+    println!("COST MODEL num_cqs {:#?}", num_cqs);
+
+    cost += num_cqs;
 
     cost += accepting_circuit(nfa, is_match);
 

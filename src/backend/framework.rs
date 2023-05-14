@@ -607,6 +607,7 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
 
     // println!("num foldings: {:#?}", proof_info.num_steps);
     for i in 0..proof_info.num_steps {
+        #[cfg(feature = "metrics")]
         let test = format!("step {}", i);
 
         // blocks until we receive first witness
