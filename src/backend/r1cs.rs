@@ -391,6 +391,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut circ_r1cs = to_r1cs(final_cs, cfg());
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
+        // LEAVE THIS IN HERE FOR DEBUGGING >:(
+        for r in circ_r1cs.constraints().clone() {
+            println!("{:#?}", circ_r1cs.format_qeq(&r));
+        }
+
         circ_r1cs.finalize(&final_cs)
     }
 
@@ -742,6 +747,21 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 );
 
                 self.assertions.push(q_ordering);
+            } else {
+                let q_ordering = term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("nldoc_full_{}_q", i)),
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Add),
+                            vec![new_var(format!("nldoc_full_prev_round_q")), new_const(1)],
+                        ),
+                    ],
+                );
+
+                self.pub_inputs
+                    .push(new_var(format!("nldoc_full_prev_round_q")));
+                self.assertions.push(q_ordering);
             }
         }
 
@@ -1004,6 +1024,18 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
 
         // q relations
+
+        // we could pass this but come on
+        let prev_round_lookup = if batch_num == 0 {
+            Integer::from(-1)
+        } else {
+            Integer::from(q[0] - 1)
+        };
+        wits.insert(
+            format!("nldoc_full_prev_round_q"),
+            new_wit(prev_round_lookup),
+        );
+
         for i in 0..q.len() {
             // not final q (running claim)
             println!("FULL Q {:#?} = {:#?}", i, q[i]);
@@ -1629,18 +1661,18 @@ mod tests {
                     println!("actual cost: {:#?}", pd.r1cs.constraints.len());
                     println!("\n\n\n");
 
-                    /*                assert!(
-                                      pd.r1cs.constraints.len() as usize
-                                          == costs::full_round_cost_model_nohash(
-                                              &nfa,
-                                              r1cs_converter.batch_size,
-                                              b.clone(),
-                                              nfa.is_match(&chars),
-                                              doc.len(),
-                                              c
-                                          )
-                                  );
-                    */ // deal with later TODO
+                    assert!(
+                        pd.r1cs.constraints.len() as usize
+                            == costs::full_round_cost_model_nohash(
+                                &nfa,
+                                r1cs_converter.batch_size,
+                                b.clone(),
+                                nfa.is_match(&chars),
+                                doc.len(),
+                                c
+                            )
+                    );
+                    // deal with later TODO
                 }
             }
         }

@@ -102,6 +102,9 @@ pub fn commit_circuit_nohash(
             println!("COST MODEL num_cqs {:#?}", num_cqs);
             cost += num_cqs;
 
+            // q ordering check
+            cost += (batch_size + 1) + ((batch_size - 1) * (2 + 3));
+
             cost
         }
     }
