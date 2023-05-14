@@ -173,25 +173,33 @@ fn setup<'a>(
             ]
         }
         (JBatching::NaivePolys, JCommit::Nlookup) => {
+            let q_idx = <G1 as Group>::Scalar::from(0);
             let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
 
             let doc_v = <G1 as Group>::Scalar::from(0);
 
             vec![
-                GlueOpts::PolyNL((doc_q.clone(), doc_v.clone())),
-                GlueOpts::PolyNL((doc_q, doc_v)),
+                GlueOpts::PolyNL((q_idx.clone(), doc_q.clone(), doc_v.clone())),
+                GlueOpts::PolyNL((q_idx, doc_q, doc_v)),
             ]
         }
         (JBatching::Nlookup, JCommit::Nlookup) => {
             let q = vec![<G1 as Group>::Scalar::from(0); q_len];
 
             let v = <G1 as Group>::Scalar::from(0);
+            let q_idx = <G1 as Group>::Scalar::from(0);
             let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
 
             let doc_v = <G1 as Group>::Scalar::from(0);
             vec![
-                GlueOpts::NlNl((q.clone(), v.clone(), doc_q.clone(), doc_v.clone())),
-                GlueOpts::NlNl((q, v, doc_q, doc_v)),
+                GlueOpts::NlNl((
+                    q.clone(),
+                    v.clone(),
+                    q_idx.clone(),
+                    doc_q.clone(),
+                    doc_v.clone(),
+                )),
+                GlueOpts::NlNl((q, v, q_idx, doc_q, doc_v)),
             ]
         }
     };
@@ -294,10 +302,15 @@ fn setup<'a>(
             z
         }
         (JBatching::NaivePolys, JCommit::Nlookup) => {
-            let mut z = vec![
-                <G1 as Group>::Scalar::from(current_state as u64),
-                //<G1 as Group>::Scalar::from(nfa.ab_to_num(&doc[0]) as u64),
-            ];
+            let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
+
+            if r1cs_converter.substring.0 == 0 {
+                z.push(<G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1));
+            } else {
+                z.push(<G1 as Group>::Scalar::from(
+                    r1cs_converter.substring.0 as u64,
+                ));
+            }
 
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
             z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
@@ -307,13 +320,19 @@ fn setup<'a>(
             z
         }
         (JBatching::Nlookup, JCommit::Nlookup) => {
-            let mut z = vec![
-                <G1 as Group>::Scalar::from(current_state as u64),
-                //<G1 as Group>::Scalar::from(nfa.ab_to_num(&doc[0]) as u64),
-            ];
+            let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
 
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
             z.push(int_to_ff(r1cs_converter.table[0].clone()));
+
+            if r1cs_converter.substring.0 == 0 {
+                z.push(<G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1));
+            } else {
+                z.push(<G1 as Group>::Scalar::from(
+                    r1cs_converter.substring.0 as u64,
+                ));
+            }
+
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
             z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
             z.push(<G1 as Group>::Scalar::from(
@@ -477,6 +496,14 @@ fn solve<'a>(
                 g
             }
             (JBatching::NaivePolys, JCommit::Nlookup) => {
+                let q_idx = if r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) == 0 {
+                    <G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1)
+                } else {
+                    <G1 as Group>::Scalar::from(
+                        (r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) - 1) as u64,
+                    )
+                };
+
                 let doc_q = match doc_running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
                     None => vec![<G1 as Group>::Scalar::from(0); qd_len],
@@ -487,6 +514,9 @@ fn solve<'a>(
                     None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
                 };
 
+                let next_q_idx = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size - 1)) as u64,
+                );
                 let next_doc_q = next_doc_running_q
                     .clone()
                     .unwrap()
@@ -494,16 +524,12 @@ fn solve<'a>(
                     .map(|x| int_to_ff(x))
                     .collect();
                 let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
-                #[cfg(feature = "metrics")]
-                log::stop(Component::Solver, &test, "calculate running claim");
                 vec![
-                    GlueOpts::PolyNL((doc_q, doc_v)),
-                    GlueOpts::PolyNL((next_doc_q, next_doc_v)),
+                    GlueOpts::PolyNL((q_idx, doc_q, doc_v)),
+                    GlueOpts::PolyNL((next_q_idx, next_doc_q, next_doc_v)),
                 ]
             }
             (JBatching::Nlookup, JCommit::Nlookup) => {
-                #[cfg(feature = "metrics")]
-                log::tic(Component::Solver, &test, "calculate running claim");
                 let q = match running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
                     None => vec![<G1 as Group>::Scalar::from(0); q_len],
@@ -521,7 +547,16 @@ fn solve<'a>(
                     .map(|x| int_to_ff(x))
                     .collect();
                 let next_v = int_to_ff(next_running_v.clone().unwrap());
-
+                let q_idx = if r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) == 0 {
+                    <G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1)
+                } else {
+                    <G1 as Group>::Scalar::from(
+                        (r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) - 1) as u64,
+                    )
+                };
+                let next_q_idx = <G1 as Group>::Scalar::from(
+                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size - 1)) as u64,
+                );
                 let doc_q = match doc_running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
                     None => vec![<G1 as Group>::Scalar::from(0); qd_len],
@@ -538,11 +573,9 @@ fn solve<'a>(
                     .map(|x| int_to_ff(x))
                     .collect();
                 let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
-                #[cfg(feature = "metrics")]
-                log::stop(Component::Solver, &test, "calculate running claim");
                 vec![
-                    GlueOpts::NlNl((q, v, doc_q, doc_v)),
-                    GlueOpts::NlNl((next_q, next_v, next_doc_q, next_doc_v)),
+                    GlueOpts::NlNl((q, v, q_idx, doc_q, doc_v)),
+                    GlueOpts::NlNl((next_q, next_v, next_q_idx, next_doc_q, next_doc_v)),
                 ]
             }
         };
@@ -742,14 +775,14 @@ fn verify(
             final_clear_checks(
                 eval_type,
                 reef_commit,
-                zn[2 + qd_len],
+                zn[3 + qd_len],
                 &table,
                 doc_len,
                 None,
                 None,
                 None,
-                Some(zn[1..(qd_len + 1)].to_vec()),
-                Some(zn[1 + qd_len]),
+                Some(zn[2..(qd_len + 2)].to_vec()),
+                Some(zn[2 + qd_len]),
             );
         }
         (JBatching::Nlookup, JCommit::HashChain) => {
@@ -770,14 +803,14 @@ fn verify(
             final_clear_checks(
                 eval_type,
                 reef_commit,
-                zn[1 + q_len + 1 + qd_len + 1],
+                zn[2 + q_len + 1 + qd_len + 1],
                 &table,
                 doc_len,
                 Some(zn[1..(q_len + 1)].to_vec()),
                 Some(zn[q_len + 1]),
                 None,
-                Some(zn[(1 + q_len + 1)..(1 + q_len + 1 + qd_len)].to_vec()),
-                Some(zn[1 + q_len + 1 + qd_len]),
+                Some(zn[(2 + q_len + 1)..(2 + q_len + 1 + qd_len)].to_vec()),
+                Some(zn[2 + q_len + 1 + qd_len]),
             );
         }
     }
