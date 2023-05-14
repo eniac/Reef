@@ -715,6 +715,21 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
             self.assertions.push(q_eq);
             self.pub_inputs.push(new_var(format!("nldoc_full_{}_q", i)));
+
+            if i > 0 {
+                let q_ordering = term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("nldoc_full_{}_q", i)),
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Add),
+                            vec![new_var(format!("nldoc_full_{}_q", i - 1)), new_const(1)],
+                        ),
+                    ],
+                );
+
+                self.assertions.push(q_ordering);
+            }
         }
 
         // lookups and nl circuit
@@ -978,6 +993,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // q relations
         for i in 0..q.len() {
             // not final q (running claim)
+            println!("FULL Q {:#?} = {:#?}", i, q[i]);
 
             wits.insert(format!("nldoc_full_{}_q", i), new_wit(q[i]));
         }
@@ -1022,7 +1038,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut combined_qs = vec![];
         let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
 
-        println!("num cqs {:#?}", num_cqs);
+        //println!("num cqs {:#?}", num_cqs);
 
         let mut cq = 0;
         while cq < num_cqs {
@@ -1044,7 +1060,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                         || (i == self.batch_size - 1 && j == sc_l - 1)
                     {
                         cq += 1;
-                        println!("PUSH CQ");
+                        //println!("PUSH CQ");
                         combined_qs.push(combined_q.clone());
                         combined_q = Integer::from(0);
                         next_slot = Integer::from(1);
@@ -1066,7 +1082,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             );
         }
 
-        println!("combined_qs {:#?}", combined_qs);
+        //println!("combined_qs {:#?}", combined_qs);
 
         for j in 0..sc_l {
             // running
