@@ -545,7 +545,9 @@ where {
         s: &String,
         //var: Var,
         is_doc_nl: bool,
-        alloc_qv: &mut Vec<Option<AllocatedNum<F>>>,
+        //alloc_qv: &mut Vec<Option<AllocatedNum<F>>>,
+        alloc_qs: &mut Vec<Option<AllocatedNum<F>>>,
+        alloc_vs: &mut Vec<Option<AllocatedNum<F>>>,
         alloc_claim_r: &mut Option<AllocatedNum<F>>,
         alloc_gs: &mut Vec<Vec<Option<AllocatedNum<F>>>>,
         //prev_q: &Vec<AllocatedNum<F>>,
@@ -555,7 +557,9 @@ where {
         if (!is_doc_nl && s.starts_with("nl_combined_q"))
             || (is_doc_nl && s.starts_with("nldoc_combined_q"))
         {
-            alloc_qv[0] = Some(alloc_v.clone());
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[3].parse().unwrap();
+            alloc_qs[j] = Some(alloc_v.clone());
 
             return Ok(true);
         } else if !is_doc_nl && s.starts_with("v_") {
@@ -563,7 +567,7 @@ where {
 
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
-            alloc_qv[j] = v_j; // TODO check
+            alloc_vs[j - 1] = v_j; // TODO check
 
             return Ok(true);
         } else if is_doc_nl && s.starts_with("char_") {
@@ -574,7 +578,7 @@ where {
             let j: usize = s_sub[1].parse().unwrap();
 
             if j < self.batch_size {
-                alloc_qv[j + 1] = v_j;
+                alloc_vs[j] = v_j; // j+1 -> j
             } // don't add the last one
 
             return Ok(true);
@@ -657,7 +661,9 @@ where {
         //sponge_ns: &mut Namespace<'b, F, CS>,
         tag: &str,
         sc_l: usize,
-        alloc_qv: &Vec<Option<AllocatedNum<F>>>,
+        //alloc_qv: &Vec<Option<AllocatedNum<F>>>,
+        alloc_qs: &Vec<Option<AllocatedNum<F>>>,
+        alloc_vs: &Vec<Option<AllocatedNum<F>>>,
         alloc_prev_rc: &Vec<Option<AllocatedNum<F>>>,
         alloc_rc: &Vec<Option<AllocatedNum<F>>>,
         alloc_claim_r: &Option<AllocatedNum<F>>,
@@ -669,18 +675,20 @@ where {
         //A: Arity<F>,
         CS: ConstraintSystem<F>,
     {
+        let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
+
         let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
         let mut sponge_ns = cs.namespace(|| format!("{} sponge", tag));
 
         let mut pattern = match tag {
             "eval" => vec![
-                SpongeOp::Absorb((self.batch_size + sc_l + 2) as u32), // vs,
+                SpongeOp::Absorb((self.batch_size + sc_l + 1 + num_cqs) as u32), // vs,
                 // combined_q,
                 // running q,v
                 SpongeOp::Squeeze(1),
             ],
             "doc" => vec![
-                SpongeOp::Absorb((self.batch_size + sc_l + 3) as u32), // vs,
+                SpongeOp::Absorb((self.batch_size + sc_l + 2 + num_cqs) as u32), // vs,
                 SpongeOp::Squeeze(1),
             ],
             _ => panic!("weird tag"),
@@ -694,18 +702,28 @@ where {
 
         // (combined_q, vs, running_q, running_v)
         let mut elts = vec![];
+        println!("FIAT SHAMIR ELTS");
+
         // if DOC
         if matches!(tag, "doc") {
             let e = AllocatedNum::alloc(sponge_ns.namespace(|| "doc commit hash start"), || {
                 Ok(vesta_hash)
             })?;
+
+            println!("e: {:#?}", e.clone().get_value());
             elts.push(Elt::Allocated(e));
         }
-        for e in alloc_qv {
+        for e in alloc_qs {
             elts.push(Elt::Allocated(e.clone().unwrap()));
+            println!("e: {:#?}", e.clone().unwrap().get_value());
+        }
+        for e in alloc_vs {
+            elts.push(Elt::Allocated(e.clone().unwrap()));
+            println!("e: {:#?}", e.clone().unwrap().get_value());
         }
         for e in alloc_prev_rc {
             elts.push(Elt::Allocated(e.clone().unwrap()));
+            println!("e: {:#?}", e.clone().unwrap().get_value());
         }
 
         self.fiatshamir_circuit(
@@ -896,10 +914,6 @@ where
 
         // intms
         let mut alloc_chars = vec![None; self.batch_size];
-        //alloc_chars[0] = Some(char_0.clone());
-        let mut alloc_qv = vec![None; self.batch_size + 1];
-        let mut alloc_doc_qv = vec![None; self.batch_size + 1];
-        //alloc_doc_qv[1] = Some(char_0.clone());
         let mut alloc_idxs = vec![None; self.batch_size + 1];
 
         let mut alloc_claim_r = None;
@@ -997,6 +1011,10 @@ where
                 let mut alloc_prev_rc = vec![None; sc_l + 1];
                 let mut alloc_gs = vec![vec![None; 3]; sc_l];
 
+                let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
+                let mut alloc_qs = vec![None; num_cqs];
+                let mut alloc_vs = vec![None; self.batch_size];
+
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
                     let val_f = || {
@@ -1058,7 +1076,8 @@ where
                                     &s,
                                     //    var,
                                     false,
-                                    &mut alloc_qv,
+                                    &mut alloc_qs,
+                                    &mut alloc_vs,
                                     &mut alloc_claim_r,
                                     &mut alloc_gs,
                                     //    &prev_q,
@@ -1096,7 +1115,8 @@ where
                     //&mut sponge,
                     //    &mut fs_eval_ns,
                     sc_l,
-                    &alloc_qv,
+                    &alloc_qs,
+                    &alloc_vs,
                     &alloc_prev_rc,
                     &alloc_rc,
                     &alloc_claim_r,
@@ -1132,6 +1152,10 @@ where
 
                 let prev_dq = z[1..(doc_l + 1)].to_vec(); //.clone();
                 let prev_dv = z[1 + doc_l].clone();
+
+                let num_doc_cqs = ((self.batch_size * doc_l) as f64 / 254.0).ceil() as usize;
+                let mut alloc_doc_q = vec![None; num_doc_cqs];
+                let mut alloc_doc_v = vec![None; self.batch_size];
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
@@ -1180,7 +1204,9 @@ where
                                 &s,
                                 //   var,
                                 true,
-                                &mut alloc_doc_qv,
+                                //&mut alloc_doc_qv,
+                                &mut alloc_doc_q,
+                                &mut alloc_doc_v,
                                 &mut alloc_doc_claim_r,
                                 &mut alloc_doc_gs,
                                 //   &prev_dq,
@@ -1213,7 +1239,8 @@ where
                     //       &mut doc_sponge,
                     //        &mut fs_doc_ns,
                     doc_l,
-                    &alloc_doc_qv,
+                    &alloc_doc_q,
+                    &alloc_doc_v,
                     &alloc_doc_prev_rc,
                     &alloc_doc_rc,
                     &alloc_doc_claim_r,
@@ -1243,6 +1270,14 @@ where
                 let prev_v = z[1 + sc_l].clone();
                 let prev_dq = z[(sc_l + 2)..(sc_l + doc_l + 2)].to_vec(); //.clone();
                 let prev_dv = z[sc_l + doc_l + 2].clone();
+
+                let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
+                let mut alloc_qs = vec![None; num_cqs];
+                let mut alloc_vs = vec![None; self.batch_size];
+
+                let num_doc_cqs = ((self.batch_size * doc_l) as f64 / 254.0).ceil() as usize;
+                let mut alloc_doc_q = vec![None; num_doc_cqs];
+                let mut alloc_doc_v = vec![None; self.batch_size];
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
@@ -1303,7 +1338,8 @@ where
                                 &s,
                                 //   var,
                                 false,
-                                &mut alloc_qv,
+                                &mut alloc_qs,
+                                &mut alloc_vs,
                                 &mut alloc_claim_r,
                                 &mut alloc_gs,
                                 //   &prev_q,
@@ -1319,7 +1355,8 @@ where
                                     &s,
                                     //    var,
                                     true,
-                                    &mut alloc_doc_qv,
+                                    &mut alloc_doc_q,
+                                    &mut alloc_doc_v,
                                     &mut alloc_doc_claim_r,
                                     &mut alloc_doc_gs,
                                     //  &prev_dq,
@@ -1366,10 +1403,9 @@ where
                 self.nl_eval_fiatshamir(
                     cs,
                     "eval",
-                    //    &mut sponge,
-                    //    &mut fs_eval_ns,
                     sc_l,
-                    &alloc_qv,
+                    &alloc_qs,
+                    &alloc_vs,
                     &alloc_prev_rc,
                     &alloc_rc,
                     &alloc_claim_r,
@@ -1379,10 +1415,9 @@ where
                 self.nl_eval_fiatshamir(
                     cs,
                     "doc",
-                    //    &mut doc_sponge,
-                    //    &mut fs_doc_ns,
                     doc_l,
-                    &alloc_doc_qv,
+                    &alloc_doc_q,
+                    &alloc_doc_v,
                     &alloc_doc_prev_rc,
                     &alloc_doc_rc,
                     &alloc_doc_claim_r,

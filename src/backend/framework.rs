@@ -323,10 +323,18 @@ fn setup<'a>(
         }
     };
 
+    /* println!(
+            "substring {:#?}, batch_size {:#?}",
+            r1cs_converter.substring, r1cs_converter.batch_size
+        );
+    */
+
     let num_steps = ceil_div(
         r1cs_converter.substring.1 - r1cs_converter.substring.0,
         r1cs_converter.batch_size,
     );
+
+    assert!(num_steps > 0, "trying to prove something about 0 foldings");
 
     (num_steps, z0_primary, pp)
 }
@@ -374,6 +382,7 @@ fn solve<'a>(
     let mut next_state = current_state;
 
     for i in 0..num_steps {
+        #[cfg(feature = "metrics")]
         let test = format!("step {}", i);
 
         #[cfg(feature = "metrics")]
@@ -417,7 +426,6 @@ fn solve<'a>(
                 let i_last = <G1 as Group>::Scalar::from(
                     (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
                 );
-                println!("i0 il {:#?} {:#?}", i_0, i_last);
                 let g = vec![
                     GlueOpts::PolyHash((i_0, prev_hash)),
                     GlueOpts::PolyHash((i_last, next_hash)),
@@ -597,7 +605,9 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
     let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
+    // println!("num foldings: {:#?}", proof_info.num_steps);
     for i in 0..proof_info.num_steps {
+        #[cfg(feature = "metrics")]
         let test = format!("step {}", i);
 
         // blocks until we receive first witness
@@ -605,6 +615,7 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, &test, "prove step");
+
         let result = RecursiveSNARK::prove_step(
             &proof_info.pp.lock().unwrap(),
             recursive_snark,
@@ -620,16 +631,16 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
 
         // verify recursive - TODO we can get rid of this verify once everything works
         // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
-        let res = result.clone().unwrap().verify(
-            &proof_info.pp.lock().unwrap(),
-            FINAL_EXTERNAL_COUNTER,
-            proof_info.z0_primary.clone(),
-            z0_secondary.clone(),
-        );
-        //println!("Recursive res: {:#?}", res);
+        /*let res = result.clone().unwrap().verify(
+                    &proof_info.pp.lock().unwrap(),
+                    FINAL_EXTERNAL_COUNTER,
+                    proof_info.z0_primary.clone(),
+                    z0_secondary.clone(),
+                );
+                println!("Recursive res: {:#?}", res);
 
-        assert!(res.is_ok()); // TODO delete
-
+                assert!(res.is_ok()); // TODO delete
+        */
         recursive_snark = Some(result.unwrap());
     }
 
@@ -800,6 +811,21 @@ mod tests {
             batching_type.clone(),
             commit_docype.clone(),
             batch_size,
+        );
+    }
+
+    #[test]
+    fn e2e_q_overflow() {
+        backend_test(
+            "abcdefg".to_string(),
+            "gaa*bb*cc*dd*ee*f".to_string(),
+            ("gaaaaaabbbbbbccccccddddddeeeeeef".to_string())
+                .chars()
+                .map(|c| c.to_string())
+                .collect(),
+            Some(JBatching::Nlookup),
+            Some(JCommit::Nlookup),
+            33,
         );
     }
 
