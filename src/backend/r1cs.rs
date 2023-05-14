@@ -392,9 +392,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
         // LEAVE THIS IN HERE FOR DEBUGGING >:(
-        for r in circ_r1cs.constraints().clone() {
+        /*for r in circ_r1cs.constraints().clone() {
             println!("{:#?}", circ_r1cs.format_qeq(&r));
-        }
+        }*/
 
         circ_r1cs.finalize(&final_cs)
     }
@@ -1031,6 +1031,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         } else {
             Integer::from(q[0] - 1)
         };
+        println!("PREV ROUND Q LOOKUP {:#?}", prev_round_lookup.clone());
         wits.insert(
             format!("nldoc_full_prev_round_q"),
             new_wit(prev_round_lookup),
@@ -1038,7 +1039,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         for i in 0..q.len() {
             // not final q (running claim)
-            println!("FULL Q {:#?} = {:#?}", i, q[i]);
+            //println!("FULL Q {:#?} = {:#?}", i, q[i]);
 
             wits.insert(format!("nldoc_full_{}_q", i), new_wit(q[i]));
         }

@@ -503,6 +503,7 @@ fn solve<'a>(
                         (r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) - 1) as u64,
                     )
                 };
+                println!("Q IDX {:#?}", q_idx);
 
                 let doc_q = match doc_running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
@@ -517,6 +518,8 @@ fn solve<'a>(
                 let next_q_idx = <G1 as Group>::Scalar::from(
                     (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size - 1)) as u64,
                 );
+
+                println!("NEXT Q IDX {:#?}", next_q_idx);
                 let next_doc_q = next_doc_running_q
                     .clone()
                     .unwrap()
@@ -554,9 +557,11 @@ fn solve<'a>(
                         (r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) - 1) as u64,
                     )
                 };
+                println!("Q IDX {:#?}", q_idx);
                 let next_q_idx = <G1 as Group>::Scalar::from(
                     (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size - 1)) as u64,
                 );
+                println!("NEXT Q IDX {:#?}", next_q_idx);
                 let doc_q = match doc_running_q {
                     Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
                     None => vec![<G1 as Group>::Scalar::from(0); qd_len],
@@ -664,16 +669,16 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
 
         // verify recursive - TODO we can get rid of this verify once everything works
         // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
-        /*let res = result.clone().unwrap().verify(
-                    &proof_info.pp.lock().unwrap(),
-                    FINAL_EXTERNAL_COUNTER,
-                    proof_info.z0_primary.clone(),
-                    z0_secondary.clone(),
-                );
-                println!("Recursive res: {:#?}", res);
+        let res = result.clone().unwrap().verify(
+            &proof_info.pp.lock().unwrap(),
+            FINAL_EXTERNAL_COUNTER,
+            proof_info.z0_primary.clone(),
+            z0_secondary.clone(),
+        );
+        println!("Recursive res: {:#?}", res);
 
-                assert!(res.is_ok()); // TODO delete
-        */
+        assert!(res.is_ok()); // TODO delete
+
         recursive_snark = Some(result.unwrap());
     }
 

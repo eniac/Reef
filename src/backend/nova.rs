@@ -731,7 +731,7 @@ where {
 
         // (combined_q, vs, running_q, running_v)
         let mut elts = vec![];
-        println!("FIAT SHAMIR ELTS");
+        //println!("FIAT SHAMIR ELTS");
 
         // if DOC
         if matches!(tag, "doc") {
@@ -739,20 +739,20 @@ where {
                 Ok(vesta_hash)
             })?;
 
-            println!("e: {:#?}", e.clone().get_value());
+            //println!("e: {:#?}", e.clone().get_value());
             elts.push(Elt::Allocated(e));
         }
         for e in alloc_qs {
             elts.push(Elt::Allocated(e.clone().unwrap()));
-            println!("e: {:#?}", e.clone().unwrap().get_value());
+            //println!("e: {:#?}", e.clone().unwrap().get_value());
         }
         for e in alloc_vs {
             elts.push(Elt::Allocated(e.clone().unwrap()));
-            println!("e: {:#?}", e.clone().unwrap().get_value());
+            //println!("e: {:#?}", e.clone().unwrap().get_value());
         }
         for e in alloc_prev_rc {
             elts.push(Elt::Allocated(e.clone().unwrap()));
-            println!("e: {:#?}", e.clone().unwrap().get_value());
+            //println!("e: {:#?}", e.clone().unwrap().get_value());
         }
 
         self.fiatshamir_circuit(
@@ -1304,7 +1304,7 @@ where
             GlueOpts::NlNl((q, _v, _idx, dq, _dv)) => {
                 let sc_l = q.len();
                 let doc_l = dq.len();
-                let prev_q_idx = z[sc_l + 1].clone();
+                let prev_q_idx = z[sc_l + 2].clone();
 
                 let mut alloc_rc = vec![None; sc_l + 1];
                 let mut alloc_prev_rc = vec![None; sc_l + 1];
