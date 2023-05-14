@@ -462,32 +462,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             self.assertions.push(i_plus);
             self.pub_inputs.push(new_var(format!("i_{}", idx)));
         }
-        /*
-              let ite = term(
-                  Op::Ite,
-                  vec![
-                      term(Op::Eq, vec![new_var(format!("i_0")), new_const(0)]),
-                      term(
-                          Op::Eq,
-                          vec![
-                              new_var(format!("first_hash_input")),
-                              new_var(format!("random_hash_result")),
-                          ],
-                      ),
-                      term(
-                          Op::Eq,
-                          vec![
-                              new_var(format!("first_hash_input")),
-                              new_var(format!("z_hash_input")),
-                          ],
-                      ),
-                  ],
-              );
-              self.assertions.push(ite);
-              self.pub_inputs.push(new_var(format!("first_hash_input")));
-              self.pub_inputs.push(new_var(format!("random_hash_result")));
-              self.pub_inputs.push(new_var(format!("z_hash_input")));
-        */
     }
 
     // for use at the end of sum check
@@ -711,7 +685,39 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     fn nlookup_doc_commit(&mut self) {
-        // start: usize, end: usize) {
+        // q relations
+        for i in 0..self.batch_size {
+            // not final q (running claim)
+
+            let mut full_q = new_const(0); // dummy
+            let mut next_slot = Integer::from(1);
+            let doc_l = logmn(self.udoc.len());
+            for j in (0..doc_l).rev() {
+                full_q = term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        full_q,
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Mul),
+                            vec![
+                                new_const(next_slot.clone()),
+                                new_var(format!("nldoc_eq_{}_q_{}", i, j)),
+                            ],
+                        ),
+                    ],
+                );
+                next_slot *= Integer::from(2);
+            }
+
+            let q_eq = term(
+                Op::Eq,
+                vec![full_q.clone(), new_var(format!("nldoc_full_{}_q", i))],
+            );
+            self.assertions.push(q_eq);
+            self.pub_inputs.push(new_var(format!("nldoc_full_{}_q", i)));
+        }
+
+        // lookups and nl circuit
         let mut char_lookups = vec![];
         for c in 0..self.batch_size {
             char_lookups.push(new_var(format!("char_{}", c)));
@@ -967,6 +973,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             q.push(access_at);
 
             v.push(self.idoc[access_at].clone());
+        }
+
+        // q relations
+        for i in 0..q.len() {
+            // not final q (running claim)
+
+            wits.insert(format!("nldoc_full_{}_q", i), new_wit(q[i]));
         }
 
         let (w, next_running_q, next_running_v) =
