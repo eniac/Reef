@@ -20,8 +20,6 @@ use crate::regex::Regex;
 pub struct NFA {
     /// Alphabet
     pub ab: Vec<String>,
-    /// Teleporting states (can fast-forward)
-    teleporting: HashSet<usize>,
     /// Transition relation from [state -> char -> state] given an input
     g: Graph<Regex, String>,
     /// Must match from the begining of the document (default: false)
@@ -35,7 +33,10 @@ pub const EPSILON: &String = &String::new();
 
 impl PartialEq for NFA {
     fn eq(&self, other: &Self) -> bool {
-        self.ab == other.ab && self.g[self.get_init_nodeidx()] == other.g[other.get_init_nodeidx()]
+        self.ab == other.ab &&
+        self.to_regex() == other.to_regex() &&
+        self.anchor_start == other.anchor_start &&
+        self.anchor_end == other.anchor_start
     }
 }
 
@@ -71,7 +72,6 @@ impl NFA {
         // Return DFA
         Self {
             ab: ab.into_iter().map(|c| c.to_string()).collect(),
-            teleporting: HashSet::new(),
             g: graph,
             anchor_start: re.is_start_anchored(),
             anchor_end: re.is_end_anchored(),
@@ -281,26 +281,21 @@ impl NFA {
     pub fn cut(&mut self, r: &Regex) {
         // Remove children
         if let Some(i) = self.find_node(r) {
-            self.remove_outgoing_edges(i);
-            self.teleporting.insert(i.index());
-            self.g.add_edge(i, i, EPSILON.clone());
+          self.remove_outgoing_edges(i);
+          self.g.add_edge(i, i, EPSILON.clone());
 
-            // Update node to epsilon
-            if let Some(xr) = self.g.node_weight_mut(i) {
-                *xr = Regex::nil();
-            }
+          // Update node to epsilon
+          if let Some(xr) = self.g.node_weight_mut(i) {
+              *xr = Regex::nil();
+          }
         }
     }
 
     pub fn print_states(&self) {
         for n in self.g.node_indices() {
             let i = n.index();
-            if self.accepting().contains(&i) && self.teleporting.contains(&i) {
-                println!("{} -> {} (ACCEPTING, TELEPORTING)", i, self.g[n]);
-            } else if self.accepting().contains(&i) {
+            if self.accepting().contains(&i) {
                 println!("{} -> {} (ACCEPTING)", i, self.g[n]);
-            } else if self.teleporting.contains(&i) {
-                println!("{} -> {} (TELEPORTING)", i, self.g[n]);
             } else {
                 println!("{} -> {}", i, self.g[n]);
             }
