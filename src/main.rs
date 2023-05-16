@@ -1,6 +1,5 @@
 #![allow(missing_docs, non_snake_case)]
 use clap::Parser;
-
 use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
@@ -9,6 +8,10 @@ use reef::regex::Regex;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
+
+#[cfg(all(not(windows), not(target_env = "musl")))]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[cfg(feature = "metrics")]
 use reef::metrics::{log, log::Component};
