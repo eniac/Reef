@@ -1,4 +1,4 @@
-use core::panic;
+use core::{panic, num};
 
 use crate::nfa::NFA;
 use clap::ValueEnum;
@@ -8,7 +8,6 @@ static GLUE_NUMBER: usize = 11376 + 10347;
 #[derive(Debug, Clone, ValueEnum, Copy)]
 pub enum JBatching {
     NaivePolys,
-    //Plookup,
     Nlookup,
 }
 
@@ -111,9 +110,11 @@ fn commit_circuit_hash(
     is_match: Option<(usize, usize)>,
 ) -> usize {
     match commit_type {
+        //This is slightly off by batch_size + 5 for hashchain, likely a result
+        //of absorb 2 vs absorb 3 in hash_circuit
         JCommit::HashChain => match is_match {
-            None => (batch_size + 1) * (POSEIDON_NUM + 3),
-            Some((_, end)) if end == doc_len => (batch_size + 1) * POSEIDON_NUM,
+            None => ((batch_size + 1) * (POSEIDON_NUM + 3)) -(7+(3*batch_size)),
+            Some((_, end)) if end == doc_len => ((batch_size + 1) * (POSEIDON_NUM+3))-(7+(3*batch_size)),
             _ => panic!("Cant do hashchain with substring"),
         },
         JCommit::Nlookup => {
@@ -123,16 +124,19 @@ fn commit_circuit_hash(
             };
             let mn: usize = mod_len + get_padding(mod_len, batch_size, JCommit::Nlookup);
             let log_mn: usize = logmn(mn);
+            let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
             let mut cost = 578;
 
             //Running claim
-            if log_mn + batch_size > 5 {
-                let mut n_sponge = (((log_mn + batch_size - 5) / 4) as f32).ceil() as usize;
+            if log_mn + batch_size + num_cqs > 5 {
+                let num: f32 = (log_mn + batch_size + num_cqs - 5) as f32;
+                let mut n_sponge = ((num / 4.0) as f32).round() as usize;
                 if n_sponge == 0 {
                     n_sponge += 1;
                 }
                 cost += n_sponge * 288;
             }
+            
 
             //Sum check poseidon hashes
             cost += log_mn * 290;
@@ -194,7 +198,6 @@ pub fn nlookup_cost_model_nohash<'a>(
 
     // combine qs (for fiat shamir)
     let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
-    println!("COST MODEL num_cqs {:#?}", num_cqs);
 
     cost += num_cqs;
 
@@ -214,13 +217,15 @@ pub fn nlookup_cost_model_hash<'a>(
 ) -> usize {
     let mn: usize = nfa.nedges();
     let log_mn: usize = logmn(mn);
+    let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
     let mut cost = nlookup_cost_model_nohash(nfa, batch_size, is_match, doc_len, commit_type);
 
     cost += 578;
 
     //Running claim
-    if log_mn + batch_size > 5 {
-        let mut n_sponge = (((log_mn + batch_size - 5) / 4) as f32).ceil() as usize;
+    if log_mn + batch_size + num_cqs > 5 {
+        let num: f32 = (log_mn + num_cqs + batch_size - 5) as f32;
+        let mut n_sponge = ((num / 4.0) as f32).floor() as usize;
         if n_sponge == 0 {
             n_sponge += 1;
         }
@@ -266,7 +271,7 @@ pub fn full_round_cost_model<'a>(
         }
         JBatching::Nlookup => {
             nlookup_cost_model_hash(nfa, batch_size, is_match, doc_len, commit_type)
-        } //      JBatching::Plookup => plookup_cost_model_hash(nfa, batch_size),
+        } 
     };
 
     cost += commit_circuit_hash(doc_len, batch_size, commit_type, is_match);
@@ -461,7 +466,6 @@ pub fn opt_cost_model_select_with_batch<'a>(
             mod_len = doc_length;
         }
     }
-
     (
         opt_batching,
         opt_commit.clone(),
