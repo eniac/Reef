@@ -198,20 +198,6 @@ impl NFA {
         })
     }
 
-    /// Compute the strongly connected components of the DFA
-    pub fn scc(&self) -> Vec<Self> {
-        algo::tarjan_scc(&self.g)
-            .into_iter()
-            .map(|v| {
-                NFA::new(
-                    &self.ab.join(""),
-                    self.g[*v.iter().min_by_key(|i| i.index()).unwrap()].clone(),
-                )
-            })
-            .filter(|v| v != self)
-            .collect()
-    }
-
     /// Is the DFA a sink (has no accepting states)
     pub fn is_sink(&self) -> bool {
         self.accepting().is_empty()
@@ -373,6 +359,8 @@ impl NFA {
         Ok(())
     }
 
+=======
+>>>>>>> ea66bfc... Rewrite SNFA compiler
     /// Dot file
     pub fn write_dot(&self, filename: &str) -> std::io::Result<()> {
         let s: String = Dot::new(&self.g).to_string();
@@ -596,13 +584,5 @@ mod tests {
         let mut nfa = setup_nfa("^.*a$", "ab");
         let doc = nfa.k_stride(1, &vs("aabbaaa"));
         check(&nfa, &doc, Some((0, 4)))
-    }
-
-    #[test]
-    #[cfg(feature = "plot")]
-    fn test_nfa_split() {
-        let mut nfa = setup_nfa("(.*a|b.*)", "ab");
-
-        nfa.split_dot_star().unwrap();
     }
 }

@@ -2,17 +2,19 @@ use itertools::Itertools;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::process::Command;
 
-use petgraph::{Direction, Graph};
+use petgraph::Graph;
 use petgraph::graph::NodeIndex;
 use petgraph::dot::Dot;
+use petgraph::visit::*;
 
 use printpdf::*;
 use std::fs::File;
 use std::io::BufWriter;
 use std::result::Result;
 
-use crate::regex::{Regex, JumpType};
+use crate::regex::{Regex, RegexF, JumpType};
 use crate::nfa::EPSILON;
+use rayon::iter::*;
 
 use core::fmt;
 use core::fmt::{Display,Formatter};
@@ -21,12 +23,12 @@ use core::fmt::{Display,Formatter};
 pub struct Jump(JumpType, usize);
 
 #[derive(Debug, Clone)]
-pub struct SNFA {
+pub struct SNFA<C: Clone> {
     /// Alphabet
-    pub ab: Vec<String>,
+    pub ab: Vec<C>,
 
     /// A hypergraph?
-    pub hg: Vec<Graph<Either<Regex, Jump>, String>>,
+    pub hg: Vec<Graph<Either<Regex, Jump>, Option<C>>>,
 
     /// Must match from the begining of the document (default: false)
     anchor_start: bool,
@@ -61,79 +63,213 @@ impl<A: Display, B: Display> Display for Either<A, B> {
     }
 }
 
-impl SNFA {
-    pub fn new<'a>(alphabet: &'a str, re: Regex) -> Self {
+type Coord = (usize, NodeIndex<u32>);
+
+impl SNFA<char> {
+
+    pub fn new<'a>(alphabet: &'a str, re: &Regex) -> Self {
         let ab = alphabet.chars().sorted().collect();
-
-        fn get_next(r: &Regex, ab: &Vec<char>) -> Either<Vec<(char, Regex)>,(JumpType, Option<Regex>, Regex)> {
-            if let Some((j, k, c)) = r.split(ab) {
-                Either::right((j, k, c))
-            } else {
-                let mut v: Vec<(char, Regex)> = Vec::with_capacity(ab.len());
-                for c in &ab[..] {
-                    let q_c = r.deriv(&c);
-                    v.push((*c, q_c));
-                }
-                Either::left(v)
-            }
-        }
-
-        fn build_hg(
-            hg: &mut Vec<Graph<Either<Regex, Jump>, String>>,
-            ab: &Vec<char>,
-            i: usize,
-            j: NodeIndex<u32>,
-            q: &Regex) {
-        println!("========= HG {:#?}", hg);
-            match get_next(q, ab).0 {
-              Ok(ds) => // Take all the single character steps
-                for (c, q_c) in ds {
-                    if let Some(n_c) = hg[i].node_indices().find(|x| hg[i][*x].0 == Ok(q_c.clone())) {
-                        hg[i].add_edge(j, n_c, c.to_string());
-                    } else {
-                        // Add to DFA if not already there
-                        let n_c = hg[i].add_node(Either::left(q_c.clone()));
-                        // Reflexive step
-                        hg[i].add_edge(n_c, n_c, EPSILON.clone());
-                        println!("J {:?}", j);
-                        hg[i].add_edge(j, n_c, c.to_string());
-                        build_hg(hg, ab, i, n_c, &q_c);
-                    }
-                },
-              Err((jmp, kopt, c)) => { // Jump ahead
-                let mut cg: Graph<Either<Regex,Jump>, String> = Graph::new();
-                let n_c = cg.add_node(Either::left(c.clone()));
-                cg.add_edge(n_c, n_c, EPSILON.clone());
-                // Add [jmp] to [g]
-                let m = hg.len();
-                let n_jmp = hg[i].add_node(Either::right(Jump(jmp, m)));
-                hg[i].add_edge(j, n_jmp, EPSILON.clone());
-                // The landing pad [cg]
-                hg.push(cg);
-                build_hg(hg, ab, m, n_c, &c);
-                if let Some(k) = kopt {
-                    build_hg(hg, ab, i, j, &k);
-                }
-              },
-            }
-        }
-
-        let mut hg: Vec<Graph<Either<Regex, Jump>, String>> = Vec::new();
-        hg.push(Graph::new());
-        let n = hg[0].add_node(Either::left(re.clone()));
-        hg[0].add_edge(n, n, EPSILON.clone());
-        // Recursively build transitions
-        build_hg(&mut hg, &ab, 0, n, &re);
-
-        // Return DFA
-        Self {
-            ab: ab.into_iter().map(|c| c.to_string()).collect(),
-            hg,
+        let mut s = Self {
+            ab,
+            hg: Vec::new(),
             anchor_start: re.is_start_anchored(),
-            anchor_end: re.is_end_anchored(),
+            anchor_end: re.is_end_anchored()
+        };
+        let n = s.add_re(0, re.clone());
+        s.build((0, n), re.clone());
+        s
+    }
+
+
+    pub fn add_re(&mut self, i: usize, re: Regex) -> NodeIndex<u32> {
+        while i >= self.hg.len() {
+            self.hg.push(Graph::new());
+        }
+        let n_k = self.hg[i].add_node(Either::left(re));
+        self.hg[i].add_edge(n_k, n_k, None);
+        n_k
+    }
+
+    pub fn add_jump(&mut self, from: Coord, jt: JumpType, re: Regex) {
+        // the new graph is hg[m]
+        let m = self.hg.len();
+        let root = (m, self.add_re(m, re.clone()));
+        // Add the jump hg[from.0] -> hg[m]
+        let n_jmp = self.hg[from.0].add_node(Either::right(Jump(jt, m)));
+        self.hg[from.0].add_edge(from.1, n_jmp, None);
+        // Recursively build the new graph hg[m]
+        self.build(root, re);
+    }
+
+    pub fn find_re(&self, i: usize, re: &Regex) -> Option<NodeIndex<u32>> {
+        self.hg[i].node_indices().find(|x| self.hg[i][*x].0 == Ok(re.clone()))
+    }
+
+    pub fn build_deriv(&mut self, from: Coord, q: Regex) {
+        // Take all the single character steps
+        for c in self.ab.clone() {
+            let q_c = q.deriv(&c);
+            // State [q_c] exists already, add edge
+            if let Some(n_c) = self.find_re(from.0, &q_c) {
+                self.hg[from.0].add_edge(from.1, n_c, Some(c));
+            } else {
+                // Add to NFA if not already there
+                let n_c = self.add_re(from.0, q_c.clone());
+                // Reflexive step
+                self.hg[from.0].add_edge(n_c, n_c, None);
+                self.hg[from.0].add_edge(from.1, n_c, Some(c));
+                self.build((from.0, n_c), q_c);
+            }
         }
     }
 
+    /// Mutually recursive, build hypergraph
+    pub fn build(&mut self, from: Coord, q: Regex) {
+        let ab = &self.ab;
+        match *q.0 {
+            // .*
+            RegexF::Star(ref a) if a.accepts_any(ab) =>
+                self.add_jump(from, JumpType::Star, Regex::nil()),
+            // .{i,j}
+            RegexF::Range(ref a, x, y) if a.accepts_any(ab) =>
+                self.add_jump(from, JumpType::range(x, y), Regex::nil()),
+            // (?=r)
+            RegexF::Lookahead(ref a) =>
+                self.add_jump(from, JumpType::Offset(0), a.clone()),
+            RegexF::Alt(ref a, ref b) => {
+                self.build(from, a.clone());
+                self.build(from, b.clone());
+            },
+            RegexF::App(ref a, ref b) => {
+                println!("Now exploring {:?}", a);
+                match *a.0 {
+                    // .*r
+                    RegexF::Star(ref a) if a.accepts_any(ab) =>
+                        self.add_jump(from, JumpType::Star, b.clone()),
+                    // .{i,j}r
+                    RegexF::Range(ref a, x, y) if a.accepts_any(ab) =>
+                        self.add_jump(from, JumpType::range(x, y), b.clone()),
+                    // (?=r1)r2
+                    RegexF::Lookahead(ref a) => {
+                        self.add_jump(from, JumpType::Offset(0), a.clone());
+                        self.build(from, b.clone())
+                    },
+                    RegexF::Alt(ref x, ref y) => {
+                        self.build(from, x.clone());
+                        self.build(from, y.clone());
+                        self.build(from, b.clone());
+                    },
+                    // Re-associate [app] right if needed
+                    RegexF::App(ref x, ref y) =>
+                        self.build(from, Regex::app(x.clone(), Regex::app(y.clone(), b.clone()))),
+                    // Some other kind of app, use derivatives
+                    _ => self.build_deriv(from, q)
+                }},
+            // Other (derivative)
+            _ => self.build_deriv(from, q)
+        }
+    }
+
+    /// Return a vector of (NFA id, node) of all accepting states
+    pub fn accepting(&self) -> Vec<Coord> {
+        let mut i: usize = 0;
+        let mut res: Vec<Coord> = Vec::new();
+
+        for g in self.hg.iter() {
+            for j in g.node_indices() {
+                if let Ok(re) = g[j].0.clone() {
+                    if re.nullable() {
+                        res.push((i, j))
+                    }
+                }
+            }
+            i += 1;
+        }
+        res
+    }
+
+    /// Return a vector of (NFA id, node, Dest NFA id) of all jumps
+    pub fn jumps(&self) -> Vec<Coord> {
+        let mut i: usize = 0;
+        let mut res: Vec<Coord> = Vec::new();
+
+        for g in self.hg.iter() {
+            for j in g.node_indices() {
+                if let Err(Jump(_, dst)) = g[j].0 {
+                    res.push((i, j));
+                }
+            }
+            i += 1;
+        }
+        res
+    }
+
+    pub fn get_init(&self) -> Coord {
+        (0, NodeIndex::new(0))
+    }
+
+    pub fn get_node(&self, i: Coord) -> Result<Regex, Jump> {
+        self.hg[i.0][i.1].0.clone()
+    }
+
+    pub fn as_str_snfa(&self) -> SNFA<String> {
+        SNFA {
+            ab: self.ab.iter().map(|c| c.to_string()).collect(),
+            hg: self.hg.iter()
+                    .map(|g| g.map(|_, b| b.clone(),
+                        |_,e| e.map(|c| c.to_string())))
+                    .collect::<Vec<Graph<Either<Regex, Jump>, Option<String>>>>(),
+            anchor_start: self.anchor_start,
+            anchor_end: self.anchor_end
+        }
+    }
+    /// All epsilon adjacent states outgoing from [from], including [from]
+    fn epsilons_rec(&self, from: Coord, visited: &mut HashSet<Coord>) -> HashSet<Coord> {
+        if visited.contains(&from) {
+            return HashSet::from([from.clone()]);
+        }
+
+        self.hg[from.0]
+            .edges(from.1)
+            .filter(|e| *e.weight() == None)
+            .flat_map(|e| {
+                visited.insert((from.0, e.target()));
+                self.epsilons_rec((from.0, e.target()), visited)
+            }).collect()
+    }
+
+    /*
+    /// Starting at [from] and [i] position of [doc], take a single non-det step
+    fn delta_rec(&self, from: Coord, doc: &Vec<String>, i: usize, visited: &mut HashSet<Coord>) -> HashSet<Vec<Coord>> {
+        if visited.contains(&from) {
+            return HashSet::new();
+        }
+        let mut from_set = self.epsilons_rec(from, &mut visited);
+        // all of these need to match
+        from_set.into_iter().map(|from| {
+            visited.insert(from);
+            match self.hg[from.0][from.1].0 {
+                // A normal character transition, consume the character in this NFA
+                Ok(_) => self.hg[from.0]
+                          .edges(from.1)
+                          .filter(|e| e.weight() == &doc[i])
+                          .map(|e| (from.0, e.target()))
+                          .collect::<Vec<Coord>>(),
+                // A jump
+                Err(Jump(JumpType::Offset(offset), nfa_dest)) =>
+                    self.delta_rec((nfa_dest, NodeIndex::new(0)), doc, i + offset, visited),
+                Err(Jump(JumpType::Choice(offsets), nfa_dest)) =>
+                    // At least one of these needs to match
+                    offsets.into_iter().flat_map(|offset| self.delta_rec((nfa_dest, NodeIndex::new(0)), doc, i + offset, visited)),
+                Err(Jump(JumpType::Star, nfa_dest)) =>
+                    // At least one of these needs to match
+                    (i..doc.len()).flat_map(|i| self.delta_rec((nfa_dest, NodeIndex::new(0)), doc, i, visited))
+            }
+        })
+    } */
+}
+
+impl SNFA<String> {
     /// Write DOT -> PDF files for all graphs
     pub fn write_pdf(&self,  filename: &str) -> std::io::Result<()> {
         fn write_text_pdf(s: &String, f: &str) {
@@ -155,7 +291,10 @@ impl SNFA {
         let mut files: Vec<String> = Vec::new();
         let mut i = 0;
         for g in self.hg.iter() {
-          let s: String = Dot::new(&g).to_string();
+          let pg = g.map(|_, b| b.clone(),
+                         |_, e| e.clone().unwrap_or(EPSILON.clone()));
+
+          let s: String = Dot::new(&pg).to_string();
           let fdot = format!("{}-{}.dot", filename.to_string(), i);
           std::fs::write(fdot.clone(), s)?;
 
@@ -205,9 +344,9 @@ mod tests {
 
     #[test]
     fn test_snfa() {
-        let r = Regex::new(".*a.*b");
-        let snfa = SNFA::new("ab", r);
-        snfa.write_pdf("snfa").unwrap();
-        println!("SNFA {:#?}", snfa);
+        let r = Regex::new("((?=b)(?=.)|.{5})a(?=ba).{4,10}ab");
+        let snfa = SNFA::new("ab", &r);
+        snfa.as_str_snfa().write_pdf("snfa").unwrap();
     }
+
 }

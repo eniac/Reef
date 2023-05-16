@@ -14,7 +14,7 @@ pub mod arbitrary;
 
 /// Hash-consed regex terms
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Regex(HConsed<RegexF>);
+pub struct Regex(pub HConsed<RegexF>);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RegexF {
@@ -45,6 +45,14 @@ pub enum JumpType {
 }
 
 impl JumpType {
+    pub fn range(i: usize, j: usize) -> Self {
+        if i == j {
+            JumpType::Offset(i)
+        } else {
+            JumpType::Choice((i..=j).collect())
+        }
+    }
+
     /// Union of two jumps is a jump
     fn or(&self, a: &JumpType) -> JumpType {
         match (self, a) {
@@ -221,6 +229,14 @@ impl Regex {
             (RegexF::Range(x, i1, j1), RegexF::Range(y, i2, j2)) if x == y && i2 <= i1 && j1 <= j2 => Some(false),
             (RegexF::Empty, _) => Some(true),
             (_, RegexF::Empty) => Some(false),
+            // (a|b) >= c if (a >= c)
+            (RegexF::Alt(x1, _), x2) if Some(false) == Regex::partial_le(x1, &Regex(G.mk(x2.clone()))) => Some(false),
+            // (a|b) >= c if (b >= c)
+            (RegexF::Alt(_, x1), x2) if Some(false) == Regex::partial_le(x1, &Regex(G.mk(x2.clone()))) => Some(false),
+            // c <= (a|b) if (c <= a)
+            (x1, RegexF::Alt(x2, _)) if Some(true) == Regex::partial_le(&Regex(G.mk(x1.clone())), x2) => Some(true),
+            // c <= (a|b) if (c <= b)
+            (x1, RegexF::Alt(_, x2)) if Some(true) == Regex::partial_le(&Regex(G.mk(x1.clone())), x2) => Some(true),
             (_, RegexF::Star(i)) if *i.0 == RegexF::Dot => Some(true),
             (RegexF::Star(i), _) if *i.0 == RegexF::Dot => Some(false),
             (RegexF::Star(a), RegexF::Star(b)) => Regex::partial_le(a, b),
@@ -235,8 +251,8 @@ impl Regex {
 
     pub fn app(a: Regex, b: Regex) -> Regex {
         match (&*a.0, &*b.0) {
-            // Left-associative [app]
-            (_, RegexF::App(x, y)) => Regex::app(Regex::app(a, x.clone()), y.clone()),
+            // Right-associative [app]
+            (RegexF::App(x, y), _) => Regex::app(x.clone(), Regex::app(y.clone(), b)),
             // Monoid on Nil
             (_, RegexF::Nil) => a,
             (RegexF::Nil, _) => b,
@@ -263,10 +279,6 @@ impl Regex {
             (x, y) if x == y => a,
             // Left-associative [alt]
             (_, RegexF::Alt(x, y)) => Regex::alt(Regex::alt(a, x.clone()), y.clone()),
-            // (a|b) | a = (a|b)
-            (RegexF::Alt(x1, _), x2) if *x1.0 == *x2 => a,
-            // (a|b) | b = (a|b)
-            (RegexF::Alt(_, x1), x2) if *x1.0 == *x2 => a,
             // a | b and a <= b -> b
             (_, _) if Some(true) == Regex::partial_le(&a, &b) => b,
             // a | b and a >= b -> a
@@ -365,9 +377,8 @@ impl Regex {
     ///              |
     ///              --> Regex' -> NFA'
     ///
-    pub fn split(&self, ab: &Vec<char>) -> Option<(JumpType, Option<Regex>, Regex)> {
+    pub fn has_jump(&self, ab: &Vec<char>) -> Option<(JumpType, Option<Regex>, Regex)> {
         match *self.0 {
-            RegexF::Dot => Some((JumpType::Offset(1), None, Regex::nil())),
             RegexF::Star(ref a) if a.accepts_any(ab) => Some((JumpType::Star, None, Regex::nil())),
             RegexF::Range(ref a, i, j) if i == j && a.accepts_any(ab) =>
                 Some((JumpType::Offset(i), None, Regex::nil())),
@@ -375,31 +386,38 @@ impl Regex {
                 Some((JumpType::Choice((i..=j).collect()), None, Regex::nil())),
             RegexF::Lookahead(ref a) => Some((JumpType::Offset(0), Some(a.clone()), Regex::nil())),
             RegexF::App(ref a, ref b) =>
-                if let Some((ja, ra, ca)) = a.split(ab) {
+                if let Some((ja, ra, ca)) = a.has_jump(ab) {
                     Some((ja, ra, Regex::app(ca, b.clone())))
                 } else { None },
+            RegexF::Alt(ref a, ref b) =>
+                match (a.has_jump(ab), b.has_jump(ab)) {
+                    // Both jump, two forks and two continuations
+                    (Some((ja, Some(ra), ca)), Some((jb, Some(rb), cb))) =>
+                        Some((ja.or(&jb), Some(Regex::alt(ra, rb)), Regex::alt(ca, cb))),
+                    // Both jump, one fork and two continuations
+                    (Some((ja, Some(ra), ca)), Some((jb, None, cb))) =>
+                        Some((ja.or(&jb), Some(ra), Regex::alt(ca, cb))),
+                    (Some((ja, None, ca)), Some((jb, Some(rb), cb))) =>
+                        Some((ja.or(&jb), Some(rb), Regex::alt(ca, cb))),
+                    // Both jump, no fork and two continuations
+                    (Some((ja, None, ca)), Some((jb, None, cb))) =>
+                        Some((ja.or(&jb), None, Regex::alt(ca, cb))),
+                    // One jump, one fork and one continuations
+                    (Some((j, Some(r), c)), None) =>
+                        Some((j, Some(Regex::alt(r, b.clone())), c)),
+                    (None, Some((j, Some(r), c))) =>
+                        Some((j, Some(Regex::alt(a.clone(), r)), c)),
+                    // One jump, no fork and one continuations
+                    (Some((j, None, c)), None) =>
+                        Some((j, Some(b.clone()), c)),
+                    (None, Some((j, None, c))) =>
+                        Some((j, Some(a.clone()), c)),
+                    (None, None) => None
+                },
             _ => None
         }
     }
 
-    /// Same derivative given any character (wildcard)
-    pub fn deriv_dot(&self) -> Regex {
-        match *self.0 {
-            RegexF::Nil => Regex::empty(),
-            RegexF::Empty => Regex::empty(),
-            RegexF::Dot => Regex::nil(),
-            RegexF::Char(_) => Regex::empty(),
-            RegexF::Not(ref r) => Regex::not(r.deriv_dot()),
-            RegexF::App(ref a, ref b) if *a.0 == RegexF::LineStart => b.deriv_dot(),
-            RegexF::App(ref a, ref b) if *b.0 == RegexF::LineEnd => a.deriv_dot(),
-            RegexF::App(ref a, ref b) if a.nullable() =>
-                Regex::alt(Regex::app(a.deriv_dot(), b.clone()), b.deriv_dot()),
-            RegexF::App(ref a, ref b) => Regex::app(a.deriv_dot(), b.clone()),
-            RegexF::Alt(ref a, ref b) => Regex::alt(a.deriv_dot(), b.deriv_dot()),
-            RegexF::Star(ref a) => Regex::app(a.deriv_dot(), Regex::star(a.clone())),
-            _ => Regex::empty()
-        }
-    }
 
     /// Derivative
     pub fn deriv(&self, c: &char) -> Regex {
