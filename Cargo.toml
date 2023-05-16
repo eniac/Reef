@@ -51,3 +51,9 @@ harness = false
 [profile.release]
 debug = true
 
+[profile.performance]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+incremental = false
+
