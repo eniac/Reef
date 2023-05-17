@@ -10,10 +10,6 @@ use petgraph::visit::*;
 use petgraph::{Direction, Graph};
 use rayon::iter::*;
 
-use printpdf::*;
-use std::fs::File;
-use std::io::BufWriter;
-
 use crate::regex::Regex;
 
 #[derive(Debug, Clone)]
@@ -288,79 +284,6 @@ impl NFA {
         }
     }
 
-    /// Split NFA in .*
-    pub fn split_dot_star(&mut self) -> std::io::Result<()> {
-        fn write_to_pdf(s: &str, f: &str) {
-            let (doc, page1, layer1) = PdfDocument::new(s, Mm(210.0), Mm(297.0), "Layer 1");
-            let current_layer = doc.get_page(page1).get_layer(layer1);
-
-            // Add some text to the document
-            let font = doc.add_builtin_font(BuiltinFont::HelveticaBold).unwrap();
-            current_layer.set_font(&font, 32.0);
-            current_layer.set_line_height(20.0);
-            current_layer.use_text(s, 32.0, Mm(10.0), Mm(100.0), &font);
-            current_layer.end_text_section();
-
-            let file = File::create(f).unwrap();
-            let mut buf_writer = BufWriter::new(file);
-            doc.save(&mut buf_writer).unwrap();
-        }
-
-        let sccs = self.scc();
-        let accepting_loops: Vec<_> =
-            sccs.clone()
-                .into_iter()
-                .filter(|v| v.g.node_indices().all(|i| v.accepting().contains(&i.index())) && v != self)
-                .collect();
-
-        // ORIGINAL graph
-        write_to_pdf("ORIGINAL graph", "text1.pdf");
-        self.write_pdf("original")?;
-        let mut files: Vec<String> =
-            Vec::from(["text1.pdf".to_string(), "original.pdf".to_string()]);
-
-        // SCCS
-        write_to_pdf("Strongly connected subgraphs", "text2.pdf");
-        files.push("text2.pdf".to_string());
-        for i in 0..sccs.len() {
-            let fout = format!("scc-{}", i);
-            sccs[i].write_pdf(fout.as_str())?;
-            files.push(format!("{}.pdf", fout));
-        }
-
-        // FILTERED
-        write_to_pdf("All accepting SCC subgraphs", "text3.pdf");
-        files.push("text3.pdf".to_string());
-        for i in 0..accepting_loops.len() {
-            let fout = format!("loops-{}", i);
-            //   self.cut(&accepting_loops[i].to_regex());
-            accepting_loops[i].write_pdf(fout.as_str())?;
-            files.push(format!("{}.pdf", fout));
-        }
-
-        // REDUCED
-        // write_to_pdf("Reduced original graph", "text4.pdf");
-        // files.push("text4.pdf".to_string());
-        // self.write_pdf("reduced")?;
-        // files.push("reduced.pdf".to_string());
-
-        Command::new("pdfjam")
-            .args(files.clone())
-            .arg("-o")
-            .arg("scc.pdf")
-            .spawn()
-            .expect("[dot] CLI failed to convert dfa to [pdf] file")
-            .wait()?;
-
-        for fout in files.clone() {
-            std::fs::remove_file(fout)?;
-        }
-
-        Ok(())
-    }
-
-=======
->>>>>>> ea66bfc... Rewrite SNFA compiler
     /// Dot file
     pub fn write_dot(&self, filename: &str) -> std::io::Result<()> {
         let s: String = Dot::new(&self.g).to_string();
