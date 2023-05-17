@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashSet, LinkedList};
 use std::process::Command;
 
 use petgraph::Graph;
@@ -29,12 +29,6 @@ pub struct SNFA<C: Clone> {
 
     /// A hypergraph?
     pub hg: Vec<Graph<Either<Regex, Jump>, Option<C>>>,
-
-    /// Must match from the begining of the document (default: false)
-    anchor_start: bool,
-
-    /// Must match until the end of the document (default: false)
-    anchor_end: bool,
 }
 
 impl Display for Jump {
@@ -72,51 +66,32 @@ impl SNFA<char> {
         let mut s = Self {
             ab,
             hg: Vec::new(),
-            anchor_start: re.is_start_anchored(),
-            anchor_end: re.is_end_anchored()
         };
         let n = s.add_re(0, re.clone());
         s.build((0, n), re.clone());
         s
     }
 
-
-    pub fn add_re(&mut self, i: usize, re: Regex) -> NodeIndex<u32> {
-        while i >= self.hg.len() {
-            self.hg.push(Graph::new());
-        }
-        let n_k = self.hg[i].add_node(Either::left(re));
-        self.hg[i].add_edge(n_k, n_k, None);
-        n_k
-    }
-
-    pub fn add_jump(&mut self, from: Coord, jt: JumpType, re: Regex) {
-        // the new graph is hg[m]
-        let m = self.hg.len();
-        let root = (m, self.add_re(m, re.clone()));
-        // Add the jump hg[from.0] -> hg[m]
-        let n_jmp = self.hg[from.0].add_node(Either::right(Jump(jt, m)));
-        self.hg[from.0].add_edge(from.1, n_jmp, None);
-        // Recursively build the new graph hg[m]
-        self.build(root, re);
-    }
-
-    pub fn find_re(&self, i: usize, re: &Regex) -> Option<NodeIndex<u32>> {
-        self.hg[i].node_indices().find(|x| self.hg[i][*x].0 == Ok(re.clone()))
-    }
-
     pub fn build_deriv(&mut self, from: Coord, q: Regex) {
         // Take all the single character steps
         for c in self.ab.clone() {
             let q_c = q.deriv(&c);
-            // State [q_c] exists already, add edge
             if let Some(n_c) = self.find_re(from.0, &q_c) {
+                // State [q_c] exists already, add edge
                 self.hg[from.0].add_edge(from.1, n_c, Some(c));
+            } else if let Some(n_o) = self.find_edge_endpoint(from, c) {
+                // State[q_c] is new, but if transition from q-[c]> n_o exists
+                let mw_o = self.hg[from.0].node_weight_mut(n_o)
+                            .expect("Getting mutable reference to [n_o]");
+                let re_o = mw_o.0.clone()
+                            .expect("Expecting a regex from a char transition");
+                let new_re = Regex::alt(re_o, q_c);
+                *mw_o = Either::left(new_re.clone());
+                self.build((from.0, n_o), new_re);
             } else {
                 // Add to NFA if not already there
                 let n_c = self.add_re(from.0, q_c.clone());
                 // Reflexive step
-                self.hg[from.0].add_edge(n_c, n_c, None);
                 self.hg[from.0].add_edge(from.1, n_c, Some(c));
                 self.build((from.0, n_c), q_c);
             }
@@ -131,7 +106,7 @@ impl SNFA<char> {
             RegexF::Star(ref a) if a.accepts_any(ab) =>
                 self.add_jump(from, JumpType::Star, Regex::nil()),
             // .{i,j}
-            RegexF::Range(ref a, x, y) if a.accepts_any(ab) =>
+            RegexF::Range(ref a, x, y) if a.accepts_any(ab) && !a.nullable() =>
                 self.add_jump(from, JumpType::range(x, y), Regex::nil()),
             // (?=r)
             RegexF::Lookahead(ref a) =>
@@ -141,7 +116,6 @@ impl SNFA<char> {
                 self.build(from, b.clone());
             },
             RegexF::App(ref a, ref b) => {
-                println!("Now exploring {:?}", a);
                 match *a.0 {
                     // .*r
                     RegexF::Star(ref a) if a.accepts_any(ab) =>
@@ -152,7 +126,7 @@ impl SNFA<char> {
                     // (?=r1)r2
                     RegexF::Lookahead(ref a) => {
                         self.add_jump(from, JumpType::Offset(0), a.clone());
-                        self.build(from, b.clone())
+                        self.add_jump(from, JumpType::Offset(0), b.clone());
                     },
                     RegexF::Alt(ref x, ref y) => {
                         self.build(from, x.clone());
@@ -168,6 +142,88 @@ impl SNFA<char> {
             // Other (derivative)
             _ => self.build_deriv(from, q)
         }
+    }
+
+    /// Add a jump node to the graph at position [Coord]
+    pub fn add_jump(&mut self, from: Coord, jt: JumpType, re: Regex) {
+        // the new graph is hg[m]
+        let m = self.hg.len();
+        let root = (m, self.add_re(m, re.clone()));
+        // Add the jump hg[from.0] -> hg[m]
+        let n_jmp = self.hg[from.0].add_node(Either::right(Jump(jt, m)));
+        self.hg[from.0].add_edge(from.1, n_jmp, None);
+        // Recursively build the new graph hg[m]
+        self.build(root, re);
+    }
+
+    /// From SNFA<char> -> SNFA<String>
+    pub fn as_str_snfa(&self) -> SNFA<String> {
+        SNFA {
+            ab: self.ab.iter().map(|c| c.to_string()).collect(),
+            hg: self.hg.iter()
+                    .map(|g| g.map(|_, b| b.clone(),
+                        |_,e| e.map(|c| c.to_string())))
+                    .collect::<Vec<Graph<Either<Regex, Jump>, Option<String>>>>(),
+        }
+    }
+}
+
+type Moves = LinkedList<(Coord, usize)>;
+
+impl<C: Clone + Eq + Display + Sync> SNFA<C> {
+    pub fn add_re(&mut self, i: usize, re: Regex) -> NodeIndex<u32> {
+        while i >= self.hg.len() {
+            self.hg.push(Graph::new());
+        }
+        let n_k = self.hg[i].add_node(Either::left(re));
+        self.hg[i].add_edge(n_k, n_k, None);
+        n_k
+    }
+
+    pub fn is_start_anchored(&self, from: Coord) -> bool {
+        match self.hg[from.0][from.1].0 {
+            Ok(ref re) => re.is_start_anchored(),
+            Err(Jump(_, ref to)) => self.is_start_anchored((*to, NodeIndex::new(0)))
+        }
+    }
+
+    pub fn is_end_anchored(&self, from: Coord) -> bool {
+        match self.hg[from.0][from.1].0 {
+            Ok(ref re) => re.is_end_anchored(),
+            Err(Jump(_, ref to)) => self.is_end_anchored((*to, NodeIndex::new(0)))
+        }
+    }
+
+
+    /// Find regular expression in graph [i]
+    pub fn find_re(&self, i: usize, re: &Regex) -> Option<NodeIndex<u32>> {
+        self.hg[i].node_indices().find(|x| self.hg[i][*x].0 == Ok(re.clone()))
+    }
+
+    /// If an edge [c] exists from [from] returns the other endpoint
+    pub fn find_edge_endpoint(&self, from: Coord, c: C) -> Option<NodeIndex<u32>> {
+        self.hg[from.0].edges(from.1)
+            .find_map(|e| if e.weight().as_ref() == Some(&c) { Some(e.target()) } else { None })
+    }
+
+    pub fn deltas(&self) -> Vec<(Coord, C, Coord)> {
+        let mut start = self.get_init();
+        let mut res = Vec::new();
+        res
+    }
+
+    /// Is this a state with jumps
+    pub fn is_jump_pad(&self, from: Coord) -> bool {
+        self.hg[from.0].edges(from.1)
+                       .filter(|e| e.target() != from.1)
+                       .all(|e| self.hg[from.0][e.target()].0.is_err() && e.weight().is_none())
+    }
+
+    /// Is this a state with derivatives
+    pub fn is_deriv_pad(&self, from: Coord) -> bool {
+        self.hg[from.0].edges(from.1)
+                       .filter(|e| e.target() != from.1)
+                       .all(|e| self.hg[from.0][e.target()].0.is_ok() && e.weight().is_some())
     }
 
     /// Return a vector of (NFA id, node) of all accepting states
@@ -212,61 +268,88 @@ impl SNFA<char> {
         self.hg[i.0][i.1].0.clone()
     }
 
-    pub fn as_str_snfa(&self) -> SNFA<String> {
-        SNFA {
-            ab: self.ab.iter().map(|c| c.to_string()).collect(),
-            hg: self.hg.iter()
-                    .map(|g| g.map(|_, b| b.clone(),
-                        |_,e| e.map(|c| c.to_string())))
-                    .collect::<Vec<Graph<Either<Regex, Jump>, Option<String>>>>(),
-            anchor_start: self.anchor_start,
-            anchor_end: self.anchor_end
-        }
-    }
-    /// All epsilon adjacent states outgoing from [from], including [from]
-    fn epsilons_rec(&self, from: Coord, visited: &mut HashSet<Coord>) -> HashSet<Coord> {
-        if visited.contains(&from) {
-            return HashSet::from([from.clone()]);
-        }
-
-        self.hg[from.0]
-            .edges(from.1)
-            .filter(|e| *e.weight() == None)
-            .flat_map(|e| {
-                visited.insert((from.0, e.target()));
-                self.epsilons_rec((from.0, e.target()), visited)
-            }).collect()
+    /// Match the SNFA on a document (backtracking)
+    pub fn solve(&self, doc: &Vec<C>) -> LinkedList<Moves> {
+        self.solve_rec((0, NodeIndex::new(0)), doc, 0).unwrap_or(LinkedList::new())
     }
 
-    /*
-    /// Starting at [from] and [i] position of [doc], take a single non-det step
-    fn delta_rec(&self, from: Coord, doc: &Vec<String>, i: usize, visited: &mut HashSet<Coord>) -> HashSet<Vec<Coord>> {
-        if visited.contains(&from) {
-            return HashSet::new();
+    /// Is the state [from] accepting
+    fn is_accepting(&self, from: Coord) -> bool {
+        match self.hg[from.0][from.1].0.clone() {
+            Ok(re) if re.nullable() => true,
+            Err(Jump(JumpType::Offset(offset), nfa_dest)) if offset == 0 =>
+                self.is_accepting((nfa_dest, NodeIndex::new(0))),
+            Err(Jump(JumpType::Choice(offsets), nfa_dest)) if offsets.contains(&0) =>
+                self.is_accepting((nfa_dest, NodeIndex::new(0))),
+            Err(Jump(JumpType::Star, nfa_dest)) =>
+                self.is_accepting((nfa_dest, NodeIndex::new(0))),
+            _ => false
         }
-        let mut from_set = self.epsilons_rec(from, &mut visited);
-        // all of these need to match
-        from_set.into_iter().map(|from| {
-            visited.insert(from);
-            match self.hg[from.0][from.1].0 {
-                // A normal character transition, consume the character in this NFA
-                Ok(_) => self.hg[from.0]
-                          .edges(from.1)
-                          .filter(|e| e.weight() == &doc[i])
-                          .map(|e| (from.0, e.target()))
-                          .collect::<Vec<Coord>>(),
-                // A jump
-                Err(Jump(JumpType::Offset(offset), nfa_dest)) =>
-                    self.delta_rec((nfa_dest, NodeIndex::new(0)), doc, i + offset, visited),
-                Err(Jump(JumpType::Choice(offsets), nfa_dest)) =>
-                    // At least one of these needs to match
-                    offsets.into_iter().flat_map(|offset| self.delta_rec((nfa_dest, NodeIndex::new(0)), doc, i + offset, visited)),
-                Err(Jump(JumpType::Star, nfa_dest)) =>
-                    // At least one of these needs to match
-                    (i..doc.len()).flat_map(|i| self.delta_rec((nfa_dest, NodeIndex::new(0)), doc, i, visited))
+    }
+
+    fn solve_jump(&self, jmp: &Jump, doc: &Vec<C>, i: usize) -> Option<LinkedList<Moves>> {
+        match jmp {
+            Jump(JumpType::Offset(offset), nfa_dest) =>
+                self.solve_rec((*nfa_dest, NodeIndex::new(0)), doc, i + offset),
+            Jump(JumpType::Choice(offsets), nfa_dest) =>
+                // Parallelize this
+                offsets.into_par_iter()
+                       .filter(|&o| i + o < doc.len())
+                       .find_map_any(|o| self.solve_rec((*nfa_dest, NodeIndex::new(0)), doc, i + o)),
+            Jump(JumpType::Star, nfa_dest) =>
+                (i..doc.len())
+                    .into_par_iter()
+                    .find_map_any(|j| self.solve_rec((*nfa_dest, NodeIndex::new(0)), doc, j))
+        }
+    }
+
+    fn solve_rec(&self, from: Coord, doc: &Vec<C>, i: usize) -> Option<LinkedList<Moves>> {
+        println!("SOLVE: i = {}, doc[i] = {}, from = ({},{}), from(re) = {}",
+            i, doc.get(i).map(|a|a.to_string()).unwrap_or("NaN".to_string()), from.0, from.1.index(), self.hg[from.0][from.1]);
+
+        // Acceptance criteria
+        if self.is_accepting(from) && !self.is_end_anchored(from) {
+            return Some(LinkedList::from([LinkedList::from([(from, i)])]));
+        } else if self.is_accepting(from) && (i == doc.len()) {
+            return Some(LinkedList::from([LinkedList::from([(from, i)])]));
+        } else if i == doc.len() {
+            return None;
+        }
+        if self.is_jump_pad(from) {
+            println!("Jump pad detected {}", self.hg[from.0][from.1]);
+            // All the children are jumps
+            let paths_opt: Vec<Option<LinkedList<Moves>>> =
+              self.hg[from.0]
+                .edges(from.1)
+                .filter(|e| e.target() != from.1)
+                .map(|e| match self.hg[from.0][e.target()].0 {
+                    Err(ref jmp) => self.solve_jump(jmp, doc, i),
+                    Ok(_) => panic!("Invariant: Jumping pad {} should not have derivative {}",
+                                        self.hg[from.0][from.1],
+                                        self.hg[from.0][e.target()])
+                }).collect();
+            // All jumps must successfully match
+            if paths_opt.iter().all(Option::is_some) {
+                Some(paths_opt.into_iter().flat_map(Option::unwrap).collect())
+            } else {
+                println!("Just invalidated a whole lot of paths {:?}", paths_opt.clone());
+                None
             }
-        })
-    } */
+        } else {
+            println!("Deriv pad detected {}", self.hg[from.0][from.1]);
+            // All the children are derivative steps
+            let mut paths: LinkedList<Moves> =
+              self.hg[from.0]
+                .edges(from.1)
+                .find(|e| e.weight().as_ref() == Some(&doc[i]))
+                .and_then(|e| self.solve_rec((from.0, e.target()), doc, i+1))?;
+
+            for path in paths.iter_mut() {
+                path.push_front((from,i))
+            }
+            Some(paths)
+        }
+    }
 }
 
 impl SNFA<String> {
@@ -344,9 +427,15 @@ mod tests {
 
     #[test]
     fn test_snfa() {
-        let r = Regex::new("((?=b)(?=.)|.{5})a(?=ba).{4,10}ab");
+        let r = Regex::new("((?=b)(?=.))b.{1,2}ab");
         let snfa = SNFA::new("ab", &r);
         snfa.as_str_snfa().write_pdf("snfa").unwrap();
+        let doc = "baab".chars().collect();
+        let sol = snfa.solve(&doc);
+        println!("SOLUTION: ");
+        for s in sol {
+            println!("{:?}", s);
+        }
     }
 
 }
