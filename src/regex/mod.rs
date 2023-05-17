@@ -284,7 +284,7 @@ impl Regex {
             // a | b and a >= b -> a
             (_, _) if Some(false) == Regex::partial_le(&a, &b) => a,
             // The smallest syntactically thing on the left
-            (x, y) if y < x => Regex::alt(b, a),
+            (x, y) if y > x => Regex::alt(b, a),
             (_, _) => Regex(G.mk(RegexF::Alt(a, b))),
         }
     }
