@@ -28,10 +28,10 @@ pub const EPSILON: &String = &String::new();
 
 impl PartialEq for NFA {
     fn eq(&self, other: &Self) -> bool {
-        self.ab == other.ab &&
-        self.to_regex() == other.to_regex() &&
-        self.anchor_start == other.anchor_start &&
-        self.anchor_end == other.anchor_start
+        self.ab == other.ab
+            && self.to_regex() == other.to_regex()
+            && self.anchor_start == other.anchor_start
+            && self.anchor_end == other.anchor_start
     }
 }
 
@@ -134,9 +134,11 @@ impl NFA {
 
     /// Non final states
     pub fn non_accepting(&self) -> HashSet<usize> {
-        self.g.node_indices()
-            .filter(|i| ! self.g[*i].nullable())
-            .map(|v| v.index()).collect()
+        self.g
+            .node_indices()
+            .filter(|i| !self.g[*i].nullable())
+            .map(|v| v.index())
+            .collect()
     }
 
     /// Single step transition

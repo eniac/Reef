@@ -1,6 +1,7 @@
 use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
 use crate::nfa::{EPSILON, NFA};
+use crate::snfa::*;
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
@@ -15,7 +16,7 @@ use neptune::{
 use rug::{integer::Order, ops::RemRounding, Integer};
 
 pub struct R1CS<'a, F: PrimeField> {
-    pub nfa: &'a NFA,
+    pub snfa: &'a SNFA,
     pub table: Vec<Integer>,
     pub batching: JBatching,
     pub commit_type: JCommit,
@@ -31,28 +32,28 @@ pub struct R1CS<'a, F: PrimeField> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     pub doc_extend: usize,
-    is_match: bool,
-    pub substring: (usize, usize), // todo getters
+    //is_match: bool,
+    //pub substring: (usize, usize), // todo getters
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
     pub fn new(
-        nfa: &'a NFA,
+        snfa: &'a SNFA,
         doc: &Vec<String>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U4>,
         batch_override: Option<JBatching>,
         commit_override: Option<JCommit>,
     ) -> Self {
-        let nfa_match = nfa.is_match(doc);
-        let is_match = nfa_match.is_some();
+        //let nfa_match = nfa.is_match(doc);
+        //let is_match = nfa_match.is_some();
 
         let batching;
         let commit;
         let opt_batch_size;
         let cost: usize;
-        if batch_size > 0 {
+      /*  if batch_size > 0 {
             (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
                 (Some(b), Some(c)) => (
                     b,
@@ -85,8 +86,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 batch_override,
             );
         }
+*/
+  //      let sel_batch_size = opt_batch_size;
 
-        let sel_batch_size = opt_batch_size;
+
+        let sel_batch_size = batch_size;
 
         println!(
             "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}, cost {:#?}",
@@ -105,8 +109,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             epsilon_to_add = 0;
         }
 
-        let mut substring = (0, batch_doc.len());
+//        let mut substring = (0, batch_doc.len());
 
+        // TODO timing here
+        let moves = snfa.solve(&doc);
+
+        /*
         match nfa_match {
             // todo remove this bs call
             Some((start, end)) => {
@@ -126,14 +134,28 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             None => { // see above
             }
         }
+*/
+        // generate T - todo need deltas
+        let total_states = vec![0]; //snfa.hg[0].node_count()];
+        for i in 0..snfa.hg.len() {
 
-        // generate T
+            total_states.push(total_states[i]+ snfa.hg[i].node_count());
+        }
+        let num_graphs = snfa.hg.len();
+
+
         let mut table = vec![];
-        for (ins, c, out) in nfa.deltas() {
+        let num_chars = snfa.ab.len();
+
+        for (in_coord, c, out_coord) in snfa.deltas() {
+            let ins = big_state_num(in_coord);
+            let outs = big_state_num(out_coord);
+            let num_states = total_states[total_states.len()-1];
+
             table.push(
                 Integer::from(
-                    (ins * nfa.nstates() * nfa.nchars())
-                        + (out * nfa.nchars())
+                        + (ins * num_states * num_chars)
+                        + (out * num_chars)
                         + nfa.ab_to_num(&c.to_string()),
                 )
                 .rem_floor(cfg().field().modulus()),
@@ -152,6 +174,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 .rem_floor(cfg().field().modulus()),
             );
         }
+*/
 
         // generate usize doc
         // doc to usizes - can I use this elsewhere too? TODO
@@ -164,7 +187,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
 
         Self {
-            nfa,
+            snfa,
             table,    // TODO fix else
             batching, // TODO
             commit_type: commit,
@@ -176,10 +199,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
             doc_extend: epsilon_to_add,
-            is_match,
-            substring,
+            total_states,
+            //is_match,
+            //substring,
             pc: pcs,
         }
+    }
+
+    fn big_state_num(coord: Coord){
+        self.total_states[coord.0] + coord.1;
+
     }
 
     pub fn set_commitment(&mut self, rc: ReefCommitment<F>) {
@@ -195,6 +224,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
         }
     }
+
 
     // IN THE CLEAR
 
@@ -254,17 +284,17 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // PROVER
 
-    pub fn prover_accepting_state(&self, batch_num: usize, state: usize) -> u64 {
+    pub fn prover_accepting_state(&self, state: Coord) -> u64 {
         let mut out = false;
 
         if self.is_match {
             // proof of membership
-            for xi in self.nfa.accepting().into_iter() {
-                out = out || (state == xi);
+            if snfa.is_accepting(state) {
+                out = true;
             }
         } else {
-            for xi in self.nfa.non_accepting().into_iter() {
-                out = out || (state == xi);
+            if !snfa.is_accepting(state) {
+                out = true;
             }
         }
 

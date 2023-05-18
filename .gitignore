@@ -6,3 +6,5 @@ out*
 *.pdf
 *.txt
 *.csv
+fast*
+slow*
