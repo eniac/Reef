@@ -27,7 +27,7 @@ pub struct SNFA<C: Clone> {
     /// Alphabet
     pub ab: Vec<C>,
 
-    /// A hypergraph?
+    /// A hypergraph
     pub hg: Vec<Graph<Either<Regex, Jump>, Option<C>>>,
 }
 
@@ -170,7 +170,7 @@ impl SNFA<char> {
 
 type Moves = LinkedList<(Coord, usize)>;
 
-impl<C: Clone + Eq + Display + Sync> SNFA<C> {
+impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> SNFA<C> {
     pub fn add_re(&mut self, i: usize, re: Regex) -> NodeIndex<u32> {
         while i >= self.hg.len() {
             self.hg.push(Graph::new());
@@ -206,10 +206,42 @@ impl<C: Clone + Eq + Display + Sync> SNFA<C> {
             .find_map(|e| if e.weight().as_ref() == Some(&c) { Some(e.target()) } else { None })
     }
 
-    pub fn deltas(&self) -> Vec<(Coord, C, Coord)> {
-        let mut start = self.get_init();
-        let mut res = Vec::new();
-        res
+    fn deltas_one_step(&self, from: Coord) -> HashSet<(Coord, Option<C>, Coord)> {
+        match self.hg[from.0][from.1].0 {
+            Err(Jump(_, next)) => {
+                self.deltas_one_step((next, NodeIndex::new(0)))
+            },
+            Ok(_) =>
+                Some((from, None, from))
+                    .into_iter()
+                    .chain(self.hg[from.0]
+                            .edges(from.1) // epsilon transitions
+                            .filter(|e| e.target() != from.1 && e.weight().is_none())
+                            .flat_map(|e| self.deltas_one_step((from.0, e.target())))
+                            .map(|(_, w, x)| (from, w, x))
+                    ).chain(self.hg[from.0]
+                            .edges(from.1) // Non-epsilon transitions
+                            .filter(|e| e.target() != from.1 && e.weight().is_some())
+                            .map(|e| (from, e.weight().clone(), (from.0, e.target())))
+                    ).collect::<HashSet<_>>()
+        }
+    }
+
+    pub fn deltas(&self) -> Vec<(Coord, Option<C>, Coord)> {
+        let mut i: usize = 0;
+        let mut res: HashSet<(Coord, Option<C>, Coord)> = HashSet::new();
+
+        for g in self.hg.iter() {
+            for j in g.node_indices() {
+                if let Ok(_) = g[j].0.clone() {
+                    for x in self.deltas_one_step((i, j)) {
+                        res.insert(x);
+                    }
+                }
+            }
+            i += 1;
+        }
+        res.into_iter().sorted().collect()
     }
 
     /// Is this a state with jumps
@@ -316,7 +348,6 @@ impl<C: Clone + Eq + Display + Sync> SNFA<C> {
             return None;
         }
         if self.is_jump_pad(from) {
-            println!("Jump pad detected {}", self.hg[from.0][from.1]);
             // All the children are jumps
             let paths_opt: Vec<Option<LinkedList<Moves>>> =
               self.hg[from.0]
@@ -332,11 +363,9 @@ impl<C: Clone + Eq + Display + Sync> SNFA<C> {
             if paths_opt.iter().all(Option::is_some) {
                 Some(paths_opt.into_iter().flat_map(Option::unwrap).collect())
             } else {
-                println!("Just invalidated a whole lot of paths {:?}", paths_opt.clone());
                 None
             }
         } else {
-            println!("Deriv pad detected {}", self.hg[from.0][from.1]);
             // All the children are derivative steps
             let mut paths: LinkedList<Moves> =
               self.hg[from.0]
@@ -432,6 +461,10 @@ mod tests {
         snfa.as_str_snfa().write_pdf("snfa").unwrap();
         let doc = "baab".chars().collect();
         let sol = snfa.solve(&doc);
+        println!("DELTAS");
+        for d in snfa.deltas() {
+            println!("{:?}", d);
+        }
         println!("SOLUTION: ");
         for s in sol {
             println!("{:?}", s);
