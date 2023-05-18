@@ -206,30 +206,35 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
             .find_map(|e| if e.weight().as_ref() == Some(&c) { Some(e.target()) } else { None })
     }
 
-    fn deltas_one_step(&self, from: Coord) -> HashSet<(Coord, Option<C>, Coord)> {
+    fn deltas_one_step(&self, from: Coord) -> HashSet<(Coord, Option<C>, Coord, Option<JumpType>)> {
         match self.hg[from.0][from.1].0 {
-            Err(Jump(_, next)) => {
+            Err(Jump(ref j1, next)) => {
                 self.deltas_one_step((next, NodeIndex::new(0)))
+                    .into_iter()
+                    .map(|(a,w,b,j)| match j {
+                        Some(j2) => (a,w,b,Some(j1.then(&j2))),
+                        None => (a,w,b,Some(j1.clone()))
+                    }).collect()
             },
             Ok(_) =>
-                Some((from, None, from))
+                Some((from, None, from, None))
                     .into_iter()
                     .chain(self.hg[from.0]
                             .edges(from.1) // epsilon transitions
                             .filter(|e| e.target() != from.1 && e.weight().is_none())
                             .flat_map(|e| self.deltas_one_step((from.0, e.target())))
-                            .map(|(_, w, x)| (from, w, x))
+                            .map(|(_, w, x, j)| (from, w, x, j))
                     ).chain(self.hg[from.0]
                             .edges(from.1) // Non-epsilon transitions
                             .filter(|e| e.target() != from.1 && e.weight().is_some())
-                            .map(|e| (from, e.weight().clone(), (from.0, e.target())))
+                            .map(|e| (from, e.weight().clone(), (from.0, e.target()), None))
                     ).collect::<HashSet<_>>()
         }
     }
 
-    pub fn deltas(&self) -> Vec<(Coord, Option<C>, Coord)> {
+    pub fn deltas(&self) -> Vec<(Coord, Option<C>, Coord, Option<JumpType>)> {
         let mut i: usize = 0;
-        let mut res: HashSet<(Coord, Option<C>, Coord)> = HashSet::new();
+        let mut res: HashSet<(Coord, Option<C>, Coord, Option<JumpType>)> = HashSet::new();
 
         for g in self.hg.iter() {
             for j in g.node_indices() {
@@ -269,22 +274,6 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
                     if re.nullable() {
                         res.push((i, j))
                     }
-                }
-            }
-            i += 1;
-        }
-        res
-    }
-
-    /// Return a vector of (NFA id, node, Dest NFA id) of all jumps
-    pub fn jumps(&self) -> Vec<Coord> {
-        let mut i: usize = 0;
-        let mut res: Vec<Coord> = Vec::new();
-
-        for g in self.hg.iter() {
-            for j in g.node_indices() {
-                if let Err(Jump(_, dst)) = g[j].0 {
-                    res.push((i, j));
                 }
             }
             i += 1;

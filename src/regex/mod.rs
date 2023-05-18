@@ -68,7 +68,7 @@ impl JumpType {
     }
 
     /// Sequential composition of two jumps is a jump
-    fn then(&self, a: &JumpType) -> JumpType {
+    pub fn then(&self, a: &JumpType) -> JumpType {
         match (self, a) {
             (JumpType::Offset(0), _) => a.clone(),
             (JumpType::Offset(i), JumpType::Offset(j)) => JumpType::Offset(i+j),
