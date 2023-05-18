@@ -44,7 +44,7 @@ struct ProofInfo {
 
 #[cfg(feature = "metrics")]
 use crate::metrics::{log, log::Component};
-
+/*
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(
     nfa: NFA,
@@ -830,6 +830,7 @@ fn verify(
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Final Clear Checks");
 }
+*/
 
 #[cfg(test)]
 mod tests {

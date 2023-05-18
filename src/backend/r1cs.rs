@@ -14,10 +14,13 @@ use neptune::{
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
 };
 use rug::{integer::Order, ops::RemRounding, Integer};
+use std::collections::LinkedList;
 
 pub struct R1CS<'a, F: PrimeField> {
-    pub snfa: &'a SNFA,
+    pub snfa: &'a SNFA<C>,
+    pub num_ab: FxHashMap<Option<char>, usize>,
     pub table: Vec<Integer>,
+    total_states: Vec<usize>,
     pub batching: JBatching,
     pub commit_type: JCommit,
     pub reef_commit: Option<ReefCommitment<F>>,
@@ -32,14 +35,15 @@ pub struct R1CS<'a, F: PrimeField> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     pub doc_extend: usize,
-    //is_match: bool,
+    moves: LinkedList<Moves>,
+    is_match: bool,
     //pub substring: (usize, usize), // todo getters
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
     pub fn new(
-        snfa: &'a SNFA,
+        snfa: &'a SNFA<C>,
         doc: &Vec<String>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U4>,
@@ -53,42 +57,41 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let commit;
         let opt_batch_size;
         let cost: usize;
-      /*  if batch_size > 0 {
-            (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
-                (Some(b), Some(c)) => (
-                    b,
-                    c,
-                    batch_size,
-                    full_round_cost_model(nfa, batch_size, b, nfa_match, doc.len(), c),
-                ),
-                (Some(b), _) => {
-                    opt_commit_select_with_batch(nfa, batch_size, nfa_match, doc.len(), b)
+        /*  if batch_size > 0 {
+                    (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
+                        (Some(b), Some(c)) => (
+                            b,
+                            c,
+                            batch_size,
+                            full_round_cost_model(nfa, batch_size, b, nfa_match, doc.len(), c),
+                        ),
+                        (Some(b), _) => {
+                            opt_commit_select_with_batch(nfa, batch_size, nfa_match, doc.len(), b)
+                        }
+                        (None, Some(c)) => opt_cost_model_select_with_commit(
+                            &nfa,
+                            batch_size,
+                            nfa.is_match(doc),
+                            doc.len(),
+                            c,
+                        ),
+                        (None, None) => {
+                            opt_cost_model_select_with_batch(&nfa, batch_size, nfa_match, doc.len())
+                        }
+                    };
+                } else {
+                    (batching, commit, opt_batch_size, cost) = opt_cost_model_select(
+                        &nfa,
+                        0,
+                        logmn(doc.len()) - 1,
+                        nfa_match,
+                        doc.len(),
+                        commit_override,
+                        batch_override,
+                    );
                 }
-                (None, Some(c)) => opt_cost_model_select_with_commit(
-                    &nfa,
-                    batch_size,
-                    nfa.is_match(doc),
-                    doc.len(),
-                    c,
-                ),
-                (None, None) => {
-                    opt_cost_model_select_with_batch(&nfa, batch_size, nfa_match, doc.len())
-                }
-            };
-        } else {
-            (batching, commit, opt_batch_size, cost) = opt_cost_model_select(
-                &nfa,
-                0,
-                logmn(doc.len()) - 1,
-                nfa_match,
-                doc.len(),
-                commit_override,
-                batch_override,
-            );
-        }
-*/
-  //      let sel_batch_size = opt_batch_size;
-
+        */
+        //      let sel_batch_size = opt_batch_size;
 
         let sel_batch_size = batch_size;
 
@@ -109,56 +112,61 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             epsilon_to_add = 0;
         }
 
-//        let mut substring = (0, batch_doc.len());
+        //        let mut substring = (0, batch_doc.len());
 
         // TODO timing here
         let moves = snfa.solve(&doc);
+        let is_match = moves.len() != 0;
 
         /*
-        match nfa_match {
-            // todo remove this bs call
-            Some((start, end)) => {
-                match commit {
-                    JCommit::HashChain => {
-                        assert!(
-                            end == batch_doc.len(),
-                            "for HashChain commitment, Regex must handle EOD, switch commit type or change Regex r to r$ or r.*$"
-                        );
-                        substring = (start, batch_doc.len()); // ... right?
+                match nfa_match {
+                    // todo remove this bs call
+                    Some((start, end)) => {
+                        match commit {
+                            JCommit::HashChain => {
+                                assert!(
+                                    end == batch_doc.len(),
+                                    "for HashChain commitment, Regex must handle EOD, switch commit type or change Regex r to r$ or r.*$"
+                                );
+                                substring = (start, batch_doc.len()); // ... right?
+                            }
+                            JCommit::Nlookup => {
+                                substring = (start, end); // exact
+                            }
+                        }
                     }
-                    JCommit::Nlookup => {
-                        substring = (start, end); // exact
+                    None => { // see above
                     }
                 }
-            }
-            None => { // see above
-            }
+        */
+
+        // character conversions
+        let num_ab = FxHashMap::new();
+        let mut i = 0;
+        for c in snfa.ab {
+            num_ab.insert(Some(c), i);
+            i += 1;
         }
-*/
-        // generate T - todo need deltas
+        num_ab.insert(None, i);
+
+        // generate T
         let total_states = vec![0]; //snfa.hg[0].node_count()];
         for i in 0..snfa.hg.len() {
-
-            total_states.push(total_states[i]+ snfa.hg[i].node_count());
+            total_states.push(total_states[i] + snfa.hg[i].node_count());
         }
         let num_graphs = snfa.hg.len();
 
-
         let mut table = vec![];
         let num_chars = snfa.ab.len();
+        let num_states = total_states[total_states.len() - 1];
 
-        for (in_coord, c, out_coord) in snfa.deltas() {
-            let ins = big_state_num(in_coord);
-            let outs = big_state_num(out_coord);
-            let num_states = total_states[total_states.len()-1];
+        for (in_coord, c, out_coord, _jump) in snfa.deltas() {
+            let ins = total_states[in_coord.0] + in_coord.1.index(); //self.big_state_num(in_coord);
+            let outs = total_states[out_coord.0] + out_coord.1.index(); //self.big_state_num(out_coord);
 
             table.push(
-                Integer::from(
-                        + (ins * num_states * num_chars)
-                        + (out * num_chars)
-                        + nfa.ab_to_num(&c.to_string()),
-                )
-                .rem_floor(cfg().field().modulus()),
+                Integer::from((ins * num_states * num_chars) + (outs * num_chars) + num_ab(c))
+                    .rem_floor(cfg().field().modulus()),
             );
         }
 
@@ -167,28 +175,27 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         while table.len() < base.pow(logmn(table.len()) as u32) {
             table.push(
                 Integer::from(
-                    (nfa.nstates() * nfa.nstates() * nfa.nchars())
-                        + (nfa.nstates() * nfa.nchars())
-                        + nfa.nchars(),
+                    (num_states * num_states * num_chars) + (num_states * num_chars) + num_chars,
                 )
                 .rem_floor(cfg().field().modulus()),
             );
         }
-*/
 
         // generate usize doc
         // doc to usizes - can I use this elsewhere too? TODO
         let mut usize_doc = vec![];
         let mut int_doc = vec![];
         for c in batch_doc.clone().into_iter() {
-            let u = nfa.ab_to_num(&c.to_string());
+            let u = num_ab(Some(c));
             usize_doc.push(u);
             int_doc.push(Integer::from(u));
         }
 
         Self {
             snfa,
-            table,    // TODO fix else
+            num_ab,
+            table, // TODO fix else
+            total_states,
             batching, // TODO
             commit_type: commit,
             reef_commit: None,
@@ -199,16 +206,15 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
             doc_extend: epsilon_to_add,
-            total_states,
-            //is_match,
+            moves,
+            is_match,
             //substring,
             pc: pcs,
         }
     }
 
-    fn big_state_num(coord: Coord){
-        self.total_states[coord.0] + coord.1;
-
+    fn big_state_num(&self, coord: Coord) {
+        self.total_states[coord.0] + coord.1.index();
     }
 
     pub fn set_commitment(&mut self, rc: ReefCommitment<F>) {
@@ -225,63 +231,62 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
-
     // IN THE CLEAR
+    /*
+        pub fn prover_calc_hash(
+            &self,
+            start_hash_or_blind: F,
+            blind: bool,
+            start: usize,
+            num_iters: usize,
+        ) -> F {
+            let mut next_hash;
 
-    pub fn prover_calc_hash(
-        &self,
-        start_hash_or_blind: F,
-        blind: bool,
-        start: usize,
-        num_iters: usize,
-    ) -> F {
-        let mut next_hash;
-
-        if start == 0 && blind {
-            // H_0 = Hash(0, r, 0)
-            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-            let acc = &mut ();
-
-            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-            sponge.start(parameter, None, acc);
-
-            SpongeAPI::absorb(&mut sponge, 2, &[start_hash_or_blind, F::from(0)], acc);
-            next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-            sponge.finish(acc).unwrap();
-        } else {
-            next_hash = vec![start_hash_or_blind];
-        }
-
-        let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
-        for b in 0..num_iters {
-            //self.batch_size {
-            let access_at = start + b;
-            if access_at < self.substring.1 {
-                // else nothing
-
-                // expected poseidon
+            if start == 0 && blind {
+                // H_0 = Hash(0, r, 0)
                 let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
                 let acc = &mut ();
 
-                sponge.start(parameter.clone(), None, acc);
-                SpongeAPI::absorb(
-                    &mut sponge,
-                    3,
-                    &[
-                        next_hash[0],
-                        F::from(self.udoc[access_at].clone() as u64),
-                        F::from((access_at) as u64),
-                    ],
-                    acc,
-                );
+                let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+                sponge.start(parameter, None, acc);
+
+                SpongeAPI::absorb(&mut sponge, 2, &[start_hash_or_blind, F::from(0)], acc);
                 next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-                sponge.finish(acc).unwrap(); // assert expected hash finished correctly
+                sponge.finish(acc).unwrap();
+            } else {
+                next_hash = vec![start_hash_or_blind];
             }
+
+            let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+            for b in 0..num_iters {
+                //self.batch_size {
+                let access_at = start + b;
+                if access_at < self.substring.1 {
+                    // else nothing
+
+                    // expected poseidon
+                    let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+                    let acc = &mut ();
+
+                    sponge.start(parameter.clone(), None, acc);
+                    SpongeAPI::absorb(
+                        &mut sponge,
+                        3,
+                        &[
+                            next_hash[0],
+                            F::from(self.udoc[access_at].clone() as u64),
+                            F::from((access_at) as u64),
+                        ],
+                        acc,
+                    );
+                    next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+                    sponge.finish(acc).unwrap(); // assert expected hash finished correctly
+                }
+            }
+
+            next_hash[0]
         }
-
-        next_hash[0]
-    }
-
+    */
     // PROVER
 
     pub fn prover_accepting_state(&self, state: Coord) -> u64 {
@@ -289,11 +294,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         if self.is_match {
             // proof of membership
-            if snfa.is_accepting(state) {
+            if self.snfa.is_accepting(state) {
                 out = true;
             }
         } else {
-            if !snfa.is_accepting(state) {
+            if !self.snfa.is_accepting(state) {
                 out = true;
             }
         }
@@ -311,6 +316,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // check if we need vs as vars
     fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
+        let num_chars = self.snfa.ab.len();
+        let num_states = self.total_states[self.total_states.len() - 1];
+
         let mut v = vec![];
         for i in 1..=self.batch_size {
             let v_i = term(
@@ -323,15 +331,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                                 Op::PfNaryOp(PfNaryOp::Mul),
                                 vec![
                                     new_var(format!("state_{}", i - 1)),
-                                    new_const(self.nfa.nstates() * self.nfa.nchars()),
+                                    new_const(num_states * num_chars),
                                 ],
                             ),
                             term(
                                 Op::PfNaryOp(PfNaryOp::Mul),
-                                vec![
-                                    new_var(format!("state_{}", i)),
-                                    new_const(self.nfa.nchars()),
-                                ],
+                                vec![new_var(format!("state_{}", i)), new_const(num_chars)],
                             ),
                         ],
                     ),
@@ -354,40 +359,41 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         v
     }
 
-    // TODO - we don't want it to always accept state 0
-    fn accepting_state_circuit(&mut self) {
-        // final state (non) match check
-        let vanishing_poly;
-        let final_states = self.nfa.accepting();
-        let non_final_states = self.nfa.non_accepting();
-        let mut vanish_on = vec![];
+    /*
+        // TODO - we don't want it to always accept state 0
+        fn accepting_state_circuit(&mut self) {
+            // final state (non) match check
+            let vanishing_poly;
+            let final_states = self.snfa.accepting();
+            let non_final_states = self.nfa.non_accepting();
+            let mut vanish_on = vec![];
 
-        if self.is_match {
-            // proof of membership
-            for xi in final_states.into_iter() {
-                vanish_on.push(Integer::from(xi));
+            if self.is_match {
+                // proof of membership
+                for xi in final_states.into_iter() {
+                    vanish_on.push(Integer::from(xi));
+                }
+            } else {
+                for xi in non_final_states.into_iter() {
+                    vanish_on.push(Integer::from(xi));
+                }
             }
-        } else {
-            for xi in non_final_states.into_iter() {
-                vanish_on.push(Integer::from(xi));
-            }
+            vanishing_poly =
+                poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
+
+            let match_term = term(
+                Op::Ite,
+                vec![
+                    term(Op::Eq, vec![new_const(0), vanishing_poly]),
+                    term(Op::Eq, vec![new_var(format!("accepting")), new_const(1)]),
+                    term(Op::Eq, vec![new_var(format!("accepting")), new_const(0)]),
+                ],
+            );
+
+            self.assertions.push(match_term);
+            self.pub_inputs.push(new_var(format!("accepting")));
         }
-        vanishing_poly =
-            poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
-
-        let match_term = term(
-            Op::Ite,
-            vec![
-                term(Op::Eq, vec![new_const(0), vanishing_poly]),
-                term(Op::Eq, vec![new_var(format!("accepting")), new_const(1)]),
-                term(Op::Eq, vec![new_var(format!("accepting")), new_const(0)]),
-            ],
-        );
-
-        self.assertions.push(match_term);
-        self.pub_inputs.push(new_var(format!("accepting")));
-    }
-
+    */
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
         let cs = Computation::from_constraint_system_parts(
             self.assertions.clone(),
@@ -436,22 +442,9 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
-    // TODO batch size (1 currently)
     fn to_polys(&mut self) -> (ProverData, VerifierData) {
         //let l_time = Instant::now();
         let lookup = self.lookup_idxs(false);
-
-        let mut evals = vec![];
-        for (si, c, so) in self.nfa.deltas() {
-            evals.push(
-                Integer::from(
-                    (si * self.nfa.nstates() * self.nfa.nchars())
-                        + (so * self.nfa.nchars())
-                        + self.nfa.ab_to_num(&c.to_string()),
-                )
-                .rem_floor(cfg().field().modulus()),
-            );
-        }
 
         //Makes big polynomial
         for i in 0..self.batch_size {
@@ -459,14 +452,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 Op::Eq,
                 vec![
                     new_const(0), // vanishing
-                    poly_eval_circuit(evals.clone(), lookup[i].clone()), // this means repeats, but I think circ
-                                                                         // takes care of; TODO also clones
+                    poly_eval_circuit(self.table.clone(), lookup[i].clone()), // this means repeats, but I think circ
+                                                                              // takes care of; TODO also clones
                 ],
             );
             self.assertions.push(eq);
         }
 
-        self.accepting_state_circuit();
+        // TODO NEW      self.accepting_state_circuit();
 
         match self.commit_type {
             JCommit::HashChain => {
@@ -704,7 +697,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs(true);
-        self.nlookup_gadget(lookups, self.nfa.nedges(), "nl");
+        self.nlookup_gadget(lookups, self.table.len(), "nl"); // len correct? TODO
 
         self.accepting_state_circuit(); // TODO
 
@@ -850,7 +843,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.pub_inputs
             .push(new_var(format!("{}_next_running_claim", id)));
     }
-
+    /*
     pub fn gen_wit_i(
         &self,
         batch_num: usize,
@@ -1404,7 +1397,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 )
             }
         }
-    }
+    }*/
 }
 
 pub fn ceil_div(a: usize, b: usize) -> usize {
@@ -1744,7 +1737,7 @@ mod tests {
             "a".to_string(),
             "^a*$".to_string(),
             "aaaa".to_string(),
-            vec![1, 2],
+            vec![1], // 2],
             true,
         );
     }
