@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::collections::{HashSet, LinkedList};
+use std::collections::{HashSet, HashMap, BTreeSet, LinkedList};
 use std::process::Command;
 
 use petgraph::Graph;
@@ -12,42 +12,103 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::result::Result;
 
-use crate::regex::{Regex, RegexF, JumpType};
+use crate::regex::{Regex, RegexF};
 use crate::nfa::EPSILON;
 use rayon::iter::*;
 
 use core::fmt;
 use core::fmt::{Display,Formatter};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Jump(JumpType, usize);
-
-#[derive(Debug, Clone)]
-pub struct SNFA<C: Clone> {
-    /// Alphabet
-    pub ab: Vec<C>,
-
-    /// A hypergraph
-    pub hg: Vec<Graph<Either<Regex, Jump>, Option<C>>>,
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Skip {
+    Offset(usize),
+    Choice(BTreeSet<usize>),
+    Star
 }
 
-impl Display for Jump {
+impl Skip {
+    pub fn range(i: usize, j: usize) -> Self {
+        if i == j {
+            Skip::Offset(i)
+        } else {
+            Skip::Choice((i..=j).collect())
+        }
+    }
+
+    pub fn epsilon() -> Self {
+        Skip::Offset(0)
+    }
+    /// Sequential composition of two jumps is a jump
+    pub fn then(&self, a: &Skip) -> Skip {
+        match (self, a) {
+            (Skip::Offset(0), _) => a.clone(),
+            (Skip::Offset(i), Skip::Offset(j)) => Skip::Offset(i+j),
+            (Skip::Offset(i), Skip::Choice(x)) | (Skip::Choice(x), Skip::Offset(i)) =>
+                Skip::Choice(x.into_iter().map(|x| x + i).collect()),
+            (Skip::Choice(x), Skip::Choice(y)) => {
+                let mut s = BTreeSet::new();
+                for i in x.into_iter() {
+                    for j in y.into_iter() {
+                        s.insert(i + j);
+                    }
+                }
+                Skip::Choice(s)
+            },
+            (Skip::Star, _) | (_, Skip::Star) => Skip::Star
+        }
+    }
+}
+
+impl fmt::Display for Skip {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Jump({} -> {})", self.0, self.1)
+        match self {
+            Skip::Offset(u) if *u == 0 => write!(f, "ε"),
+            Skip::Offset(u) => write!(f, "+{}", u),
+            Skip::Choice(us) => write!(f, "{:?}", us),
+            Skip::Star => write!(f, "*")
+        }
     }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Either<A,B>(Result<A, B>);
+pub struct Either<A, B>(Result<A, B>);
 
-impl<A,B> Either<A,B> {
+impl<A, B> Either<A, B> {
     fn left(a: A) -> Self {
-        Either(Ok(a))
+        Self(Ok(a))
     }
     fn right(b: B) -> Self {
-        Either(Err(b))
+        Self(Err(b))
+    }
+    fn is_left(&self) -> bool {
+        self.0.is_ok()
+    }
+    fn is_right(&self) -> bool {
+        self.0.is_err()
     }
 }
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct Quant<A>(A, bool);
+
+impl<A: Clone> Quant<A> {
+    fn and(a: A) -> Self {
+        Self(a, true)
+    }
+    fn or(a: A) -> Self {
+        Self(a, false)
+    }
+    fn is_and(&self) -> bool {
+        self.1
+    }
+    fn is_or(&self) -> bool {
+        !self.1
+    }
+    fn get(&self) -> A {
+        self.0.clone()
+    }
+}
+
 impl<A: Display, B: Display> Display for Either<A, B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.0 {
@@ -57,156 +118,188 @@ impl<A: Display, B: Display> Display for Either<A, B> {
     }
 }
 
-type Coord = (usize, NodeIndex<u32>);
+impl<A: Display> Display for Quant<A> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.1 {
+            write!(f, "∀ {}", self.0)
+        } else {
+            write!(f, "∃ {}", self.0)
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SNFA<C: Clone> {
+    /// Alphabet
+    pub ab: Vec<C>,
+
+    /// A graph
+    pub g: Graph<Quant<Regex>, Either<C, Skip>>,
+}
 
 impl SNFA<char> {
-
+    /// Shallow constructor
     pub fn new<'a>(alphabet: &'a str, re: &Regex) -> Self {
         let ab = alphabet.chars().sorted().collect();
-        let mut s = Self {
-            ab,
-            hg: Vec::new(),
-        };
-        let n = s.add_re(0, re.clone());
-        s.build((0, n), re.clone());
+        let mut g: Graph<Quant<Regex>, Either<char, Skip>> = Graph::new();
+        let n_init = g.add_node(Quant::and(re.clone()));
+        g.add_edge(n_init, n_init, SNFA::epsilon());
+        let mut s = Self { ab, g };
+        s.add(n_init, re);
         s
     }
 
-    pub fn build_deriv(&mut self, from: Coord, q: Regex) {
-        // Take all the single character steps
-        for c in self.ab.clone() {
-            let q_c = q.deriv(&c);
-            if let Some(n_c) = self.find_re(from.0, &q_c) {
-                // State [q_c] exists already, add edge
-                self.hg[from.0].add_edge(from.1, n_c, Some(c));
-            } else if let Some(n_o) = self.find_edge_endpoint(from, c) {
-                // State[q_c] is new, but if transition from q-[c]> n_o exists
-                let mw_o = self.hg[from.0].node_weight_mut(n_o)
-                            .expect("Getting mutable reference to [n_o]");
-                let re_o = mw_o.0.clone()
-                            .expect("Expecting a regex from a char transition");
-                let new_re = Regex::alt(re_o, q_c);
-                *mw_o = Either::left(new_re.clone());
-                self.build((from.0, n_o), new_re);
+    /// Add a regex to position [from] (an Or by default)
+    fn add_skip(&mut self, n: NodeIndex<u32>, skip: Skip, q_c: &Regex) {
+        if let Some(n_c) = self.g.node_indices().find(|i|
+                                &self.g[*i].get() == q_c && self.g[*i].is_or()) {
+            self.g.add_edge(n, n_c, Either::right(skip));
+        } else {
+            // Add to graph if not already there
+            let n_c = self.g.add_node(Quant::or(q_c.clone()));
+            // Reflexive step
+            self.g.add_edge(n_c, n_c, SNFA::epsilon());
+            self.g.add_edge(n, n_c, Either::right(skip));
+            // Recurse on child [q_c]
+            self.add(n_c, &q_c);
+        }
+    }
+
+    fn add_derivatives(&mut self, from: NodeIndex<u32>, q: &Regex) {
+      let n =
+        if let Some(n) = self.g.node_indices().find(|i| self.g[*i] == Quant::or(q.clone())) {
+            if n != from {
+                self.g.add_edge(from, n, SNFA::epsilon());
+            }
+            n
+        } else {
+            if self.g[from].is_or() {
+              from
             } else {
-                // Add to NFA if not already there
-                let n_c = self.add_re(from.0, q_c.clone());
+              // Add an OR node to graph if not already there
+              let n = self.g.add_node(Quant::or(q.clone()));
+              self.g.add_edge(n, n, SNFA::epsilon());
+              // Reflexive step
+              self.g.add_edge(from, n, SNFA::epsilon());
+              n
+            }
+        };
+
+        // Take all the single character steps
+        for c in self.ab.clone().iter() {
+            let q_c = q.deriv(&c);
+            if let Some(n_c) = self.g.node_indices().find(|i| self.g[*i] == Quant::or(q_c.clone())) {
+                self.g.add_edge(n, n_c, Either::left(*c));
+            } else {
+                // Add to graph if not already there
+                let n_c = self.g.add_node(Quant::or(q_c.clone()));
                 // Reflexive step
-                self.hg[from.0].add_edge(from.1, n_c, Some(c));
-                self.build((from.0, n_c), q_c);
+                self.g.add_edge(n_c, n_c, SNFA::epsilon());
+                self.g.add_edge(n, n_c, Either::left(*c));
+                self.add(n_c, &q_c);
             }
         }
     }
 
-    /// Mutually recursive, build hypergraph
-    pub fn build(&mut self, from: Coord, q: Regex) {
-        let ab = &self.ab;
-        match *q.0 {
-            // .*
-            RegexF::Star(ref a) if a.accepts_any(ab) =>
-                self.add_jump(from, JumpType::Star, Regex::nil()),
-            // .{i,j}
-            RegexF::Range(ref a, x, y) if a.accepts_any(ab) && !a.nullable() =>
-                self.add_jump(from, JumpType::range(x, y), Regex::nil()),
-            // (?=r)
-            RegexF::Lookahead(ref a) =>
-                self.add_jump(from, JumpType::Offset(0), a.clone()),
-            RegexF::Alt(ref a, ref b) => {
-                self.build(from, a.clone());
-                self.build(from, b.clone());
-            },
-            RegexF::App(ref a, ref b) => {
-                match *a.0 {
-                    // .*r
-                    RegexF::Star(ref a) if a.accepts_any(ab) =>
-                        self.add_jump(from, JumpType::Star, b.clone()),
-                    // .{i,j}r
-                    RegexF::Range(ref a, x, y) if a.accepts_any(ab) =>
-                        self.add_jump(from, JumpType::range(x, y), b.clone()),
-                    // (?=r1)r2
-                    RegexF::Lookahead(ref a) => {
-                        self.add_jump(from, JumpType::Offset(0), a.clone());
-                        self.add_jump(from, JumpType::Offset(0), b.clone());
-                    },
-                    RegexF::Alt(ref x, ref y) => {
-                        self.build(from, x.clone());
-                        self.build(from, y.clone());
-                        self.build(from, b.clone());
-                    },
-                    // Re-associate [app] right if needed
-                    RegexF::App(ref x, ref y) =>
-                        self.build(from, Regex::app(x.clone(), Regex::app(y.clone(), b.clone()))),
-                    // Some other kind of app, use derivatives
-                    _ => self.build_deriv(from, q)
-                }},
-            // Other (derivative)
-            _ => self.build_deriv(from, q)
-        }
+    fn to_and(&mut self, from: NodeIndex<u32>) {
+        self.g[from] = Quant::and(self.g[from].get());
     }
 
-    /// Add a jump node to the graph at position [Coord]
-    pub fn add_jump(&mut self, from: Coord, jt: JumpType, re: Regex) {
-        // the new graph is hg[m]
-        let m = self.hg.len();
-        let root = (m, self.add_re(m, re.clone()));
-        // Add the jump hg[from.0] -> hg[m]
-        let n_jmp = self.hg[from.0].add_node(Either::right(Jump(jt, m)));
-        self.hg[from.0].add_edge(from.1, n_jmp, None);
-        // Recursively build the new graph hg[m]
-        self.build(root, re);
+    fn to_or(&mut self, from: NodeIndex<u32>) {
+        self.g[from] = Quant::or(self.g[from].get());
+    }
+
+    fn add(&mut self, from: NodeIndex<u32>, q: &Regex) {
+        match *q.0 {
+            // .*
+            RegexF::Star(ref a) if a.accepts_any(&self.ab) =>
+              self.add_skip(from, Skip::Star, &Regex::nil()),
+            // .{i,j}
+            RegexF::Range(ref a, x, y) if a.accepts_any(&self.ab) && !a.nullable() =>
+              self.add_skip(from, Skip::range(x, y), &Regex::nil()),
+            // (?=r)
+            RegexF::Lookahead(ref a) => {
+              self.to_and(from);
+              self.add_skip(from, Skip::epsilon(), a)
+            },
+            // (r | r')
+            RegexF::Alt(_, _) => {
+              q.to_alt_list()
+               .into_iter()
+               .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
+            },
+            // r1r2
+            RegexF::App(ref a, ref b) => {
+              match *a.0 {
+                  // .*r
+                  RegexF::Star(ref a) if a.accepts_any(&self.ab) =>
+                      self.add_skip(from, Skip::Star, b),
+                  // .{i,j}r
+                  RegexF::Range(ref a, x, y) if a.accepts_any(&self.ab) =>
+                      self.add_skip(from, Skip::range(x, y), b),
+                  // (?=r1)r2
+                  RegexF::Lookahead(ref a) => {
+                      self.to_and(from);
+                      self.add_skip(from, Skip::epsilon(), a);
+                      self.add_skip(from, Skip::epsilon(), b);
+                  },
+                  // Distributivity with alt
+                  RegexF::Alt(ref x, ref y) =>
+                    self.add(from,
+                        &Regex::alt(
+                            Regex::app(x.clone(), b.clone()),
+                            Regex::app(y.clone(), b.clone()))),
+                  // Some other kind of app
+                  _ => self.add_derivatives(from, q)
+              }
+            },
+            // Other (derivative)
+            _ => self.add_derivatives(from, q)
+        }
     }
 
     /// From SNFA<char> -> SNFA<String>
     pub fn as_str_snfa(&self) -> SNFA<String> {
         SNFA {
             ab: self.ab.iter().map(|c| c.to_string()).collect(),
-            hg: self.hg.iter()
-                    .map(|g| g.map(|_, b| b.clone(),
-                        |_,e| e.map(|c| c.to_string())))
-                    .collect::<Vec<Graph<Either<Regex, Jump>, Option<String>>>>(),
+            g: self.g.map(|_, b| b.clone(),
+                          |_, e| Either(e.clone().0.map(|c| c.to_string())))
         }
     }
 }
 
-type Moves = LinkedList<(Coord, usize)>;
-
 impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> SNFA<C> {
-    pub fn add_re(&mut self, i: usize, re: Regex) -> NodeIndex<u32> {
-        while i >= self.hg.len() {
-            self.hg.push(Graph::new());
-        }
-        let n_k = self.hg[i].add_node(Either::left(re));
-        self.hg[i].add_edge(n_k, n_k, None);
-        n_k
+    /// To regular expression (root node)
+    pub fn to_regex(&self) -> Regex {
+        self.g[NodeIndex::new(0)].get()
     }
 
-    pub fn is_start_anchored(&self, from: Coord) -> bool {
-        match self.hg[from.0][from.1].0 {
-            Ok(ref re) => re.is_start_anchored(),
-            Err(Jump(_, ref to)) => self.is_start_anchored((*to, NodeIndex::new(0)))
-        }
+    pub fn is_start_anchored(&self, from: NodeIndex<u32>) -> bool {
+        self.g[from].get().is_start_anchored()
     }
 
-    pub fn is_end_anchored(&self, from: Coord) -> bool {
-        match self.hg[from.0][from.1].0 {
-            Ok(ref re) => re.is_end_anchored(),
-            Err(Jump(_, ref to)) => self.is_end_anchored((*to, NodeIndex::new(0)))
-        }
+    pub fn is_end_anchored(&self, from: NodeIndex<u32>) -> bool {
+        self.g[from].get().is_end_anchored()
     }
 
+    /// An epsilon transition
+    fn epsilon() -> Either<C, Skip> {
+        Either::right(Skip::Offset(0))
+    }
 
     /// Find regular expression in graph [i]
-    pub fn find_re(&self, i: usize, re: &Regex) -> Option<NodeIndex<u32>> {
-        self.hg[i].node_indices().find(|x| self.hg[i][*x].0 == Ok(re.clone()))
+    pub fn find_regex(&self, re: &Regex) -> Option<NodeIndex<u32>> {
+        self.g.node_indices().find(|x| &self.g[*x].get() == re)
     }
 
+    /*
     /// If an edge [c] exists from [from] returns the other endpoint
     pub fn find_edge_endpoint(&self, from: Coord, c: C) -> Option<NodeIndex<u32>> {
         self.hg[from.0].edges(from.1)
             .find_map(|e| if e.weight().as_ref() == Some(&c) { Some(e.target()) } else { None })
     }
 
-    fn deltas_one_step(&self, from: Coord) -> HashSet<(Coord, Option<C>, Coord, Option<JumpType>)> {
+    fn deltas_one_step(&self, from: Coord) -> HashSet<(Coord, Option<C>, Coord, Option<Skip>)> {
         match self.hg[from.0][from.1].0 {
             Err(Jump(ref j1, next)) => {
                 self.deltas_one_step((next, NodeIndex::new(0)))
@@ -232,9 +325,9 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         }
     }
 
-    pub fn deltas(&self) -> Vec<(Coord, Option<C>, Coord, Option<JumpType>)> {
+    pub fn deltas(&self) -> Vec<(Coord, Option<C>, Coord, Option<Skip>)> {
         let mut i: usize = 0;
-        let mut res: HashSet<(Coord, Option<C>, Coord, Option<JumpType>)> = HashSet::new();
+        let mut res: HashSet<(Coord, Option<C>, Coord, Option<Skip>)> = HashSet::new();
 
         for g in self.hg.iter() {
             for j in g.node_indices() {
@@ -250,14 +343,14 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
     }
 
     /// Is this a state with jumps
-    pub fn is_jump_pad(&self, from: Coord) -> bool {
+    fn is_jump_pad(&self, from: Coord) -> bool {
         self.hg[from.0].edges(from.1)
                        .filter(|e| e.target() != from.1)
                        .all(|e| self.hg[from.0][e.target()].0.is_err() && e.weight().is_none())
     }
 
     /// Is this a state with derivatives
-    pub fn is_deriv_pad(&self, from: Coord) -> bool {
+    fn is_deriv_pad(&self, from: Coord) -> bool {
         self.hg[from.0].edges(from.1)
                        .filter(|e| e.target() != from.1)
                        .all(|e| self.hg[from.0][e.target()].0.is_ok() && e.weight().is_some())
@@ -285,8 +378,8 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         (0, NodeIndex::new(0))
     }
 
-    pub fn get_node(&self, i: Coord) -> Result<Regex, Jump> {
-        self.hg[i.0][i.1].0.clone()
+    pub fn get_node(&self, i: Coord) -> Either<Regex, Jump> {
+        self.hg[i.0][i.1].clone()
     }
 
     /// Match the SNFA on a document (backtracking)
@@ -298,11 +391,11 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
     fn is_accepting(&self, from: Coord) -> bool {
         match self.hg[from.0][from.1].0.clone() {
             Ok(re) if re.nullable() => true,
-            Err(Jump(JumpType::Offset(offset), nfa_dest)) if offset == 0 =>
+            Err(Jump(Skip::Offset(offset), nfa_dest)) if offset == 0 =>
                 self.is_accepting((nfa_dest, NodeIndex::new(0))),
-            Err(Jump(JumpType::Choice(offsets), nfa_dest)) if offsets.contains(&0) =>
+            Err(Jump(Skip::Choice(offsets), nfa_dest)) if offsets.contains(&0) =>
                 self.is_accepting((nfa_dest, NodeIndex::new(0))),
-            Err(Jump(JumpType::Star, nfa_dest)) =>
+            Err(Jump(Skip::Star, nfa_dest)) =>
                 self.is_accepting((nfa_dest, NodeIndex::new(0))),
             _ => false
         }
@@ -310,14 +403,14 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
 
     fn solve_jump(&self, jmp: &Jump, doc: &Vec<C>, i: usize) -> Option<LinkedList<Moves>> {
         match jmp {
-            Jump(JumpType::Offset(offset), nfa_dest) =>
+            Jump(Skip::Offset(offset), nfa_dest) =>
                 self.solve_rec((*nfa_dest, NodeIndex::new(0)), doc, i + offset),
-            Jump(JumpType::Choice(offsets), nfa_dest) =>
+            Jump(Skip::Choice(offsets), nfa_dest) =>
                 // Parallelize this
                 offsets.into_par_iter()
                        .filter(|&o| i + o < doc.len())
                        .find_map_any(|o| self.solve_rec((*nfa_dest, NodeIndex::new(0)), doc, i + o)),
-            Jump(JumpType::Star, nfa_dest) =>
+            Jump(Skip::Star, nfa_dest) =>
                 (i..doc.len())
                     .into_par_iter()
                     .find_map_any(|j| self.solve_rec((*nfa_dest, NodeIndex::new(0)), doc, j))
@@ -367,74 +460,31 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
             }
             Some(paths)
         }
-    }
+    } */
 }
 
 impl SNFA<String> {
-    /// Write DOT -> PDF files for all graphs
+    /// Write DOT -> PDF file
     pub fn write_pdf(&self,  filename: &str) -> std::io::Result<()> {
-        fn write_text_pdf(s: &String, f: &str) {
-            let (doc, page1, layer1) = PdfDocument::new(s, Mm(210.0), Mm(297.0), "Layer 1");
-            let current_layer = doc.get_page(page1).get_layer(layer1);
+        let s: String = Dot::new(&self.g).to_string();
+        let fdot = format!("{}.dot", filename.to_string());
+        std::fs::write(fdot.clone(), s)?;
 
-            // Add some text to the document
-            let font = doc.add_builtin_font(BuiltinFont::HelveticaBold).unwrap();
-            current_layer.set_font(&font, 32.0);
-            current_layer.set_line_height(20.0);
-            current_layer.use_text(s, 32.0, Mm(10.0), Mm(100.0), &font);
-            current_layer.end_text_section();
+        let fpdf = format!("{}.pdf", filename.to_string());
 
-            let file = File::create(f).unwrap();
-            let mut buf_writer = BufWriter::new(file);
-            doc.save(&mut buf_writer).unwrap();
-        }
-
-        let mut files: Vec<String> = Vec::new();
-        let mut i = 0;
-        for g in self.hg.iter() {
-          let pg = g.map(|_, b| b.clone(),
-                         |_, e| e.clone().unwrap_or(EPSILON.clone()));
-
-          let s: String = Dot::new(&pg).to_string();
-          let fdot = format!("{}-{}.dot", filename.to_string(), i);
-          std::fs::write(fdot.clone(), s)?;
-
-          let fpdf = format!("{}-{}.pdf", filename.to_string(), i);
-          let ftxt = format!("text-{}-{}.pdf", filename.to_string(), i);
-
-          // Convert to pdf
-          Command::new("dot")
-              .arg("-Tpdf")
-              .arg(fdot.clone())
-              .arg("-o")
-              .arg(fpdf.clone())
-              .spawn()
-              .expect("[dot] CLI failed to convert dfa to [pdf] file")
-              .wait()?;
-
-          // Remove DOT file
-          std::fs::remove_file(fdot)?;
-
-          write_text_pdf(&format!("Graph {}", i), &ftxt);
-          files.push(ftxt);
-          files.push(fpdf);
-          i += 1;
-        }
-
-        let fout = format!("{}.pdf", filename.to_string());
-        Command::new("pdfjam")
-            .args(files.clone())
+        // Convert to pdf
+        Command::new("dot")
+            .arg("-Tpdf")
+            .arg(fdot.clone())
             .arg("-o")
-            .arg(fout.clone())
+            .arg(fpdf.clone())
             .spawn()
             .expect("[dot] CLI failed to convert dfa to [pdf] file")
             .wait()?;
 
-        println!("Wrote PDF file {}.", fout);
-        for fout in files.clone() {
-            std::fs::remove_file(fout)?;
-        }
-        Ok(())
+          // Remove DOT file
+          std::fs::remove_file(fdot)?;
+          Ok(())
     }
 }
 
@@ -445,19 +495,21 @@ mod tests {
 
     #[test]
     fn test_snfa() {
-        let r = Regex::new("((?=b)(?=.))b.{1,2}ab");
+        let r = Regex::new("(?=b)(?=.)(baaaaa|.*b).{1,2}");
         let snfa = SNFA::new("ab", &r);
         snfa.as_str_snfa().write_pdf("snfa").unwrap();
-        let doc = "baab".chars().collect();
-        let sol = snfa.solve(&doc);
-        println!("DELTAS");
-        for d in snfa.deltas() {
-            println!("{:?}", d);
-        }
-        println!("SOLUTION: ");
-        for s in sol {
-            println!("{:?}", s);
-        }
+        // let strdoc = "baaaaab";
+        // let doc = strdoc.chars().collect();
+        // let sol = snfa.solve(&doc);
+        // println!("DELTAS");
+        // for d in snfa.deltas() {
+        //    println!("{:?}", d);
+        // }
+        // println!("SOLUTION for: {}", strdoc);
+        // for s in sol {
+        //   println!("{}", s.into_iter().map(|x| format!("{} @ {}",
+        //       snfa.get_node(x.0), x.1)).collect::<Vec<String>>().join("\n"));
+        // }
     }
 
 }
