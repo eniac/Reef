@@ -7,7 +7,6 @@ use petgraph::graph::NodeIndex;
 use petgraph::dot::Dot;
 use petgraph::visit::*;
 
-use printpdf::*;
 use std::fs::File;
 use std::io::BufWriter;
 use std::result::Result;
@@ -70,7 +69,7 @@ impl fmt::Display for Skip {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Either<A, B>(Result<A, B>);
 
 impl<A, B> Either<A, B> {
@@ -88,7 +87,7 @@ impl<A, B> Either<A, B> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Quant<A>(A, bool);
 
 impl<A: Clone> Quant<A> {
@@ -165,6 +164,7 @@ impl SAFA<char> {
         }
     }
 
+    /// Add derivative of a node in the graph
     fn add_derivatives(&mut self, from: NodeIndex<u32>, q: &Regex) {
       let n =
         if let Some(n) = self.g.node_indices().find(|i| self.g[*i] == Quant::or(q.clone())) {
@@ -268,6 +268,7 @@ impl SAFA<char> {
     }
 }
 
+
 impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> SAFA<C> {
     /// To regular expression (root node)
     pub fn to_regex(&self) -> Regex {
@@ -287,60 +288,118 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         Either::right(Skip::Offset(0))
     }
 
+    /// Return a vector of (NFA id, node) of all accepting states
+    pub fn accepting(&self) -> Vec<NodeIndex<u32>> {
+        let mut res: Vec<_> = Vec::new();
+
+        for n in self.g.node_indices() {
+            if self.g[n].get().nullable() {
+                res.push(n);
+            }
+        }
+        res
+    }
+
+    /// Get initial state
+    pub fn get_init(&self) -> NodeIndex<u32> {
+        NodeIndex::new(0)
+    }
+
     /// Find regular expression in graph [i]
     pub fn find_regex(&self, re: &Regex) -> Option<NodeIndex<u32>> {
         self.g.node_indices().find(|x| &self.g[*x].get() == re)
     }
 
-    /*
-    /// If an edge [c] exists from [from] returns the other endpoint
-    pub fn find_edge_endpoint(&self, from: Coord, c: C) -> Option<NodeIndex<u32>> {
-        self.hg[from.0].edges(from.1)
-            .find_map(|e| if e.weight().as_ref() == Some(&c) { Some(e.target()) } else { None })
+    pub fn deltas(&self) -> BTreeSet<(Quant<NodeIndex<u32>>, Either<C, Skip>, NodeIndex<u32>)> {
+        self.g.node_indices().flat_map(|n|
+            self.g.edges(n).map(|e|
+                if self.g[e.source()].is_and() {
+                    (Quant::and(e.source()), e.weight().clone(), e.target())
+                } else {
+                    (Quant::or(e.source()), e.weight().clone(), e.target())
+                })).collect()
     }
 
-    fn deltas_one_step(&self, from: Coord) -> HashSet<(Coord, Option<C>, Coord, Option<Skip>)> {
-        match self.hg[from.0][from.1].0 {
-            Err(Jump(ref j1, next)) => {
-                self.deltas_one_step((next, NodeIndex::new(0)))
-                    .into_iter()
-                    .map(|(a,w,b,j)| match j {
-                        Some(j2) => (a,w,b,Some(j1.then(&j2))),
-                        None => (a,w,b,Some(j1.clone()))
-                    }).collect()
+    /// Find the largest continuous matching string of characters
+    /// exclusive both in [node index] and [usize] that didn't match
+    pub fn solve_char(&self, c: C, next: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> Option<(NodeIndex<u32>, usize, usize)> {
+        if c == doc[i] {
+            if let Some((nn, a, b)) =
+                self.g.edges(next)
+                      .find_map(|e| self.solve_char(e.weight().0.clone().ok()?, e.target(), i+1, doc)) {
+                Some((nn, a-1, b))
+            } else { Some((next, i, i+1)) }
+        } else {
+            None
+        }
+    }
+
+    /// Recursively solve an edge and all the children coming off of it
+    fn solve_edge(&self, e: &Either<C, Skip>, from: NodeIndex<u32>, to: NodeIndex<u32>, i: usize, doc: &Vec<C>) ->
+        Option<Vec<(NodeIndex<u32>, usize, usize)>> {
+        match e.0 {
+            Ok(ref c) => {
+                let (n, a, b) = self.solve_char(c.clone(), to, i, doc)?;
+                let mut sols = self.solve_rec(n, b, doc)?;
+                sols.insert(0, (from, a, b));
+                Some(sols)
             },
-            Ok(_) =>
-                Some((from, None, from, None))
-                    .into_iter()
-                    .chain(self.hg[from.0]
-                            .edges(from.1) // epsilon transitions
-                            .filter(|e| e.target() != from.1 && e.weight().is_none())
-                            .flat_map(|e| self.deltas_one_step((from.0, e.target())))
-                            .map(|(_, w, x, j)| (from, w, x, j))
-                    ).chain(self.hg[from.0]
-                            .edges(from.1) // Non-epsilon transitions
-                            .filter(|e| e.target() != from.1 && e.weight().is_some())
-                            .map(|e| (from, e.weight().clone(), (from.0, e.target()), None))
-                    ).collect::<HashSet<_>>()
+            Err(Skip::Offset(n)) => self.solve_rec(to, i+n, doc),
+            Err(Skip::Choice(ref ns)) =>
+                ns.into_par_iter()
+                  .find_map_any(|n| self.solve_rec(to, i+n, doc)),
+            Err(Skip::Star) =>
+                (i..doc.len())
+                    .into_par_iter()
+                    .find_map_any(|n| self.solve_rec(to, i+n, doc))
         }
     }
 
-    pub fn deltas(&self) -> Vec<(Coord, Option<C>, Coord, Option<Skip>)> {
-        let mut i: usize = 0;
-        let mut res: HashSet<(Coord, Option<C>, Coord, Option<Skip>)> = HashSet::new();
+    /// Find a non-empty list of continuous matching document strings, as well as the sub-AFA that matched them
+    fn solve_rec(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> Option<Vec<(NodeIndex<u32>, usize, usize)>> {
+        let mut start_idxs = Vec::new();
 
-        for g in self.hg.iter() {
-            for j in g.node_indices() {
-                if let Ok(_) = g[j].0.clone() {
-                    for x in self.deltas_one_step((i, j)) {
-                        res.insert(x);
-                    }
+        // Iterate over all postfixes of doc
+        if self.is_start_anchored(n) {
+            start_idxs.push(i);
+        } else {
+            start_idxs.append(&mut (i..doc.len()).collect());
+        }
+
+        let accepting = &self.accepting();
+
+        // Initial state is also accepting
+        if accepting.contains(&n) && (!self.is_end_anchored(n) || doc.len() == 0) {
+            return Some(vec![(n, 0, 0)]);
+        }
+
+        // For every postfix of doc (O(n^2))
+        start_idxs.into_par_iter().find_map_any(|i| {
+            let mut next = self.g.edges(n);
+            if self.g[n].is_and() {
+                // All of the next entries must have solutions
+                let subsolutions : Vec<_> = next.into_iter()
+                    .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
+                    .collect();
+
+                // All of them need to be
+                if subsolutions.iter().all(Option::is_some) {
+                    Some(subsolutions.into_iter().flat_map(Option::unwrap).collect())
+                } else {
+                    None
                 }
+            } else {
+                // One of the next entries must has a solution
+                next.find_map(|e|
+                    self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
             }
-            i += 1;
-        }
-        res.into_iter().sorted().collect()
+        })
     }
+
+    pub fn solve(&self, doc: &Vec<C>) -> Option<Vec<(NodeIndex<u32>, usize, usize)>> {
+        self.solve_rec(self.get_init(), 0, doc)
+    }
+    /*
 
     /// Is this a state with jumps
     fn is_jump_pad(&self, from: Coord) -> bool {
@@ -354,32 +413,6 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         self.hg[from.0].edges(from.1)
                        .filter(|e| e.target() != from.1)
                        .all(|e| self.hg[from.0][e.target()].0.is_ok() && e.weight().is_some())
-    }
-
-    /// Return a vector of (NFA id, node) of all accepting states
-    pub fn accepting(&self) -> Vec<Coord> {
-        let mut i: usize = 0;
-        let mut res: Vec<Coord> = Vec::new();
-
-        for g in self.hg.iter() {
-            for j in g.node_indices() {
-                if let Ok(re) = g[j].0.clone() {
-                    if re.nullable() {
-                        res.push((i, j))
-                    }
-                }
-            }
-            i += 1;
-        }
-        res
-    }
-
-    pub fn get_init(&self) -> Coord {
-        (0, NodeIndex::new(0))
-    }
-
-    pub fn get_node(&self, i: Coord) -> Either<Regex, Jump> {
-        self.hg[i.0][i.1].clone()
     }
 
     /// Match the SAFA on a document (backtracking)
@@ -490,26 +523,23 @@ impl SAFA<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::snfa::SAFA;
+    use crate::safa::SAFA;
     use crate::regex::Regex;
 
     #[test]
     fn test_snfa() {
         let r = Regex::new("(?=b)(?=a?)(baa|.*b)(.?){1,2}");
-        let snfa = SAFA::new("ab", &r);
-        snfa.as_str_snfa().write_pdf("snfa").unwrap();
-        // let strdoc = "baaaaab";
-        // let doc = strdoc.chars().collect();
-        // let sol = snfa.solve(&doc);
-        // println!("DELTAS");
-        // for d in snfa.deltas() {
-        //    println!("{:?}", d);
-        // }
-        // println!("SOLUTION for: {}", strdoc);
-        // for s in sol {
-        //   println!("{}", s.into_iter().map(|x| format!("{} @ {}",
-        //       snfa.get_node(x.0), x.1)).collect::<Vec<String>>().join("\n"));
-        // }
+        let safa = SAFA::new("ab", &r);
+        safa.as_str_snfa().write_pdf("safa").unwrap();
+        let strdoc = "baaaaab";
+        let doc = strdoc.chars().collect();
+
+        println!("DELTAS");
+        for d in safa.deltas() {
+           println!("{:?}", d);
+        }
+        println!("SOLUTION for: {}", strdoc);
+        println!("{:?}", safa.solve(&doc));
     }
 
 }
