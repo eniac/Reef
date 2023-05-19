@@ -289,6 +289,7 @@ impl Regex {
     pub fn nullable(&self) -> bool {
         match *self.0 {
             RegexF::Nil | RegexF::LineEnd | RegexF::LineStart | RegexF::Star(_) => true,
+            RegexF::Range(_, i, _) if i == 0 => true,
             RegexF::Empty | RegexF::Char(_) | RegexF::Dot | RegexF::Range(_, _, _) | RegexF::Lookahead(_) => false,
             RegexF::Not(ref r) => !r.nullable(),
             RegexF::App(ref a, ref b) => a.nullable() && b.nullable(),

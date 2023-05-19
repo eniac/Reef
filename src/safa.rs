@@ -129,7 +129,7 @@ impl<A: Display> Display for Quant<A> {
 }
 
 #[derive(Debug, Clone)]
-pub struct SNFA<C: Clone> {
+pub struct SAFA<C: Clone> {
     /// Alphabet
     pub ab: Vec<C>,
 
@@ -137,13 +137,13 @@ pub struct SNFA<C: Clone> {
     pub g: Graph<Quant<Regex>, Either<C, Skip>>,
 }
 
-impl SNFA<char> {
+impl SAFA<char> {
     /// Shallow constructor
     pub fn new<'a>(alphabet: &'a str, re: &Regex) -> Self {
         let ab = alphabet.chars().sorted().collect();
         let mut g: Graph<Quant<Regex>, Either<char, Skip>> = Graph::new();
         let n_init = g.add_node(Quant::and(re.clone()));
-        g.add_edge(n_init, n_init, SNFA::epsilon());
+        g.add_edge(n_init, n_init, SAFA::epsilon());
         let mut s = Self { ab, g };
         s.add(n_init, re);
         s
@@ -158,7 +158,7 @@ impl SNFA<char> {
             // Add to graph if not already there
             let n_c = self.g.add_node(Quant::or(q_c.clone()));
             // Reflexive step
-            self.g.add_edge(n_c, n_c, SNFA::epsilon());
+            self.g.add_edge(n_c, n_c, SAFA::epsilon());
             self.g.add_edge(n, n_c, Either::right(skip));
             // Recurse on child [q_c]
             self.add(n_c, &q_c);
@@ -169,7 +169,7 @@ impl SNFA<char> {
       let n =
         if let Some(n) = self.g.node_indices().find(|i| self.g[*i] == Quant::or(q.clone())) {
             if n != from {
-                self.g.add_edge(from, n, SNFA::epsilon());
+                self.g.add_edge(from, n, SAFA::epsilon());
             }
             n
         } else {
@@ -178,9 +178,9 @@ impl SNFA<char> {
             } else {
               // Add an OR node to graph if not already there
               let n = self.g.add_node(Quant::or(q.clone()));
-              self.g.add_edge(n, n, SNFA::epsilon());
+              self.g.add_edge(n, n, SAFA::epsilon());
               // Reflexive step
-              self.g.add_edge(from, n, SNFA::epsilon());
+              self.g.add_edge(from, n, SAFA::epsilon());
               n
             }
         };
@@ -194,7 +194,7 @@ impl SNFA<char> {
                 // Add to graph if not already there
                 let n_c = self.g.add_node(Quant::or(q_c.clone()));
                 // Reflexive step
-                self.g.add_edge(n_c, n_c, SNFA::epsilon());
+                self.g.add_edge(n_c, n_c, SAFA::epsilon());
                 self.g.add_edge(n, n_c, Either::left(*c));
                 self.add(n_c, &q_c);
             }
@@ -258,9 +258,9 @@ impl SNFA<char> {
         }
     }
 
-    /// From SNFA<char> -> SNFA<String>
-    pub fn as_str_snfa(&self) -> SNFA<String> {
-        SNFA {
+    /// From SAFA<char> -> SAFA<String>
+    pub fn as_str_snfa(&self) -> SAFA<String> {
+        SAFA {
             ab: self.ab.iter().map(|c| c.to_string()).collect(),
             g: self.g.map(|_, b| b.clone(),
                           |_, e| Either(e.clone().0.map(|c| c.to_string())))
@@ -268,7 +268,7 @@ impl SNFA<char> {
     }
 }
 
-impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> SNFA<C> {
+impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> SAFA<C> {
     /// To regular expression (root node)
     pub fn to_regex(&self) -> Regex {
         self.g[NodeIndex::new(0)].get()
@@ -382,7 +382,7 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         self.hg[i.0][i.1].clone()
     }
 
-    /// Match the SNFA on a document (backtracking)
+    /// Match the SAFA on a document (backtracking)
     pub fn solve(&self, doc: &Vec<C>) -> LinkedList<Moves> {
         self.solve_rec((0, NodeIndex::new(0)), doc, 0).unwrap_or(LinkedList::new())
     }
@@ -463,7 +463,7 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
     } */
 }
 
-impl SNFA<String> {
+impl SAFA<String> {
     /// Write DOT -> PDF file
     pub fn write_pdf(&self,  filename: &str) -> std::io::Result<()> {
         let s: String = Dot::new(&self.g).to_string();
@@ -490,13 +490,13 @@ impl SNFA<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::snfa::SNFA;
+    use crate::snfa::SAFA;
     use crate::regex::Regex;
 
     #[test]
     fn test_snfa() {
-        let r = Regex::new("(?=b)(?=.)(baaaaa|.*b).{1,2}");
-        let snfa = SNFA::new("ab", &r);
+        let r = Regex::new("(?=b)(?=a?)(baa|.*b)(.?){1,2}");
+        let snfa = SAFA::new("ab", &r);
         snfa.as_str_snfa().write_pdf("snfa").unwrap();
         // let strdoc = "baaaaab";
         // let doc = strdoc.chars().collect();
