@@ -117,7 +117,7 @@ impl<A: Display, B: Display> Display for Either<A, B> {
     }
 }
 
-impl<A: Display> Display for Quant<A> {
+impl Display for Quant<Regex> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if self.1 {
             write!(f, "∀ {}", self.0)
@@ -126,6 +126,17 @@ impl<A: Display> Display for Quant<A> {
         }
     }
 }
+
+impl Display for Quant<NodeIndex<u32>> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.1 {
+            write!(f, "∀ {}", self.0.index())
+        } else {
+            write!(f, "∃ {}", self.0.index())
+        }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct SAFA<C: Clone> {
@@ -224,6 +235,7 @@ impl SAFA<char> {
             },
             // (r | r')
             RegexF::Alt(_, _) => {
+              self.to_or(from);
               q.to_alt_list()
                .into_iter()
                .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
@@ -244,11 +256,13 @@ impl SAFA<char> {
                       self.add_skip(from, Skip::epsilon(), b);
                   },
                   // Distributivity with alt
-                  RegexF::Alt(ref x, ref y) =>
+                  RegexF::Alt(ref x, ref y) => {
                     self.add(from,
                         &Regex::alt(
                             Regex::app(x.clone(), b.clone()),
-                            Regex::app(y.clone(), b.clone()))),
+                            Regex::app(y.clone(), b.clone())));
+                    self.to_or(from);
+                  }
                   // Some other kind of app
                   _ => self.add_derivatives(from, q)
               }
@@ -259,7 +273,7 @@ impl SAFA<char> {
     }
 
     /// From SAFA<char> -> SAFA<String>
-    pub fn as_str_snfa(&self) -> SAFA<String> {
+    pub fn as_str_safa(&self) -> SAFA<String> {
         SAFA {
             ab: self.ab.iter().map(|c| c.to_string()).collect(),
             g: self.g.map(|_, b| b.clone(),
@@ -320,62 +334,110 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
                 })).collect()
     }
 
+    fn safe_get(v: &Vec<C>, i: usize) -> String {
+        if i == v.len() {
+            "NaN".to_string()
+        } else {
+            v[i].to_string()
+        }
+    }
+
     /// Find the largest continuous matching string of characters
     /// exclusive both in [node index] and [usize] that didn't match
-    pub fn solve_char(&self, c: C, next: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> Option<(NodeIndex<u32>, usize, usize)> {
-        if c == doc[i] {
-            if let Some((nn, a, b)) =
-                self.g.edges(next)
-                      .find_map(|e| self.solve_char(e.weight().0.clone().ok()?, e.target(), i+1, doc)) {
-                Some((nn, a-1, b))
-            } else { Some((next, i, i+1)) }
-        } else {
-            None
+    pub fn solve_char(&self, from: NodeIndex<u32>, i: usize, doc: &Vec<C>) ->
+        (NodeIndex<u32>, Option<(usize, usize)>) {
+        let accepting = &self.accepting();
+
+        // Initial state is also accepting
+        if accepting.contains(&self.get_init()) &&
+            (!self.is_end_anchored(from) || doc.len() == 0) {
+            return (from, Some((0, 0)));
         }
+
+        // For every postfix of doc (O(n^2))
+        let mut s = from;
+        for j in i..doc.len() {
+            // Apply transition relation
+            if let Some(x) =
+                self.g.edges(s)
+                      .find(|e| e.source() != e.target() &&
+                                e.weight() == &Either::left(doc[j].clone()))
+                      .map(|e| e.target()) {
+                // found a substring match or exact match
+                if self.is_accept(x, j, doc) {
+                    return (x, Some((i, j + 1)));
+                }
+                s = x;
+            } else {
+                // Non-character transition found
+                return (s, Some((i, j)));
+            }
+        }
+        (s, None)
+    }
+
+    pub fn is_sink(&self, n: NodeIndex<u32>) -> bool {
+        self.g.edges(n).all(|e| e.target() == n)
     }
 
     /// Recursively solve an edge and all the children coming off of it
-    fn solve_edge(&self, e: &Either<C, Skip>, from: NodeIndex<u32>, to: NodeIndex<u32>, i: usize, doc: &Vec<C>) ->
+    fn solve_edge(&self, e: &Either<C, Skip>, from: NodeIndex<u32>,
+        to: NodeIndex<u32>, i: usize, doc: &Vec<C>) ->
         Option<Vec<(NodeIndex<u32>, usize, usize)>> {
         match e.0 {
-            Ok(ref c) => {
-                let (n, a, b) = self.solve_char(c.clone(), to, i, doc)?;
-                let mut sols = self.solve_rec(n, b, doc)?;
-                sols.insert(0, (from, a, b));
-                Some(sols)
-            },
+            Ok(_) =>
+                match self.solve_char(from, i, doc) {
+                  (n, Some((a,b))) if self.is_accept(n, b, doc) =>
+                      Some(vec![(from, a, b)]),
+                  (n, Some(_)) if self.is_sink(n) => None,
+                  (n, Some((a,b))) => {
+                      let mut sols = self.solve_rec(n, b, doc)?;
+                      sols.insert(0, (from, a, b));
+                      Some(sols)
+                  },
+                  (_, None) => None
+                },
             Err(Skip::Offset(n)) => self.solve_rec(to, i+n, doc),
             Err(Skip::Choice(ref ns)) =>
-                ns.into_par_iter()
-                  .find_map_any(|n| self.solve_rec(to, i+n, doc)),
+                ns.into_iter()
+                  .find_map(|n| self.solve_rec(to, i+n, doc)),
             Err(Skip::Star) =>
                 (i..doc.len())
-                    .into_par_iter()
-                    .find_map_any(|n| self.solve_rec(to, i+n, doc))
+                    .into_iter()
+                    .find_map(|n| self.solve_rec(to, i, doc))
         }
     }
 
-    /// Find a non-empty list of continuous matching document strings, as well as the sub-AFA that matched them
-    fn solve_rec(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> Option<Vec<(NodeIndex<u32>, usize, usize)>> {
-        let mut start_idxs = Vec::new();
+    fn is_accept(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> bool {
+        // Initial state is also accepting
+        if self.accepting().contains(&n) && (!self.is_end_anchored(n) || i == doc.len() - 1) {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Find a non-empty list of continuous matching document strings,
+    /// as well as the sub-AFA that matched them
+    fn solve_rec(&self, n: NodeIndex<u32>, i: usize,
+        doc: &Vec<C>) -> Option<Vec<(NodeIndex<u32>, usize, usize)>> {
+
+        // Check accepting condition
+        if self.is_accept(n, i, doc) {
+            return Some(vec![]);
+        }
 
         // Iterate over all postfixes of doc
+        let mut start_idxs = Vec::new();
         if self.is_start_anchored(n) {
             start_idxs.push(i);
         } else {
             start_idxs.append(&mut (i..doc.len()).collect());
         }
 
-        let accepting = &self.accepting();
-
-        // Initial state is also accepting
-        if accepting.contains(&n) && (!self.is_end_anchored(n) || doc.len() == 0) {
-            return Some(vec![(n, 0, 0)]);
-        }
-
         // For every postfix of doc (O(n^2))
-        start_idxs.into_par_iter().find_map_any(|i| {
-            let mut next = self.g.edges(n);
+        start_idxs.into_iter().find_map(|i| {
+            let mut next = self.g.edges(n).filter(|e| e.source() != e.target());
             if self.g[n].is_and() {
                 // All of the next entries must have solutions
                 let subsolutions : Vec<_> = next.into_iter()
@@ -399,101 +461,6 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
     pub fn solve(&self, doc: &Vec<C>) -> Option<Vec<(NodeIndex<u32>, usize, usize)>> {
         self.solve_rec(self.get_init(), 0, doc)
     }
-    /*
-
-    /// Is this a state with jumps
-    fn is_jump_pad(&self, from: Coord) -> bool {
-        self.hg[from.0].edges(from.1)
-                       .filter(|e| e.target() != from.1)
-                       .all(|e| self.hg[from.0][e.target()].0.is_err() && e.weight().is_none())
-    }
-
-    /// Is this a state with derivatives
-    fn is_deriv_pad(&self, from: Coord) -> bool {
-        self.hg[from.0].edges(from.1)
-                       .filter(|e| e.target() != from.1)
-                       .all(|e| self.hg[from.0][e.target()].0.is_ok() && e.weight().is_some())
-    }
-
-    /// Match the SAFA on a document (backtracking)
-    pub fn solve(&self, doc: &Vec<C>) -> LinkedList<Moves> {
-        self.solve_rec((0, NodeIndex::new(0)), doc, 0).unwrap_or(LinkedList::new())
-    }
-
-    /// Is the state [from] accepting
-    fn is_accepting(&self, from: Coord) -> bool {
-        match self.hg[from.0][from.1].0.clone() {
-            Ok(re) if re.nullable() => true,
-            Err(Jump(Skip::Offset(offset), nfa_dest)) if offset == 0 =>
-                self.is_accepting((nfa_dest, NodeIndex::new(0))),
-            Err(Jump(Skip::Choice(offsets), nfa_dest)) if offsets.contains(&0) =>
-                self.is_accepting((nfa_dest, NodeIndex::new(0))),
-            Err(Jump(Skip::Star, nfa_dest)) =>
-                self.is_accepting((nfa_dest, NodeIndex::new(0))),
-            _ => false
-        }
-    }
-
-    fn solve_jump(&self, jmp: &Jump, doc: &Vec<C>, i: usize) -> Option<LinkedList<Moves>> {
-        match jmp {
-            Jump(Skip::Offset(offset), nfa_dest) =>
-                self.solve_rec((*nfa_dest, NodeIndex::new(0)), doc, i + offset),
-            Jump(Skip::Choice(offsets), nfa_dest) =>
-                // Parallelize this
-                offsets.into_par_iter()
-                       .filter(|&o| i + o < doc.len())
-                       .find_map_any(|o| self.solve_rec((*nfa_dest, NodeIndex::new(0)), doc, i + o)),
-            Jump(Skip::Star, nfa_dest) =>
-                (i..doc.len())
-                    .into_par_iter()
-                    .find_map_any(|j| self.solve_rec((*nfa_dest, NodeIndex::new(0)), doc, j))
-        }
-    }
-
-    fn solve_rec(&self, from: Coord, doc: &Vec<C>, i: usize) -> Option<LinkedList<Moves>> {
-        println!("SOLVE: i = {}, doc[i] = {}, from = ({},{}), from(re) = {}",
-            i, doc.get(i).map(|a|a.to_string()).unwrap_or("NaN".to_string()), from.0, from.1.index(), self.hg[from.0][from.1]);
-
-        // Acceptance criteria
-        if self.is_accepting(from) && !self.is_end_anchored(from) {
-            return Some(LinkedList::from([LinkedList::from([(from, i)])]));
-        } else if self.is_accepting(from) && (i == doc.len()) {
-            return Some(LinkedList::from([LinkedList::from([(from, i)])]));
-        } else if i == doc.len() {
-            return None;
-        }
-        if self.is_jump_pad(from) {
-            // All the children are jumps
-            let paths_opt: Vec<Option<LinkedList<Moves>>> =
-              self.hg[from.0]
-                .edges(from.1)
-                .filter(|e| e.target() != from.1)
-                .map(|e| match self.hg[from.0][e.target()].0 {
-                    Err(ref jmp) => self.solve_jump(jmp, doc, i),
-                    Ok(_) => panic!("Invariant: Jumping pad {} should not have derivative {}",
-                                        self.hg[from.0][from.1],
-                                        self.hg[from.0][e.target()])
-                }).collect();
-            // All jumps must successfully match
-            if paths_opt.iter().all(Option::is_some) {
-                Some(paths_opt.into_iter().flat_map(Option::unwrap).collect())
-            } else {
-                None
-            }
-        } else {
-            // All the children are derivative steps
-            let mut paths: LinkedList<Moves> =
-              self.hg[from.0]
-                .edges(from.1)
-                .find(|e| e.weight().as_ref() == Some(&doc[i]))
-                .and_then(|e| self.solve_rec((from.0, e.target()), doc, i+1))?;
-
-            for path in paths.iter_mut() {
-                path.push_front((from,i))
-            }
-            Some(paths)
-        }
-    } */
 }
 
 impl SAFA<String> {
@@ -525,18 +492,54 @@ impl SAFA<String> {
 mod tests {
     use crate::safa::SAFA;
     use crate::regex::Regex;
+    use petgraph::graph::NodeIndex;
 
     #[test]
-    fn test_snfa() {
-        let r = Regex::new("(?=b)(?=a?)(baa|.*b)(.?){1,2}");
+    fn test_safa_match_exact() {
+        // unsafe { backtrace_on_stack_overflow::enable() };
+        let r = Regex::new("^baa$");
         let safa = SAFA::new("ab", &r);
-        safa.as_str_snfa().write_pdf("safa").unwrap();
-        let strdoc = "baaaaab";
+        let strdoc = "baa";
+        let doc = strdoc.chars().collect();
+        assert_eq!(safa.solve(&doc), Some(vec![(NodeIndex::new(1), 0, 3)]));
+
+    }
+
+    #[test]
+    fn test_safa_match_partial() {
+        // unsafe { backtrace_on_stack_overflow::enable() };
+        let r = Regex::new("baa");
+        let safa = SAFA::new("ab", &r);
+        let strdoc = "abababaaba";
+        let doc = strdoc.chars().collect();
+        assert_eq!(safa.solve(&doc), Some(vec![(NodeIndex::new(1), 5, 8)]));
+    }
+
+    #[test]
+    fn test_safa_alt() {
+        // unsafe { backtrace_on_stack_overflow::enable() };
+        let r = Regex::new(".*baa(b|a)");
+        let safa = SAFA::new("ab", &r);
+        safa.as_str_safa().write_pdf("safa").unwrap();
+        let strdoc = "abababaab";
+        let doc = strdoc.chars().collect();
+        assert_eq!(safa.solve(&doc),
+            Some(vec![(NodeIndex::new(1), 5, 8),
+                      (NodeIndex::new(6), 8, 9)]));
+    }
+
+    #[test]
+    fn test_safa_pdf() {
+        // unsafe { backtrace_on_stack_overflow::enable() };
+        let r = Regex::new("(?=a).*baa(b|a)");
+        let safa = SAFA::new("ab", &r);
+        safa.as_str_safa().write_pdf("safa").unwrap();
+        let strdoc = "abababaab";
         let doc = strdoc.chars().collect();
 
         println!("DELTAS");
         for d in safa.deltas() {
-           println!("{:?}", d);
+           println!("{}, {}, {}", d.0, d.1, d.2.index());
         }
         println!("SOLUTION for: {}", strdoc);
         println!("{:?}", safa.solve(&doc));
