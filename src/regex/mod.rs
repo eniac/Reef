@@ -5,7 +5,6 @@ use fancy_regex::{Expr, LookAround};
 use regex_syntax::hir::{HirKind, Class, Literal};
 
 use std::str::FromStr;
-use std::collections::BTreeSet;
 
 use core::fmt;
 use core::fmt::Formatter;
@@ -35,67 +34,6 @@ pub enum RegexF {
 consign! {
     /// Factory for terms.
     let G = consign(10) for RegexF ;
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum JumpType {
-    Offset(usize),
-    Choice(BTreeSet<usize>),
-    Star
-}
-
-impl JumpType {
-    pub fn range(i: usize, j: usize) -> Self {
-        if i == j {
-            JumpType::Offset(i)
-        } else {
-            JumpType::Choice((i..=j).collect())
-        }
-    }
-
-    /// Union of two jumps is a jump
-    fn or(&self, a: &JumpType) -> JumpType {
-        match (self, a) {
-            (JumpType::Offset(i), JumpType::Offset(j)) => JumpType::Choice(BTreeSet::from([*i, *j])),
-            (JumpType::Offset(i), JumpType::Choice(x)) | (JumpType::Choice(x), JumpType::Offset(i)) => {
-                let mut s = x.clone();
-                s.insert(*i);
-                JumpType::Choice(s)
-            },
-            (JumpType::Choice(x), JumpType::Choice(y)) => JumpType::Choice(x.union(y).map(|c|*c).collect()),
-            (JumpType::Star, _) | (_, JumpType::Star) => JumpType::Star
-        }
-    }
-
-    /// Sequential composition of two jumps is a jump
-    pub fn then(&self, a: &JumpType) -> JumpType {
-        match (self, a) {
-            (JumpType::Offset(0), _) => a.clone(),
-            (JumpType::Offset(i), JumpType::Offset(j)) => JumpType::Offset(i+j),
-            (JumpType::Offset(i), JumpType::Choice(x)) | (JumpType::Choice(x), JumpType::Offset(i)) =>
-                JumpType::Choice(x.into_iter().map(|x| x + i).collect()),
-            (JumpType::Choice(x), JumpType::Choice(y)) => {
-                let mut s = BTreeSet::new();
-                for i in x.into_iter() {
-                    for j in y.into_iter() {
-                        s.insert(i + j);
-                    }
-                }
-                JumpType::Choice(s)
-            },
-            (JumpType::Star, _) | (_, JumpType::Star) => JumpType::Star
-        }
-    }
-}
-
-impl fmt::Display for JumpType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            JumpType::Offset(u) => write!(f, "offset({})", u),
-            JumpType::Choice(us) => write!(f, "choice({:?})", us),
-            JumpType::Star => write!(f, "*")
-        }
-    }
 }
 
 impl fmt::Display for Regex {
@@ -215,6 +153,32 @@ impl Regex {
         Regex(G.mk(RegexF::LineEnd))
     }
 
+    /// Flatten a tree of alt into a list of alts
+    pub fn to_alt_list(&self) -> Vec<Regex> {
+        match *self.0 {
+            RegexF::Alt(ref a, ref b) => {
+                let mut la = a.to_alt_list();
+                let mut lb = b.to_alt_list();
+                la.append(&mut lb);
+                la
+            },
+            _ => vec![self.clone()]
+        }
+    }
+
+    /// Flatten a tree of app into a list of app
+    pub fn to_app_list(&self) -> Vec<Regex> {
+        match *self.0 {
+            RegexF::App(ref a, ref b) => {
+                let mut la = a.to_app_list();
+                let mut lb = b.to_app_list();
+                la.append(&mut lb);
+                la
+            },
+            _ => vec![self.clone()]
+        }
+    }
+
     /// Subset relation is a partial order
     pub fn partial_le(a: &Regex, b: &Regex) -> Option<bool> {
         match (&*a.0, &*b.0) {
@@ -325,6 +289,7 @@ impl Regex {
     pub fn nullable(&self) -> bool {
         match *self.0 {
             RegexF::Nil | RegexF::LineEnd | RegexF::LineStart | RegexF::Star(_) => true,
+            RegexF::Range(_, i, _) if i == 0 => true,
             RegexF::Empty | RegexF::Char(_) | RegexF::Dot | RegexF::Range(_, _, _) | RegexF::Lookahead(_) => false,
             RegexF::Not(ref r) => !r.nullable(),
             RegexF::App(ref a, ref b) => a.nullable() && b.nullable(),
@@ -370,54 +335,6 @@ impl Regex {
             None => Regex::nil()
         }
     }
-
-    /// Extract the longest possible wildcard jump and two continuation regexs
-    ///
-    ///   self ---[J]--> Regex -> NFA
-    ///              |
-    ///              --> Regex' -> NFA'
-    ///
-    pub fn has_jump(&self, ab: &Vec<char>) -> Option<(JumpType, Option<Regex>, Regex)> {
-        match *self.0 {
-            RegexF::Star(ref a) if a.accepts_any(ab) => Some((JumpType::Star, None, Regex::nil())),
-            RegexF::Range(ref a, i, j) if i == j && a.accepts_any(ab) =>
-                Some((JumpType::Offset(i), None, Regex::nil())),
-            RegexF::Range(ref a, i, j) if a.accepts_any(ab) =>
-                Some((JumpType::Choice((i..=j).collect()), None, Regex::nil())),
-            RegexF::Lookahead(ref a) => Some((JumpType::Offset(0), Some(a.clone()), Regex::nil())),
-            RegexF::App(ref a, ref b) =>
-                if let Some((ja, ra, ca)) = a.has_jump(ab) {
-                    Some((ja, ra, Regex::app(ca, b.clone())))
-                } else { None },
-            RegexF::Alt(ref a, ref b) =>
-                match (a.has_jump(ab), b.has_jump(ab)) {
-                    // Both jump, two forks and two continuations
-                    (Some((ja, Some(ra), ca)), Some((jb, Some(rb), cb))) =>
-                        Some((ja.or(&jb), Some(Regex::alt(ra, rb)), Regex::alt(ca, cb))),
-                    // Both jump, one fork and two continuations
-                    (Some((ja, Some(ra), ca)), Some((jb, None, cb))) =>
-                        Some((ja.or(&jb), Some(ra), Regex::alt(ca, cb))),
-                    (Some((ja, None, ca)), Some((jb, Some(rb), cb))) =>
-                        Some((ja.or(&jb), Some(rb), Regex::alt(ca, cb))),
-                    // Both jump, no fork and two continuations
-                    (Some((ja, None, ca)), Some((jb, None, cb))) =>
-                        Some((ja.or(&jb), None, Regex::alt(ca, cb))),
-                    // One jump, one fork and one continuations
-                    (Some((j, Some(r), c)), None) =>
-                        Some((j, Some(Regex::alt(r, b.clone())), c)),
-                    (None, Some((j, Some(r), c))) =>
-                        Some((j, Some(Regex::alt(a.clone(), r)), c)),
-                    // One jump, no fork and one continuations
-                    (Some((j, None, c)), None) =>
-                        Some((j, Some(b.clone()), c)),
-                    (None, Some((j, None, c))) =>
-                        Some((j, Some(a.clone()), c)),
-                    (None, None) => None
-                },
-            _ => None
-        }
-    }
-
 
     /// Derivative
     pub fn deriv(&self, c: &char) -> Regex {

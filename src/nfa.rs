@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::collections::{BTreeSet, HashSet};
 use std::process::Command;
 
-use petgraph::algo;
 use petgraph::dot::Dot;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::*;
@@ -205,72 +204,6 @@ impl NFA {
 
     pub fn to_regex(&self) -> Regex {
         self.g[self.get_init_nodeidx()].clone()
-    }
-
-    /// Does this DFA has an infintely accepting cycle - or - does this DFA accept arbitrary length prefixes
-    pub fn has_accepting_cycle(&self) -> bool {
-        fn all_epsilon(g: &Graph<Regex, String>, p: &Vec<Vec<NodeIndex<u32>>>) -> bool {
-            let s: HashSet<&NodeIndex<u32>> = p.into_iter().flatten().collect();
-            s.len() == 1
-                && s.into_iter()
-                    .all(|s| g.edges_connecting(*s, *s).all(|e| e.weight() == EPSILON))
-        }
-
-        // For all accepting states
-        for acc in self.accepting().iter() {
-            let acc_idx = NodeIndex::new(*acc);
-            let start = self.get_init_nodeidx();
-            // From start -> accepting state, find all paths
-            let paths_fwd: Vec<_> =
-                algo::all_simple_paths::<Vec<_>, _>(&self.g, start, acc_idx, 0, None).collect();
-            let paths_back: Vec<_> =
-                algo::all_simple_paths::<Vec<_>, _>(&self.g, acc_idx, start, 0, None).collect();
-            if paths_fwd.len() > 0 && paths_back.len() > 0 && // path is a cycle
-                ! all_epsilon(&self.g, &paths_fwd) &&         // Not an epsilon transition
-                ! all_epsilon(&self.g, &paths_back)
-            {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Remove all outgoing edges and visited nodes out of [i]
-    pub fn remove_outgoing_edges(&mut self, i: NodeIndex<u32>) {
-        let mut dfs = Dfs::new(&self.g, i);
-        let mut nodes = HashSet::new();
-        while let Some(node) = dfs.next(&self.g) {
-            // use a detached neighbors walker
-            let mut edges = self
-                .g
-                .neighbors_directed(node, Direction::Outgoing)
-                .detach();
-            while let Some(edge) = edges.next_edge(&self.g) {
-                if let Some((_, dst)) = self.g.edge_endpoints(edge) {
-                    if dst != i {
-                        nodes.insert(dst);
-                    }
-                }
-                self.g.remove_edge(edge);
-            }
-        }
-        for n in nodes {
-            self.g.remove_node(n);
-        }
-    }
-
-    /// Substitute any sub-DFA with another DFA while maintaining transitions
-    pub fn cut(&mut self, r: &Regex) {
-        // Remove children
-        if let Some(i) = self.find_node(r) {
-          self.remove_outgoing_edges(i);
-          self.g.add_edge(i, i, EPSILON.clone());
-
-          // Update node to epsilon
-          if let Some(xr) = self.g.node_weight_mut(i) {
-              *xr = Regex::nil();
-          }
-        }
     }
 
     pub fn print_states(&self) {

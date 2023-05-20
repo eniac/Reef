@@ -1,7 +1,7 @@
 use reef::backend::costs::*;
 use reef::backend::framework::*;
-use reef::backend::r1cs::init;
-use reef::dfa::NFA;
+use reef::backend::r1cs::*;
+use reef::nfa::NFA;
 use reef::regex::Regex;
 
 use criterion::*;
