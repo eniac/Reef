@@ -1,6 +1,5 @@
 use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
-use crate::nfa::EPSILON;
 use crate::safa::{Either, Skip, SAFA};
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
@@ -20,6 +19,7 @@ pub struct R1CS<'a, F: PrimeField> {
     pub safa: &'a SAFA<String>,
     pub num_ab: FxHashMap<Option<String>, usize>,
     pub table: Vec<Integer>,
+    delta: FxHashMap<(usize, usize), usize>, // in state, char as num, out state
     pub batching: JBatching,
     pub commit_type: JCommit,
     pub reef_commit: Option<ReefCommitment<F>>,
@@ -30,7 +30,7 @@ pub struct R1CS<'a, F: PrimeField> {
     // sticking out here
     pub_inputs: Vec<Term>,
     pub batch_size: usize,
-    pub cdoc: Vec<String>,
+    //pub cdoc: Vec<String>,
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     pub doc_extend: usize,
@@ -102,15 +102,17 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         );
         */
 
-        let mut batch_doc = doc.clone();
+        //let mut batch_doc = doc.clone();
+        let mut batch_doc_len = doc.len();
 
         if matches!(commit, JCommit::Nlookup) {
-            batch_doc.push(EPSILON.clone()); // MUST do to make batching work w/commitments
+            //    batch_doc.push(EPSILON.clone()); // MUST do to make batching work w/commitments
+            batch_doc_len += 1;
         }
 
-        let mut epsilon_to_add = sel_batch_size - (batch_doc.len() % sel_batch_size);
+        let mut epsilon_to_add = sel_batch_size - (batch_doc_len % sel_batch_size);
 
-        if batch_doc.len() % sel_batch_size == 0 {
+        if batch_doc_len % sel_batch_size == 0 {
             epsilon_to_add = 0;
         }
 
@@ -149,11 +151,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             num_ab.insert(Some(c), i);
             i += 1;
         }
-        num_ab.insert(None, i);
+        num_ab.insert(None, i); // EPSILON
 
         // generate T
         let num_states = safa.g.node_count();
         let num_chars = safa.ab.len();
+        let mut delta = FxHashMap::default(); //TODO (rm duplicates)
 
         // TODO range check
         let mut table = vec![];
@@ -172,6 +175,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 Integer::from((in_state * num_states * num_chars) + (out_state * num_chars) + c)
                     .rem_floor(cfg().field().modulus()),
             );
+
+            delta.insert((in_state, c), out_state);
         }
 
         // need to round out table size
@@ -189,8 +194,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // doc to usizes - can I use this elsewhere too? TODO
         let mut usize_doc = vec![];
         let mut int_doc = vec![];
-        for c in batch_doc.clone().into_iter() {
+        for c in doc.clone().into_iter() {
             let u = num_ab[&Some(c)];
+            usize_doc.push(u);
+            int_doc.push(Integer::from(u));
+        }
+        // EPSILON
+        if matches!(commit, JCommit::Nlookup) {
+            let u = num_ab[&None];
             usize_doc.push(u);
             int_doc.push(Integer::from(u));
         }
@@ -198,14 +209,15 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         Self {
             safa,
             num_ab,
-            table,    // TODO fix else
+            table, // TODO fix else
+            delta,
             batching, // TODO
             commit_type: commit,
             reef_commit: None,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: sel_batch_size,
-            cdoc: batch_doc, //chars
+            //cdoc: batch_doc, //chars
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
             doc_extend: epsilon_to_add,
@@ -288,13 +300,13 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     */
     // PROVER
 
-    pub fn prover_accepting_state(&self, state: NodeIndex) -> u64 {
+    pub fn prover_accepting_state(&self, state: usize) -> u64 {
         let mut out = false;
 
         if self.is_match {
             // proof of membership
             for a in self.safa.accepting() {
-                out = out || a == state;
+                out = out || a.index() == state;
             }
         } else {
             unimplemented!();
@@ -470,6 +482,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.r1cs_conv()
     }
 
+    // TODO get rid of i compares
     fn hashchain_commit(&mut self) {
         self.pub_inputs.push(new_var(format!("i_0")));
         for idx in 1..=self.batch_size {
@@ -840,9 +853,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.pub_inputs
             .push(new_var(format!("{}_next_running_claim", id)));
     }
-    /*
+
     pub fn gen_wit_i(
         &self,
+        move_num: (usize, usize),
         batch_num: usize,
         current_state: usize,
         prev_running_claim_q: Option<Vec<Integer>>,
@@ -870,6 +884,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                     start_epsilons,
                     next_doc_idx,
                 ) = self.gen_wit_i_polys(
+                    move_num,
                     batch_num,
                     current_state,
                     prev_doc_running_claim_q,
@@ -888,6 +903,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 )
             }
             JBatching::Nlookup => self.gen_wit_i_nlookup(
+                move_num,
                 batch_num,
                 current_state,
                 prev_running_claim_q,
@@ -899,14 +915,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         }
     }
 
-    fn access_doc_at(&self, batch_num: usize, i: usize) -> (usize, bool) {
+    fn access_doc_at(&self, move_num: (usize, usize), batch_num: usize, i: usize) -> (usize, bool) {
         let access_at = batch_num * self.batch_size + i;
 
         match self.commit_type {
-            JCommit::HashChain => (access_at, access_at >= self.substring.1),
+            JCommit::HashChain => (access_at, access_at >= move_num.1),
 
             JCommit::Nlookup => {
-                if access_at >= self.substring.1 {
+                if access_at >= move_num.1 {
                     //self.udoc.len() - 1 {
                     (self.udoc.len() - 1, true)
                 } else {
@@ -918,6 +934,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     fn gen_wit_i_nlookup(
         &self,
+        move_num: (usize, usize),
         batch_num: usize,
         current_state: usize,
         running_q: Option<Vec<Integer>>,
@@ -945,16 +962,17 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut q = vec![];
         let mut start_epsilons = -1;
         for i in 1..=self.batch_size {
-            let (access_at, is_epsilon) = self.access_doc_at(batch_num, i - 1 + self.substring.0);
+            let (access_at, is_epsilon) =
+                self.access_doc_at(move_num, batch_num, i - 1 + move_num.0);
 
             let char_num;
 
             //println!("is EPSILON? {:#?}", is_epsilon);
             if is_epsilon {
-                next_state = self.nfa.delta(state_i, EPSILON).unwrap();
-                char_num = self.nfa.nchars();
+                next_state = self.delta[&(state_i, self.num_ab[&None])];
+                char_num = self.num_ab[&None]; // TODO
             } else {
-                next_state = self.nfa.delta(state_i, &self.cdoc[access_at]).unwrap();
+                next_state = self.delta[&(state_i, self.udoc[access_at])];
                 char_num = self.udoc[access_at];
             }
 
@@ -969,10 +987,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             }
 
             // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
+            let num_states = self.safa.g.node_count();
+            let num_chars = self.safa.ab.len();
+
             let v_i = Integer::from(
-                (state_i * self.nfa.nstates() * self.nfa.nchars())
-                    + (next_state * self.nfa.nchars())
-                    + char_num,
+                (state_i * num_states * num_chars) + (next_state * num_chars) + char_num,
             )
             .rem_floor(cfg().field().modulus());
             v.push(v_i.clone());
@@ -994,7 +1013,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         wits.insert(
             format!("accepting"),
-            new_wit(self.prover_accepting_state(batch_num, next_state)),
+            new_wit(self.prover_accepting_state(batch_num)),
         );
 
         match self.commit_type {
@@ -1002,7 +1021,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 for i in 0..=self.batch_size {
                     wits.insert(
                         format!("i_{}", i),
-                        new_wit(batch_num * self.batch_size + i + self.substring.0),
+                        new_wit(batch_num * self.batch_size + i + move_num.0),
                     );
                 }
                 (
@@ -1022,6 +1041,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 let (w, next_doc_running_q, next_doc_running_v, next_doc_idx) = self
                     .wit_nlookup_doc_commit(
                         wits,
+                        move_num,
                         batch_num,
                         doc_running_q,
                         doc_running_v,
@@ -1045,6 +1065,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     fn wit_nlookup_doc_commit(
         &self,
         mut wits: FxHashMap<String, Value>,
+        move_num: (usize, usize),
         batch_num: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
@@ -1053,7 +1074,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut v = vec![];
         let mut q = vec![];
         for i in 0..self.batch_size {
-            let (access_at, _is_epsilon) = self.access_doc_at(batch_num, i + self.substring.0);
+            let (access_at, _is_epsilon) = self.access_doc_at(move_num, batch_num, i + move_num.0);
             q.push(access_at);
 
             v.push(self.idoc[access_at].clone());
@@ -1062,10 +1083,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         // q relations
         let prev_round_lookup = if prev_idx.is_some() {
             Integer::from(prev_idx.unwrap())
-        } else if self.substring.0 == 0 {
+        } else if move_num.0 == 0 {
             Integer::from(-1)
         } else {
-            Integer::from(self.substring.0 - 1)
+            Integer::from(move_num.0 - 1)
         };
 
         println!("PREV ROUND Q LOOKUP {:#?}", prev_round_lookup.clone());
@@ -1313,6 +1334,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     // TODO BATCH SIZE (rn = 1)
     fn gen_wit_i_polys(
         &self,
+        move_num: (usize, usize),
         batch_num: usize,
         current_state: usize, // pass in the real one, let's deal with all the dummy stuff under
         // the hood
@@ -1333,17 +1355,14 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let mut start_epsilons = -1;
         for i in 0..self.batch_size {
-            let (access_at, is_epsilon) = self.access_doc_at(batch_num, i + self.substring.0);
+            let (access_at, is_epsilon) = self.access_doc_at(move_num, batch_num, i + move_num.0);
 
             if is_epsilon {
-                wits.insert(format!("char_{}", i), new_wit(self.nfa.nchars()));
-                next_state = self.nfa.delta(state_i, EPSILON).unwrap();
+                wits.insert(format!("char_{}", i), new_wit(self.num_ab[&None]));
+                next_state = self.delta[&(state_i, self.num_ab[&None])];
             } else {
                 wits.insert(format!("char_{}", i), new_wit(self.udoc[access_at]));
-                next_state = self
-                    .nfa
-                    .delta(state_i, &self.cdoc[access_at].clone())
-                    .unwrap();
+                next_state = self.delta[&(state_i, self.udoc[access_at].clone())];
             }
 
             wits.insert(format!("state_{}", i), new_wit(state_i));
@@ -1358,7 +1377,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         wits.insert(
             format!("accepting"),
-            new_wit(self.prover_accepting_state(batch_num, next_state)),
+            new_wit(self.prover_accepting_state(batch_num)),
         );
 
         match self.commit_type {
@@ -1366,7 +1385,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 for i in 0..=self.batch_size {
                     wits.insert(
                         format!("i_{}", i),
-                        new_wit(batch_num * self.batch_size + i + self.substring.0),
+                        new_wit(batch_num * self.batch_size + i + move_num.0),
                     );
                 }
                 // values not actually checked or used
@@ -1378,6 +1397,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 let (w, next_doc_running_q, next_doc_running_v, next_doc_idx) = self
                     .wit_nlookup_doc_commit(
                         wits,
+                        move_num,
                         batch_num,
                         doc_running_q,
                         doc_running_v,
@@ -1394,7 +1414,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 )
             }
         }
-    }*/
+    }
 }
 
 pub fn ceil_div(a: usize, b: usize) -> usize {
