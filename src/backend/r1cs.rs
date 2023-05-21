@@ -1,7 +1,7 @@
 use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
-use crate::nfa::{EPSILON, NFA};
-use crate::snfa::*;
+use crate::nfa::EPSILON;
+use crate::safa::{Either, Skip, SAFA};
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
@@ -13,14 +13,13 @@ use neptune::{
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
 };
+use petgraph::graph::NodeIndex;
 use rug::{integer::Order, ops::RemRounding, Integer};
-use std::collections::LinkedList;
 
 pub struct R1CS<'a, F: PrimeField> {
-    pub snfa: &'a SNFA<C>,
-    pub num_ab: FxHashMap<Option<char>, usize>,
+    pub safa: &'a SAFA<String>,
+    pub num_ab: FxHashMap<Option<String>, usize>,
     pub table: Vec<Integer>,
-    total_states: Vec<usize>,
     pub batching: JBatching,
     pub commit_type: JCommit,
     pub reef_commit: Option<ReefCommitment<F>>,
@@ -35,7 +34,7 @@ pub struct R1CS<'a, F: PrimeField> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     pub doc_extend: usize,
-    moves: LinkedList<Moves>,
+    moves: Option<Vec<(NodeIndex<u32>, usize, usize)>>,
     is_match: bool,
     //pub substring: (usize, usize), // todo getters
     pub pc: PoseidonConstants<F, typenum::U4>,
@@ -43,7 +42,7 @@ pub struct R1CS<'a, F: PrimeField> {
 
 impl<'a, F: PrimeField> R1CS<'a, F> {
     pub fn new(
-        snfa: &'a SNFA<C>,
+        safa: &'a SAFA<String>,
         doc: &Vec<String>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U4>,
@@ -53,9 +52,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         //let nfa_match = nfa.is_match(doc);
         //let is_match = nfa_match.is_some();
 
-        let batching;
-        let commit;
-        let opt_batch_size;
+        let batching = batch_override.unwrap();
+        let commit = commit_override.unwrap();
+
+        //let opt_batch_size;
         let cost: usize;
         /*  if batch_size > 0 {
                     (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
@@ -95,10 +95,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         let sel_batch_size = batch_size;
 
+        /*
         println!(
             "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}, cost {:#?}",
             batching, commit, sel_batch_size, cost
         );
+        */
 
         let mut batch_doc = doc.clone();
 
@@ -115,8 +117,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         //        let mut substring = (0, batch_doc.len());
 
         // TODO timing here
-        let moves = snfa.solve(&doc);
-        let is_match = moves.len() != 0;
+        let moves = safa.solve(&doc);
+        let is_match = moves.is_some();
 
         /*
                 match nfa_match {
@@ -141,31 +143,33 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         */
 
         // character conversions
-        let num_ab = FxHashMap::new();
+        let mut num_ab: FxHashMap<Option<String>, usize> = FxHashMap::default();
         let mut i = 0;
-        for c in snfa.ab {
+        for c in safa.ab.clone() {
             num_ab.insert(Some(c), i);
             i += 1;
         }
         num_ab.insert(None, i);
 
         // generate T
-        let total_states = vec![0]; //snfa.hg[0].node_count()];
-        for i in 0..snfa.hg.len() {
-            total_states.push(total_states[i] + snfa.hg[i].node_count());
-        }
-        let num_graphs = snfa.hg.len();
+        let num_states = safa.g.node_count();
+        let num_chars = safa.ab.len();
 
+        // TODO range check
         let mut table = vec![];
-        let num_chars = snfa.ab.len();
-        let num_states = total_states[total_states.len() - 1];
-
-        for (in_coord, c, out_coord, _jump) in snfa.deltas() {
-            let ins = total_states[in_coord.0] + in_coord.1.index(); //self.big_state_num(in_coord);
-            let outs = total_states[out_coord.0] + out_coord.1.index(); //self.big_state_num(out_coord);
+        for (in_node, edge, out_node) in safa.deltas() {
+            let in_state = in_node.0.index(); // check AND/OR?
+            let out_state = out_node.index();
+            let c = match edge {
+                Either(Err(Skip::Offset(u))) => todo!(), //if *u == 0 => num_ab(EPSILON),
+                Either(Err(Skip::Offset(u))) => todo!(), //write!(f, "+{}", u),
+                Either(Err(Skip::Choice(us))) => todo!(), //num_ab(us),
+                Either(Err(Skip::Star)) => todo!(),      //write!(f, "*"),
+                Either(Ok(ch)) => num_ab[&Some(ch)],
+            };
 
             table.push(
-                Integer::from((ins * num_states * num_chars) + (outs * num_chars) + num_ab(c))
+                Integer::from((in_state * num_states * num_chars) + (out_state * num_chars) + c)
                     .rem_floor(cfg().field().modulus()),
             );
         }
@@ -186,16 +190,15 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         let mut usize_doc = vec![];
         let mut int_doc = vec![];
         for c in batch_doc.clone().into_iter() {
-            let u = num_ab(Some(c));
+            let u = num_ab[&Some(c)];
             usize_doc.push(u);
             int_doc.push(Integer::from(u));
         }
 
         Self {
-            snfa,
+            safa,
             num_ab,
-            table, // TODO fix else
-            total_states,
+            table,    // TODO fix else
             batching, // TODO
             commit_type: commit,
             reef_commit: None,
@@ -211,10 +214,6 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             //substring,
             pc: pcs,
         }
-    }
-
-    fn big_state_num(&self, coord: Coord) {
-        self.total_states[coord.0] + coord.1.index();
     }
 
     pub fn set_commitment(&mut self, rc: ReefCommitment<F>) {
@@ -289,18 +288,16 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     */
     // PROVER
 
-    pub fn prover_accepting_state(&self, state: Coord) -> u64 {
+    pub fn prover_accepting_state(&self, state: NodeIndex) -> u64 {
         let mut out = false;
 
         if self.is_match {
             // proof of membership
-            if self.snfa.is_accepting(state) {
-                out = true;
+            for a in self.safa.accepting() {
+                out = out || a == state;
             }
         } else {
-            if !self.snfa.is_accepting(state) {
-                out = true;
-            }
+            unimplemented!();
         }
 
         //println!("ACCEPTING? {:#?}", out);
@@ -316,8 +313,8 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // check if we need vs as vars
     fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
-        let num_chars = self.snfa.ab.len();
-        let num_states = self.total_states[self.total_states.len() - 1];
+        let num_chars = self.safa.ab.len();
+        let num_states = self.safa.g.node_count();
 
         let mut v = vec![];
         for i in 1..=self.batch_size {
@@ -359,41 +356,41 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         v
     }
 
-    /*
-        // TODO - we don't want it to always accept state 0
-        fn accepting_state_circuit(&mut self) {
-            // final state (non) match check
-            let vanishing_poly;
-            let final_states = self.snfa.accepting();
-            let non_final_states = self.nfa.non_accepting();
-            let mut vanish_on = vec![];
+    // TODO - we don't want it to always accept state 0
+    fn accepting_state_circuit(&mut self) {
+        // final state (non) match check
+        let vanishing_poly;
+        let final_states = self.safa.accepting();
+        //    let non_final_states = self.nfa.non_accepting();
+        let mut vanish_on = vec![];
 
-            if self.is_match {
-                // proof of membership
-                for xi in final_states.into_iter() {
-                    vanish_on.push(Integer::from(xi));
-                }
-            } else {
-                for xi in non_final_states.into_iter() {
-                    vanish_on.push(Integer::from(xi));
-                }
+        if self.is_match {
+            // proof of membership
+            for xi in final_states.into_iter() {
+                vanish_on.push(Integer::from(xi.index()));
             }
-            vanishing_poly =
-                poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
-
-            let match_term = term(
-                Op::Ite,
-                vec![
-                    term(Op::Eq, vec![new_const(0), vanishing_poly]),
-                    term(Op::Eq, vec![new_var(format!("accepting")), new_const(1)]),
-                    term(Op::Eq, vec![new_var(format!("accepting")), new_const(0)]),
-                ],
-            );
-
-            self.assertions.push(match_term);
-            self.pub_inputs.push(new_var(format!("accepting")));
+        } else {
+            unimplemented!();
+            /*for xi in non_final_states.into_iter() {
+                vanish_on.push(Integer::from(xi));
+            }*/
         }
-    */
+        vanishing_poly =
+            poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
+
+        let match_term = term(
+            Op::Ite,
+            vec![
+                term(Op::Eq, vec![new_const(0), vanishing_poly]),
+                term(Op::Eq, vec![new_var(format!("accepting")), new_const(1)]),
+                term(Op::Eq, vec![new_var(format!("accepting")), new_const(0)]),
+            ],
+        );
+
+        self.assertions.push(match_term);
+        self.pub_inputs.push(new_var(format!("accepting")));
+    }
+
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
         let cs = Computation::from_constraint_system_parts(
             self.assertions.clone(),

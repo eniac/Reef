@@ -2,10 +2,10 @@ use itertools::Itertools;
 use std::collections::BTreeSet;
 use std::process::Command;
 
-use petgraph::Graph;
-use petgraph::graph::NodeIndex;
 use petgraph::dot::Dot;
+use petgraph::graph::NodeIndex;
 use petgraph::visit::*;
+use petgraph::Graph;
 
 use std::result::Result;
 
@@ -14,10 +14,10 @@ use crate::skip::Skip;
 use rayon::iter::*;
 
 use core::fmt;
-use core::fmt::{Display,Formatter};
+use core::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Either<A, B>(Result<A, B>);
+pub struct Either<A, B>(pub Result<A, B>);
 
 impl<A, B> Either<A, B> {
     fn left(a: A) -> Self {
@@ -29,7 +29,7 @@ impl<A, B> Either<A, B> {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Quant<A>(A, bool);
+pub struct Quant<A>(pub A, bool);
 
 impl<A: Clone> Quant<A> {
     fn and(a: A) -> Self {
@@ -53,7 +53,7 @@ impl<A: Display, B: Display> Display for Either<A, B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.0 {
             Ok(ref a) => write!(f, "{}", a),
-            Err(ref b) => write!(f, "{}", b)
+            Err(ref b) => write!(f, "{}", b),
         }
     }
 }
@@ -112,8 +112,11 @@ impl SAFA<char> {
 
     /// Add a regex to position [from] (an Or by default)
     fn add_skip(&mut self, n: NodeIndex<u32>, skip: Skip, q_c: &Regex) {
-        if let Some(n_c) = self.g.node_indices().find(|i|
-                                &self.g[*i].get() == q_c && self.g[*i].is_or()) {
+        if let Some(n_c) = self
+            .g
+            .node_indices()
+            .find(|i| &self.g[*i].get() == q_c && self.g[*i].is_or())
+        {
             self.g.add_edge(n, n_c, Either::right(skip));
         } else {
             // Add to graph if not already there
@@ -128,29 +131,36 @@ impl SAFA<char> {
 
     /// Add derivative of a node in the graph
     fn add_derivatives(&mut self, from: NodeIndex<u32>, q: &Regex) {
-      let n =
-        if let Some(n) = self.g.node_indices().find(|i| self.g[*i] == Quant::or(q.clone())) {
+        let n = if let Some(n) = self
+            .g
+            .node_indices()
+            .find(|i| self.g[*i] == Quant::or(q.clone()))
+        {
             if n != from {
                 self.g.add_edge(from, n, SAFA::epsilon());
             }
             n
         } else {
             if self.g[from].is_or() {
-              from
+                from
             } else {
-              // Add an OR node to graph if not already there
-              let n = self.g.add_node(Quant::or(q.clone()));
-              self.g.add_edge(n, n, SAFA::epsilon());
-              // Reflexive step
-              self.g.add_edge(from, n, SAFA::epsilon());
-              n
+                // Add an OR node to graph if not already there
+                let n = self.g.add_node(Quant::or(q.clone()));
+                self.g.add_edge(n, n, SAFA::epsilon());
+                // Reflexive step
+                self.g.add_edge(from, n, SAFA::epsilon());
+                n
             }
         };
 
         // Take all the single character steps
         for c in self.ab.clone().iter() {
             let q_c = q.deriv(&c);
-            if let Some(n_c) = self.g.node_indices().find(|i| self.g[*i] == Quant::or(q_c.clone())) {
+            if let Some(n_c) = self
+                .g
+                .node_indices()
+                .find(|i| self.g[*i] == Quant::or(q_c.clone()))
+            {
                 self.g.add_edge(n, n_c, Either::left(*c));
             } else {
                 // Add to graph if not already there
@@ -207,7 +217,7 @@ impl SAFA<char> {
                   _ => self.add_derivatives(from, q)
               },
             // Other (derivative)
-            _ => self.add_derivatives(from, q)
+            _ => self.add_derivatives(from, q),
         }
     }
 
@@ -221,7 +231,6 @@ impl SAFA<char> {
         }
     }
 }
-
 
 impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> SAFA<C> {
     /// To regular expression (root node)
@@ -254,13 +263,18 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
 
     /// All edges (quantified) in the graph
     pub fn deltas(&self) -> BTreeSet<(Quant<NodeIndex<u32>>, Either<C, Skip>, NodeIndex<u32>)> {
-        self.g.node_indices().flat_map(|n|
-            self.g.edges(n).map(|e|
-                if self.g[e.source()].is_and() {
-                    (Quant::and(e.source()), e.weight().clone(), e.target())
-                } else {
-                    (Quant::or(e.source()), e.weight().clone(), e.target())
-                })).collect()
+        self.g
+            .node_indices()
+            .flat_map(|n| {
+                self.g.edges(n).map(|e| {
+                    if self.g[e.source()].is_and() {
+                        (Quant::and(e.source()), e.weight().clone(), e.target())
+                    } else {
+                        (Quant::or(e.source()), e.weight().clone(), e.target())
+                    }
+                })
+            })
+            .collect()
     }
 
     /// Find the largest continuous matching string of characters
@@ -278,11 +292,12 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         let mut s = from;
         for j in i..doc.len() {
             // Apply transition relation
-            if let Some(x) =
-                self.g.edges(s)
-                      .find(|e| e.source() != e.target() &&
-                                e.weight() == &Either::left(doc[j].clone()))
-                      .map(|e| e.target()) {
+            if let Some(x) = self
+                .g
+                .edges(s)
+                .find(|e| e.source() != e.target() && e.weight() == &Either::left(doc[j].clone()))
+                .map(|e| e.target())
+            {
                 // found a substring match or exact match
                 if self.is_accept(x, j, doc) {
                     return (x, Some((i, j + 1)));
@@ -302,9 +317,14 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
     }
 
     /// Recursively solve an edge and all the children coming off of it
-    fn solve_edge(&self, e: &Either<C, Skip>, from: NodeIndex<u32>,
-        to: NodeIndex<u32>, i: usize, doc: &Vec<C>) ->
-        Option<Vec<(NodeIndex<u32>, usize, usize)>> {
+    fn solve_edge(
+        &self,
+        e: &Either<C, Skip>,
+        from: NodeIndex<u32>,
+        to: NodeIndex<u32>,
+        i: usize,
+        doc: &Vec<C>,
+    ) -> Option<Vec<(NodeIndex<u32>, usize, usize)>> {
         match e.0 {
             Ok(_) =>
                 match self.solve_char(from, i, doc) {
@@ -363,7 +383,8 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
             let mut next = self.g.edges(n).filter(|e| e.source() != e.target());
             if self.g[n].is_and() {
                 // All of the next entries must have solutions
-                let subsolutions : Vec<_> = next.into_iter()
+                let subsolutions: Vec<_> = next
+                    .into_iter()
                     .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
                     .collect();
 
@@ -375,8 +396,7 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
                 }
             } else {
                 // One of the next entries must has a solution
-                next.find_map(|e|
-                    self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
+                next.find_map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
             }
         })
     }
@@ -388,7 +408,7 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
 
 impl SAFA<String> {
     /// Write DOT -> PDF file
-    pub fn write_pdf(&self,  filename: &str) -> std::io::Result<()> {
+    pub fn write_pdf(&self, filename: &str) -> std::io::Result<()> {
         let s: String = Dot::new(&self.g).to_string();
         let fdot = format!("{}.dot", filename.to_string());
         std::fs::write(fdot.clone(), s)?;
@@ -405,9 +425,9 @@ impl SAFA<String> {
             .expect("[dot] CLI failed to convert dfa to [pdf] file")
             .wait()?;
 
-          // Remove DOT file
-          std::fs::remove_file(fdot)?;
-          Ok(())
+        // Remove DOT file
+        std::fs::remove_file(fdot)?;
+        Ok(())
     }
 }
 
@@ -415,6 +435,7 @@ impl SAFA<String> {
 mod tests {
     use crate::safa::{SAFA, Quant, Either, Skip};
     use crate::regex::Regex;
+    use crate::safa::SAFA;
     use petgraph::graph::NodeIndex;
 
     #[test]
@@ -425,7 +446,6 @@ mod tests {
         let strdoc = "baa";
         let doc = strdoc.chars().collect();
         assert_eq!(safa.solve(&doc), Some(vec![(NodeIndex::new(1), 0, 3)]));
-
     }
 
     #[test]
@@ -445,9 +465,10 @@ mod tests {
         let safa = SAFA::new("ab", &r);
         let strdoc = "abababaab";
         let doc = strdoc.chars().collect();
-        assert_eq!(safa.solve(&doc),
-            Some(vec![(NodeIndex::new(1), 5, 8),
-                      (NodeIndex::new(6), 8, 9)]));
+        assert_eq!(
+            safa.solve(&doc),
+            Some(vec![(NodeIndex::new(1), 5, 8), (NodeIndex::new(6), 8, 9)])
+        );
     }
 
     #[test]
@@ -498,7 +519,7 @@ mod tests {
 
         println!("DELTAS");
         for d in safa.deltas() {
-           println!("{}, {}, {}", d.0, d.1, d.2.index());
+            println!("{}, {}, {}", d.0, d.1, d.2.index());
         }
         println!("SOLUTION for: {}", strdoc);
         println!("{:?}", safa.solve(&doc));
