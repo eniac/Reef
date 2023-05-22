@@ -14,6 +14,7 @@ use neptune::{
 };
 use petgraph::graph::NodeIndex;
 use rug::{integer::Order, ops::RemRounding, Integer};
+use std::cmp::max;
 
 pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub safa: &'a SAFA<C>,
@@ -93,14 +94,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         */
         //      let sel_batch_size = opt_batch_size;
 
-        let sel_batch_size = batch_size;
+        // TODO timing here
+        let moves = safa.solve(&doc);
+        let is_match = moves.is_some();
 
-        /*
+        let mut sel_batch_size = 1;
+        for m in moves.clone().unwrap() {
+            sel_batch_size = max(sel_batch_size, m.2 - m.1);
+        }
+        println!("BATCH {:#?}", sel_batch_size);
+
         println!(
-            "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}, cost {:#?}",
-            batching, commit, sel_batch_size, cost
+            "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}",
+            batching,
+            commit,
+            sel_batch_size, //cost
         );
-        */
 
         //let mut batch_doc = doc.clone();
         let mut batch_doc_len = doc.len();
@@ -117,10 +126,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         //        let mut substring = (0, batch_doc.len());
-
-        // TODO timing here
-        let moves = safa.solve(&doc);
-        let is_match = moves.is_some();
 
         /*
                 match nfa_match {
@@ -162,19 +167,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut table = vec![];
 
         safa.as_str_safa().write_pdf("safa").unwrap();
+
         println!("ACCEPTING {:#?}", safa.accepting());
-        println!("DELTAS {:#?}", safa.deltas());
+        //        println!("DELTAS {:#?}", safa.deltas());
         println!("SOLVE {:#?}", safa.solve(&doc));
-        println!("DOC {:#?}", doc.clone());
+        //        println!("DOC {:#?}", doc.clone());
 
         for (in_node, edge, out_node) in safa.deltas() {
             let in_state = in_node.0.index(); // check AND/OR?
             let out_state = out_node.index();
             let c = match edge {
-                Either(Err(Skip::Offset(u))) => todo!(), //if *u == 0 => num_ab(EPSILON),
-                Either(Err(Skip::Offset(u))) => todo!(), //write!(f, "+{}", u),
-                Either(Err(Skip::Choice(us))) => todo!(), //num_ab(us),
-                Either(Err(Skip::Star)) => todo!(),      //write!(f, "*"),
+                Either(Err(Skip::Offset(u))) if u == 0 => num_ab[&None], //EPSILON
+                Either(Err(Skip::Offset(u))) => todo!(),                 //write!(f, "+{}", u),
+                Either(Err(Skip::Choice(us))) => todo!(),                //num_ab(us),
+                Either(Err(Skip::Star)) => todo!(),                      //write!(f, "*"),
                 Either(Ok(ch)) => num_ab[&Some(ch)],
             };
 
@@ -206,6 +212,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             usize_doc.push(u);
             int_doc.push(Integer::from(u));
         }
+        println!("udoc {:#?}", usize_doc.clone());
+
         // EPSILON
         if matches!(commit, JCommit::Nlookup) {
             let u = num_ab[&None];
@@ -897,16 +905,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn access_doc_at(&self, move_num: (usize, usize), batch_num: usize, i: usize) -> (usize, bool) {
-        let access_at = batch_num * self.batch_size + i;
+        let access_at = i; //batch_num * self.batch_size + i;
 
         match self.commit_type {
-            JCommit::HashChain => (access_at, access_at >= move_num.1),
+            JCommit::HashChain => {
+                println!("access {}", access_at);
+                (access_at, access_at >= move_num.1)
+            }
 
             JCommit::Nlookup => {
                 if access_at >= move_num.1 {
-                    //self.udoc.len() - 1 {
+                    println!("access {}", self.udoc.len() - 1);
                     (self.udoc.len() - 1, true)
                 } else {
+                    println!("access {}", access_at);
                     (access_at, false)
                 }
             }
@@ -955,6 +967,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             } else {
                 next_state = self.delta[&(state_i, self.udoc[access_at])];
                 char_num = self.udoc[access_at];
+                println!(
+                    "search for ({:#?},{:#?}) in delta",
+                    state_i,
+                    self.udoc[access_at].clone(),
+                    //self.delta.clone()
+                );
             }
 
             //println!("Char {:#?}", char_num);
@@ -1346,7 +1364,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 next_state = self.delta[&(state_i, self.num_ab[&None])];
             } else {
                 wits.insert(format!("char_{}", i), new_wit(self.udoc[access_at]));
+                println!(
+                    "search for ({:#?},{:#?}) in delta",
+                    state_i,
+                    self.udoc[access_at].clone(),
+                    //self.delta.clone()
+                );
                 next_state = self.delta[&(state_i, self.udoc[access_at].clone())];
+                println!("next state {:#?}", next_state);
             }
 
             wits.insert(format!("state_{}", i), new_wit(state_i));
@@ -1631,13 +1656,14 @@ mod tests {
 
                     let (pd, _vd) = r1cs_converter.to_circuit();
 
-                    let mut current_state = safa.get_init().index();
-
                     let mut values;
                     let mut next_state;
 
                     let mut _start_epsilons;
                     let num_steps = r1cs_converter.moves.clone().unwrap().len();
+
+                    let mut current_state = r1cs_converter.moves.clone().unwrap()[0].0.index();
+
                     for i in 0..num_steps {
                         let move_i_triple = r1cs_converter.moves.clone().unwrap()[i]; // order?
                         let move_i = (move_i_triple.1, move_i_triple.2);
@@ -1737,9 +1763,9 @@ mod tests {
     fn naive_test() {
         init();
         test_func_no_hash(
-            "a".to_string(),
-            "^a*$".to_string(),
-            "aaaa".to_string(),
+            "abcd".to_string(),
+            "^abcd$".to_string(),
+            "abcd".to_string(),
             vec![1], // 2],
             true,
         );
