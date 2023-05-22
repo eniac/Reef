@@ -435,7 +435,6 @@ impl SAFA<String> {
 mod tests {
     use crate::safa::{SAFA, Quant, Either, Skip};
     use crate::regex::Regex;
-    use crate::safa::SAFA;
     use petgraph::graph::NodeIndex;
 
     #[test]

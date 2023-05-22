@@ -5,6 +5,7 @@ use hashconsing::{consign, HConsed, HashConsign};
 use regex_syntax::hir::{Class, HirKind, Literal};
 
 use std::str::FromStr;
+use crate::skip::Skip;
 
 use core::fmt;
 use core::fmt::Formatter;
