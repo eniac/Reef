@@ -13,7 +13,7 @@ use crate::backend::{
     nova::*,
     r1cs::*,
 };
-use crate::nfa::NFA;
+use crate::safa::SAFA;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::ProverData;
 use generic_array::typenum;
@@ -44,11 +44,11 @@ struct ProofInfo {
 
 #[cfg(feature = "metrics")]
 use crate::metrics::{log, log::Component};
-/*
+
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(
-    nfa: NFA,
-    doc: Vec<String>,
+    safa: SAFA<char>,
+    doc: Vec<char>,
     batching_type: Option<JBatching>,
     commit_doctype: Option<JCommit>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
@@ -71,7 +71,7 @@ pub fn run_backend(
             "Optimization Selection, R1CS precomputations",
         );
         let mut r1cs_converter = R1CS::new(
-            &nfa,
+            &safa,
             &doc,
             temp_batch_size,
             sc.clone(),
@@ -138,7 +138,7 @@ pub fn run_backend(
 }
 
 fn setup<'a>(
-    r1cs_converter: &R1CS<<G1 as Group>::Scalar>,
+    r1cs_converter: &R1CS<<G1 as Group>::Scalar, char>,
     circ_data: &'a ProverData,
 ) -> (
     usize,
@@ -210,9 +210,9 @@ fn setup<'a>(
         vec![<G1 as Group>::Scalar::from(0); 2],
         empty_glue,
         <G1 as Group>::Scalar::from(0),
-        true, //false,
-        <G1 as Group>::Scalar::from(r1cs_converter.nfa.nchars() as u64),
-        0, //nfa.nchars as isize,
+        true,                                                             //false,
+        <G1 as Group>::Scalar::from(r1cs_converter.safa.ab.len() as u64), // n chars??
+        0,                                                                //nfa.nchars as isize,
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         r1cs_converter.pc.clone(),
@@ -262,6 +262,9 @@ fn setup<'a>(
         pp.num_variables().1
     );
 
+    let move_0_triple = r1cs_converter.moves.clone().unwrap()[0]; // order?
+    let move_0 = (move_0_triple.1, move_0_triple.2);
+
     // this variable could be two different types of things, which is potentially dicey, but
     // literally whatever
     let blind = match r1cs_converter.reef_commit.clone().unwrap() {
@@ -270,52 +273,43 @@ fn setup<'a>(
     };
     // TODO only do this for HC
     let prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
-        ReefCommitment::HashChain(_) => {
-            r1cs_converter.prover_calc_hash(blind, true, 0, r1cs_converter.substring.0)
-        }
+        ReefCommitment::HashChain(_) => r1cs_converter.prover_calc_hash(blind, true, 0, move_0.0),
         ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
     };
 
-    let current_state = r1cs_converter.nfa.get_init_state();
+    let current_state = r1cs_converter.safa.get_init().index();
+
     let z0_primary = match (r1cs_converter.batching, r1cs_converter.commit_type) {
         (JBatching::NaivePolys, JCommit::HashChain) => {
             vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(r1cs_converter.substring.0 as u64),
+                <G1 as Group>::Scalar::from(move_0.0 as u64),
                 prev_hash.clone(),
-                <G1 as Group>::Scalar::from(
-                    r1cs_converter.prover_accepting_state(0, current_state),
-                ),
+                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(current_state)),
             ]
         }
         (JBatching::Nlookup, JCommit::HashChain) => {
             let mut z = vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(r1cs_converter.substring.0 as u64), //<G1 as Group>::Scalar::from(0), //nfa.ab_to_num(&doc[0]) as u64),
+                <G1 as Group>::Scalar::from(move_0.0 as u64), //<G1 as Group>::Scalar::from(0), //nfa.ab_to_num(&doc[0]) as u64),
                 prev_hash.clone(),
             ];
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
             z.push(int_to_ff(r1cs_converter.table[0].clone()));
             z.push(<G1 as Group>::Scalar::from(
-                r1cs_converter.prover_accepting_state(0, current_state),
+                r1cs_converter.prover_accepting_state(current_state),
             ));
             z
         }
         (JBatching::NaivePolys, JCommit::Nlookup) => {
             let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
 
-            if r1cs_converter.substring.0 == 0 {
-                z.push(<G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1));
-            } else {
-                z.push(<G1 as Group>::Scalar::from(
-                    (r1cs_converter.substring.0 - 1) as u64,
-                ));
-            }
+            z.push(<G1 as Group>::Scalar::from(move_0.0 as u64));
 
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
             z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
             z.push(<G1 as Group>::Scalar::from(
-                r1cs_converter.prover_accepting_state(0, current_state),
+                r1cs_converter.prover_accepting_state(current_state),
             ));
             z
         }
@@ -325,34 +319,17 @@ fn setup<'a>(
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
             z.push(int_to_ff(r1cs_converter.table[0].clone()));
 
-            if r1cs_converter.substring.0 == 0 {
-                z.push(<G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1));
-            } else {
-                z.push(<G1 as Group>::Scalar::from(
-                    (r1cs_converter.substring.0 - 1) as u64,
-                ));
-            }
-
+            z.push(<G1 as Group>::Scalar::from(move_0.0 as u64));
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
             z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
             z.push(<G1 as Group>::Scalar::from(
-                r1cs_converter.prover_accepting_state(0, current_state),
+                r1cs_converter.prover_accepting_state(current_state),
             ));
             z
         }
     };
 
-    /* println!(
-            "substring {:#?}, batch_size {:#?}",
-            r1cs_converter.substring, r1cs_converter.batch_size
-        );
-    */
-
-    let num_steps = ceil_div(
-        r1cs_converter.substring.1 - r1cs_converter.substring.0,
-        r1cs_converter.batch_size,
-    );
-
+    let num_steps = r1cs_converter.moves.clone().unwrap().len();
     assert!(num_steps > 0, "trying to prove something about 0 foldings");
 
     (num_steps, z0_primary, pp)
@@ -360,7 +337,7 @@ fn setup<'a>(
 
 fn solve<'a>(
     sender: Sender<NFAStepCircuit<<G1 as Group>::Scalar>>, //itness<<G1 as Group>::Scalar>>,
-    r1cs_converter: &R1CS<<G1 as Group>::Scalar>,
+    r1cs_converter: &R1CS<<G1 as Group>::Scalar, char>,
     circ_data: &'a ProverData,
     num_steps: usize,
 ) {
@@ -391,13 +368,16 @@ fn solve<'a>(
 
     // TODO only do this for HC
     let mut prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
-        ReefCommitment::HashChain(_) => {
-            r1cs_converter.prover_calc_hash(blind, true, 0, r1cs_converter.substring.0)
-        }
+        ReefCommitment::HashChain(_) => r1cs_converter.prover_calc_hash(
+            blind,
+            true,
+            0,
+            r1cs_converter.moves.clone().unwrap()[0].1,
+        ),
         ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
     };
 
-    let mut current_state = r1cs_converter.nfa.get_init_state();
+    let mut current_state = r1cs_converter.safa.get_init().index();
     // TODO don't recalc :(
 
     let mut next_state = current_state;
@@ -409,6 +389,8 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::tic(Component::Solver, &test, "witness generation");
         // allocate real witnesses for round i
+        let move_i_triple = r1cs_converter.moves.clone().unwrap()[i]; // order?
+        let move_i = (move_i_triple.1, move_i_triple.2);
         (
             wits,
             next_state,
@@ -419,7 +401,8 @@ fn solve<'a>(
             start_of_epsilons,
             next_doc_idx,
         ) = r1cs_converter.gen_wit_i(
-            i,
+            move_i,
+            0, // batch == 0 always right now i,
             next_state,
             running_q.clone(),
             running_v.clone(),
@@ -439,15 +422,15 @@ fn solve<'a>(
                 let next_hash = r1cs_converter.prover_calc_hash(
                     prev_hash,
                     false,
-                    r1cs_converter.substring.0 + (i * r1cs_converter.batch_size),
+                    move_i.0, // TODO + (i * r1cs_converter.batch_size),
                     r1cs_converter.batch_size,
                 );
 
                 let i_0 = <G1 as Group>::Scalar::from(
-                    (r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
+                    move_i.0 as u64, //(r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
                 );
                 let i_last = <G1 as Group>::Scalar::from(
-                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
+                    (move_i.0 + r1cs_converter.batch_size) as u64, //(r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
                 );
                 let g = vec![
                     GlueOpts::PolyHash((i_0, prev_hash)),
@@ -464,7 +447,7 @@ fn solve<'a>(
                 let next_hash = r1cs_converter.prover_calc_hash(
                     prev_hash,
                     false,
-                    r1cs_converter.substring.0 + (i * r1cs_converter.batch_size),
+                    move_i.0, //r1cs_converter.substring.0 + (i * r1cs_converter.batch_size),
                     r1cs_converter.batch_size,
                 );
 
@@ -487,10 +470,10 @@ fn solve<'a>(
                 let next_v = int_to_ff(next_running_v.clone().unwrap());
 
                 let i_0 = <G1 as Group>::Scalar::from(
-                    (r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
+                    move_i.0 as u64, //(r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
                 );
                 let i_last = <G1 as Group>::Scalar::from(
-                    (r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
+                    (move_i.0 + r1cs_converter.batch_size) as u64, //(r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
                 );
                 let g = vec![
                     GlueOpts::NlHash((i_0, prev_hash, q, v)),
@@ -500,15 +483,8 @@ fn solve<'a>(
                 g
             }
             (JBatching::NaivePolys, JCommit::Nlookup) => {
-                let q_idx = if r1cs_converter.substring.0 + i != 0 {
-                    <G1 as Group>::Scalar::from(
-                        (r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) - 1) as u64,
-                    )
-                } else if prev_doc_idx.is_none() {
-                    <G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1)
-                } else {
-                    <G1 as Group>::Scalar::from((prev_doc_idx.unwrap()) as u64)
-                };
+                // TODO fix
+                let q_idx = <G1 as Group>::Scalar::from(move_i.0 as u64);
                 println!("Q IDX {:#?}", q_idx);
 
                 let doc_q = match doc_running_q {
@@ -521,7 +497,8 @@ fn solve<'a>(
                     None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
                 };
 
-                let next_q_idx = <G1 as Group>::Scalar::from(next_doc_idx.unwrap() as u64);
+                let next_q_idx =
+                    <G1 as Group>::Scalar::from((move_i.0 + r1cs_converter.batch_size) as u64); //<G1 as Group>::Scalar::from(next_doc_idx.unwrap() as u64);
 
                 println!("NEXT Q IDX {:#?}", next_q_idx);
                 let next_doc_q = next_doc_running_q
@@ -555,17 +532,10 @@ fn solve<'a>(
                     .collect();
                 let next_v = int_to_ff(next_running_v.clone().unwrap());
 
-                let q_idx = if r1cs_converter.substring.0 + i != 0 {
-                    <G1 as Group>::Scalar::from(
-                        (r1cs_converter.substring.0 + ((i) * r1cs_converter.batch_size) - 1) as u64,
-                    )
-                } else if prev_doc_idx.is_none() {
-                    <G1 as Group>::Scalar::from(0) - <G1 as Group>::Scalar::from(1)
-                } else {
-                    <G1 as Group>::Scalar::from((prev_doc_idx.unwrap()) as u64)
-                };
+                let q_idx = <G1 as Group>::Scalar::from(move_i.0 as u64);
 
-                let next_q_idx = <G1 as Group>::Scalar::from(next_doc_idx.unwrap() as u64);
+                let next_q_idx =
+                    <G1 as Group>::Scalar::from((move_i.0 + r1cs_converter.batch_size) as u64);
 
                 println!("Q IDX {:#?}", q_idx);
                 println!("NEXT Q IDX {:#?}", next_q_idx);
@@ -614,14 +584,12 @@ fn solve<'a>(
             ],
             glue,
             blind,
-            i + r1cs_converter.substring.0 == 0,
-            <G1 as Group>::Scalar::from(r1cs_converter.nfa.nchars() as u64),
+            move_i.0 == 0,
+            <G1 as Group>::Scalar::from(r1cs_converter.safa.ab.len() as u64),
             start_of_epsilons,
             vec![
-                <G1 as Group>::Scalar::from(
-                    r1cs_converter.prover_accepting_state(i, current_state),
-                ),
-                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(i, next_state)),
+                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(current_state)),
+                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(next_state)),
             ],
             r1cs_converter.batch_size,
             r1cs_converter.pc.clone(),
@@ -830,7 +798,6 @@ fn verify(
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Final Clear Checks");
 }
-*/
 
 #[cfg(test)]
 mod tests {

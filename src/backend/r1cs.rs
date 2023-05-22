@@ -15,9 +15,9 @@ use neptune::{
 use petgraph::graph::NodeIndex;
 use rug::{integer::Order, ops::RemRounding, Integer};
 
-pub struct R1CS<'a, F: PrimeField> {
-    pub safa: &'a SAFA<String>,
-    pub num_ab: FxHashMap<Option<String>, usize>,
+pub struct R1CS<'a, F: PrimeField, C: Clone> {
+    pub safa: &'a SAFA<C>,
+    pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     delta: FxHashMap<(usize, usize), usize>, // in state, char as num, out state
     pub batching: JBatching,
@@ -34,16 +34,16 @@ pub struct R1CS<'a, F: PrimeField> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     pub doc_extend: usize,
-    moves: Option<Vec<(NodeIndex<u32>, usize, usize)>>,
+    pub moves: Option<Vec<(NodeIndex<u32>, usize, usize)>>,
     is_match: bool,
     //pub substring: (usize, usize), // todo getters
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
-impl<'a, F: PrimeField> R1CS<'a, F> {
+impl<'a, F: PrimeField> R1CS<'a, F, char> {
     pub fn new(
-        safa: &'a SAFA<String>,
-        doc: &Vec<String>,
+        safa: &'a SAFA<char>,
+        doc: &Vec<char>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U4>,
         batch_override: Option<JBatching>,
@@ -145,7 +145,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         */
 
         // character conversions
-        let mut num_ab: FxHashMap<Option<String>, usize> = FxHashMap::default();
+        let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
         let mut i = 0;
         for c in safa.ab.clone() {
             num_ab.insert(Some(c), i);
@@ -243,61 +243,61 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
     }
 
     // IN THE CLEAR
-    /*
-        pub fn prover_calc_hash(
-            &self,
-            start_hash_or_blind: F,
-            blind: bool,
-            start: usize,
-            num_iters: usize,
-        ) -> F {
-            let mut next_hash;
+    pub fn prover_calc_hash(
+        &self,
+        start_hash_or_blind: F,
+        blind: bool,
+        start: usize,
+        num_iters: usize,
+    ) -> F {
+        let mut next_hash;
 
-            if start == 0 && blind {
-                // H_0 = Hash(0, r, 0)
+        if start == 0 && blind {
+            // H_0 = Hash(0, r, 0)
+            let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+            let acc = &mut ();
+
+            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+            sponge.start(parameter, None, acc);
+
+            SpongeAPI::absorb(&mut sponge, 2, &[start_hash_or_blind, F::from(0)], acc);
+            next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            sponge.finish(acc).unwrap();
+        } else {
+            next_hash = vec![start_hash_or_blind];
+        }
+
+        let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+        for b in 0..num_iters {
+            //self.batch_size {
+            let access_at = start + b;
+            if access_at < self.udoc.len() {
+                // this is going to be wrong - TODO
+                // else nothing
+
+                // expected poseidon
                 let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
                 let acc = &mut ();
 
-                let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-                sponge.start(parameter, None, acc);
-
-                SpongeAPI::absorb(&mut sponge, 2, &[start_hash_or_blind, F::from(0)], acc);
+                sponge.start(parameter.clone(), None, acc);
+                SpongeAPI::absorb(
+                    &mut sponge,
+                    3,
+                    &[
+                        next_hash[0],
+                        F::from(self.udoc[access_at].clone() as u64),
+                        F::from((access_at) as u64),
+                    ],
+                    acc,
+                );
                 next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-                sponge.finish(acc).unwrap();
-            } else {
-                next_hash = vec![start_hash_or_blind];
+                sponge.finish(acc).unwrap(); // assert expected hash finished correctly
             }
-
-            let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
-            for b in 0..num_iters {
-                //self.batch_size {
-                let access_at = start + b;
-                if access_at < self.substring.1 {
-                    // else nothing
-
-                    // expected poseidon
-                    let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-                    let acc = &mut ();
-
-                    sponge.start(parameter.clone(), None, acc);
-                    SpongeAPI::absorb(
-                        &mut sponge,
-                        3,
-                        &[
-                            next_hash[0],
-                            F::from(self.udoc[access_at].clone() as u64),
-                            F::from((access_at) as u64),
-                        ],
-                        acc,
-                    );
-                    next_hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-                    sponge.finish(acc).unwrap(); // assert expected hash finished correctly
-                }
-            }
-
-            next_hash[0]
         }
-    */
+
+        next_hash[0]
+    }
+
     // PROVER
 
     pub fn prover_accepting_state(&self, state: usize) -> u64 {
@@ -484,22 +484,10 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
     // TODO get rid of i compares
     fn hashchain_commit(&mut self) {
-        self.pub_inputs.push(new_var(format!("i_0")));
+        /*    self.pub_inputs.push(new_var(format!("i_0")));
         for idx in 1..=self.batch_size {
-            let i_plus = term(
-                Op::Eq,
-                vec![
-                    new_var(format!("i_{}", idx)),
-                    term(
-                        Op::PfNaryOp(PfNaryOp::Add),
-                        vec![new_var(format!("i_{}", idx - 1)), new_const(1)],
-                    ),
-                ],
-            );
-
-            self.assertions.push(i_plus);
             self.pub_inputs.push(new_var(format!("i_{}", idx)));
-        }
+        }*/ //uneeded I believe
     }
 
     // for use at the end of sum check
@@ -722,7 +710,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
         self.r1cs_conv()
     }
 
-    fn nlookup_doc_commit(&mut self) {
+    fn q_ordering_circuit(&mut self, id: &str) {
         // q relations
         for i in 0..self.batch_size {
             // not final q (running claim)
@@ -739,7 +727,7 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                             Op::PfNaryOp(PfNaryOp::Mul),
                             vec![
                                 new_const(next_slot.clone()),
-                                new_var(format!("nldoc_eq_{}_q_{}", i, j)),
+                                new_var(format!("{}_eq_{}_q_{}", id, i, j)),
                             ],
                         ),
                     ],
@@ -747,56 +735,42 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
                 next_slot *= Integer::from(2);
             }
 
-            let q_eq = term(
-                Op::Eq,
-                vec![full_q.clone(), new_var(format!("nldoc_full_{}_q", i))],
-            );
+            let q_eq = term(Op::Eq, vec![full_q.clone(), new_var(format!("i_{}", i))]);
             self.assertions.push(q_eq);
-            self.pub_inputs.push(new_var(format!("nldoc_full_{}_q", i)));
+            self.pub_inputs.push(new_var(format!("i_{}", i)));
 
             // TODO make ep num = 0?
-            if i > 0 {
-                let q_ordering = term(
-                    Op::BoolNaryOp(BoolNaryOp::Or),
-                    vec![
-                        term(
-                            Op::Eq,
-                            vec![
-                                new_const(self.udoc.len() - 1), // EPSILON num
-                                new_var(format!("nldoc_full_{}_q", i)),
-                            ],
-                        ),
-                        term(
-                            Op::Eq,
-                            vec![
-                                new_var(format!("nldoc_full_{}_q", i)),
-                                term(
-                                    Op::PfNaryOp(PfNaryOp::Add),
-                                    vec![new_var(format!("nldoc_full_{}_q", i - 1)), new_const(1)],
-                                ),
-                            ],
-                        ),
-                    ],
-                );
+            let q_ordering = term(
+                Op::BoolNaryOp(BoolNaryOp::Or),
+                vec![
+                    term(
+                        Op::Eq,
+                        vec![
+                            new_const(self.udoc.len() - 1), // EPSILON num
+                            new_var(format!("i_{}", i + 1)),
+                        ],
+                    ),
+                    term(
+                        Op::Eq,
+                        vec![
+                            new_var(format!("i_{}", i + 1)),
+                            term(
+                                Op::PfNaryOp(PfNaryOp::Add),
+                                vec![new_var(format!("i_{}", i)), new_const(1)],
+                            ),
+                        ],
+                    ),
+                ],
+            );
 
-                self.assertions.push(q_ordering);
-            } else {
-                let q_ordering = term(
-                    Op::Eq,
-                    vec![
-                        new_var(format!("nldoc_full_{}_q", i)),
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Add),
-                            vec![new_var(format!("nldoc_full_prev_round_q")), new_const(1)],
-                        ),
-                    ],
-                );
-
-                self.pub_inputs
-                    .push(new_var(format!("nldoc_full_prev_round_q")));
-                self.assertions.push(q_ordering);
-            }
+            self.assertions.push(q_ordering);
         }
+        self.pub_inputs
+            .push(new_var(format!("i_{}", self.batch_size)));
+    }
+
+    fn nlookup_doc_commit(&mut self) {
+        self.q_ordering_circuit("nldoc");
 
         // lookups and nl circuit
         let mut char_lookups = vec![];
@@ -1018,12 +992,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         match self.commit_type {
             JCommit::HashChain => {
-                for i in 0..=self.batch_size {
+                /*  for i in 0..=self.batch_size {
                     wits.insert(
                         format!("i_{}", i),
                         new_wit(batch_num * self.batch_size + i + move_num.0),
                     );
-                }
+                }*/
                 (
                     wits,
                     next_state,
@@ -1099,8 +1073,11 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
             // not final q (running claim)
             println!("FULL Q {:#?} = {:#?}", i, q[i]);
 
-            wits.insert(format!("nldoc_full_{}_q", i), new_wit(q[i]));
+            wits.insert(format!("i_{}", i), new_wit(q[i]));
         }
+        wits.insert(format!("i_{}", q.len()), new_wit(q[q.len() - 1] + 1)); // MUST CHANGE with SNFA, very
+                                                                            // hacky
+
         let next_idx = q[q.len() - 1] as isize;
 
         let (w, next_running_q, next_running_v) =
@@ -1382,12 +1359,12 @@ impl<'a, F: PrimeField> R1CS<'a, F> {
 
         match self.commit_type {
             JCommit::HashChain => {
-                for i in 0..=self.batch_size {
+                /*  for i in 0..=self.batch_size {
                     wits.insert(
                         format!("i_{}", i),
                         new_wit(batch_num * self.batch_size + i + move_num.0),
                     );
-                }
+                }*/
                 // values not actually checked or used
                 (wits, next_state, None, None, start_epsilons, None)
             }

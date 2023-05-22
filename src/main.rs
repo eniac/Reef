@@ -3,8 +3,8 @@ use clap::Parser;
 use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
-use reef::nfa::NFA;
 use reef::regex::Regex;
+use reef::safa::SAFA;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
@@ -27,10 +27,11 @@ fn main() {
         opt.config
             .read_file(&PathBuf::from(&opt.input))
             .iter()
-            .map(|c| c.to_string())
+            .map(|c| c.clone()) //to_string())
             .collect()
     } else {
-        opt.input.chars().map(|c| c.to_string()).collect()
+        //opt.input.chars().map(|c| c.to_string()).collect()
+        opt.input.chars().collect()
     };
 
     #[cfg(feature = "metrics")]
@@ -39,13 +40,13 @@ fn main() {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA", "DFA");
 
-    println!("REGEX: {:#?}", Regex::new(&opt.re));
-    return;
+    let r = Regex::new(&opt.re);
+    //    println!("REGEX: {:#?}", r));
 
-    let mut nfa = NFA::new(&ab, Regex::new(&opt.re));
+    let mut safa = SAFA::new(&ab, &r);
 
     // Is document well-formed
-    nfa.well_formed(&doc);
+    // nfa.well_formed(&doc);
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA", "DFA");
@@ -55,24 +56,27 @@ fn main() {
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "DFA", "K Stride");
 
-        doc = nfa.k_stride(k, &doc);
+        todo!();
+        //doc = nfa.k_stride(k, &doc);
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "DFA", "K Stride");
     };
     #[cfg(feature = "plot")]
-    nfa.write_pdf("nfa")
+    safa.write_pdf("safa")
         .expect("Failed to plot NFA to a pdf file");
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "DFA Solving", "Clear Match");
 
+    /*
     println!(
         "Match: {}",
         nfa.is_match(&doc)
             .map(|c| format!("{:?}", c))
             .unwrap_or(String::from("NONE"))
-    );
+    );*/
+    // TODO solving here, pass result to R1CS
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver, "DFA Solving", "Clear Match");
@@ -80,7 +84,7 @@ fn main() {
     init();
 
     run_backend(
-        nfa.clone(),
+        safa.clone(),
         doc,
         opt.eval_type,
         opt.commit_type,
@@ -97,8 +101,8 @@ fn main() {
     let _ = wtr.write_record(&[
         opt.input,
         opt.re,
-        nfa.nedges().to_string(),
-        nfa.nstates().to_string(),
+        safa.g.edge_count().to_string(), //nedges().to_string(),
+        safa.g.node_count().to_string(), //nstates().to_string(),
     ]);
     let spacer = "---------";
     let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);

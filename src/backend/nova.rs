@@ -179,7 +179,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         return Ok(false);
     }
 
-    fn input_variable_hash_parsing(
+    fn input_i_parsing(
         &self,
         vars: &mut HashMap<Var, Variable>,
         s: &String,
@@ -188,21 +188,6 @@ impl<F: PrimeField> NFAStepCircuit<F> {
     ) -> Result<bool, SynthesisError> {
         if s.starts_with("i_0") {
             vars.insert(var, i_0.get_variable());
-
-            return Ok(true);
-        }
-        return Ok(false);
-    }
-
-    fn input_variable_nldoc_parsing(
-        &self,
-        vars: &mut HashMap<Var, Variable>,
-        s: &String,
-        var: Var,
-        prev_q_idx: AllocatedNum<F>,
-    ) -> Result<bool, SynthesisError> {
-        if s.starts_with("nldoc_full_prev_round_q") {
-            vars.insert(var, prev_q_idx.get_variable());
 
             return Ok(true);
         }
@@ -262,7 +247,7 @@ where {
         alloc_v: &AllocatedNum<F>,
         last_i: &mut Option<AllocatedNum<F>>,
     ) -> Result<bool, SynthesisError> {
-        if s.starts_with(&format!("nldoc_full_{}_q", self.batch_size - 1)) {
+        if s.starts_with(&format!("i_{}", self.batch_size)) {
             *last_i = Some(alloc_v.clone());
 
             return Ok(true);
@@ -275,8 +260,8 @@ where {
         s: &String,
         alloc_v: &AllocatedNum<F>,
         alloc_chars: &mut Vec<Option<AllocatedNum<F>>>,
-        alloc_idxs: &mut Vec<Option<AllocatedNum<F>>>,
-        last_i: &mut Option<AllocatedNum<F>>,
+        //alloc_idxs: &mut Vec<Option<AllocatedNum<F>>>,
+        //last_i: &mut Option<AllocatedNum<F>>,
     ) -> Result<bool, SynthesisError> {
         // intermediate (in circ) wits
         if s.starts_with("char_") {
@@ -290,20 +275,21 @@ where {
             } // don't add the last one
 
             return Ok(true);
-        } else if s.starts_with(&format!("i_{}", self.batch_size)) {
-            *last_i = Some(alloc_v.clone());
-            alloc_idxs[self.batch_size] = last_i.clone();
+            /*} else if s.starts_with(&format!("i_{}", self.batch_size)) {
+                *last_i = Some(alloc_v.clone());
+                alloc_idxs[self.batch_size] = last_i.clone();
 
-            return Ok(true);
-        } else if s.starts_with("i_") {
-            let i_j = Some(alloc_v.clone()); //.get_variable();
+                return Ok(true);
+            } else if s.starts_with("i_") {
+                let i_j = Some(alloc_v.clone()); //.get_variable();
 
-            let s_sub: Vec<&str> = s.split("_").collect();
-            let j: usize = s_sub[1].parse().unwrap();
+                let s_sub: Vec<&str> = s.split("_").collect();
+                let j: usize = s_sub[1].parse().unwrap();
 
-            alloc_idxs[j] = i_j;
+                alloc_idxs[j] = i_j;
 
-            return Ok(true);
+                return Ok(true);
+            */
         }
 
         return Ok(false);
@@ -317,10 +303,11 @@ where {
         epsilon_num: F,
         start_of_ep: isize,
         z_input_hash: AllocatedNum<F>,
-        i_0: AllocatedNum<F>,
+        i_0_f: F,
         blind: F,
         alloc_chars: Vec<Option<AllocatedNum<F>>>,
-        doc_idxs: Vec<Option<AllocatedNum<F>>>,
+        //doc_idxs: Vec<Option<AllocatedNum<F>>>,
+        last_i: &mut Option<AllocatedNum<F>>,
     ) -> Result<AllocatedNum<F>, SynthesisError>
     where
         CS: ConstraintSystem<F>,
@@ -358,6 +345,9 @@ where {
             Elt::ensure_allocated(&output[0], &mut ns.namespace(|| "ensure allocated"), true)?
         };
 
+        let mut idx_i = i_0_f;
+        let i_0 = AllocatedNum::alloc(ns.namespace(|| format!("idx 0")), || Ok(i_0_f))?;
+
         let start_hash;
         let i_0_inv;
         let first_sel;
@@ -375,7 +365,6 @@ where {
                     Ok(z_input_hash.get_value().unwrap())
                 })?;
 
-                //type_of(&i_0.get_value().unwrap());
                 let inv_opt = i_0.get_value().unwrap().invert();
                 let inv = inv_opt.expect("couldn't invert i_0 for wit");
                 i_0_inv = AllocatedNum::alloc(ns.namespace(|| "io inv"), || Ok(inv))?;
@@ -386,9 +375,12 @@ where {
         // regular hashing
         let mut prev_hash = start_hash.clone();
         let mut next_hash = start_hash.clone(); // dummy
+
+        let mut idx = i_0.clone();
         for i in 0..(self.batch_size) {
             let unwrap_alloc_char = alloc_chars[i].clone().unwrap();
             let mut hash_ns = ns.namespace(|| format!("poseidon hash batch {}", i));
+
             let hashed = {
                 let acc = &mut hash_ns;
                 let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
@@ -398,16 +390,6 @@ where {
                     None,
                     acc,
                 );
-                /*
-                                if i_0.get_value().is_some() {
-                                    println!(
-                                        "ELTS FOR HASH: {:#?}, {:#?}, {:#?}",
-                                        prev_hash.get_value().unwrap(),
-                                        unwrap_alloc_char.get_value().unwrap(),
-                                        doc_idxs[i].clone().unwrap().get_value().unwrap()
-                                    );
-                                }
-                */
 
                 SpongeAPI::absorb(
                     &mut sponge,
@@ -415,7 +397,7 @@ where {
                     &[
                         Elt::Allocated(prev_hash.clone()),
                         Elt::Allocated(unwrap_alloc_char.clone()),
-                        Elt::Allocated(doc_idxs[i].clone().unwrap()),
+                        Elt::Allocated(idx.clone()),
                     ],
                     // TODO "connected"? get rid clones
                     acc,
@@ -431,6 +413,10 @@ where {
                     true,
                 )?
             };
+
+            idx_i += F::from(1);
+            idx = AllocatedNum::alloc(hash_ns.namespace(|| format!("idx {}", i)), || Ok(idx_i))?;
+            //println!("IDX is {:#?} from {:#?}", idx.get_value(), idx_i);
 
             // wrap each in ite for epsilon in batching (first not necessary)
             // if EP_SEL then NEXT_HASH = PREV_HASH else NEXT_HASH = HASHED(PREV_HASH)
@@ -474,7 +460,7 @@ where {
             }
 
             // sanity - get rid of
-            if i_0.get_value().is_some() {
+            if ep_sel.get_value().is_some() {
                 assert_eq!(
                     ep_sel.get_value().unwrap()
                         * (hashed.get_value().unwrap() - prev_hash.get_value().unwrap()),
@@ -517,6 +503,7 @@ where {
 
             prev_hash = next_hash.clone();
         }
+        *last_i = Some(idx);
 
         // random start ite
         // if FIRST_SEL==0 then START_HASH = RANDOM_HASH else START_HASH = Z_INPUT_HASH
@@ -949,7 +936,7 @@ where
 
         // intms
         let mut alloc_chars = vec![None; self.batch_size];
-        let mut alloc_idxs = vec![None; self.batch_size + 1];
+        //let mut alloc_idxs = vec![None; self.batch_size + 1];
 
         let mut alloc_claim_r = None;
         let mut alloc_doc_claim_r = None;
@@ -968,9 +955,9 @@ where
         let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
 
         match &self.glue[0] {
-            GlueOpts::PolyHash(_) => {
-                let i_0 = z[1].clone();
-                alloc_idxs[0] = Some(i_0.clone());
+            GlueOpts::PolyHash((idx, _h)) => {
+                //let i_0 = z[1].clone();
+                //alloc_idxs[0] = Some(i_0.clone());
                 let hash_0 = z[2].clone();
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
@@ -994,11 +981,6 @@ where
                         )
                         .unwrap();
                     if !matched {
-                        matched = self
-                            .input_variable_hash_parsing(&mut vars, &s, var, i_0.clone())
-                            .unwrap();
-                    }
-                    if !matched {
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                         vars.insert(var, alloc_v.get_variable());
                         matched = self
@@ -1006,8 +988,8 @@ where
                                 &s,
                                 &alloc_v,
                                 &mut alloc_chars,
-                                &mut alloc_idxs,
-                                &mut last_i,
+                                //&mut alloc_idxs,
+                                //&mut last_i,
                             )
                             .unwrap();
 
@@ -1018,24 +1000,24 @@ where
                     }
                 }
                 out.push(last_state.unwrap());
-                out.push(last_i.unwrap());
                 let last_hash = self.hash_circuit(
                     cs,
                     self.first,
                     self.epsilon_num,
                     self.start_of_ep,
                     hash_0,
-                    i_0,
+                    *idx,
                     self.commit_blind,
                     alloc_chars,
-                    alloc_idxs,
+                    &mut last_i,
                 );
+                out.push(last_i.unwrap());
                 out.push(last_hash.unwrap());
                 out.push(accepting.unwrap());
             }
-            GlueOpts::NlHash((_i, _h, q, _v)) => {
-                let i_0 = z[1].clone();
-                alloc_idxs[0] = Some(i_0.clone());
+            GlueOpts::NlHash((idx, _h, q, _v)) => {
+                //let i_0 = z[1].clone();
+                //alloc_idxs[0] = Some(i_0.clone());
                 let hash_0 = z[2].clone();
 
                 let sc_l = q.len();
@@ -1073,11 +1055,6 @@ where
                         .unwrap();
                     if !matched {
                         matched = self
-                            .input_variable_hash_parsing(&mut vars, &s, var, i_0.clone())
-                            .unwrap();
-                    }
-                    if !matched {
-                        matched = self
                             .input_variable_qv_parsing(
                                 &mut vars,
                                 &s,
@@ -1098,8 +1075,8 @@ where
                                 &s,
                                 &alloc_v,
                                 &mut alloc_chars,
-                                &mut alloc_idxs,
-                                &mut last_i,
+                                //&mut alloc_idxs,
+                                //&mut last_i,
                             )
                             .unwrap();
 
@@ -1160,18 +1137,18 @@ where
                 )?;
 
                 out.push(last_state.unwrap());
-                out.push(last_i.unwrap());
                 let last_hash = self.hash_circuit(
                     cs,
                     self.first,
                     self.epsilon_num,
                     self.start_of_ep,
                     hash_0,
-                    i_0,
+                    *idx,
                     self.commit_blind,
                     alloc_chars,
-                    alloc_idxs,
+                    &mut last_i,
                 );
+                out.push(last_i.unwrap());
                 out.push(last_hash.unwrap());
                 for qv in alloc_rc {
                     out.push(qv.unwrap()); // better way to do this?
@@ -1180,7 +1157,7 @@ where
             }
             GlueOpts::PolyNL((_idx, dq, _dv)) => {
                 let doc_l = dq.len();
-                let prev_q_idx = z[1].clone();
+                let i_0 = z[1].clone();
 
                 let mut alloc_doc_rc = vec![None; doc_l + 1];
                 let mut alloc_doc_prev_rc = vec![None; doc_l + 1];
@@ -1232,7 +1209,7 @@ where
                     }
                     if !matched {
                         matched = self
-                            .input_variable_nldoc_parsing(&mut vars, &s, var, prev_q_idx.clone())
+                            .input_i_parsing(&mut vars, &s, var, i_0.clone())
                             .unwrap();
                     }
                     if !matched {
@@ -1304,7 +1281,7 @@ where
             GlueOpts::NlNl((q, _v, _idx, dq, _dv)) => {
                 let sc_l = q.len();
                 let doc_l = dq.len();
-                let prev_q_idx = z[sc_l + 2].clone();
+                let i_0 = z[sc_l + 2].clone();
 
                 let mut alloc_rc = vec![None; sc_l + 1];
                 let mut alloc_prev_rc = vec![None; sc_l + 1];
@@ -1378,7 +1355,7 @@ where
                     }
                     if !matched {
                         matched = self
-                            .input_variable_nldoc_parsing(&mut vars, &s, var, prev_q_idx.clone())
+                            .input_i_parsing(&mut vars, &s, var, i_0.clone())
                             .unwrap();
                     }
                     if !matched {
