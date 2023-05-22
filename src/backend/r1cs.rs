@@ -160,6 +160,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // TODO range check
         let mut table = vec![];
+
+        safa.as_str_safa().write_pdf("safa").unwrap();
+        println!("ACCEPTING {:#?}", safa.accepting());
+        println!("DELTAS {:#?}", safa.deltas());
+        println!("SOLVE {:#?}", safa.solve(&doc));
+        println!("DOC {:#?}", doc.clone());
+
         for (in_node, edge, out_node) in safa.deltas() {
             let in_state = in_node.0.index(); // check AND/OR?
             let out_state = out_node.index();
