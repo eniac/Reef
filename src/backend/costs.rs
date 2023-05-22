@@ -55,7 +55,8 @@ pub fn commit_circuit_nohash(
     is_match: Option<(usize, usize)>,
 ) -> usize {
     match commit_type {
-        // JCommit::HashChain => match is_match {
+        JCommit::HashChain => panic!("No hashchain"),
+        //match is_match {
         //     None => batch_size, // i's for hashes: i++ (batch_size),
         //     // enforce i_0 != 0 bool (2), ite (5) -> on nova level :)
         //     Some((_, end)) if end >= doc_len => batch_size,
@@ -117,6 +118,7 @@ fn commit_circuit_hash(
         //     Some((_, end)) if end == doc_len => ((batch_size + 1) * (POSEIDON_NUM+3))-(7+(3*batch_size)),
         //     _ => panic!("Cant do hashchain with substring"),
         // },
+        JCommit::HashChain => panic!("No hashchain"),
         JCommit::Nlookup => {
             let mod_len = match is_match {
                 None => doc_len,
@@ -336,6 +338,8 @@ pub fn opt_cost_model_select_with_commit<'a>(
         //         commit,
         //     );
         // }
+        // },
+        JCommit::HashChain => panic!("No hashchain"),
         JCommit::Nlookup => {
             if batch_size_v_match {
                 cost = full_round_cost_model(
