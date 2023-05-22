@@ -8,7 +8,9 @@ use std::str::FromStr;
 
 use core::fmt;
 use core::fmt::Formatter;
+use crate::skip::Skip;
 
+#[cfg(fuzz)]
 pub mod arbitrary;
 
 /// Hash-consed regex terms
@@ -82,8 +84,10 @@ impl FromStr for Regex {
                     let inner = to_regex(child)?;
                     Ok(Regex::app(inner.repeat(*lo), Regex::star(inner)))
                 },
-                Expr::Repeat { child, lo, hi, .. } =>
-                    Ok(Regex::range(to_regex(child)?, *lo, *hi)),
+                Expr::Repeat { child, lo, hi, .. } => {
+                    println!("Inner range: {:?}", child);
+                    Ok(Regex::range(&to_regex(child)?, *lo, *hi))
+                },
                 Expr::StartLine | Expr::StartText => Ok(Regex(G.mk(RegexF::LineStart))),
                 Expr::EndLine | Expr::EndText => Ok(Regex(G.mk(RegexF::LineEnd))),
                 Expr::Group(g) => to_regex(&g),
@@ -166,19 +170,6 @@ impl Regex {
         }
     }
 
-    /// Flatten a tree of app into a list of app
-    pub fn to_app_list(&self) -> Vec<Regex> {
-        match *self.0 {
-            RegexF::App(ref a, ref b) => {
-                let mut la = a.to_app_list();
-                let mut lb = b.to_app_list();
-                la.append(&mut lb);
-                la
-            },
-            _ => vec![self.clone()]
-        }
-    }
-
     /// Subset relation is a partial order
     pub fn partial_le(a: &Regex, b: &Regex) -> Option<bool> {
         match (&*a.0, &*b.0) {
@@ -223,9 +214,9 @@ impl Regex {
             // Empty absorbs everything
             (_, RegexF::Empty) | (RegexF::Empty, _) => Regex::empty(),
             // Range & star index math
-            (RegexF::Range(a, i, j), _) if a == &b => Regex::range(a.clone(), i+1, j+1),
-            (_, RegexF::Range(b, i, j)) if &a == b => Regex::range(b.clone(), i+1, j+1),
-            (RegexF::Range(a, i1, j1), RegexF::Range(b, i2, j2)) if a == b => Regex::range(a.clone(), i1+i2, j1+j2),
+            (RegexF::Range(a, i, j), _) if a == &b => a.range(i+1, j+1),
+            (_, RegexF::Range(b, i, j)) if &a == b => b.range(i+1, j+1),
+            (RegexF::Range(a, i1, j1), RegexF::Range(b, i2, j2)) if a == b => a.range(i1+i2, j1+j2),
             (RegexF::Star(x), RegexF::Range(y, _, _)) if x == y => a,
             (RegexF::Range(y, _, _), RegexF::Star(x)) if x == y => b,
             (RegexF::Star(x), RegexF::Star(y)) if x == y => a,
@@ -261,12 +252,14 @@ impl Regex {
         }
     }
 
-    pub fn range(a: Regex, i: usize, j: usize) -> Regex {
-        assert!(i <= j, "Range indices {{{}, {}}} must be 0 <= {} <= {}", i, j, i, j);
-        match &*a.0 {
-            RegexF::Star(_) | RegexF::Nil => a,
+    pub fn range(&self, i: usize, j: usize) -> Regex {
+        assert!(i <= j, "Range indices must be 0 <= {} <= {}", i, j);
+        match *self.0 {
+            RegexF::Star(_) | RegexF::Nil => self.clone(),
             RegexF::Empty => Regex::empty(),
-            _ => Regex(G.mk(RegexF::Range(a, i, j)))
+            _ if i == 0 && j == 0 => Regex::nil(),
+            _ if i == 0 => Regex::alt(Regex::nil(), Regex::range(self, 1, j)),
+            _ => Regex(G.mk(RegexF::Range(self.clone(), i, j)))
         }
     }
 
@@ -278,6 +271,13 @@ impl Regex {
         }
     }
 
+    pub fn is_nil(&self) -> bool {
+        match *self.0 {
+            RegexF::Nil => true,
+            _ => false
+        }
+    }
+
     pub fn lookahead(a: Regex) -> Regex {
         Regex(G.mk(RegexF::Lookahead(a)))
     }
@@ -286,6 +286,7 @@ impl Regex {
         a
     }
 
+    /// Nullable regex accept the empty document
     pub fn nullable(&self) -> bool {
         match *self.0 {
             RegexF::Nil | RegexF::LineEnd | RegexF::LineStart | RegexF::Star(_) => true,
@@ -313,19 +314,50 @@ impl Regex {
         }
     }
 
-    pub fn has_zero_length_assertions(&self) -> bool {
-        match *self.0 {
-            RegexF::LineEnd | RegexF:: LineStart | RegexF::Lookahead(_) => true,
-            RegexF::App(ref a, ref b) => a.has_zero_length_assertions() || b.has_zero_length_assertions(),
-            RegexF::Alt(ref a, ref b) => a.has_zero_length_assertions() || b.has_zero_length_assertions(),
-            RegexF::Star(ref a) => a.has_zero_length_assertions(),
-            _ => false
-        }
-    }
-
     /// Does it accept any string
     pub fn accepts_any(&self, ab: &Vec<char>) -> bool {
         ab.iter().all(|c| self.deriv(&c).nullable())
+    }
+
+    /// The length of the longest wildcard skip
+    pub fn to_skip(&self, ab: &Vec<char>) -> Option<(Skip, Self)> {
+        match *self.0 {
+            RegexF::Dot =>
+                Some((Skip::single(), Regex::nil())),
+            // .*
+            RegexF::Star(ref a) => {
+                let (sa, rem) = a.to_skip(ab)?;
+                if rem.is_nil() {
+                    Some((sa.star(), Regex::nil()))
+                } else { None }
+            }
+            // .{i,j}
+            RegexF::Range(ref a, x, y) => {
+                let (sa, rem) = a.to_skip(ab)?;
+                if rem.is_nil() {
+                    Some((sa.range(x, y), Regex::nil()))
+                } else { None }
+            },
+            // (r | r')
+            RegexF::Alt(ref a, ref b) => {
+                let (pa, rema) = a.to_skip(ab)?;
+                let (pb, remb) = b.to_skip(ab)?;
+                if rema.is_nil() && remb.is_nil() {
+                    Some((pa.alt(&pb), Regex::nil()))
+                } else { None }
+            },
+            // r1r2
+            RegexF::App(ref a, ref b) => {
+              let (pa, rema) = a.to_skip(ab)?;
+              match b.to_skip(ab) {
+                  Some((pb, remb)) =>
+                    Some((pa.app(&pb), Regex::app(rema, remb))),
+                  None =>
+                    Some((pa, Regex::app(rema, b.clone())))
+              }
+            },
+            _ => None
+        }
     }
 
     /// Make [r], [n] into [rrrr....r] n times.
@@ -353,6 +385,7 @@ impl Regex {
             RegexF::Alt(ref a, ref b) => Regex::alt(a.deriv(c), b.deriv(c)),
             RegexF::Star(ref a) => Regex::app(a.deriv(c), Regex::star(a.clone())),
             RegexF::Range(ref a, i, j) if i == j => a.repeat(i).deriv(c),
+            RegexF::Range(ref a, i, j) if i == 0 => Regex::alt(Regex::nil(), a.clone().range(1, j)).deriv(c),
             RegexF::Range(ref a, i, j) =>
                 match (i..=j).map(|i| a.repeat(i)).reduce(Regex::alt) {
                     Some(r) => r.deriv(c),
@@ -380,5 +413,5 @@ fn regex_parser_test_dot() {
 
 #[test]
 fn regex_parser_test_repetition_range() {
-    assert_eq!(Regex::range(Regex::character('a'), 1, 3), Regex::new("a{1,3}"));
+    assert_eq!(Regex::character('a').range(1, 3), Regex::new("a{1,3}"));
 }

@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::collections::{HashSet, HashMap, BTreeSet, LinkedList};
+use std::collections::BTreeSet;
 use std::process::Command;
 
 use petgraph::Graph;
@@ -7,67 +7,14 @@ use petgraph::graph::NodeIndex;
 use petgraph::dot::Dot;
 use petgraph::visit::*;
 
-use std::fs::File;
-use std::io::BufWriter;
 use std::result::Result;
 
 use crate::regex::{Regex, RegexF};
-use crate::nfa::EPSILON;
+use crate::skip::Skip;
 use rayon::iter::*;
 
 use core::fmt;
 use core::fmt::{Display,Formatter};
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Skip {
-    Offset(usize),
-    Choice(BTreeSet<usize>),
-    Star
-}
-
-impl Skip {
-    pub fn range(i: usize, j: usize) -> Self {
-        if i == j {
-            Skip::Offset(i)
-        } else {
-            Skip::Choice((i..=j).collect())
-        }
-    }
-
-    pub fn epsilon() -> Self {
-        Skip::Offset(0)
-    }
-    /// Sequential composition of two jumps is a jump
-    pub fn then(&self, a: &Skip) -> Skip {
-        match (self, a) {
-            (Skip::Offset(0), _) => a.clone(),
-            (Skip::Offset(i), Skip::Offset(j)) => Skip::Offset(i+j),
-            (Skip::Offset(i), Skip::Choice(x)) | (Skip::Choice(x), Skip::Offset(i)) =>
-                Skip::Choice(x.into_iter().map(|x| x + i).collect()),
-            (Skip::Choice(x), Skip::Choice(y)) => {
-                let mut s = BTreeSet::new();
-                for i in x.into_iter() {
-                    for j in y.into_iter() {
-                        s.insert(i + j);
-                    }
-                }
-                Skip::Choice(s)
-            },
-            (Skip::Star, _) | (_, Skip::Star) => Skip::Star
-        }
-    }
-}
-
-impl fmt::Display for Skip {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Skip::Offset(u) if *u == 0 => write!(f, "ε"),
-            Skip::Offset(u) => write!(f, "+{}", u),
-            Skip::Choice(us) => write!(f, "{:?}", us),
-            Skip::Star => write!(f, "*")
-        }
-    }
-}
 
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Either<A, B>(Result<A, B>);
@@ -78,12 +25,6 @@ impl<A, B> Either<A, B> {
     }
     fn right(b: B) -> Self {
         Self(Err(b))
-    }
-    fn is_left(&self) -> bool {
-        self.0.is_ok()
-    }
-    fn is_right(&self) -> bool {
-        self.0.is_err()
     }
 }
 
@@ -137,7 +78,6 @@ impl Display for Quant<NodeIndex<u32>> {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct SAFA<C: Clone> {
     /// Alphabet
@@ -145,17 +85,28 @@ pub struct SAFA<C: Clone> {
 
     /// A graph
     pub g: Graph<Quant<Regex>, Either<C, Skip>>,
+
+    /// Set of accepting states
+    pub accepting: BTreeSet<NodeIndex<u32>>
 }
 
 impl SAFA<char> {
     /// Shallow constructor
     pub fn new<'a>(alphabet: &'a str, re: &Regex) -> Self {
         let ab = alphabet.chars().sorted().collect();
+        // Add root
         let mut g: Graph<Quant<Regex>, Either<char, Skip>> = Graph::new();
         let n_init = g.add_node(Quant::and(re.clone()));
         g.add_edge(n_init, n_init, SAFA::epsilon());
-        let mut s = Self { ab, g };
+        let mut s = Self { ab, g, accepting: BTreeSet::new() };
+        // Recursively build graph
         s.add(n_init, re);
+        // Accepting states
+        for n in s.g.node_indices() {
+            if s.g[n].get().nullable() {
+                s.accepting.insert(n);
+            }
+        }
         s
     }
 
@@ -221,34 +172,23 @@ impl SAFA<char> {
     }
 
     fn add(&mut self, from: NodeIndex<u32>, q: &Regex) {
-        match *q.0 {
-            // .*
-            RegexF::Star(ref a) if a.accepts_any(&self.ab) =>
-              self.add_skip(from, Skip::Star, &Regex::nil()),
-            // .{i,j}
-            RegexF::Range(ref a, x, y) if a.accepts_any(&self.ab) && !a.nullable() =>
-              self.add_skip(from, Skip::range(x, y), &Regex::nil()),
-            // (?=r)
-            RegexF::Lookahead(ref a) => {
+        match ((*q.0).clone(), q.to_skip(&self.ab))  {
+            (RegexF::Lookahead(ref a), None) => {
               self.to_and(from);
               self.add_skip(from, Skip::epsilon(), a)
             },
             // (r | r')
-            RegexF::Alt(_, _) => {
+            (RegexF::Alt(_, _), None) => {
               self.to_or(from);
               q.to_alt_list()
                .into_iter()
                .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
             },
+            // Some wildcards, skip them
+            (_, Some((skip, rem))) => self.add_skip(from, skip, &rem),
             // r1r2
-            RegexF::App(ref a, ref b) => {
+            (RegexF::App(ref a, ref b), None) =>
               match *a.0 {
-                  // .*r
-                  RegexF::Star(ref a) if a.accepts_any(&self.ab) =>
-                      self.add_skip(from, Skip::Star, b),
-                  // .{i,j}r
-                  RegexF::Range(ref a, x, y) if a.accepts_any(&self.ab) =>
-                      self.add_skip(from, Skip::range(x, y), b),
                   // (?=r1)r2
                   RegexF::Lookahead(ref a) => {
                       self.to_and(from);
@@ -265,8 +205,7 @@ impl SAFA<char> {
                   }
                   // Some other kind of app
                   _ => self.add_derivatives(from, q)
-              }
-            },
+              },
             // Other (derivative)
             _ => self.add_derivatives(from, q)
         }
@@ -277,7 +216,8 @@ impl SAFA<char> {
         SAFA {
             ab: self.ab.iter().map(|c| c.to_string()).collect(),
             g: self.g.map(|_, b| b.clone(),
-                          |_, e| Either(e.clone().0.map(|c| c.to_string())))
+                          |_, e| Either(e.clone().0.map(|c| c.to_string()))),
+            accepting: self.accepting.clone()
         }
     }
 }
@@ -302,18 +242,6 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         Either::right(Skip::Offset(0))
     }
 
-    /// Return a vector of (NFA id, node) of all accepting states
-    pub fn accepting(&self) -> Vec<NodeIndex<u32>> {
-        let mut res: Vec<_> = Vec::new();
-
-        for n in self.g.node_indices() {
-            if self.g[n].get().nullable() {
-                res.push(n);
-            }
-        }
-        res
-    }
-
     /// Get initial state
     pub fn get_init(&self) -> NodeIndex<u32> {
         NodeIndex::new(0)
@@ -324,6 +252,7 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         self.g.node_indices().find(|x| &self.g[*x].get() == re)
     }
 
+    /// All edges (quantified) in the graph
     pub fn deltas(&self) -> BTreeSet<(Quant<NodeIndex<u32>>, Either<C, Skip>, NodeIndex<u32>)> {
         self.g.node_indices().flat_map(|n|
             self.g.edges(n).map(|e|
@@ -334,22 +263,13 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
                 })).collect()
     }
 
-    fn safe_get(v: &Vec<C>, i: usize) -> String {
-        if i == v.len() {
-            "NaN".to_string()
-        } else {
-            v[i].to_string()
-        }
-    }
-
     /// Find the largest continuous matching string of characters
     /// exclusive both in [node index] and [usize] that didn't match
     pub fn solve_char(&self, from: NodeIndex<u32>, i: usize, doc: &Vec<C>) ->
         (NodeIndex<u32>, Option<(usize, usize)>) {
-        let accepting = &self.accepting();
 
         // Initial state is also accepting
-        if accepting.contains(&self.get_init()) &&
+        if self.accepting.contains(&self.get_init()) &&
             (!self.is_end_anchored(from) || doc.len() == 0) {
             return (from, Some((0, 0)));
         }
@@ -376,8 +296,9 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         (s, None)
     }
 
+    /// A sink is a self-looping node that is not accepting
     pub fn is_sink(&self, n: NodeIndex<u32>) -> bool {
-        self.g.edges(n).all(|e| e.target() == n)
+        self.g.edges(n).all(|e| e.target() == n && !self.accepting.contains(&e.target()))
     }
 
     /// Recursively solve an edge and all the children coming off of it
@@ -399,18 +320,20 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
                 },
             Err(Skip::Offset(n)) => self.solve_rec(to, i+n, doc),
             Err(Skip::Choice(ref ns)) =>
-                ns.into_iter()
-                  .find_map(|n| self.solve_rec(to, i+n, doc)),
+                ns.into_par_iter()
+                  .find_map_any(|n| self.solve_rec(to, i+n, doc)),
             Err(Skip::Star) =>
                 (i..doc.len())
-                    .into_iter()
-                    .find_map(|n| self.solve_rec(to, i, doc))
+                    .into_par_iter()
+                    .find_map_any(|i| self.solve_rec(to, i, doc))
         }
     }
 
-    fn is_accept(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> bool {
+
+    /// Accepting criterion for a node, document and cursor
+    pub fn is_accept(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> bool {
         // Initial state is also accepting
-        if self.accepting().contains(&n) && (!self.is_end_anchored(n) || i == doc.len() - 1) {
+        if self.accepting.contains(&n) && (!self.is_end_anchored(n) || i == doc.len() - 1) {
             true
         } else {
             false
@@ -418,7 +341,7 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
     }
 
     /// Find a non-empty list of continuous matching document strings,
-    /// as well as the sub-AFA that matched them
+    /// as well as the sub-automaton that matched them
     fn solve_rec(&self, n: NodeIndex<u32>, i: usize,
         doc: &Vec<C>) -> Option<Vec<(NodeIndex<u32>, usize, usize)>> {
 
@@ -436,7 +359,7 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         }
 
         // For every postfix of doc (O(n^2))
-        start_idxs.into_iter().find_map(|i| {
+        start_idxs.into_par_iter().find_map_any(|i| {
             let mut next = self.g.edges(n).filter(|e| e.source() != e.target());
             if self.g[n].is_and() {
                 // All of the next entries must have solutions
@@ -457,7 +380,7 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
             }
         })
     }
-
+    /// Solve at the root
     pub fn solve(&self, doc: &Vec<C>) -> Option<Vec<(NodeIndex<u32>, usize, usize)>> {
         self.solve_rec(self.get_init(), 0, doc)
     }
@@ -490,7 +413,7 @@ impl SAFA<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::safa::SAFA;
+    use crate::safa::{SAFA, Quant, Either, Skip};
     use crate::regex::Regex;
     use petgraph::graph::NodeIndex;
 
@@ -520,7 +443,6 @@ mod tests {
         // unsafe { backtrace_on_stack_overflow::enable() };
         let r = Regex::new(".*baa(b|a)");
         let safa = SAFA::new("ab", &r);
-        safa.as_str_safa().write_pdf("safa").unwrap();
         let strdoc = "abababaab";
         let doc = strdoc.chars().collect();
         assert_eq!(safa.solve(&doc),
@@ -529,8 +451,45 @@ mod tests {
     }
 
     #[test]
-    fn test_safa_pdf() {
+    fn test_safa_range() {
         // unsafe { backtrace_on_stack_overflow::enable() };
+        let r = Regex::new(".{3}b");
+        let safa = SAFA::new("ab", &r);
+        let doc = "aaab".chars().collect();
+        let expected = (Quant::and(NodeIndex::new(0)),
+                          Either::right(Skip::Offset(3)),
+                            NodeIndex::new(1));
+        // Check compilation of range successful
+        assert!(safa.deltas().contains(&expected));
+        // Check result
+        assert_eq!(safa.solve(&doc),
+            Some(vec![(NodeIndex::new(1), 3, 4)]));
+    }
+
+    #[test]
+    fn test_safa_range2() {
+        // unsafe { backtrace_on_stack_overflow::enable() };
+        let r = Regex::new("(.{1,3}){1,2}b");
+        let safa = SAFA::new("ab", &r);
+        let doc = "aaaab".chars().collect();
+        println!("DELTAS");
+        for d in safa.deltas() {
+           println!("{}, {}, {}", d.0, d.1, d.2.index());
+        }
+
+        let expected = (Quant::and(NodeIndex::new(0)),
+                          Either::right(Skip::choice(&[1, 2, 3, 4, 6])),
+                            NodeIndex::new(1));
+        // Check compilation of range successful
+        assert!(safa.deltas().contains(&expected));
+        // Check result
+        assert_eq!(safa.solve(&doc),
+            Some(vec![(NodeIndex::new(1), 4, 5)]));
+    }
+
+    #[cfg(feature = "plot")]
+    #[test]
+    fn test_safa_pdf() {
         let r = Regex::new("(?=a).*baa(b|a)");
         let safa = SAFA::new("ab", &r);
         safa.as_str_safa().write_pdf("safa").unwrap();
@@ -544,5 +503,4 @@ mod tests {
         println!("SOLUTION for: {}", strdoc);
         println!("{:?}", safa.solve(&doc));
     }
-
 }
