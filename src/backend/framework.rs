@@ -810,17 +810,17 @@ mod tests {
     fn backend_test(
         ab: String,
         rstr: String,
-        doc: Vec<String>,
+        doc: Vec<char>,
         batching_type: Option<JBatching>,
         commit_docype: Option<JCommit>,
         batch_size: usize,
     ) {
         let r = Regex::new(&rstr);
-        let nfa = NFA::new(&ab[..], r);
+        let safa = SAFA::new(&ab[..], &r);
 
         init();
         run_backend(
-            nfa.clone(),
+            safa.clone(),
             doc.clone(),
             batching_type.clone(),
             commit_docype.clone(),
@@ -835,7 +835,7 @@ mod tests {
             "gaa*bb*cc*dd*ee*f".to_string(),
             ("gaaaaaabbbbbbccccccddddddeeeeeef".to_string())
                 .chars()
-                .map(|c| c.to_string())
+                //.map(|c| c.to_string())
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::Nlookup),
@@ -850,7 +850,7 @@ mod tests {
             "bbb".to_string(),
             ("aaabbbaaa".to_string())
                 .chars()
-                .map(|c| c.to_string())
+                //.map(|c| c.to_string())
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::Nlookup),
@@ -862,7 +862,7 @@ mod tests {
             "bbbaaa".to_string(),
             ("aaabbbaaa".to_string())
                 .chars()
-                .map(|c| c.to_string())
+                //.map(|c| c.to_string())
                 .collect(),
             Some(JBatching::NaivePolys),
             Some(JCommit::HashChain),
@@ -877,7 +877,7 @@ mod tests {
             "^a*b*$".to_string(),
             ("aaab".to_string())
                 .chars()
-                .map(|c| c.to_string())
+                //.map(|c| c.to_string())
                 .collect(),
             Some(JBatching::NaivePolys),
             Some(JCommit::HashChain),
@@ -915,7 +915,7 @@ mod tests {
             "^a*b*$".to_string(),
             ("aaab".to_string())
                 .chars()
-                .map(|c| c.to_string())
+                //.map(|c| c.to_string())
                 .collect(),
             Some(JBatching::NaivePolys),
             Some(JCommit::Nlookup),
@@ -972,7 +972,7 @@ mod tests {
             "^a*b*$".to_string(),
             ("aaab".to_string())
                 .chars()
-                .map(|c| c.to_string())
+                //.map(|c| c.to_string())
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::HashChain),
@@ -1030,7 +1030,7 @@ mod tests {
             "^a*b*$".to_string(),
             ("aaab".to_string())
                 .chars()
-                .map(|c| c.to_string())
+                //.map(|c| c.to_string())
                 .collect(),
             Some(JBatching::Nlookup),
             Some(JCommit::Nlookup),
