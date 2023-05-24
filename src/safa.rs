@@ -110,7 +110,7 @@ impl SAFA<char> {
         s
     }
 
-    /// Add a regex to position [from] (an Or by default)
+     /// Add a regex to position [from] (an Or by default)
     fn add_skip(&mut self, n: NodeIndex<u32>, skip: Skip, q_c: &Regex) {
         if let Some(n_c) = self
             .g
@@ -238,14 +238,6 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         self.g[NodeIndex::new(0)].get()
     }
 
-    pub fn is_start_anchored(&self, from: NodeIndex<u32>) -> bool {
-        self.g[from].get().is_start_anchored()
-    }
-
-    pub fn is_end_anchored(&self, from: NodeIndex<u32>) -> bool {
-        self.g[from].get().is_end_anchored()
-    }
-
     /// An epsilon transition
     fn epsilon() -> Either<C, Skip> {
         Either::right(Skip::Offset(0))
@@ -283,9 +275,8 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
         (NodeIndex<u32>, Option<(usize, usize)>) {
 
         // Initial state is also accepting
-        if self.accepting.contains(&self.get_init()) &&
-            (!self.is_end_anchored(from) || doc.len() == 0) {
-            return (from, Some((0, 0)));
+        if self.is_accept(from, i, doc) {
+            return (from, Some((i, i)));
         }
 
         // For every postfix of doc (O(n^2))
@@ -352,12 +343,16 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
 
     /// Accepting criterion for a node, document and cursor
     pub fn is_accept(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> bool {
-        // Initial state is also accepting
-        if self.accepting.contains(&n) && (!self.is_end_anchored(n) || i == doc.len() - 1) {
-            true
-        } else {
-            false
+        self.accepting.contains(&n) && i == doc.len() - 1
+    }
+
+    /// Non accepting states
+    pub fn non_accepting(&self) -> BTreeSet<NodeIndex<u32>> {
+        let mut s: BTreeSet<_> = self.g.node_indices().collect();
+        for x in self.accepting.clone() {
+            s.remove(&x);
         }
+        s
     }
 
     /// Find a non-empty list of continuous matching document strings,
@@ -370,36 +365,26 @@ impl<C: Clone + Eq + Ord + std::fmt::Debug + Display + std::hash::Hash + Sync> S
             return Some(vec![]);
         }
 
-        // Iterate over all postfixes of doc
-        let mut start_idxs = Vec::new();
-        if self.is_start_anchored(n) {
-            start_idxs.push(i);
-        } else {
-            start_idxs.append(&mut (i..doc.len()).collect());
-        }
+        let mut next = self.g.edges(n).filter(|e| e.source() != e.target());
+        if self.g[n].is_and() {
+            // All of the next entries must have solutions
+            let subsolutions : Vec<_> = next.into_iter()
+                .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
+                .collect();
 
-        // For every postfix of doc (O(n^2))
-        start_idxs.into_par_iter().find_map_any(|i| {
-            let mut next = self.g.edges(n).filter(|e| e.source() != e.target());
-            if self.g[n].is_and() {
-                // All of the next entries must have solutions
-                let subsolutions: Vec<_> = next
-                    .into_iter()
-                    .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
-                    .collect();
-
-                // All of them need to be
-                if subsolutions.iter().all(Option::is_some) {
-                    Some(subsolutions.into_iter().flat_map(Option::unwrap).collect())
-                } else {
-                    None
-                }
+            // All of them need to be
+            if subsolutions.iter().all(Option::is_some) {
+                Some(subsolutions.into_iter().flat_map(Option::unwrap).collect())
             } else {
-                // One of the next entries must has a solution
-                next.find_map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
+                None
             }
-        })
+        } else {
+            // One of the next entries must has a solution
+            next.find_map(|e|
+                self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
+        }
     }
+
     /// Solve at the root
     pub fn solve(&self, doc: &Vec<C>) -> Option<Vec<(NodeIndex<u32>, usize, usize)>> {
         self.solve_rec(self.get_init(), 0, doc)
@@ -441,6 +426,7 @@ mod tests {
     fn test_safa_match_exact() {
         // unsafe { backtrace_on_stack_overflow::enable() };
         let r = Regex::new("^baa$");
+        println!("REGEX {}", r);
         let safa = SAFA::new("ab", &r);
         let strdoc = "baa";
         let doc = strdoc.chars().collect();
@@ -510,7 +496,7 @@ mod tests {
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = Regex::new("(?=a).*baa(b|a)");
+        let r = Regex::new("(?=a)baa(b|a)");
         let safa = SAFA::new("ab", &r);
         safa.as_str_safa().write_pdf("safa").unwrap();
         let strdoc = "abababaab";

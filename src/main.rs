@@ -63,7 +63,7 @@ fn main() {
         log::stop(Component::Compiler, "DFA", "K Stride");
     };
     #[cfg(feature = "plot")]
-    safa.write_pdf("safa")
+    safa.as_str_safa().write_pdf("main")
         .expect("Failed to plot NFA to a pdf file");
 
     #[cfg(feature = "metrics")]

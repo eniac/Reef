@@ -5,7 +5,6 @@ use hashconsing::{consign, HConsed, HashConsign};
 use regex_syntax::hir::{Class, HirKind, Literal};
 
 use std::str::FromStr;
-use crate::skip::Skip;
 
 use core::fmt;
 use core::fmt::Formatter;
@@ -23,8 +22,6 @@ pub enum RegexF {
     Nil,
     Empty,
     Dot,
-    LineStart,
-    LineEnd,
     Char(char),
     Not(Regex),
     App(Regex, Regex),
@@ -45,8 +42,6 @@ impl fmt::Display for Regex {
             RegexF::Nil => write!(f, "ε"),
             RegexF::Empty => write!(f, "∅"),
             RegexF::Dot => write!(f, "."),
-            RegexF::LineStart => write!(f, "^"),
-            RegexF::LineEnd => write!(f, "$"),
             RegexF::Char(c) => write!(f, "{}", c),
             RegexF::Not(c) => write!(f, "! {}", c),
             RegexF::App(x, y) => write!(f, "{}{}", x, y),
@@ -63,16 +58,44 @@ impl fmt::Display for Regex {
 impl FromStr for Regex {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        fn to_regex_top(e: &Expr) -> Result<Regex, String> {
+            println!("TOP {:?}", e);
+            match e {
+                Expr::Concat(l) => {
+                    let mut inner = to_regex(e.clone())?;
+                    if let Some(e) = l.get(0) {
+                        match e {
+                            Expr::StartLine | Expr::StartText => (),
+                            _ => inner = Regex::app(Regex::dotstar(), inner),
+                        }
+                    }
+
+                    if let Some(e) = l.get(l.len() - 1) {
+                        match e {
+                            Expr::EndLine | Expr::EndText => (),
+                            _ => inner = Regex::app(inner, Regex::dotstar()),
+                        }
+                    }
+                    Ok(inner)
+                },
+                _ => Ok(Regex::app(
+                    Regex::app(Regex::dotstar(), to_regex(e)?),
+                    Regex::dotstar(),
+                )),
+            }
+        }
+
         fn to_regex(e: &Expr) -> Result<Regex, String> {
             match e {
                 Expr::Empty => Ok(Regex::empty()),
                 Expr::Any { .. } => Ok(Regex::dot()),
+                Expr::StartText | Expr::StartLine | Expr::EndText | Expr::EndLine => Ok(Regex::nil()),
                 Expr::Literal { val, .. } => val.chars().try_fold(Regex::nil(), |acc, a| {
                     Ok(Regex::app(acc, Regex::character(a)))
                 }),
                 Expr::Concat(l) => l
                     .iter()
-                    .try_fold(Regex::nil(), |acc, a| Ok(Regex::app(acc, to_regex(&a)?))),
+                    .try_fold(Regex::nil(), |acc, a| Ok(Regex::app(acc, to_regex(a)?))),
                 Expr::Alt(l) => l
                     .iter()
                     .try_fold(Regex::empty(), |acc, a| Ok(Regex::alt(acc, to_regex(&a)?))),
@@ -90,13 +113,17 @@ impl FromStr for Regex {
                 Expr::StartLine | Expr::StartText => Ok(Regex(G.mk(RegexF::LineStart))),
                 Expr::EndLine | Expr::EndText => Ok(Regex(G.mk(RegexF::LineEnd))),
                 Expr::Group(g) => to_regex(&g),
-                Expr::LookAround(g, LookAround::LookAhead) => Ok(Regex::lookahead(to_regex(g)?)),
-                Expr::LookAround(g, LookAround::LookBehind) => Ok(Regex::lookbehind(to_regex(g)?)),
+                Expr::LookAround(g, LookAround::LookAhead) => {
+                    Ok(Regex::lookahead(to_regex_top(g)?))
+                }
+                Expr::LookAround(g, LookAround::LookBehind) => {
+                    Ok(Regex::lookbehind(to_regex_top(g)?))
+                }
                 Expr::LookAround(g, LookAround::LookAheadNeg) => {
-                    Ok(Regex::lookahead(Regex::not(to_regex(g)?)))
+                    Ok(Regex::lookahead(Regex::not(to_regex_top(g)?)))
                 }
                 Expr::LookAround(g, LookAround::LookBehindNeg) => {
-                    Ok(Regex::lookbehind(Regex::not(to_regex(g)?)))
+                    Ok(Regex::lookbehind(Regex::not(to_regex_top(g)?)))
                 }
                 Expr::Delegate { inner, .. } => {
                     let re = regex_syntax::Parser::new().parse(inner).unwrap();
@@ -126,7 +153,7 @@ impl FromStr for Regex {
             }
         }
 
-        to_regex(&Expr::parse_tree(s).unwrap().expr)
+        to_regex_top(&Expr::parse_tree(s).unwrap().expr)
     }
 }
 
@@ -150,14 +177,6 @@ impl Regex {
 
     pub fn dot() -> Regex {
         Regex(G.mk(RegexF::Dot))
-    }
-
-    pub fn line_start() -> Regex {
-        Regex(G.mk(RegexF::LineStart))
-    }
-
-    pub fn line_end() -> Regex {
-        Regex(G.mk(RegexF::LineEnd))
     }
 
     /// Flatten a tree of alt into a list of alts
@@ -251,9 +270,6 @@ impl Regex {
             (RegexF::Star(x), RegexF::Range(y, _, _)) if x == y => a,
             (RegexF::Range(y, _, _), RegexF::Star(x)) if x == y => b,
             (RegexF::Star(x), RegexF::Star(y)) if x == y => a,
-            // ^, $ idempotent
-            (RegexF::LineStart, RegexF::LineStart) | (RegexF::LineEnd, RegexF::LineEnd) => a,
-            (RegexF::LineStart, RegexF::LineEnd) => Regex::empty(),
             (_, _) => Regex(G.mk(RegexF::App(a, b))),
         }
     }
@@ -282,6 +298,10 @@ impl Regex {
         }
     }
 
+    pub fn dotstar() -> Regex {
+        Regex::star(Regex::dot())
+    }
+
     pub fn range(&self, i: usize, j: usize) -> Regex {
         assert!(i <= j, "Range indices must be 0 <= {} <= {}", i, j);
         match *self.0 {
@@ -289,7 +309,7 @@ impl Regex {
             RegexF::Empty => Regex::empty(),
             _ if i == 0 && j == 0 => Regex::nil(),
             _ if i == 0 => Regex::alt(Regex::nil(), Regex::range(self, 1, j)),
-            _ => Regex(G.mk(RegexF::Range(self.clone(), i, j)))
+            _ => Regex(G.mk(RegexF::Range(self.clone(), i, j))),
         }
     }
 
@@ -304,7 +324,7 @@ impl Regex {
     pub fn is_nil(&self) -> bool {
         match *self.0 {
             RegexF::Nil => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -319,28 +339,12 @@ impl Regex {
     /// Nullable regex accept the empty document
     pub fn nullable(&self) -> bool {
         match *self.0 {
-            RegexF::Nil | RegexF::LineEnd | RegexF::LineStart | RegexF::Star(_) => true,
+            RegexF::Nil | RegexF::Star(_) => true,
             RegexF::Range(_, i, _) if i == 0 => true,
             RegexF::Empty | RegexF::Char(_) | RegexF::Dot | RegexF::Range(_, _, _) | RegexF::Lookahead(_) => false,
             RegexF::Not(ref r) => !r.nullable(),
             RegexF::App(ref a, ref b) => a.nullable() && b.nullable(),
             RegexF::Alt(ref a, ref b) => a.nullable() || b.nullable(),
-        }
-    }
-
-    pub fn is_start_anchored(&self) -> bool {
-        match *self.0 {
-            RegexF::LineStart => true,
-            RegexF::App(ref a, _) => a.is_start_anchored(),
-            _ => false,
-        }
-    }
-
-    pub fn is_end_anchored(&self) -> bool {
-        match *self.0 {
-            RegexF::LineEnd => true,
-            RegexF::App(_, ref a) => a.is_end_anchored(),
-            _ => false,
         }
     }
 
@@ -352,41 +356,44 @@ impl Regex {
     /// The length of the longest wildcard skip
     pub fn to_skip(&self, ab: &Vec<char>) -> Option<(Skip, Self)> {
         match *self.0 {
-            RegexF::Dot =>
-                Some((Skip::single(), Regex::nil())),
+            RegexF::Dot => Some((Skip::single(), Regex::nil())),
             // .*
             RegexF::Star(ref a) => {
                 let (sa, rem) = a.to_skip(ab)?;
                 if rem.is_nil() {
                     Some((sa.star(), Regex::nil()))
-                } else { None }
+                } else {
+                    None
+                }
             }
             // .{i,j}
             RegexF::Range(ref a, x, y) => {
                 let (sa, rem) = a.to_skip(ab)?;
                 if rem.is_nil() {
                     Some((sa.range(x, y), Regex::nil()))
-                } else { None }
-            },
+                } else {
+                    None
+                }
+            }
             // (r | r')
             RegexF::Alt(ref a, ref b) => {
                 let (pa, rema) = a.to_skip(ab)?;
                 let (pb, remb) = b.to_skip(ab)?;
                 if rema.is_nil() && remb.is_nil() {
                     Some((pa.alt(&pb), Regex::nil()))
-                } else { None }
-            },
+                } else {
+                    None
+                }
+            }
             // r1r2
             RegexF::App(ref a, ref b) => {
-              let (pa, rema) = a.to_skip(ab)?;
-              match b.to_skip(ab) {
-                  Some((pb, remb)) =>
-                    Some((pa.app(&pb), Regex::app(rema, remb))),
-                  None =>
-                    Some((pa, Regex::app(rema, b.clone())))
-              }
-            },
-            _ => None
+                let (pa, rema) = a.to_skip(ab)?;
+                match b.to_skip(ab) {
+                    Some((pb, remb)) => Some((pa.app(&pb), Regex::app(rema, remb))),
+                    None => Some((pa, Regex::app(rema, b.clone()))),
+                }
+            }
+            _ => None,
         }
     }
 
@@ -407,8 +414,6 @@ impl Regex {
             RegexF::Char(x) if &x == c => Regex::nil(),
             RegexF::Char(_) => Regex::empty(),
             RegexF::Not(ref r) => Regex::not(r.deriv(c)),
-            RegexF::App(ref a, ref b) if *a.0 == RegexF::LineStart => b.deriv(c),
-            RegexF::App(ref a, ref b) if *b.0 == RegexF::LineEnd => a.deriv(c),
             RegexF::App(ref a, ref b) if a.nullable() => {
                 Regex::alt(Regex::app(a.deriv(c), b.clone()), b.deriv(c))
             }
@@ -428,42 +433,36 @@ impl Regex {
 }
 
 #[test]
-fn regex_parser_test_zero_length() {
+fn test_regex_zero_length() {
     assert_eq!(
         Regex::app(
-            Regex::app(
-                Regex::app(
-                    Regex::app(Regex::line_start(), Regex::character('F')),
-                    Regex::character('o')
-                ),
-                Regex::character('o')
-            ),
-            Regex::line_end()
+            Regex::app(Regex::character('F'), Regex::character('o')),
+            Regex::character('o')
         ),
         Regex::new("^Foo$")
     );
 }
 
 #[test]
-fn regex_parser_test_char_ranges() {
+fn test_regex_ranges() {
     assert_eq!(
         Regex::app(
             Regex::app(
-                Regex::line_start(),
+                Regex::dotstar(),
                 Regex::alt(Regex::character('a'), Regex::character('b'))
             ),
-            Regex::line_end()
+            Regex::dotstar()
         ),
-        Regex::new("^[a-b]$")
+        Regex::new("[a-b]")
     );
 }
 
 #[test]
-fn regex_parser_test_dot() {
+fn test_regex_dot() {
     assert_eq!(
         Regex::app(
-            Regex::app(Regex::line_start(), Regex::star(Regex::dot())),
-            Regex::character('c')
+            Regex::app(Regex::dotstar(), Regex::character('c')),
+            Regex::dotstar()
         ),
         Regex::new("^.*c")
     );

@@ -1,6 +1,6 @@
 use core::{panic, num};
 
-use crate::nfa::NFA;
+use crate::safa::SAFA;
 use clap::ValueEnum;
 
 static POSEIDON_NUM: usize = 292;
@@ -36,14 +36,14 @@ pub fn get_padding(doc_len: usize, batch_size: usize, commit: JCommit) -> usize 
     epsilon_to_add + 1
 }
 
-pub fn accepting_circuit<'a>(nfa: &'a NFA, is_match: Option<(usize, usize)>) -> usize {
+pub fn accepting_circuit<'a>(nfa: &'a SAFA<String>, is_match: Option<(usize, usize)>) -> usize {
     // vanishing selection for final check
     // poly of degree (# final states - 1)
     // (alt, # non final states - 1)
     let cost: usize = 5; //constrain to boolean costs and bool accepting
     let nstate =  match is_match {
         None => nfa.non_accepting().len() as usize - 1 ,
-        _ => nfa.accepting().len() as usize - 1,
+        _ => nfa.accepting.len() as usize - 1,
     };
     cost + nstate + 2
 }
@@ -149,14 +149,14 @@ fn commit_circuit_hash(
 }
 
 pub fn naive_cost_model_nohash<'a>(
-    nfa: &'a NFA,
+    nfa: &'a SAFA<String>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_len: usize,
     commit_type: JCommit,
 ) -> usize {
     // vanishing poly - m * n multiplications + 2 for lookup
-    let mut cost = nfa.nedges() - 1;
+    let mut cost = nfa.deltas().len() - 1;
     cost *= batch_size;
 
     cost += accepting_circuit(nfa, is_match);
@@ -167,13 +167,13 @@ pub fn naive_cost_model_nohash<'a>(
 }
 
 pub fn nlookup_cost_model_nohash<'a>(
-    nfa: &'a NFA,
+    nfa: &'a SAFA<String>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_len: usize,
     commit_type: JCommit,
 ) -> usize {
-    let mn: usize = nfa.nedges();
+    let mn: usize = nfa.deltas().len();
     let log_mn: usize = logmn(mn);
     let mut cost: usize = 0;
 
@@ -211,13 +211,13 @@ pub fn nlookup_cost_model_nohash<'a>(
 }
 
 pub fn nlookup_cost_model_hash<'a>(
-    nfa: &'a NFA,
+    nfa: &'a SAFA<String>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_len: usize,
     commit_type: JCommit,
 ) -> usize {
-    let mn: usize = nfa.nedges();
+    let mn: usize = nfa.deltas().len();
     let log_mn: usize = logmn(mn);
     let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
     let mut cost = nlookup_cost_model_nohash(nfa, batch_size, is_match, doc_len, commit_type);
@@ -241,7 +241,7 @@ pub fn nlookup_cost_model_hash<'a>(
 }
 
 pub fn full_round_cost_model_nohash<'a>(
-    nfa: &'a NFA,
+    nfa: &'a SAFA<String>,
     batch_size: usize,
     lookup_type: JBatching,
     is_match: Option<(usize, usize)>,
@@ -260,7 +260,7 @@ pub fn full_round_cost_model_nohash<'a>(
 }
 
 pub fn full_round_cost_model<'a>(
-    nfa: &'a NFA,
+    nfa: &'a SAFA<String>,
     batch_size: usize,
     lookup_type: JBatching,
     is_match: Option<(usize, usize)>,
@@ -296,7 +296,7 @@ pub fn get_folded_cost(cost: usize, doc_len: usize, batch_size: usize) -> usize 
 }
 
 pub fn opt_cost_model_select_with_commit<'a>(
-    nfa: &'a NFA,
+    nfa: &'a SAFA<String>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_length: usize,
@@ -378,7 +378,7 @@ pub fn opt_cost_model_select_with_commit<'a>(
 }
 
 pub fn opt_cost_model_select_with_batch<'a>(
-    nfa: &'a NFA,
+    nfa: &'a SAFA<String>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_length: usize,
@@ -479,7 +479,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
 }
 
 pub fn opt_commit_select_with_batch<'a>(
-    nfa: &'a NFA,
+    nfa: &'a SAFA<String>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_length: usize,
@@ -546,7 +546,7 @@ pub fn opt_commit_select_with_batch<'a>(
 }
 
 pub fn opt_cost_model_select<'a>(
-    nfa: &'a NFA,
+    nfa: &'a SAFA<String>,
     batch_range_lower: usize,
     batch_range_upper: usize,
     is_match: Option<(usize, usize)>,

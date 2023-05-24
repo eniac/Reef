@@ -804,7 +804,7 @@ mod tests {
 
     use crate::backend::framework::*;
     use crate::backend::r1cs_helper::init;
-    use crate::nfa::NFA;
+    use crate::safa::SAFA;
     use crate::regex::Regex;
 
     fn backend_test(
