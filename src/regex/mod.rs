@@ -59,7 +59,6 @@ impl FromStr for Regex {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         fn to_regex_top(e: &Expr) -> Result<Regex, String> {
-            println!("TOP {:?}", e);
             match e {
                 Expr::Concat(l) => {
                     let mut inner = to_regex(e.clone())?;

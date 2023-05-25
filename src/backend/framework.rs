@@ -262,8 +262,9 @@ fn setup<'a>(
         pp.num_variables().1
     );
 
-    let move_0_triple = r1cs_converter.moves.clone().unwrap()[0]; // order?
-    let move_0 = (move_0_triple.1, move_0_triple.2);
+
+    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().into_iter().collect();
+    let move_0 = (moves[0].3, moves[0].4);
 
     // this variable could be two different types of things, which is potentially dicey, but
     // literally whatever
@@ -362,6 +363,7 @@ fn solve<'a>(
     let mut next_doc_running_q;
     let mut next_doc_running_v;
 
+    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().into_iter().collect();
     let mut start_of_epsilons;
     let mut prev_doc_idx = None;
     let mut next_doc_idx;
@@ -372,7 +374,7 @@ fn solve<'a>(
             blind,
             true,
             0,
-            r1cs_converter.moves.clone().unwrap()[0].1,
+            moves[0].3,
         ),
         ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
     };
@@ -389,8 +391,7 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::tic(Component::Solver, &test, "witness generation");
         // allocate real witnesses for round i
-        let move_i_triple = r1cs_converter.moves.clone().unwrap()[i]; // order?
-        let move_i = (move_i_triple.1, move_i_triple.2);
+        let move_i = (moves[i].3, moves[i].4);
         (
             wits,
             next_state,

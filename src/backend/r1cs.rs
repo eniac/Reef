@@ -16,6 +16,7 @@ use neptune::{
 use petgraph::graph::NodeIndex;
 use rug::{integer::Order, ops::RemRounding, Integer};
 use std::cmp::max;
+use std::collections::LinkedList;
 
 pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub safa: &'a SAFA<C>,
@@ -36,7 +37,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     pub doc_extend: usize,
-    pub moves: Option<Vec<(NodeIndex<u32>, usize, usize)>>,
+    pub moves: Option<LinkedList<(NodeIndex<u32>, Either<char, Skip>, NodeIndex<u32>, usize, usize)>>,
     is_match: bool,
     //pub substring: (usize, usize), // todo getters
     pub pc: PoseidonConstants<F, typenum::U4>,
@@ -101,7 +102,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut sel_batch_size = 1;
         for m in moves.clone().unwrap() {
-            sel_batch_size = max(sel_batch_size, m.2 - m.1);
+            sel_batch_size = max(sel_batch_size, m.4 - m.3);
         }
         println!("BATCH {:#?}", sel_batch_size);
 
@@ -1661,13 +1662,13 @@ mod tests {
                     let mut next_state;
 
                     let mut _start_epsilons;
-                    let num_steps = r1cs_converter.moves.clone().unwrap().len();
+                    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().into_iter().collect();
+                    let num_steps = moves.len();
 
-                    let mut current_state = r1cs_converter.moves.clone().unwrap()[0].0.index();
+                    let mut current_state = moves[0].0.index();
 
                     for i in 0..num_steps {
-                        let move_i_triple = r1cs_converter.moves.clone().unwrap()[i]; // order?
-                        let move_i = (move_i_triple.1, move_i_triple.2);
+                        let move_i = (moves[i].3, moves[i].4);
 
                         (
                             values,
