@@ -77,6 +77,7 @@ impl FromStr for Regex {
                     }
                     Ok(inner)
                 },
+                Expr::Group(g) => to_regex_top(&g),
                 _ => Ok(Regex::app(
                     Regex::app(Regex::dotstar(), to_regex(e)?),
                     Regex::dotstar(),
@@ -179,11 +180,11 @@ impl Regex {
     }
 
     /// Flatten a tree of alt into a list of alts
-    pub fn to_alt_list(&self) -> Vec<Regex> {
-        match *self.0 {
+    pub fn to_alt_set(&self) -> BTreeSet<Regex> {
+        let res = match *self.0 {
             RegexF::Alt(ref a, ref b) => {
-                let mut la = a.to_alt_list();
-                let mut lb = b.to_alt_list();
+                let mut la = a.to_alt_set();
+                let mut lb = b.to_alt_set();
                 la.append(&mut lb);
                 la
             },
@@ -284,7 +285,7 @@ impl Regex {
             // a | b and a >= b -> a
             (_, _) if Some(false) == Regex::partial_le(&a, &b) => a,
             // The smallest syntactically thing on the left
-            (x, y) if y > x => Regex::alt(b, a),
+            (x, y) if x > y => Regex::alt(b, a),
             (_, _) => Regex(G.mk(RegexF::Alt(a, b))),
         }
     }
@@ -429,6 +430,11 @@ impl Regex {
             _ => panic!("No derivatives for regex {}", self)
         }
     }
+}
+
+#[test]
+fn test_regex_ord() {
+    assert!(Regex::character('a') < Regex::character('b'))
 }
 
 #[test]

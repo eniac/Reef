@@ -196,7 +196,7 @@ impl SAFA<char> {
             // (r | r')
             (RegexF::Alt(_, _), None) => {
                 self.to_or(from);
-                q.to_alt_list()
+                q.to_alt_set()
                     .into_iter()
                     .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
             }
@@ -239,6 +239,9 @@ impl SAFA<char> {
             ),
             accepting: self.accepting.clone(),
         }
+    }
+    pub fn write_pdf(&self, fout: &str) -> std::io::Result<()> {
+        self.as_str_safa().write_pdf(fout)
     }
 }
 
@@ -296,65 +299,9 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
             .all(|e| e.target() == n && !self.accepting.contains(&e.target()))
     }
 
-    /// Recursively solve an edge and all the children coming off of it
-    fn solve_edge(
-        &self,
-        e: &Either<C, Skip>,
-        from: NodeIndex<u32>,
-        to: NodeIndex<u32>,
-        i: usize,
-        doc: &Vec<C>,
-    ) -> Trace<C> {
-        fn prepend<'a, A: Clone>(v: &'a mut LinkedList<A>, a: A)
-        -> Option<LinkedList<A>> {
-            v.push_front(a.clone());
-            Some(v.clone())
-        }
-        println!(
-            "[ Edge ({},{}) -[{}]-> ({}, {}), char: {:?}",
-            from.index(),
-            self.g[from],
-            e,
-            to.index(),
-            self.g[to],
-            doc.get(i)
-        );
-        let res = match e.0.clone() {
-            // Sink state, cannot succeed
-            Ok(_) if self.is_sink(to) => None,
-            // Character match
-            Ok(c) if c == doc[i] => prepend(
-                &mut self.solve_rec(to, i + 1, doc)?,
-                (from, e.clone(), to, i, i + 1),
-            ),
-            Ok(_) => None,
-            Err(Skip::Offset(n)) => prepend(
-                &mut self.solve_rec(to, i + n, doc)?,
-                (from, e.clone(), to, i, i + n),
-            ),
-            Err(Skip::Choice(ref ns)) => ns.into_par_iter().find_map_any(|n| {
-                prepend(
-                    &mut self.solve_rec(to, i + n, doc)?,
-                    (from, e.clone(), to, i, i + n),
-                )
-            }),
-            Err(Skip::Star) => (i..=doc.len()).into_iter().find_map(|j| {
-                println!("======== STAR MATCHED {}, {}, doc[j..] = {:?}", from.index(),
-                    j, &doc[j..]);
-                prepend(&mut self.solve_rec(to, j, doc)?, (from, e.clone(), to, i, j))
-            }),
-        };
-        println!(
-            "] Edge ({},{}) -[{}]-> ({}, {}), char: {:?}, res: {:?}",
-            from.index(),
-            self.g[from],
-            e,
-            to.index(),
-            self.g[to],
-            doc.get(i),
-            res
-        );
-        res
+    fn prepend<'a, A: Clone + Debug>(v: &'a mut LinkedList<A>, a: A) -> Option<LinkedList<A>> {
+        v.push_front(a.clone());
+        Some(v.clone())
     }
 
     /// Accepting criterion for a node, document and cursor
@@ -371,18 +318,60 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
         s
     }
 
+    /// Recursively solve an edge and all the children coming off of it
+    fn solve_edge(
+        &self,
+        e: &Either<C, Skip>,
+        from: NodeIndex<u32>,
+        to: NodeIndex<u32>,
+        i: usize,
+        doc: &Vec<C>,
+    ) -> Trace<C> {
+        match e.0.clone() {
+            // Sink state, cannot succeed
+            Ok(_) if self.is_sink(to) => None,
+            // Character match
+            Ok(c) if c == doc[i] => Self::prepend(
+                &mut self.solve_rec(to, i + 1, doc)?,
+                (from, e.clone(), to, i, i + 1),
+            ),
+            // Character non-match
+            Ok(_) => None,
+            // Skip
+            Err(Skip::Offset(n)) => Self::prepend(
+                &mut self.solve_rec(to, i + n, doc)?,
+                (from, e.clone(), to, i, i + n),
+            ),
+            Err(Skip::Choice(ref ns)) => ns.into_par_iter().find_map_any(|n| {
+                Self::prepend(
+                    &mut self.solve_rec(to, i + n, doc)?,
+                    (from, e.clone(), to, i, i + n),
+                )
+            }),
+            Err(Skip::Star) => (i..=doc.len()).into_par_iter().find_map_any(|j| {
+                Self::prepend(
+                    &mut self.solve_rec(to, j, doc)?,
+                    (from, e.clone(), to, i, j),
+                )
+            }),
+        }
+    }
+
     /// Find a non-empty list of continuous matching document strings,
     /// as well as the sub-automaton that matched them
     fn solve_rec(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> Trace<C> {
-        println!("Solve rec from = {}, i = {}", n.index(), i);
         // Check accepting condition
         if self.is_accept(n, i, doc) {
             return Some(LinkedList::new());
         } else if i >= doc.len() {
             return None;
         }
-        println!("DID NOT ACCEPT!!!");
-        let mut next = self.g.edges(n).filter(|e| e.source() != e.target());
+        // Next nodes to visit
+        let next: Vec<_> = self
+            .g
+            .edges(n)
+            .filter(|e| e.source() != e.target())
+            .collect();
         if self.g[n].is_and() {
             // All of the next entries must have solutions
             let subsolutions: Vec<_> = next
@@ -398,23 +387,13 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
             }
         } else {
             // One of the next entries must has a solution
-            next.find_map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
+            next.into_par_iter()
+                .find_map_any(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
         }
     }
 
     /// Solve at the root
-    pub fn solve(
-        &self,
-        doc: &Vec<C>,
-    ) -> Option<
-        LinkedList<(
-            NodeIndex<u32>,
-            Either<C, Skip>,
-            NodeIndex<u32>,
-            usize,
-            usize,
-        )>,
-    > {
+    pub fn solve(&self, doc: &Vec<C>) -> Trace<C> {
         self.solve_rec(self.get_init(), 0, doc)
     }
 }
@@ -471,12 +450,10 @@ mod tests {
 
     #[test]
     fn test_safa_match_partial() {
-        // unsafe { backtrace_on_stack_overflow::enable() };
         let r = Regex::new("baa");
         let safa = SAFA::new("ab", &r);
-        let strdoc = "ababbbaaba";
+        let strdoc = "ababbbaa";
         let doc: Vec<_> = strdoc.chars().collect();
-        safa.as_str_safa().write_pdf("safa").unwrap();
         assert_eq!(
             safa.solve(&doc),
             Some(LinkedList::from([
@@ -485,74 +462,81 @@ mod tests {
                     Either(Err(Skip::Star)),
                     NodeIndex::new(1),
                     0,
-                    1
+                    5
                 ),
                 (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 5, 6),
                 (NodeIndex::new(3), Either(Ok('a')), NodeIndex::new(4), 6, 7),
-                (NodeIndex::new(4), Either(Ok('a')), NodeIndex::new(5), 7, 8),
-                (
-                    NodeIndex::new(5),
-                    Either(Err(Skip::Star)),
-                    NodeIndex::new(6),
-                    8,
-                    8
-                )
+                (NodeIndex::new(4), Either(Ok('a')), NodeIndex::new(5), 7, 8)
             ]))
         );
     }
 
     #[test]
     fn test_safa_alt() {
-        // unsafe { backtrace_on_stack_overflow::enable() };
-        let r = Regex::new(".*baa(b|a)");
+        let r = Regex::new("^.*baa(b|a)$");
+        println!("======== ALT REGEX {:?}", r);
         let safa = SAFA::new("ab", &r);
+        safa.write_pdf("alt").unwrap();
         let strdoc = "abababaab";
         let doc: Vec<_> = strdoc.chars().collect();
-        //assert_eq!(
-        //    safa.solve(&doc),
-        //    Some(vec![(NodeIndex::new(1), 5, 8), (NodeIndex::new(6), 8, 9)])
-        //);
+        assert_eq!(
+            safa.solve(&doc),
+            Some(LinkedList::from([
+                (
+                    NodeIndex::new(0),
+                    Either(Err(Skip::Star)),
+                    NodeIndex::new(1),
+                    0,
+                    5
+                ),
+                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 5, 6),
+                (NodeIndex::new(3), Either(Ok('a')), NodeIndex::new(4), 6, 7),
+                (NodeIndex::new(4), Either(Ok('a')), NodeIndex::new(5), 7, 8),
+                (NodeIndex::new(5), SAFA::epsilon(), NodeIndex::new(8), 8, 8),
+                (NodeIndex::new(8), Either(Ok('b')), NodeIndex::new(7), 8, 9)
+            ]))
+        )
     }
 
     #[test]
-    fn test_safa_range() {
-        // unsafe { backtrace_on_stack_overflow::enable() };
-        let r = Regex::new(".{3}b");
+    fn test_safa_range_exact() {
+        let r = Regex::new("^.{3}b$");
         let safa = SAFA::new("ab", &r);
         let doc: Vec<_> = "aaab".chars().collect();
-        let expected = (
-            Quant::and(NodeIndex::new(0)),
-            Either::right(Skip::Offset(3)),
-            NodeIndex::new(1),
-        );
-        // Check compilation of range successful
-        assert!(safa.deltas().contains(&expected));
-        // Check result
-        //assert_eq!(safa.solve(&doc),
-        //    Some(vec![(NodeIndex::new(1), 3, 4)]));
+        assert_eq!(
+            safa.solve(&doc),
+            Some(LinkedList::from([
+                (
+                    NodeIndex::new(0),
+                    Either(Err(Skip::Offset(3))),
+                    NodeIndex::new(1),
+                    0,
+                    3
+                ),
+                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 3, 4)
+            ]))
+        )
     }
 
     #[test]
-    fn test_safa_range2() {
+    fn test_safa_range_nested() {
         // unsafe { backtrace_on_stack_overflow::enable() };
-        let r = Regex::new("(.{1,3}){1,2}b");
+        let r = Regex::new("^(.{1,3}){1,2}b$");
         let safa = SAFA::new("ab", &r);
         let doc: Vec<_> = "aaaab".chars().collect();
-        println!("DELTAS");
-        for d in safa.deltas() {
-            println!("{}, {}, {}", d.0, d.1, d.2.index());
-        }
-
-        let expected = (
-            Quant::and(NodeIndex::new(0)),
-            Either::right(Skip::choice(&[1, 2, 3, 4, 6])),
-            NodeIndex::new(1),
-        );
-        // Check compilation of range successful
-        assert!(safa.deltas().contains(&expected));
-        // Check result
-        // assert_eq!(safa.solve(&doc),
-        //    Some(vec![(NodeIndex::new(1), 4, 5)]));
+        assert_eq!(
+            safa.solve(&doc),
+            Some(LinkedList::from([
+                (
+                    NodeIndex::new(0),
+                    Either(Err(Skip::choice(&[1, 2, 3, 4, 6]))),
+                    NodeIndex::new(1),
+                    0,
+                    4
+                ),
+                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 4, 5)
+            ]))
+        )
     }
 
     #[cfg(feature = "plot")]
