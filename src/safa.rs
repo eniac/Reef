@@ -9,8 +9,10 @@ use petgraph::Graph;
 
 use std::result::Result;
 
-use crate::regex::{Regex, RegexF};
+use crate::regex::Regex;
 use crate::skip::Skip;
+use crate::quantifier::Quant;
+
 use rayon::iter::*;
 
 use core::fmt;
@@ -30,52 +32,11 @@ impl<A, B> Either<A, B> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Quant<A>(pub A, bool);
-
-impl<A: Clone> Quant<A> {
-    fn and(a: A) -> Self {
-        Self(a, true)
-    }
-    fn or(a: A) -> Self {
-        Self(a, false)
-    }
-    fn is_and(&self) -> bool {
-        self.1
-    }
-    fn is_or(&self) -> bool {
-        !self.1
-    }
-    fn get(&self) -> A {
-        self.0.clone()
-    }
-}
-
 impl<A: Display, B: Display> Display for Either<A, B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.0 {
             Ok(ref a) => write!(f, "{}", a),
             Err(ref b) => write!(f, "{}", b),
-        }
-    }
-}
-
-impl Display for Quant<Regex> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.1 {
-            write!(f, "∀ {}", self.0)
-        } else {
-            write!(f, "∃ {}", self.0)
-        }
-    }
-}
-
-impl Display for Quant<NodeIndex<u32>> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.1 {
-            write!(f, "∀ {}", self.0.index())
-        } else {
-            write!(f, "∃ {}", self.0.index())
         }
     }
 }
@@ -188,44 +149,26 @@ impl SAFA<char> {
     }
 
     fn add(&mut self, from: NodeIndex<u32>, q: &Regex) {
-        match ((*q.0).clone(), q.to_skip(&self.ab)) {
-            (RegexF::Lookahead(ref a), None) => {
-                self.to_and(from);
-                self.add_skip(from, Skip::epsilon(), a)
-            }
-            // (r | r')
-            (RegexF::Alt(_, _), None) => {
-                self.to_or(from);
-                q.to_alt_set()
-                    .into_iter()
-                    .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
-            }
-            // Some wildcards, skip them
-            (_, Some((skip, rem))) => self.add_skip(from, skip, &rem),
-            // r1r2
-            (RegexF::App(ref a, ref b), None) => match *a.0 {
-                // (?=r1)r2
-                RegexF::Lookahead(ref a) => {
-                    self.to_and(from);
-                    self.add_skip(from, Skip::epsilon(), a);
-                    self.add_skip(from, Skip::epsilon(), b);
+        match q.to_skip(&self.ab) {
+            // First, check for wildcard skips
+            Some((skip, rem)) => self.add_skip(from, skip, &rem),
+            None =>
+                // Then for forks (and, or)
+                match q.to_fork() {
+                    Some(children) => {
+                        children.get().into_iter().for_each(|q_c|
+                            self.add_skip(from, Skip::epsilon(), &q_c));
+                        // Set the current node quantifier
+                        if children.is_and() {
+                            self.to_and(from)
+                        } else {
+                            self.to_or(from)
+                        }
+                    },
+                    None =>
+                        // If neither fork or skip, use a simple derivative
+                        self.add_derivatives(from, q)
                 }
-                // Distributivity with alt
-                RegexF::Alt(ref x, ref y) => {
-                    self.add(
-                        from,
-                        &Regex::alt(
-                            Regex::app(x.clone(), b.clone()),
-                            Regex::app(y.clone(), b.clone()),
-                        ),
-                    );
-                    self.to_or(from);
-                }
-                // Some other kind of app
-                _ => self.add_derivatives(from, q),
-            },
-            // Other (derivative)
-            _ => self.add_derivatives(from, q),
         }
     }
 
@@ -426,7 +369,8 @@ impl SAFA<String> {
 #[cfg(test)]
 mod tests {
     use crate::regex::Regex;
-    use crate::safa::{Either, Quant, Skip, SAFA};
+    use crate::skip::Skip;
+    use crate::safa::{Either, SAFA};
     use petgraph::graph::NodeIndex;
     use std::collections::LinkedList;
 
@@ -474,9 +418,7 @@ mod tests {
     #[test]
     fn test_safa_alt() {
         let r = Regex::new("^.*baa(b|a)$");
-        println!("======== ALT REGEX {:?}", r);
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("alt").unwrap();
         let strdoc = "abababaab";
         let doc: Vec<_> = strdoc.chars().collect();
         assert_eq!(
@@ -542,10 +484,10 @@ mod tests {
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = Regex::new("(?=a)baa(b|a)");
+        let r = Regex::new("^(?=b)(a|b).*a.?b$");
         let safa = SAFA::new("ab", &r);
         safa.as_str_safa().write_pdf("safa").unwrap();
-        let strdoc = "abababaab";
+        let strdoc = "baababab";
         let doc = strdoc.chars().collect();
 
         println!("DELTAS");

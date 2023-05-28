@@ -14,10 +14,10 @@ use crate::skip::Skip;
 pub mod arbitrary;
 
 /// Hash-consed regex terms
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Regex(pub HConsed<RegexF>);
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum RegexF {
     Nil,
     Empty,
@@ -76,7 +76,7 @@ impl FromStr for Regex {
                         }
                     }
                     Ok(inner)
-                },
+                }
                 Expr::Group(g) => to_regex_top(&g),
                 _ => Ok(Regex::app(
                     Regex::app(Regex::dotstar(), to_regex(e)?),
@@ -89,7 +89,9 @@ impl FromStr for Regex {
             match e {
                 Expr::Empty => Ok(Regex::empty()),
                 Expr::Any { .. } => Ok(Regex::dot()),
-                Expr::StartText | Expr::StartLine | Expr::EndText | Expr::EndLine => Ok(Regex::nil()),
+                Expr::StartText | Expr::StartLine | Expr::EndText | Expr::EndLine => {
+                    Ok(Regex::nil())
+                }
                 Expr::Literal { val, .. } => val.chars().try_fold(Regex::nil(), |acc, a| {
                     Ok(Regex::app(acc, Regex::character(a)))
                 }),
@@ -353,7 +355,29 @@ impl Regex {
         ab.iter().all(|c| self.deriv(&c).nullable())
     }
 
-    /// The length of the longest wildcard skip
+    /// Extract a fork (and, or) from a regex and return the rest
+    pub fn to_fork(&self) -> Option<Quant<BTreeSet<Regex>>> {
+        match *self.0 {
+            RegexF::Lookahead(ref a) => Some(Quant::and(BTreeSet::from([a.clone()]))),
+            // (r | r')
+            RegexF::Alt(_, _) => Some(Quant::or(self.to_alt_set())),
+            // r1r2
+            RegexF::App(ref a, ref b) => {
+                let qa = a.to_fork()?;
+                Some(qa.map(|children| {
+                    children
+                        .into_iter()
+                        .map(|c| Regex::app(c, b.clone()))
+                        .collect()
+                }))
+            }
+            // Reduce ranges to or nodes at this point, since there are no skips
+            RegexF::Range(ref a, i, j) => Some(Quant::or((i..=j).map(|i| a.repeat(i)).collect())),
+            _ => None,
+        }
+    }
+
+    /// Extract a skip from a regex and return the rest
     pub fn to_skip(&self, ab: &Vec<char>) -> Option<(Skip, Self)> {
         match *self.0 {
             RegexF::Dot => Some((Skip::single(), Regex::nil())),
@@ -410,7 +434,6 @@ impl Regex {
         match *self.0 {
             RegexF::Nil => Regex::empty(),
             RegexF::Empty => Regex::empty(),
-            RegexF::Dot => Regex::nil(),
             RegexF::Char(x) if &x == c => Regex::nil(),
             RegexF::Char(_) => Regex::empty(),
             RegexF::Not(ref r) => Regex::not(r.deriv(c)),

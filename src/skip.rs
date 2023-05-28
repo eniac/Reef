@@ -104,6 +104,7 @@ impl Skip {
             (Skip::Star, _) | (_, Skip::Star) => Skip::Star
         }
     }
+
 }
 
 impl fmt::Display for Skip {
