@@ -270,7 +270,8 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
         i: usize,
         doc: &Vec<C>,
     ) -> Trace<C> {
-        match e.0.clone() {
+
+        let res = match e.0.clone() {
             // Sink state, cannot succeed
             Ok(_) if self.is_sink(to) => None,
             // Character match
@@ -297,7 +298,8 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
                     (from, e.clone(), to, i, j),
                 )
             }),
-        }
+        };
+        res
     }
 
     /// Find a non-empty list of continuous matching document strings,
@@ -313,7 +315,7 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
         let next: Vec<_> = self
             .g
             .edges(n)
-            .filter(|e| e.source() != e.target())
+            .filter(|e| e.source() != e.target() || e.weight() != &SAFA::epsilon())
             .collect();
         if self.g[n].is_and() {
             // All of the next entries must have solutions
@@ -413,6 +415,25 @@ mod tests {
                 (NodeIndex::new(4), Either(Ok('a')), NodeIndex::new(5), 7, 8)
             ]))
         );
+    }
+
+    #[test]
+    fn test_safa_match_star() {
+        let r = Regex::new("^a*$");
+        let safa = SAFA::new("ab", &r);
+        let strdoc = "aa";
+        let doc: Vec<_> = strdoc.chars().collect();
+        assert_eq!(
+            safa.solve(&doc),
+            Some(LinkedList::from([(NodeIndex::new(0),
+                   SAFA::epsilon(),
+                   NodeIndex::new(1), 0, 0),
+                  (NodeIndex::new(1),
+                   Either::left('a'),
+                   NodeIndex::new(1), 0, 1),
+                  (NodeIndex::new(1),
+                   Either::left('a'),
+                   NodeIndex::new(1), 1, 2)])))
     }
 
     #[test]
