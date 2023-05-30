@@ -183,7 +183,7 @@ impl Regex {
 
     /// Flatten a tree of alt into a list of alts
     pub fn to_alt_set(&self) -> BTreeSet<Regex> {
-        let res = match *self.0 {
+        match *self.0 {
             RegexF::Alt(ref a, ref b) => {
                 let mut la = a.to_alt_set();
                 let mut lb = b.to_alt_set();
