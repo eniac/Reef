@@ -206,51 +206,44 @@ impl Regex {
     /// Subset relation is a partial order
     pub fn partial_le(a: &Regex, b: &Regex) -> Option<bool> {
         match (&*a.0, &*b.0) {
-            (x, y) if x == y => Some(true),
-            (RegexF::Char(_), RegexF::Dot) => Some(true),
-            (RegexF::Dot, RegexF::Char(_)) => Some(false),
-            (RegexF::Nil, RegexF::Star(_)) => Some(true),
-            (RegexF::Star(_), RegexF::Nil) => Some(false),
-            (RegexF::Range(x, _, _), RegexF::Star(y)) if Some(true) == Regex::partial_le(x, y) =>
-                Some(true),
-            (RegexF::Star(x), RegexF::Range(y, _, _)) if Some(false) == Regex::partial_le(x, y) =>
-                Some(true),
-            (RegexF::Range(x, i1, j1), RegexF::Range(y, i2, j2))
-                if x == y && i1 <= i2 && j2 <= j1 =>
-                Some(true),
-            (RegexF::Range(x, i1, j1), RegexF::Range(y, i2, j2))
-                if x == y && i2 <= i1 && j1 <= j2 =>
-                Some(false),
+            // Bot
             (RegexF::Empty, _) => Some(true),
-            (_, RegexF::Empty) => Some(false),
-            // (a|b) >= c if (a >= c)
-            (RegexF::Alt(x1, x2), _)
-                if Some(false) == Regex::partial_le(x1, b) &&
-                   Some(false) == Regex::partial_le(x2, b) =>
-                Some(false),
-            // (a|b) >= c if (b >= c)
-            (RegexF::Alt(x1, x2), _)
-                if Some(false) == Regex::partial_le(x1, b) &&
-                   Some(false) == Regex::partial_le(x2, b) =>
-                Some(false),
-            // c <= (a|b) if (c <= a)
-            (_, RegexF::Alt(x1, x2))
-                if Some(true) == Regex::partial_le(a, x1) &&
-                   Some(true) == Regex::partial_le(a, x2) =>
-                Some(true),
-            // c <= (a|b) if (c <= b)
-            (_, RegexF::Alt(x1, x2))
-                if Some(true) == Regex::partial_le(a, x1) &&
-                   Some(true) == Regex::partial_le(a, x2) =>
-                Some(true),
+            // Top
             (_, RegexF::Star(i)) if *i.0 == RegexF::Dot => Some(true),
-            (RegexF::Star(i), _) if *i.0 == RegexF::Dot => Some(false),
+            // Refl
+            (x, y) if x == y => Some(true),
+            // Dot
+            (RegexF::Char(_), RegexF::Dot) => Some(true),
+            // Nil
+            (RegexF::Nil, _) if b.nullable() => Some(true),
+            // Range*
+            (RegexF::Range(x, i, _), RegexF::Star(y))
+                if *i == 0 && Some(true) == Regex::partial_le(x, y) =>
+                Some(true),
+            // Range
+            (RegexF::Range(x, i1, j1), RegexF::Range(y, i2, j2))
+                if Regex::partial_le(x, y) == Some(true) && i1 >= i2 && j1 <= j2 =>
+                Some(true),
+            // Star
             (RegexF::Star(a), RegexF::Star(b)) => Regex::partial_le(a, b),
-            (RegexF::App(ref a, ref x), RegexF::App(ref b, ref y)) => {
-                let h = Regex::partial_le(a, b)?;
-                let t = Regex::partial_le(x, y)?;
-                Some(h && t)
-            }
+            // AltL
+            (RegexF::Alt(x1, x2), _)
+                if Some(true) == Regex::partial_le(x1, b) &&
+                   Some(true) == Regex::partial_le(x2, b) =>
+                Some(true),
+            // AltR
+            (_, RegexF::Alt(x1, x2))
+                if Some(true) == Regex::partial_le(a, x1) &&
+                   Some(true) == Regex::partial_le(a, x2) =>
+                Some(true),
+            // App
+            (RegexF::App(ref a, ref x), RegexF::App(ref b, ref y))
+                if a == b && Regex::partial_le(x, y) == Some(true) =>
+                Some(true),
+            (_, _) if Regex::partial_le(b, a) == Some(true) =>
+                Some(false),
+            (_, _) if Regex::partial_le(b, a) == Some(false) =>
+                Some(true),
             (_, _) => None,
         }
     }
