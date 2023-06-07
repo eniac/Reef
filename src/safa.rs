@@ -149,27 +149,27 @@ impl SAFA<char> {
     }
 
     fn add(&mut self, from: NodeIndex<u32>, q: &Regex) {
-        match q.to_skip(&self.ab) {
-            // First, check for wildcard skips
-            Some((skip, rem)) => self.add_skip(from, skip, &rem),
-            None =>
-                // Then for forks (and, or)
-                match q.to_fork() {
-                    Some(children) => {
-                        children.get().into_iter().for_each(|q_c|
-                            self.add_skip(from, Skip::epsilon(), &q_c));
-                        // Set the current node quantifier
-                        if children.is_and() {
-                            self.to_and(from)
-                        } else {
-                            self.to_or(from)
-                        }
-                    },
-                    None =>
-                        // If neither fork or skip, use a simple derivative
-                        self.add_derivatives(from, q)
-                }
-        }
+        q.extract_skip(&self.ab)
+         .map(|(skip, rem)| self.add_skip(from, skip, &rem))
+         .or_else(|| {
+            let children = q.extract_lookahead()?;
+            self.to_and(from);
+            children
+               .into_iter()
+               .for_each(|q_c|
+                    self.add_skip(from, Skip::epsilon(), &q_c));
+            Some(())
+         })
+         .or_else(|| {
+            let children = q.extract_alt()?;
+            self.to_or(from);
+            children
+                .into_iter()
+                .for_each(|q_c|
+                    self.add_skip(from, Skip::epsilon(), &q_c));
+            Some(())
+         })
+         .or_else(|| Some(self.add_derivatives(from, q))); // Catch-all
     }
 
     /// From SAFA<char> -> SAFA<String>
@@ -505,9 +505,9 @@ mod tests {
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = Regex::new("^(?=b)(a|b).*a.?b$");
-        let safa = SAFA::new("ab", &r);
-        safa.as_str_safa().write_pdf("safa").unwrap();
+        let r = Regex::new("^[a-c]*b$");
+        let safa = SAFA::new("abcd", &r);
+        safa.as_str_safa().write_pdf("safa2").unwrap();
         let strdoc = "baababab";
         let doc = strdoc.chars().collect();
 
