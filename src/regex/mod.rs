@@ -58,7 +58,27 @@ impl fmt::Display for Regex {
 #[derive(Clone,Debug,PartialEq,Eq,PartialOrd,Ord)]
 struct CharacterClass(Vec<ClassUnicodeRange>);
 impl CharacterClass {
+    fn len(self) -> usize { 
+         // let size = ranges
+                            //     .iter()
+                            //     .fold(0, |a, r| a + (r.end() as u32 - r.start() as u32));
+                            // if size > 120 {
+                            //     Ok(Regex::dot())
+                            // } else if size == 0 {
+                            //     Ok(Regex::empty())
+                            // } else {
+                            //     Ok(ranges
+                            //         .iter()
+                            //         .flat_map(|a| (a.start()..=a.end()))
+                            //         .map(|a| Regex::character(a))
+                            //         .reduce(Regex::alt)
+                            //         .unwrap_or(Regex::empty()))
+                            // }
+                            0
+    }
     fn negate(self) -> Self {
+        // let v :Vec<ClassUnicodeRange> = [a,b];
+        // CharacterClass(v)
         // TODO
         self.clone()
     }
@@ -145,22 +165,24 @@ impl Regex {
                     println!("RAW DELEGATED REGEX {:?}", re.kind());
                     match re.kind() {
                         HirKind::Class(Class::Unicode(ranges)) => {
-
-                            let size = ranges
-                                .iter()
-                                .fold(0, |a, r| a + (r.end() as u32 - r.start() as u32));
-                            if size > 120 {
-                                Ok(Regex::dot())
-                            } else if size == 0 {
-                                Ok(Regex::empty())
-                            } else {
-                                Ok(ranges
-                                    .iter()
-                                    .flat_map(|a| (a.start()..=a.end()))
-                                    .map(|a| Regex::character(a))
-                                    .reduce(Regex::alt)
-                                    .unwrap_or(Regex::empty()))
-                            }
+                            let cc: CharacterClass = CharacterClass(ranges.ranges().to_vec());
+                            Ok(cc.to_regex())
+                            
+                            // let size = ranges
+                            //     .iter()
+                            //     .fold(0, |a, r| a + (r.end() as u32 - r.start() as u32));
+                            // if size > 120 {
+                            //     Ok(Regex::dot())
+                            // } else if size == 0 {
+                            //     Ok(Regex::empty())
+                            // } else {
+                            //     Ok(ranges
+                            //         .iter()
+                            //         .flat_map(|a| (a.start()..=a.end()))
+                            //         .map(|a| Regex::character(a))
+                            //         .reduce(Regex::alt)
+                            //         .unwrap_or(Regex::empty()))
+                            // }
                         }
                         HirKind::Literal(Literal::Unicode(c)) => Ok(Regex::character(*c)),
                         _ => Err(format!("Unsupported regex (regex_syntax) {:#?}", re.kind())),
@@ -528,3 +550,26 @@ fn test_regex_negative_char_class() {
         Regex::new("[^a]b")
     );
 }
+
+
+#[test]
+fn test_regex_negative_char_class2() {
+    assert_eq!(
+        Regex::app(
+            Regex::app(
+                Regex::app(
+                    Regex::dotstar(),
+                    Regex::not(
+                        Regex::alt(
+                            Regex::character('a'),
+                            Regex::character('b'),
+                        )
+                    )
+                ),
+                Regex::character('c')),
+            Regex::dotstar()),
+        Regex::new("[^ab]c")
+    );
+}
+
+//add test for :space:, alphanum, etc
