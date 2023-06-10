@@ -80,14 +80,11 @@ impl CharacterClass {
             for r in 1..self_v.len() {
                 let prev_upper = self_v[r-1].end() as u8;
                 let curr_lower = self_v[r].start() as u8;
-                assert_ne!(prev_upper+1, curr_lower-1);
+                //assert_ne!(prev_upper+1, curr_lower-1);
                 v.push(ClassUnicodeRange::new((prev_upper+1) as char, (curr_lower-1) as char));
             }
         }
 
-        // let v :Vec<ClassUnicodeRange> = [a,b];
-        // CharacterClass(v)
-        // TODO
         CharacterClass(v)
     }
     fn to_regex(&self) -> Regex {
@@ -98,7 +95,7 @@ impl CharacterClass {
         } else if size >= char_max && self.0.len()==1 {
             return Regex::dot() //check that this is correct
         } else {
-            if (char_max - size < size) {
+            if char_max - size < size {
                 let neg = self.clone().negate();
                 let to_neg: Regex = neg.0.iter().flat_map(|a| (a.start()..=a.end())).map(|a| Regex::character(a)).reduce(Regex::alt).unwrap_or(Regex::empty());
                 return Regex::not(to_neg)
