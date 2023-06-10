@@ -58,33 +58,54 @@ impl fmt::Display for Regex {
 #[derive(Clone,Debug,PartialEq,Eq,PartialOrd,Ord)]
 struct CharacterClass(Vec<ClassUnicodeRange>);
 impl CharacterClass {
-    fn len(self) -> usize { 
-         // let size = ranges
-                            //     .iter()
-                            //     .fold(0, |a, r| a + (r.end() as u32 - r.start() as u32));
-                            // if size > 120 {
-                            //     Ok(Regex::dot())
-                            // } else if size == 0 {
-                            //     Ok(Regex::empty())
-                            // } else {
-                            //     Ok(ranges
-                            //         .iter()
-                            //         .flat_map(|a| (a.start()..=a.end()))
-                            //         .map(|a| Regex::character(a))
-                            //         .reduce(Regex::alt)
-                            //         .unwrap_or(Regex::empty()))
-                            // }
-                            0
+    fn chars_len(self) -> u32 { 
+       let size = self.0.iter().fold(0, |a, r| a + (r.end() as u32 - r.start() as u32)); 
+       size
     }
-    fn negate(self) -> Self {
+
+    fn negate(self) -> CharacterClass {
+        let self_v = self.0;
+        let mut v: Vec<ClassUnicodeRange> = vec![];
+        let max_char = std::char::MAX;
+        if self_v.len() == 1 {
+            let lower = self_v[0].start() as u8;
+            let upper = self_v[0].end() as u8;
+            if lower == 0 {
+                v.push(ClassUnicodeRange::new((upper + 1) as char, max_char));
+            } else {
+                v.push(ClassUnicodeRange::new(0 as char, (lower-1) as char));
+                v.push(ClassUnicodeRange::new((upper+1) as char, max_char));
+            }
+        } else {
+            for r in 1..self_v.len() {
+                let prev_upper = self_v[r-1].end() as u8;
+                let curr_lower = self_v[r].start() as u8;
+                assert_ne!(prev_upper+1, curr_lower-1);
+                v.push(ClassUnicodeRange::new((prev_upper+1) as char, (curr_lower-1) as char));
+            }
+        }
+
         // let v :Vec<ClassUnicodeRange> = [a,b];
         // CharacterClass(v)
         // TODO
-        self.clone()
+        CharacterClass(v)
     }
     fn to_regex(&self) -> Regex {
-        // TODO
-        Regex::empty()
+        let size = self.clone().chars_len();
+        let char_max: u32 = std::char::MAX as u32;
+        if size == 0 {
+            return Regex::empty() //empty
+        } else if size >= char_max && self.0.len()==1 {
+            return Regex::dot() //check that this is correct
+        } else {
+            if (char_max - size < size) {
+                let neg = self.clone().negate();
+                let to_neg: Regex = neg.0.iter().flat_map(|a| (a.start()..=a.end())).map(|a| Regex::character(a)).reduce(Regex::alt).unwrap_or(Regex::empty());
+                return Regex::not(to_neg)
+            } else {
+                return self.0.iter().flat_map(|a| (a.start()..=a.end())).map(|a| Regex::character(a)).reduce(Regex::alt).unwrap_or(Regex::empty())
+            }
+        }
     }
 }
 
