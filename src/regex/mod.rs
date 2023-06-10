@@ -58,8 +58,8 @@ impl fmt::Display for Regex {
 #[derive(Clone,Debug,PartialEq,Eq,PartialOrd,Ord)]
 struct CharacterClass(Vec<ClassUnicodeRange>);
 impl CharacterClass {
-    fn chars_len(self) -> u32 { 
-       let size = self.0.iter().fold(0, |a, r| a + (r.end() as u32 - r.start() as u32)); 
+    fn chars_len(v: Vec<ClassUnicodeRange>) -> u32 { 
+       let size = v.iter().fold(0, |a, r| a + (r.end() as u32 - r.start() as u32)); 
        size
     }
 
@@ -88,13 +88,17 @@ impl CharacterClass {
         CharacterClass(v)
     }
     fn to_regex(&self) -> Regex {
-        let size = self.clone().chars_len();
+        println!("Pre CLone");
+        let size = self.0.iter().fold(0, |a, r| a + (r.end() as u32 - r.start() as u32)); 
+        //CharacterClass::chars_len(self.0.clone());
+        println!("Post Clone");
         let char_max: u32 = std::char::MAX as u32;
         if size == 0 {
             return Regex::empty() //empty
         } else if size >= char_max && self.0.len()==1 {
             return Regex::dot() //check that this is correct
         } else {
+            println!("To Negate");
             if char_max - size < size {
                 let neg = self.clone().negate();
                 let to_neg: Regex = neg.0.iter().flat_map(|a| (a.start()..=a.end())).map(|a| Regex::character(a)).reduce(Regex::alt).unwrap_or(Regex::empty());
