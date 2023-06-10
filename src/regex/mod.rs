@@ -84,7 +84,7 @@ impl CharacterClass {
                 v.push(ClassUnicodeRange::new((prev_upper+1) as char, (curr_lower-1) as char));
             }
         }
-
+        println!("Negate finished");
         CharacterClass(v)
     }
     fn to_regex(&self) -> Regex {
@@ -185,22 +185,6 @@ impl Regex {
                         HirKind::Class(Class::Unicode(ranges)) => {
                             let cc: CharacterClass = CharacterClass(ranges.ranges().to_vec());
                             Ok(cc.to_regex())
-                            
-                            // let size = ranges
-                            //     .iter()
-                            //     .fold(0, |a, r| a + (r.end() as u32 - r.start() as u32));
-                            // if size > 120 {
-                            //     Ok(Regex::dot())
-                            // } else if size == 0 {
-                            //     Ok(Regex::empty())
-                            // } else {
-                            //     Ok(ranges
-                            //         .iter()
-                            //         .flat_map(|a| (a.start()..=a.end()))
-                            //         .map(|a| Regex::character(a))
-                            //         .reduce(Regex::alt)
-                            //         .unwrap_or(Regex::empty()))
-                            // }
                         }
                         HirKind::Literal(Literal::Unicode(c)) => Ok(Regex::character(*c)),
                         _ => Err(format!("Unsupported regex (regex_syntax) {:#?}", re.kind())),
@@ -572,6 +556,7 @@ fn test_regex_negative_char_class() {
 
 #[test]
 fn test_regex_negative_char_class2() {
+    unsafe { backtrace_on_stack_overflow::enable() };
     assert_eq!(
         Regex::app(
             Regex::app(
