@@ -58,12 +58,12 @@ impl fmt::Display for Regex {
 #[derive(Clone,Debug,PartialEq,Eq,PartialOrd,Ord)]
 struct CharacterClass(Vec<ClassUnicodeRange>);
 impl CharacterClass {
-    fn chars_len(v: Vec<ClassUnicodeRange>) -> u32 { 
+    fn chars_len(v:Vec<ClassUnicodeRange>) -> u32 { 
        let size = v.iter().fold(0, |a, r| a + (r.end() as u32 - r.start() as u32)); 
        size
     }
 
-    fn negate(self) -> CharacterClass {
+    fn negate(mut self) -> CharacterClass {
         let self_v = self.0;
         let mut v: Vec<ClassUnicodeRange> = vec![];
         let max_char = std::char::MAX;
@@ -88,9 +88,9 @@ impl CharacterClass {
         CharacterClass(v)
     }
     fn to_regex(&self) -> Regex {
-        println!("Pre CLone");
-        let size = self.0.iter().fold(0, |a, r| a + (r.end() as u32 - r.start() as u32)); 
-        //CharacterClass::chars_len(self.0.clone());
+        println!("Into Regex");
+        println!("Self Len : {:#?}",self.0.len());
+        let size = CharacterClass::chars_len(self.0.clone());
         println!("Post Clone");
         let char_max: u32 = std::char::MAX as u32;
         if size == 0 {
@@ -560,7 +560,7 @@ fn test_regex_negative_char_class() {
 
 #[test]
 fn test_regex_negative_char_class2() {
-    unsafe { backtrace_on_stack_overflow::enable() };
+    //unsafe { backtrace_on_stack_overflow::enable() };
     assert_eq!(
         Regex::app(
             Regex::app(
