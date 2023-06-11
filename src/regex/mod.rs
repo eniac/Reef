@@ -18,11 +18,13 @@ pub mod arbitrary;
 pub struct Regex(pub HConsed<RegexF>);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct CharClass(Vec<(char,char)>);
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum RegexF {
     Nil,
-    Empty,
     Dot,
-    Char(char),
+    CharClass(CharClass),
     Not(Regex),
     App(Regex, Regex),
     Alt(Regex, Regex),
@@ -36,13 +38,25 @@ consign! {
     let G = consign(10) for RegexF ;
 }
 
+impl fmt::Display for CharClass {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.0.is_empty() {
+            write!(f, "∅")
+        } else {
+            match self.0.is_single() {
+                Some(c) => write!(f, "{}", c),
+                None => write!(f, "[{}]", self.0.join(","))
+            }
+        }
+    }
+}
+
 impl fmt::Display for Regex {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &*self.0 {
             RegexF::Nil => write!(f, "ε"),
-            RegexF::Empty => write!(f, "∅"),
             RegexF::Dot => write!(f, "."),
-            RegexF::Char(c) => write!(f, "{}", c),
+            RegexF::CharClass(c) => write!(f, "{}", c),
             RegexF::Not(c) => write!(f, "! {}", c),
             RegexF::App(x, y) => write!(f, "{}{}", x, y),
             RegexF::Alt(x, y) => write!(f, "({} | {})", x, y),
@@ -55,15 +69,43 @@ impl fmt::Display for Regex {
     }
 }
 
-#[derive(Clone,Debug,PartialEq,Eq,PartialOrd,Ord)]
-struct CharacterClass(Vec<ClassUnicodeRange>);
-impl CharacterClass {
-    fn chars_len(v:Vec<ClassUnicodeRange>) -> u32 {
-       let size = v.iter().fold(0, |a, r| a + (r.end() as u32 - r.start() as u32));
-       size
+impl CharClass {
+    /// Create a single character
+    pub fn single(c: char) -> Self {
+        Self(vec![(c,c)])
     }
-
-    fn negate(&self) -> CharacterClass {
+    /// Create a single range of characters
+    pub fn new(from: char, to: char) -> Self {
+        assert!(from <= to, "Cannot create char range {}-{}", from, to);
+        CharClass(vec![(from, to)])
+    }
+    /// Is it empty
+    pub fn is_empty(&self) -> bool {
+        self.0.len() == 0
+    }
+    /// Is it a single character, if yes return it
+    pub fn is_single(&self) -> Option<char> {
+        if self.0.len() == 1 {
+            let h = self.0.into_iter().next()?;
+            if h.0 == h.1 {
+                Some(h.0)
+            else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    /// Total interval of all ranges added together
+    pub fn interv_len(&self) -> usize {
+       self.0.iter().fold(0, |a, r| a + ((r.end()- r.start()) as usize))
+    }
+    /// How many ranges in the class
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    /// Compute the complement set (Unicode / self)
+    pub fn negate(&self) -> CharacterClass {
         let self_v = &self.0;
         let mut v: Vec<ClassUnicodeRange> = vec![];
         let max_char = std::char::MAX;
@@ -84,29 +126,7 @@ impl CharacterClass {
                 v.push(ClassUnicodeRange::new((prev_upper+1) as char, (curr_lower-1) as char));
             }
         }
-        println!("Negate finished");
         CharacterClass(v)
-    }
-    fn to_regex(&self) -> Regex {
-        println!("Into Regex");
-        println!("Self Len : {:#?}",self.0.len());
-        let size = CharacterClass::chars_len(self.0.clone());
-        println!("Post Clone");
-        let char_max: u32 = std::char::MAX as u32;
-        if size == 0 {
-            return Regex::empty() //empty
-        } else if size >= char_max && self.0.len()==1 {
-            return Regex::dot() //check that this is correct
-        } else {
-            println!("To Negate");
-            if char_max - size < size {
-                let neg = self.clone().negate();
-                let to_neg: Regex = neg.0.iter().flat_map(|a| (a.start()..=a.end())).map(|a| Regex::character(a)).reduce(Regex::alt).unwrap_or(Regex::empty());
-                return Regex::not(to_neg)
-            } else {
-                return self.0.iter().flat_map(|a| (a.start()..=a.end())).map(|a| Regex::character(a)).reduce(Regex::alt).unwrap_or(Regex::empty())
-            }
-        }
     }
 }
 
@@ -210,8 +230,16 @@ impl Regex {
         Regex(G.mk(RegexF::Empty))
     }
 
-    pub fn character(c: char) -> Regex {
-        Regex(G.mk(RegexF::Char(c)))
+    pub fn charclass(c: &CharClass) -> Regex {
+        let size = c.interv_len();
+        let char_max: u32 = std::char::MAX as u32;
+        if size == 0 {
+            Regex::empty() //empty
+        } else if size >= char_max && c.len()==1 {
+            Regex::dot()  //check that this is correct
+        } else {
+            Regex(G.mk(RegexF::CharClass(c.clone())))
+        }
     }
 
     pub fn dot() -> Regex {
