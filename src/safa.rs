@@ -502,12 +502,35 @@ mod tests {
         )
     }
 
+    #[test]
+    fn test_safa_range_alt() {
+        unsafe { backtrace_on_stack_overflow::enable() };
+        let r = Regex::new("^((.{1,2}.)(.{4,5}b))a$");
+        let safa = SAFA::new("ab", &r);
+
+        safa.write_pdf("safa_alt").unwrap();
+        let doc: Vec<_> = "aaaab".chars().collect();
+        assert_eq!(
+            safa.solve(&doc),
+            Some(LinkedList::from([
+                (
+                    NodeIndex::new(0),
+                    Either(Err(Skip::choice(&[1, 2, 3, 4, 6]))),
+                    NodeIndex::new(1),
+                    0,
+                    4
+                ),
+                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 4, 5)
+            ]))
+        )
+    }
+
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
         let r = Regex::new("^[a-c]*b$");
         let safa = SAFA::new("abcd", &r);
-        safa.as_str_safa().write_pdf("safa2").unwrap();
+        safa.write_pdf("safa2").unwrap();
         let strdoc = "baababab";
         let doc = strdoc.chars().collect();
 

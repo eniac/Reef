@@ -6,8 +6,8 @@ use core::fmt::Formatter;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Skip {
-    Offset(usize),
     Choice(BTreeSet<usize>),
+    Inverse(Box<Skip>),
     Star
 }
 
@@ -16,45 +16,85 @@ impl Skip {
 
     /// A single wildcard (.)
     pub fn single() -> Self {
-        Skip::Offset(1)
+        Skip::choice(&[1])
     }
 
     /// No step (unit of app)
     pub fn epsilon() -> Self {
-        Skip::Offset(0)
+        Skip::choice(&[0])
     }
 
+    /// One offset
+    pub fn offset(x: usize) -> Self {
+        Skip::choice(&[x])
+    }
+
+    /// Inverse of * is the empty set
+    pub fn empty() -> Self {
+        Skip::Inverse(Box::new(Skip::Star))
+    }
+
+    /// Choice between elements
     pub fn choice(v: &[usize]) -> Self {
-        assert!(v.len() > 0, "Nullary skip choice not supported");
-        if v.len() == 1 {
-            return Skip::Offset(1);
-        }
-        let mut s = BTreeSet::new();
-        for x in v.into_iter() {
-            s.insert(x.clone());
-        }
-        Skip::Choice(s)
-    }
-
-    /// [i] != 0 ensured by the smart constructor in Regex::range
-    pub fn range(&self, i: usize, j: usize) -> Self {
-        assert!(0 < i && i <= j, "Range indices must be 0 < {} <= {}", i, j);
-        if i == j {
-            self.times(i)
+        if v.len() == 0 {
+            Skip::empty()
         } else {
-            (i..=j).map(|n| self.times(n))
-                   .reduce(|a, b| a.alt(&b))
-                   .unwrap()
+            let mut s = BTreeSet::new();
+            for x in v.into_iter() {
+                s.insert(x.clone());
+            }
+            Skip::Choice(s)
         }
     }
 
+    /// Is it the nil skip
+    pub fn is_epsilon(&self) -> bool {
+        match self {
+            Skip::Choice(xs) if xs.contains(&0) && xs.len() == 1 => true,
+            Skip::Inverse(x) => (*x).is_epsilon(),
+            _ => false
+        }
+    }
+
+    /// Is it the empty set (no transition exists)
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Skip::Choice(xs) if xs.len() == 0 => true,
+            Skip::Inverse(x) if **x == Skip::Star => true,
+            _ => false
+        }
+    }
+
+    /// Repeat [self] between [i,j] times
+    pub fn range(&self, i: usize, j: usize) -> Self {
+        assert!(i <= j, "Range indices must be 0 < {} <= {}", i, j);
+        match self {
+            _ if self.is_epsilon() => Skip::epsilon(),
+            _ if self.is_empty() =>
+                if i == 0 { Skip::epsilon() } else { Skip::empty() },
+            Skip::Choice(xs) => {
+                let mut s: BTreeSet<usize> = BTreeSet::new();
+                for x in xs {
+                    for y in i..=j {
+                        s.insert(x*y);
+                    }
+                }
+                Skip::Choice(s)
+            },
+            Skip::Inverse(s) => Skip::Inverse(Box::new((*s).range(i,j))),
+            Skip::Star => Skip::Star
+        }
+    }
+
+    /// Repeat [self] exactly [n] times
     pub fn times(&self, n: usize) -> Self {
         match self {
-            Skip::Offset(x) => Skip::Offset(x*n),
             Skip::Choice(xs) =>
                 Skip::Choice(xs.into_iter().map(|x|x*n).collect()),
             Skip::Star if n == 0 =>
                 Skip::epsilon(),
+            Skip::Inverse(x) =>
+                Skip::Inverse(Box::new((*x).times(n))),
             Skip::Star => Skip::Star
         }
     }
@@ -62,36 +102,20 @@ impl Skip {
     /// The kleene-star of a skip
     pub fn star(&self) -> Skip {
         match self {
-            Skip::Offset(0) => Skip::Offset(0),
+            _ if self.is_empty() || self.is_epsilon() => Skip::epsilon(),
             _ => Skip::Star
-        }
-    }
-
-    /// Alternation
-    pub fn alt(&self, a: &Skip) -> Skip {
-        match (self, a) {
-            (Skip::Offset(a), Skip::Offset(b)) => Skip::choice(&[*a,*b]),
-            (Skip::Choice(c), Skip::Offset(o)) | (Skip::Offset(o), Skip::Choice(c)) => {
-                let mut s = c.clone();
-                s.insert(*o);
-                Skip::Choice(s)
-            },
-            (Skip::Choice(a), Skip::Choice(b)) => {
-                let mut s = a.clone();
-                for x in b { s.insert(*x); };
-                Skip::Choice(s)
-            }
-            (Skip::Star, _) | (_, Skip::Star) => Skip::Star
         }
     }
 
     /// Sequential composition of two jumps is a jump
     pub fn app(&self, a: &Skip) -> Skip {
         match (self, a) {
-            (Skip::Offset(0), _) => a.clone(),
-            (Skip::Offset(i), Skip::Offset(j)) => Skip::Offset(i+j),
-            (Skip::Offset(i), Skip::Choice(x)) | (Skip::Choice(x), Skip::Offset(i)) =>
-                Skip::Choice(x.into_iter().map(|x| x + i).collect()),
+            (Skip::Inverse(x), _) if &**x == a => Skip::epsilon(),
+            (_, Skip::Inverse(x)) if &**x == self => Skip::epsilon(),
+            (Skip::Inverse(x), Skip::Inverse(y)) =>
+                Skip::Inverse(Box::new(Skip::app(&**x, &**y))),
+            (Skip::Inverse(_), _) => unreachable!(),
+            (_, Skip::Inverse(_)) => unreachable!(),
             (Skip::Choice(x), Skip::Choice(y)) => {
                 let mut s = BTreeSet::new();
                 for i in x.into_iter() {
@@ -104,15 +128,15 @@ impl Skip {
             (Skip::Star, _) | (_, Skip::Star) => Skip::Star
         }
     }
-
 }
 
 impl fmt::Display for Skip {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Skip::Offset(u) if *u == 0 => write!(f, "ε"),
-            Skip::Offset(u) => write!(f, "+{}", u),
+            _ if self.is_epsilon() => write!(f, "ε"),
+            _ if self.is_empty() => write!(f, "∅"),
             Skip::Choice(us) => write!(f, "{:?}", us),
+            Skip::Inverse(x) => write!(f, "!{}", **x),
             Skip::Star => write!(f, "*")
         }
     }
@@ -120,18 +144,12 @@ impl fmt::Display for Skip {
 
 #[test]
 fn test_skip_app() {
-    assert_eq!(Skip::choice(&[1,3]).app(&Skip::Offset(2)), Skip::choice(&[3,5]))
+    assert_eq!(Skip::choice(&[1,3]).app(&Skip::offset(2)), Skip::choice(&[3,5]))
 }
 
 #[test]
 fn test_skip_app2() {
     assert_eq!(Skip::choice(&[1,3]).app(&Skip::choice(&[1,2])), Skip::choice(&[2,3,4,5]))
-}
-
-
-#[test]
-fn test_skip_alt() {
-    assert_eq!(Skip::choice(&[1,3]).alt(&Skip::choice(&[1,2])), Skip::choice(&[1,2,3]))
 }
 
 #[test]
