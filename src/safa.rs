@@ -441,8 +441,35 @@ mod tests {
 
     #[test]
     fn test_safa_alt() {
-        let r = re::new("^.*baa(b|a)$");
+        let r = re::new("^.*baa(a|c)$");
+        let safa = SAFA::new("abc", &r);
+        safa.write_pdf("safa_alt").unwrap();
+        let strdoc = "abababaac";
+        let doc: Vec<_> = strdoc.chars().collect();
+        assert_eq!(
+            safa.solve(&doc),
+            Some(LinkedList::from([
+                (
+                    NodeIndex::new(0),
+                    Either(Err(Skip::star())),
+                    NodeIndex::new(1),
+                    0,
+                    5
+                ),
+                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 5, 6),
+                (NodeIndex::new(3), Either(Ok('a')), NodeIndex::new(4), 6, 7),
+                (NodeIndex::new(4), Either(Ok('a')), NodeIndex::new(5), 7, 8),
+                (NodeIndex::new(5), SAFA::epsilon(), NodeIndex::new(8), 8, 8),
+                (NodeIndex::new(8), Either(Ok('c')), NodeIndex::new(7), 8, 9)
+            ]))
+        )
+    }
+
+    #[test]
+    fn test_safa_alt_merge() {
+        let r = re::new("^.*baa(a|b)$");
         let safa = SAFA::new("ab", &r);
+        safa.write_pdf("safa_alt").unwrap();
         let strdoc = "abababaab";
         let doc: Vec<_> = strdoc.chars().collect();
         assert_eq!(

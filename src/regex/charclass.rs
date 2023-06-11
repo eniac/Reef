@@ -11,6 +11,13 @@ pub struct CharClass(pub Vec<(char,char)>);
 
 impl fmt::Display for CharClass {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        fn fmt_interv(c: &(char,char)) -> String {
+            if c.0 == c.1 {
+                c.0.to_string()
+            } else {
+                format!("{}-{}",c.0,c.1)
+            }
+        }
         if self.is_empty() {
             write!(f, "∅")
         } else {
@@ -19,7 +26,7 @@ impl fmt::Display for CharClass {
                 None =>
                     write!(f, "[{}]",
                         self.0.iter()
-                              .map(|(a,b)| format!("{}-{}",a,b))
+                              .map(fmt_interv)
                               .collect::<Vec<_>>()
                               .join(","))
             }

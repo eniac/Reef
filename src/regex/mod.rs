@@ -1,17 +1,21 @@
 #![allow(dead_code)]
 #![allow(missing_docs)]
-use fancy_regex::{Expr, LookAround};
 use hashconsing::{consign, HConsed, HashConsign};
-use regex_syntax::hir::{Class, HirKind, Literal};
-
-use std::str::FromStr;
+use std::collections::BTreeSet;
 
 use core::fmt;
 use core::fmt::Formatter;
 use crate::skip::Skip;
+use crate::regex::charclass::CharClass;
+use crate::regex::parser::RegexParser;
 
 #[cfg(fuzz)]
 pub mod arbitrary;
+
+pub mod charclass;
+pub mod parser;
+pub mod ord;
+
 
 /// Hash-consed regex terms
 pub type Regex = HConsed<RegexF>;
@@ -65,69 +69,15 @@ impl RegexF {
         }
     }
 
+    /// Empty set
+    pub fn empty() -> RegexF {
+        RegexF::CharClass(CharClass(vec![]))
+    }
+
     /// Matches empty string (ε)
     pub fn nil() -> RegexF {
         RegexF::Nil
     }
-
-        fn to_regex(e: &Expr) -> Result<Regex, String> {
-            println!("Raw regex {:?}", e);
-            match e {
-                Expr::Empty => Ok(Regex::empty()),
-                Expr::Any { .. } => Ok(Regex::dot()),
-                Expr::StartText | Expr::StartLine | Expr::EndText | Expr::EndLine => {
-                    Ok(Regex::nil())
-                }
-                Expr::Literal { val, .. } => val.chars().try_fold(Regex::nil(), |acc, a| {
-                    Ok(Regex::app(acc, Regex::character(a)))
-                }),
-                Expr::Concat(l) => l
-                    .iter()
-                    .try_fold(Regex::nil(), |acc, a| Ok(Regex::app(acc, to_regex(a)?))),
-                Expr::Alt(l) => l
-                    .iter()
-                    .try_fold(Regex::empty(), |acc, a| Ok(Regex::alt(acc, to_regex(&a)?))),
-                Expr::Repeat { child, lo, hi, .. } if *lo == 0 && *hi == usize::MAX => {
-                    Ok(Regex::star(to_regex(&*child)?))
-                }
-                Expr::Repeat { child, lo, hi, .. } if *hi == usize::MAX => {
-                    let inner = to_regex(child)?;
-                    Ok(Regex::app(inner.repeat(*lo), Regex::star(inner)))
-                },
-                Expr::Repeat { child, lo, hi, .. } => {
-                    println!("Inner range: {:?}", child);
-                    Ok(Regex::range(&to_regex(child)?, *lo, *hi))
-                },
-                Expr::StartLine | Expr::StartText => Ok(Regex(G.mk(RegexF::LineStart))),
-                Expr::EndLine | Expr::EndText => Ok(Regex(G.mk(RegexF::LineEnd))),
-                Expr::Group(g) => to_regex(&g),
-                Expr::LookAround(g, LookAround::LookAhead) => {
-                    Ok(Regex::lookahead(to_regex_top(g)?))
-                }
-                Expr::LookAround(g, LookAround::LookBehind) => {
-                    Ok(Regex::lookbehind(to_regex_top(g)?))
-                }
-                Expr::LookAround(g, LookAround::LookAheadNeg) => {
-                    Ok(Regex::lookahead(Regex::not(to_regex_top(g)?)))
-                }
-                Expr::LookAround(g, LookAround::LookBehindNeg) => {
-                    Ok(Regex::lookbehind(Regex::not(to_regex_top(g)?)))
-                }
-                Expr::Delegate { inner, .. } => {
-                    let re = regex_syntax::Parser::new().parse(inner).unwrap();
-                    println!("RAW DELEGATED REGEX {:?}", re.kind());
-                    match re.kind() {
-                        HirKind::Class(Class::Unicode(ranges)) => {
-                            let cc: CharacterClass = CharacterClass(ranges.ranges().to_vec());
-                            Ok(cc.to_regex())
-                        }
-                        HirKind::Literal(Literal::Unicode(c)) => Ok(Regex::character(*c)),
-                        _ => Err(format!("Unsupported regex (regex_syntax) {:#?}", re.kind())),
-                    }
-                }
-                _ => Err(format!("Unsupported regex (fancy_regex) {:#?}", e)),
-            }
-        }
 
     /// A single character ([c] character class)
     pub fn character(c: char) -> RegexF {
@@ -154,24 +104,7 @@ impl RegexF {
         } else if size >= char_max && c.len() == 1 {
             RegexF::dot() //check that this is correct
         } else {
-            Regex(G.mk(RegexF::CharClass(c.clone())))
-        }
-    }
-
-    pub fn dot() -> Regex {
-        Regex(G.mk(RegexF::Dot))
-    }
-
-    /// Flatten a tree of alt into a list of alts
-    pub fn to_alt_set(&self) -> BTreeSet<Regex> {
-        match *self.0 {
-            RegexF::Alt(ref a, ref b) => {
-                let mut la = a.to_alt_set();
-                let mut lb = b.to_alt_set();
-                la.append(&mut lb);
-                la
-            },
-            _ => vec![self.clone()]
+            RegexF::CharClass(c.clone())
         }
     }
 
@@ -260,13 +193,20 @@ impl RegexF {
             // Empty absorbs everything
             (_, _) if a.is_empty() || b.is_empty() => RegexF::empty(),
             // Range & star index math
-            (RegexF::Range(a, i, j), _) if a == &b => a.range(i+1, j+1),
-            (_, RegexF::Range(b, i, j)) if &a == b => b.range(i+1, j+1),
-            (RegexF::Range(a, i1, j1), RegexF::Range(b, i2, j2)) if a == b => a.range(i1+i2, j1+j2),
-            (RegexF::Star(x), RegexF::Range(y, _, _)) if x == y => a,
-            (RegexF::Range(y, _, _), RegexF::Star(x)) if x == y => b,
-            (RegexF::Star(x), RegexF::Star(y)) if x == y => a,
-            (_, _) => Regex(G.mk(RegexF::App(a, b))),
+            (RegexF::Range(ref a, i, j), _) if &*a.clone() == b => RegexF::range(a, i + 1, j + 1),
+            (_, RegexF::Range(ref b, i, j)) if a == &*b.clone() => RegexF::range(b, i + 1, j + 1),
+            (RegexF::Range(a, i1, j1), RegexF::Range(b, i2, j2)) if a == b => {
+                RegexF::range(a, i1 + i2, j1 + j2)
+            }
+            (RegexF::Star(x), RegexF::Star(y)) if RegexF::partial_le(x, y) == Some(true) => {
+                b.clone()
+            }
+            (RegexF::Star(x), RegexF::Star(y)) if RegexF::partial_le(y, x) == Some(true) => {
+                a.clone()
+            }
+            // Right-associative [app]
+            (RegexF::App(x, y), _) => RegexF::app(x, &RegexF::app(y, b)),
+            (_, _) => RegexF::App(G.mk(a.clone()), G.mk(b.clone())),
         }
     }
 
@@ -352,8 +292,8 @@ impl RegexF {
         match self {
             _ if self.is_empty() => false,
             RegexF::Nil | RegexF::Star(_) => true,
-            RegexF::Range(_, i, _) if i == 0 => true,
-            RegexF::Empty | RegexF::Char(_) | RegexF::Dot | RegexF::Range(_, _, _) | RegexF::Lookahead(_) => false,
+            RegexF::Range(_, i, _) if *i == 0 => true,
+            RegexF::CharClass(_) | RegexF::Dot | RegexF::Range(_, _, _) => false,
             RegexF::Not(ref r) => !r.nullable(),
             RegexF::And(ref a, ref b) | RegexF::App(ref a, ref b) => a.nullable() && b.nullable(),
             RegexF::Alt(ref a, ref b) => a.nullable() || b.nullable(),
@@ -482,17 +422,10 @@ impl RegexF {
             RegexF::App(ref a, ref b) if a.nullable() => {
                 RegexF::alt(&RegexF::app(&a.deriv(c), b), &b.deriv(c))
             }
-            RegexF::App(ref a, ref b) => Regex::app(a.deriv(c), b.clone()),
-            RegexF::Alt(ref a, ref b) => Regex::alt(a.deriv(c), b.deriv(c)),
-            RegexF::Star(ref a) => Regex::app(a.deriv(c), Regex::star(a.clone())),
-            RegexF::Range(ref a, i, j) if i == j => a.repeat(i).deriv(c),
-            RegexF::Range(ref a, i, j) if i == 0 => Regex::alt(Regex::nil(), a.clone().range(1, j)).deriv(c),
-            RegexF::Range(ref a, i, j) =>
-                match (i..=j).map(|i| a.repeat(i)).reduce(Regex::alt) {
-                    Some(r) => r.deriv(c),
-                    None => Regex::nil()
-                },
-            _ => panic!("No derivatives for regex {}", self)
+            RegexF::App(ref a, ref b) => RegexF::app(&a.deriv(c), b),
+            RegexF::Alt(ref a, ref b) => RegexF::alt(&a.deriv(c), &b.deriv(c)),
+            RegexF::Star(ref a) => RegexF::app(&a.deriv(c), &RegexF::star(a)),
+            _ => panic!("No derivatives for regex {}", self),
         }
     }
 }
@@ -634,7 +567,7 @@ fn test_regex_dot_star() {
 
 #[test]
 fn regex_parser_test_repetition_range() {
-    assert_eq!(Regex::character('a').range(1, 3), Regex::new("a{1,3}"));
+    assert_eq!(re::range(re::character('a'), 1, 3), re::new("a{1,3}"));
 }
 
 #[test]
