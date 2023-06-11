@@ -58,13 +58,13 @@ impl fmt::Display for Regex {
 #[derive(Clone,Debug,PartialEq,Eq,PartialOrd,Ord)]
 struct CharacterClass(Vec<ClassUnicodeRange>);
 impl CharacterClass {
-    fn chars_len(v:Vec<ClassUnicodeRange>) -> u32 { 
-       let size = v.iter().fold(0, |a, r| a + (r.end() as u32 - r.start() as u32)); 
+    fn chars_len(v:Vec<ClassUnicodeRange>) -> u32 {
+       let size = v.iter().fold(0, |a, r| a + (r.end() as u32 - r.start() as u32));
        size
     }
 
-    fn negate(mut self) -> CharacterClass {
-        let self_v = self.0;
+    fn negate(&self) -> CharacterClass {
+        let self_v = &self.0;
         let mut v: Vec<ClassUnicodeRange> = vec![];
         let max_char = std::char::MAX;
         if self_v.len() == 1 {
@@ -267,10 +267,6 @@ impl Regex {
             // App
             (RegexF::App(ref a, ref x), RegexF::App(ref b, ref y))
                 if a == b && Regex::partial_le(x, y) == Some(true) =>
-                Some(true),
-            (_, _) if Regex::partial_le(b, a) == Some(true) =>
-                Some(false),
-            (_, _) if Regex::partial_le(b, a) == Some(false) =>
                 Some(true),
             (_, _) => None,
         }
@@ -528,7 +524,7 @@ fn test_regex_ranges() {
 }
 
 #[test]
-fn test_regex_dot() {
+fn test_regex_dot_star() {
     assert_eq!(
         Regex::app(
             Regex::app(Regex::dotstar(), Regex::character('c')),
@@ -579,4 +575,14 @@ fn test_regex_negative_char_class2() {
     );
 }
 
+#[test]
+fn test_regex_dot() {
+    assert_eq!(
+        Regex::app(
+            Regex::dot(),
+            Regex::character('a'),
+        ),
+        Regex::new("^.a$")
+    );
+}
 //add test for :space:, alphanum, etc
