@@ -179,10 +179,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let in_state = in_node.0.index(); // check AND/OR?
             let out_state = out_node.index();
             let c = match edge {
-                Either(Err(Skip::Offset(u))) if u == 0 => num_ab[&None], //EPSILON
-                Either(Err(Skip::Offset(u))) => todo!(),                 //write!(f, "+{}", u),
+                Either(Err(e)) if e.is_epsilon() => num_ab[&None],       //EPSILON
                 Either(Err(Skip::Choice(us))) => todo!(),                //num_ab(us),
-                Either(Err(Skip::Star)) => todo!(),                      //write!(f, "*"),
+                Either(Err(Skip::Star(n))) => todo!(),                   //write!(f, "*"),
                 Either(Ok(ch)) => num_ab[&Some(ch)],
             };
 
@@ -1437,7 +1436,7 @@ mod tests {
 
     use crate::backend::costs;
     use crate::backend::r1cs::*;
-    use crate::regex::Regex;
+    use crate::regex::re;
     use crate::safa::SAFA;
     use neptune::Strength;
     use nova_snark::traits::Group;
@@ -1621,7 +1620,7 @@ mod tests {
         batch_sizes: Vec<usize>,
         expected_match: bool,
     ) {
-        let r = Regex::new(&rstr);
+        let r = re::new(&rstr);
         let safa = SAFA::new(&ab[..], &r);
 
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
@@ -1974,7 +1973,7 @@ mod tests {
         batch_sizes: Vec<usize>,
         k: usize,
     ) {
-        let r = Regex::new(&rstr);
+        let r = re::new(&rstr);
         let mut safa = SAFA::new(&ab[..], r);
         let mut d = doc.chars().map(|c| c.to_string()).collect();
         d = nfa.k_stride(k, &d);

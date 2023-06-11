@@ -6,12 +6,11 @@ use core::fmt::Formatter;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Skip {
-    Choice(BTreeSet<usize>),
-    Inverse(Box<Skip>),
-    Star
+    Choice(BTreeSet<usize>), // {a,c,d,...,e}
+    Star(usize)              // {n,n+1,....}
 }
 
-/// The kleene algebra of skips
+/// Combinators on skips; monoid (app, epsilon,star,range)
 impl Skip {
 
     /// A single wildcard (.)
@@ -31,7 +30,16 @@ impl Skip {
 
     /// Inverse of * is the empty set
     pub fn empty() -> Self {
-        Skip::Inverse(Box::new(Skip::Star))
+        Skip::Choice(BTreeSet::new())
+    }
+
+    /// The first offset of this skip
+    pub fn first(&self) -> Option<usize> {
+        match self {
+            Skip::Choice(cs) =>
+                cs.first().map(|c|c.clone()),
+            Skip::Star(n) => Some(*n)
+        }
     }
 
     /// Choice between elements
@@ -47,26 +55,47 @@ impl Skip {
         }
     }
 
+    /// Kleene-*
+    pub fn star() -> Self {
+        Skip::Star(0)
+    }
+
+    /// Inclusive range [from,to]
+    pub fn range(from: usize, to: usize) -> Self {
+        Skip::Choice((from..=to).collect())
+    }
+
     /// Is it the nil skip
     pub fn is_epsilon(&self) -> bool {
         match self {
             Skip::Choice(xs) if xs.contains(&0) && xs.len() == 1 => true,
-            Skip::Inverse(x) => (*x).is_epsilon(),
             _ => false
         }
+    }
+
+    /// Is it the kleene {0,*}
+    pub fn is_star(&self) -> bool {
+        match self {
+            Skip::Star(n) => *n == 0,
+            _ => false
+        }
+    }
+
+    /// Has the 0 step (possibly more as well)
+    pub fn has_epsilon(&self) -> bool {
+        self.first() == Some(0)
     }
 
     /// Is it the empty set (no transition exists)
     pub fn is_empty(&self) -> bool {
         match self {
             Skip::Choice(xs) if xs.len() == 0 => true,
-            Skip::Inverse(x) if **x == Skip::Star => true,
             _ => false
         }
     }
 
     /// Repeat [self] between [i,j] times
-    pub fn range(&self, i: usize, j: usize) -> Self {
+    pub fn range_of(&self, i: usize, j: usize) -> Self {
         assert!(i <= j, "Range indices must be 0 < {} <= {}", i, j);
         match self {
             _ if self.is_epsilon() => Skip::epsilon(),
@@ -81,41 +110,25 @@ impl Skip {
                 }
                 Skip::Choice(s)
             },
-            Skip::Inverse(s) => Skip::Inverse(Box::new((*s).range(i,j))),
-            Skip::Star => Skip::Star
-        }
-    }
-
-    /// Repeat [self] exactly [n] times
-    pub fn times(&self, n: usize) -> Self {
-        match self {
-            Skip::Choice(xs) =>
-                Skip::Choice(xs.into_iter().map(|x|x*n).collect()),
-            Skip::Star if n == 0 =>
-                Skip::epsilon(),
-            Skip::Inverse(x) =>
-                Skip::Inverse(Box::new((*x).times(n))),
-            Skip::Star => Skip::Star
+            Skip::Star(n) => Skip::Star(i*n)
         }
     }
 
     /// The kleene-star of a skip
-    pub fn star(&self) -> Skip {
+    pub fn star_of(&self, n: usize) -> Skip {
         match self {
             _ if self.is_empty() || self.is_epsilon() => Skip::epsilon(),
-            _ => Skip::Star
+            Skip::Choice(cs) => match cs.first() {
+                Some(x) => Skip::Star(n*x),
+                None => Skip::epsilon()
+            },
+            Skip::Star(x) => Skip::Star(n*x)
         }
     }
 
     /// Sequential composition of two jumps is a jump
     pub fn app(&self, a: &Skip) -> Skip {
         match (self, a) {
-            (Skip::Inverse(x), _) if &**x == a => Skip::epsilon(),
-            (_, Skip::Inverse(x)) if &**x == self => Skip::epsilon(),
-            (Skip::Inverse(x), Skip::Inverse(y)) =>
-                Skip::Inverse(Box::new(Skip::app(&**x, &**y))),
-            (Skip::Inverse(_), _) => unreachable!(),
-            (_, Skip::Inverse(_)) => unreachable!(),
             (Skip::Choice(x), Skip::Choice(y)) => {
                 let mut s = BTreeSet::new();
                 for i in x.into_iter() {
@@ -125,7 +138,13 @@ impl Skip {
                 }
                 Skip::Choice(s)
             },
-            (Skip::Star, _) | (_, Skip::Star) => Skip::Star
+            (Skip::Star(x), Skip::Star(y)) =>
+                Skip::Star(x+y),
+            (Skip::Star(x), Skip::Choice(cs)) | (Skip::Choice(cs), Skip::Star(x)) =>
+                match cs.first() {
+                    Some(y) => Skip::Star(x+y),
+                    None => Skip::empty()
+                }
         }
     }
 }
@@ -136,8 +155,8 @@ impl fmt::Display for Skip {
             _ if self.is_epsilon() => write!(f, "ε"),
             _ if self.is_empty() => write!(f, "∅"),
             Skip::Choice(us) => write!(f, "{:?}", us),
-            Skip::Inverse(x) => write!(f, "!{}", **x),
-            Skip::Star => write!(f, "*")
+            Skip::Star(n) if *n == 0 => write!(f, "*"),
+            Skip::Star(n) => write!(f, "{{{},*}}", n),
         }
     }
 }
@@ -154,12 +173,12 @@ fn test_skip_app2() {
 
 #[test]
 fn test_skip_range() {
-    assert_eq!(Skip::single().range(1, 2), Skip::choice(&[1, 2]))
+    assert_eq!(Skip::range(1, 2), Skip::choice(&[1, 2]))
 }
 
 #[test]
 fn test_skip_range2() {
-    assert_eq!(Skip::single().range(1,3).range(1, 2), Skip::choice(&[1, 2, 3, 4, 6]))
+    assert_eq!(Skip::range(1,3).range_of(1, 2), Skip::choice(&[1, 2, 3, 4, 6]))
 }
 
 #[test]

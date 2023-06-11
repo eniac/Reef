@@ -3,7 +3,7 @@ use clap::Parser;
 use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
-use reef::regex::Regex;
+use reef::regex::re;
 use reef::safa::SAFA;
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -23,7 +23,7 @@ fn main() {
     let ab = String::from_iter(opt.config.alphabet());
 
     // Input document
-    let mut doc = if Path::exists(Path::new(&opt.input)) {
+    let doc = if Path::exists(Path::new(&opt.input)) {
         opt.config
             .read_file(&PathBuf::from(&opt.input))
             .iter()
@@ -40,7 +40,7 @@ fn main() {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA", "DFA");
 
-    let r = Regex::new(&opt.re);
+    let r = re::new(&opt.re);
     //    println!("REGEX: {:#?}", r));
 
     let mut safa = SAFA::new(&ab, &r);

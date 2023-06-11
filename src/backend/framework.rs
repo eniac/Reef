@@ -806,7 +806,7 @@ mod tests {
     use crate::backend::framework::*;
     use crate::backend::r1cs_helper::init;
     use crate::safa::SAFA;
-    use crate::regex::Regex;
+    use crate::regex::{re, Regex};
 
     fn backend_test(
         ab: String,
@@ -816,7 +816,7 @@ mod tests {
         commit_docype: Option<JCommit>,
         batch_size: usize,
     ) {
-        let r = Regex::new(&rstr);
+        let r = re::new(&rstr);
         let safa = SAFA::new(&ab[..], &r);
 
         init();

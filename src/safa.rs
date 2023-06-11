@@ -9,7 +9,7 @@ use petgraph::Graph;
 
 use std::result::Result;
 
-use crate::regex::Regex;
+use crate::regex::{re, Regex};
 use crate::skip::Skip;
 use crate::quantifier::Quant;
 
@@ -54,7 +54,7 @@ pub struct SAFA<C: Clone> {
 }
 
 impl SAFA<char> {
-    /// Shallow constructor
+    /// Deep Constructor
     pub fn new<'a>(alphabet: &'a str, re: &Regex) -> Self {
         let ab = alphabet.chars().sorted().collect();
         // Add root
@@ -96,45 +96,53 @@ impl SAFA<char> {
         }
     }
 
-    /// Add derivative of a node in the graph
-    fn add_derivatives(&mut self, from: NodeIndex<u32>, q: &Regex) {
-        let n = if let Some(n) = self
+    /// Find an [or] node
+    pub fn find_or(&self, r: &Regex) -> Option<NodeIndex<u32>> {
+        self
             .g
             .node_indices()
-            .find(|i| self.g[*i] == Quant::or(q.clone()))
-        {
+            .find(|i| self.g[*i] == Quant::or(r.clone()))
+    }
+
+    /// Find an [and] node
+    pub fn find_and(&self, r: &Regex) -> Option<NodeIndex<u32>> {
+        self
+            .g
+            .node_indices()
+            .find(|i| self.g[*i] == Quant::and(r.clone()))
+    }
+
+
+    /// Add derivative of a node in the graph
+    fn add_derivatives(&mut self, from: NodeIndex<u32>, q: &Regex) {
+        let mut cached_node = from;
+        if let Some(n) = self.find_or(q) {
             if n != from {
                 self.g.add_edge(from, n, SAFA::epsilon());
+                cached_node = n;
             }
-            n
         } else {
-            if self.g[from].is_or() {
-                from
-            } else {
+            if !self.g[from].is_or() {
                 // Add an OR node to graph if not already there
-                let n = self.g.add_node(Quant::or(q.clone()));
-                self.g.add_edge(n, n, SAFA::epsilon());
+                cached_node = self.g.add_node(Quant::or(q.clone()));
+                self.g.add_edge(cached_node, cached_node, SAFA::epsilon());
                 // Reflexive step
-                self.g.add_edge(from, n, SAFA::epsilon());
-                n
+                self.g.add_edge(from, cached_node, SAFA::epsilon());
+
             }
         };
 
         // Take all the single character steps
         for c in self.ab.clone().iter() {
-            let q_c = q.deriv(&c);
-            if let Some(n_c) = self
-                .g
-                .node_indices()
-                .find(|i| self.g[*i] == Quant::or(q_c.clone()))
-            {
-                self.g.add_edge(n, n_c, Either::left(*c));
+            let q_c = re::deriv(q, &c);
+            if let Some(n_c) = self.find_or(&q_c) {
+                self.g.add_edge(cached_node, n_c, Either::left(*c));
             } else {
                 // Add to graph if not already there
                 let n_c = self.g.add_node(Quant::or(q_c.clone()));
                 // Reflexive step
                 self.g.add_edge(n_c, n_c, SAFA::epsilon());
-                self.g.add_edge(n, n_c, Either::left(*c));
+                self.g.add_edge(cached_node, n_c, Either::left(*c));
                 self.add(n_c, &q_c);
             }
         }
@@ -149,10 +157,10 @@ impl SAFA<char> {
     }
 
     fn add(&mut self, from: NodeIndex<u32>, q: &Regex) {
-        q.extract_skip(&self.ab)
+        re::extract_skip(q, &self.ab)
          .map(|(skip, rem)| self.add_skip(from, skip, &rem))
          .or_else(|| {
-            let children = q.extract_lookahead()?;
+            let children = re::extract_and(q)?;
             self.to_and(from);
             children
                .into_iter()
@@ -161,7 +169,7 @@ impl SAFA<char> {
             Some(())
          })
          .or_else(|| {
-            let children = q.extract_alt()?;
+            let children = re::extract_alt(q)?;
             self.to_or(from);
             children
                 .into_iter()
@@ -206,7 +214,7 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
 
     /// An epsilon transition
     fn epsilon() -> Either<C, Skip> {
-        Either::right(Skip::Offset(0))
+        Either::right(Skip::offset(0))
     }
 
     /// Get initial state
@@ -281,21 +289,16 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
             ),
             // Character non-match
             Ok(_) => None,
-            // Skip
-            Err(Skip::Offset(n)) => Self::prepend(
-                &mut self.solve_rec(to, i + n, doc)?,
-                (from, e.clone(), to, i, i + n),
-            ),
             Err(Skip::Choice(ref ns)) => ns.into_par_iter().find_map_any(|n| {
                 Self::prepend(
                     &mut self.solve_rec(to, i + n, doc)?,
                     (from, e.clone(), to, i, i + n),
                 )
             }),
-            Err(Skip::Star) => (i..=doc.len()).into_par_iter().find_map_any(|j| {
+            Err(Skip::Star(n)) => (i+n..=doc.len()).into_par_iter().find_map_any(|j| {
                 Self::prepend(
                     &mut self.solve_rec(to, j, doc)?,
-                    (from, e.clone(), to, i, j),
+                    (from, e.clone(), to, i + n, j),
                 )
             }),
         };
@@ -370,7 +373,7 @@ impl SAFA<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::regex::Regex;
+    use crate::regex::{re, Regex};
     use crate::skip::Skip;
     use crate::safa::{Either, SAFA};
     use petgraph::graph::NodeIndex;
@@ -378,7 +381,7 @@ mod tests {
 
     #[test]
     fn test_safa_match_exact() {
-        let r = Regex::new("^baa$");
+        let r = re::new("^baa$");
         let safa = SAFA::new("ab", &r);
         let strdoc = "baa";
         let doc = strdoc.chars().collect();
@@ -396,7 +399,7 @@ mod tests {
 
     #[test]
     fn test_safa_match_partial() {
-        let r = Regex::new("baa");
+        let r = re::new("baa");
         let safa = SAFA::new("ab", &r);
         let strdoc = "ababbbaa";
         let doc: Vec<_> = strdoc.chars().collect();
@@ -405,7 +408,7 @@ mod tests {
             Some(LinkedList::from([
                 (
                     NodeIndex::new(0),
-                    Either(Err(Skip::Star)),
+                    Either(Err(Skip::star())),
                     NodeIndex::new(1),
                     0,
                     5
@@ -419,7 +422,7 @@ mod tests {
 
     #[test]
     fn test_safa_match_star() {
-        let r = Regex::new("^a*$");
+        let r = re::new("^a*$");
         let safa = SAFA::new("ab", &r);
         let strdoc = "aa";
         let doc: Vec<_> = strdoc.chars().collect();
@@ -438,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_safa_alt() {
-        let r = Regex::new("^.*baa(b|a)$");
+        let r = re::new("^.*baa(b|a)$");
         let safa = SAFA::new("ab", &r);
         let strdoc = "abababaab";
         let doc: Vec<_> = strdoc.chars().collect();
@@ -447,7 +450,7 @@ mod tests {
             Some(LinkedList::from([
                 (
                     NodeIndex::new(0),
-                    Either(Err(Skip::Star)),
+                    Either(Err(Skip::star())),
                     NodeIndex::new(1),
                     0,
                     5
@@ -463,7 +466,7 @@ mod tests {
 
     #[test]
     fn test_safa_range_exact() {
-        let r = Regex::new("^.{3}b$");
+        let r = re::new("^.{3}b$");
         let safa = SAFA::new("ab", &r);
         let doc: Vec<_> = "aaab".chars().collect();
         assert_eq!(
@@ -471,7 +474,7 @@ mod tests {
             Some(LinkedList::from([
                 (
                     NodeIndex::new(0),
-                    Either(Err(Skip::Offset(3))),
+                    Either(Err(Skip::offset(3))),
                     NodeIndex::new(1),
                     0,
                     3
@@ -484,7 +487,7 @@ mod tests {
     #[test]
     fn test_safa_range_nested() {
         // unsafe { backtrace_on_stack_overflow::enable() };
-        let r = Regex::new("^(.{1,3}){1,2}b$");
+        let r = re::new("^(.{1,3}){1,2}b$");
         let safa = SAFA::new("ab", &r);
         let doc: Vec<_> = "aaaab".chars().collect();
         assert_eq!(
@@ -505,7 +508,7 @@ mod tests {
     #[test]
     fn test_safa_range_alt() {
         unsafe { backtrace_on_stack_overflow::enable() };
-        let r = Regex::new("^((.{1,2}.)(.{4,5}b))a$");
+        let r = re::new("^((.{1,2}.)(.{4,5}b))a$");
         let safa = SAFA::new("ab", &r);
 
         safa.write_pdf("safa_alt").unwrap();
@@ -528,7 +531,7 @@ mod tests {
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = Regex::new("^[a-c]*b$");
+        let r = re::new("^[a-c]*b$");
         let safa = SAFA::new("abcd", &r);
         safa.write_pdf("safa2").unwrap();
         let strdoc = "baababab";
