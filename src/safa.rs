@@ -441,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_safa_alt() {
-        let r = re::new("^.*baa(a|c)$");
+        let r = re::new("baa(a|c)$");
         let safa = SAFA::new("abc", &r);
         safa.write_pdf("safa_alt").unwrap();
         let strdoc = "abababaac";
@@ -469,7 +469,7 @@ mod tests {
     fn test_safa_alt_merge() {
         let r = re::new("^.*baa(a|b)$");
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa_alt").unwrap();
+        safa.write_pdf("safa").unwrap();
         let strdoc = "abababaab";
         let doc: Vec<_> = strdoc.chars().collect();
         assert_eq!(
@@ -495,6 +495,7 @@ mod tests {
     fn test_safa_range_exact() {
         let r = re::new("^.{3}b$");
         let safa = SAFA::new("ab", &r);
+        safa.write_pdf("safa").unwrap();
         let doc: Vec<_> = "aaab".chars().collect();
         assert_eq!(
             safa.solve(&doc),
@@ -510,6 +511,28 @@ mod tests {
             ]))
         )
     }
+
+    #[test]
+    fn test_safa_range_starplus() {
+        let r = re::new("^.{2,}b$");
+        let safa = SAFA::new("ab", &r);
+        safa.write_pdf("safa").unwrap();
+        let doc: Vec<_> = "aaab".chars().collect();
+        assert_eq!(
+            safa.solve(&doc),
+            Some(LinkedList::from([
+                (
+                    NodeIndex::new(0),
+                    Either(Err(Skip::starplus(2))),
+                    NodeIndex::new(1),
+                    0,
+                    3
+                ),
+                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 3, 4)
+            ]))
+        )
+    }
+
 
     #[test]
     fn test_safa_range_nested() {

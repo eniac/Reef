@@ -60,6 +60,11 @@ impl Skip {
         Skip::Star(0)
     }
 
+    /// Kleene-* plus
+    pub fn starplus(x: usize) -> Self {
+        Skip::Star(x)
+    }
+
     /// Inclusive range [from,to]
     pub fn range(from: usize, to: usize) -> Self {
         Skip::Choice((from..=to).collect())
