@@ -5,6 +5,14 @@ impl Ord for CharClass {
     fn cmp(&self, other: &CharClass) -> std::cmp::Ordering {
         if self.is_empty() && other.is_empty() {
             std::cmp::Ordering::Equal
+        } else if let Some(s) = self.is_single() {
+            if let Some(o) = other.is_single() {
+                s.cmp(&o)
+            } else if let Some(h) = other.head() {
+                s.cmp(&h.0)
+            } else { // [other] empty
+                std::cmp::Ordering::Greater
+            }
         } else {
             for x in self.0.iter() {
                 for y in other.0.iter() {

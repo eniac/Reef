@@ -565,7 +565,7 @@ fn test_regex_dot_star() {
 
 #[test]
 fn regex_parser_test_repetition_range() {
-    assert_eq!(re::range(re::character('a'), 1, 3), re::new("a{1,3}"));
+    assert_eq!(re::range(re::character('a'), 1, 3), re::new("^a{1,3}$"));
 }
 
 #[test]

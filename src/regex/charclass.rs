@@ -102,6 +102,11 @@ impl CharClass {
         } else { None }
     }
 
+    /// The first interval in lex. order
+    pub fn head(&self) -> Option<&(char,char)> {
+        self.0.iter().max_by_key(|r| r.0)
+    }
+
     /// Total interval of all ranges added together
     pub fn interv_len(&self) -> usize {
        self.0.iter().fold(0, |a, r| a + ((r.1 as usize - r.0 as usize)))
