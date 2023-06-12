@@ -109,77 +109,59 @@ impl RegexF {
     }
 
     /// Subset relation is a partial order
-    pub fn partial_le(a: &Self, b: &Self) -> Option<bool> {
+    /// a <= b -> true (a indeeed <= b)
+    /// a <= b -> false (don't know!)
+    pub fn partial_le(a: &Self, b: &Self) -> bool {
         match (a, b) {
             // Bot
-            (_, _) if a.is_empty() => Some(true),
-            (_, _) if b.is_empty() => Some(false),
+            (_, _) if a.is_empty() => true,
             // Refl
-            (x, y) if x == y => Some(true),
+            (x, y) if x == y => true,
             // Dot
-            (RegexF::CharClass(_), RegexF::Dot) => Some(true),
-            (RegexF::Dot, RegexF::CharClass(_)) => Some(false),
+            (RegexF::CharClass(_), RegexF::Dot) => true,
             // Nil
-            (RegexF::Nil, _) if b.nullable() => Some(true),
-            (_, RegexF::Nil) if a.nullable() => Some(false),
+            (RegexF::Nil, _) if b.nullable() => true,
             // Range*
             (RegexF::Range(x, i, _), RegexF::Star(y))
-                if *i == 0 && Some(true) == RegexF::partial_le(x, y) =>
-            {
-                Some(true)
-            }
-            (RegexF::Star(x), RegexF::Range(y, i, _))
-                if *i == 0 && Some(false) == RegexF::partial_le(x, y) =>
-            {
-                Some(false)
-            }
+                if *i == 0 && RegexF::partial_le(x, y) => true,
             // Range
             (RegexF::Range(x, i1, j1), RegexF::Range(y, i2, j2))
-                if RegexF::partial_le(x, y) == Some(true) && i1 >= i2 && j1 <= j2 =>
-            {
-                Some(true)
-            }
-            (RegexF::Range(x, i1, j1), RegexF::Range(y, i2, j2))
-                if RegexF::partial_le(x, y) == Some(false) && i1 <= i2 && j1 >= j2 =>
-            {
-                Some(false)
-            }
+                if RegexF::partial_le(x, y) && i1 >= i2 && j1 <= j2 => true,
             // Star
             (RegexF::Star(a), RegexF::Star(b)) => RegexF::partial_le(a, b),
             // AltOpp
-            (RegexF::Alt(x1, x2), _) => {
-                let x1b = RegexF::partial_le(x1, b)?;
-                let x2b = RegexF::partial_le(x2, b)?;
-                Some(x1b && x2b)
-            }
+            (RegexF::Alt(x1, x2), _)
+                if RegexF::partial_le(x1, b) && RegexF::partial_le(x2, b) => true,
             // AltR
-            (_, RegexF::Alt(x1, _)) if Some(true) == RegexF::partial_le(a, x1) => Some(true),
+            (_, RegexF::Alt(x1, _)) if RegexF::partial_le(a, x1) => true,
             // AltR
-            (_, RegexF::Alt(_, x2)) if Some(true) == RegexF::partial_le(a, x2) => Some(true),
+            (_, RegexF::Alt(_, x2)) if RegexF::partial_le(a, x2) => true,
             // App
-            (RegexF::App(ref a, ref x), RegexF::App(ref b, ref y)) => {
-                let ab = RegexF::partial_le(a, b)?; // a == b
-                let ba = RegexF::partial_le(b, a)?;
-                if ab && ba {
-                    RegexF::partial_le(x, y)
-                } else {
-                    None
-                }
-            }
-            (_, _) => None,
+            (RegexF::App(ref a, ref x), RegexF::App(ref b, ref y))
+                if RegexF::partial_le(a, b) && RegexF::partial_le(b, a) =>
+                RegexF::partial_le(x, y),
+            (_, _) => false,
         }
+    }
+
+    pub fn partial_eq(a: &Self, b: &Self) -> bool {
+        RegexF::partial_le(a, b) && RegexF::partial_le(b, a)
     }
 
     /// Smart constructor [and] for approx. notion of equivalence
     pub fn and(a: &Self, b: &Self) -> Self {
         match (a, b) {
-            _ if a == b => a.clone(),
-            // Left-associative [app]
-            (_, RegexF::And(x, y)) => RegexF::and(&RegexF::and(a, x), y),
+            (_, _) if RegexF::partial_eq(a, b) => a.clone(),
             (_, _) if a.is_empty() || b.is_empty() => RegexF::empty(),
-            (RegexF::Not(o), _) if o.is_empty() || re::dotstar() == *o => b.clone(),
-            (_, RegexF::Not(o)) if o.is_empty() || re::dotstar() == *o => a.clone(),
-            _ if a > b => RegexF::and(b, a),
+            // a & b and a <= b -> a
+            (_, _) if RegexF::partial_le(&a, &b) => a.clone(),
+            // a & b and a >= b -> b
+            (_, _) if RegexF::partial_le(&b, &a) => b.clone(),
+            (RegexF::Not(o), x)  | (x, RegexF::Not(o))  if o.is_empty() => x.clone(),
+            (RegexF::Star(d), x) | (x, RegexF::Star(d)) if **d == RegexF::dot() => x.clone(),
+            // Left-associative [and]
+            (x, RegexF::And(y, z)) => RegexF::and(&RegexF::and(x, y), z),
+            (_, _) if a > b => RegexF::and(b, a),
             (_, _) => RegexF::And(G.mk(a.clone()), G.mk(b.clone())),
         }
     }
@@ -188,24 +170,23 @@ impl RegexF {
     pub fn app(a: &Self, b: &Self) -> Self {
         match (a, b) {
             // Monoid on Nil
-            (_, RegexF::Nil) => a.clone(),
-            (RegexF::Nil, _) => b.clone(),
+            (x, RegexF::Nil) | (RegexF::Nil, x) => x.clone(),
             // Empty absorbs everything
             (_, _) if a.is_empty() || b.is_empty() => RegexF::empty(),
             // Range & star index math
-            (RegexF::Range(ref a, i, j), _) if &*a.clone() == b => RegexF::range(a, i + 1, j + 1),
-            (_, RegexF::Range(ref b, i, j)) if a == &*b.clone() => RegexF::range(b, i + 1, j + 1),
-            (RegexF::Range(a, i1, j1), RegexF::Range(b, i2, j2)) if a == b => {
-                RegexF::range(a, i1 + i2, j1 + j2)
-            }
-            (RegexF::Star(x), RegexF::Star(y)) if RegexF::partial_le(x, y) == Some(true) => {
-                b.clone()
-            }
-            (RegexF::Star(x), RegexF::Star(y)) if RegexF::partial_le(y, x) == Some(true) => {
-                a.clone()
-            }
+            (RegexF::Range(a, i, j), x) | (x, RegexF::Range(a, i, j))
+                if RegexF::partial_eq(&a, x) => RegexF::range(a, i + 1, j + 1),
+            (RegexF::Range(a, i1, j1), RegexF::Range(b, i2, j2)) if RegexF::partial_eq(a, b) =>
+                RegexF::range(a, i1 + i2, j1 + j2),
+            (RegexF::Star(x), RegexF::Star(y)) if RegexF::partial_le(x, y) =>
+                b.clone(),
+            (RegexF::Star(x), RegexF::Star(y)) if RegexF::partial_le(y, x) =>
+                a.clone(),
+            // (a & b)c == (a.*) & bc
+            (RegexF::And(a, b), c) =>
+                RegexF::and(&RegexF::app(a, &RegexF::dotstar()), &RegexF::app(b, c)),
             // Right-associative [app]
-            (RegexF::App(x, y), _) => RegexF::app(x, &RegexF::app(y, b)),
+            (RegexF::App(x, y), z) => RegexF::app(x, &RegexF::app(y, z)),
             (_, _) => RegexF::App(G.mk(a.clone()), G.mk(b.clone())),
         }
     }
@@ -219,11 +200,11 @@ impl RegexF {
             (_, RegexF::Alt(x, y)) => RegexF::alt(&RegexF::alt(a, x), y),
             (RegexF::CharClass(a), RegexF::CharClass(b)) => RegexF::CharClass(a.union(b)),
             // a | b and a <= b -> b
-            (_, _) if Some(true) == RegexF::partial_le(&a, &b) => b.clone(),
+            (_, _) if RegexF::partial_le(&a, &b) => b.clone(),
             // a | b and a >= b -> a
-            (_, _) if Some(false) == RegexF::partial_le(&a, &b) => a.clone(),
+            (_, _) if RegexF::partial_le(&b, &a) => a.clone(),
             // The smallest syntactically thing on the left
-            (x, y) if x > y => RegexF::alt(b, a),
+            (_, _) if a > b => RegexF::alt(b, a),
             (_, _) => RegexF::Alt(G.mk(a.clone()), G.mk(b.clone())),
         }
     }
@@ -234,7 +215,7 @@ impl RegexF {
             RegexF::Star(_) | RegexF::Nil => a.clone(),
             _ if a.is_empty() => RegexF::nil(),
             //if r \in r{i,j} then r{i,j}^* = r^*
-            RegexF::Range(ref x, i, j) if *i <= 1 && 1 <= *j => RegexF::star(x),
+            RegexF::Range(x, i, j) if *i <= 1 && 1 <= *j => RegexF::star(x),
             _ => RegexF::Star(G.mk(a.clone())),
         }
     }
@@ -324,17 +305,6 @@ impl RegexF {
                 }
                 _ => Some(BTreeSet::from([(**a).clone(), (**b).clone()])),
             },
-            // (r & r') r2 ==> (r.* & r'r2)
-            RegexF::App(ref a, ref b) => {
-                let mut children = a.extract_and()?;
-                let last = children.pop_last()?;
-                let mut chv: Vec<RegexF> = children.into_iter().collect();
-                for c in &mut chv {
-                    *c = RegexF::app(&c, &RegexF::dotstar());
-                }
-                chv.push(RegexF::app(&last, &*b));
-                Some(chv.into_iter().collect())
-            }
             _ => None,
         }
     }
@@ -496,6 +466,10 @@ pub mod re {
         G.mk(RegexF::range(&*a, i, j))
     }
 
+    /// A list of character ranges
+    pub fn charclass(v: Vec<(char,char)>) -> Regex {
+        G.mk(RegexF::charclass(v))
+    }
     /// Derivative
     pub fn deriv(a: &Regex, c: &char) -> Regex {
         G.mk(RegexF::deriv(&*a, c))
@@ -600,8 +574,22 @@ fn test_regex_dot() {
 }
 
 #[test]
+fn test_regex_negate_class() {
+    assert_eq!(re::charclass(vec![('\0', '`'), ('b', '\u{10ffff}')]), re::new("^[^a]$"))
+}
+
+#[test]
+fn test_regex_lookahead() {
+    assert_eq!(re::app(re::character('a'), re::dotstar()), re::new("^(?=a)"))
+}
+
+#[test]
+fn test_regex_negative_lookahead() {
+    assert_eq!(re::and(re::not(re::character('a')), re::nil()), re::new("^(?!a)$"))
+}
+
+#[test]
 fn test_regex_negative_char_class_range() {
-    //unsafe { backtrace_on_stack_overflow::enable() };
     assert_eq!(
         re::app(
             re::app(
