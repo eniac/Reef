@@ -264,7 +264,7 @@ fn setup<'a>(
 
 
     let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().into_iter().collect();
-    let move_0 = (moves[0].3, moves[0].4);
+    let move_0 = (moves[0].from_cur, moves[0].to_cur);
 
     // this variable could be two different types of things, which is potentially dicey, but
     // literally whatever
@@ -374,7 +374,7 @@ fn solve<'a>(
             blind,
             true,
             0,
-            moves[0].3,
+            moves[0].from_cur,
         ),
         ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
     };
@@ -391,7 +391,7 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::tic(Component::Solver, &test, "witness generation");
         // allocate real witnesses for round i
-        let move_i = (moves[i].3, moves[i].4);
+        let move_i = (moves[i].from_cur, moves[i].to_cur);
         (
             wits,
             next_state,

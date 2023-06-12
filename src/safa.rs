@@ -9,9 +9,9 @@ use petgraph::Graph;
 
 use std::result::Result;
 
+use crate::quantifier::Quant;
 use crate::regex::{re, Regex};
 use crate::skip::Skip;
-use crate::quantifier::Quant;
 
 use rayon::iter::*;
 
@@ -79,11 +79,7 @@ impl SAFA<char> {
 
     /// Add a regex to position [from] (an Or by default)
     fn add_skip(&mut self, n: NodeIndex<u32>, skip: Skip, q_c: &Regex) {
-        if let Some(n_c) = self
-            .g
-            .node_indices()
-            .find(|i| &self.g[*i].get() == q_c && self.g[*i].is_or())
-        {
+        if let Some(n_c) = self.find_or(q_c) {
             self.g.add_edge(n, n_c, Either::right(skip));
         } else {
             // Add to graph if not already there
@@ -98,20 +94,17 @@ impl SAFA<char> {
 
     /// Find an [or] node
     pub fn find_or(&self, r: &Regex) -> Option<NodeIndex<u32>> {
-        self
-            .g
+        self.g
             .node_indices()
             .find(|i| self.g[*i] == Quant::or(r.clone()))
     }
 
     /// Find an [and] node
     pub fn find_and(&self, r: &Regex) -> Option<NodeIndex<u32>> {
-        self
-            .g
+        self.g
             .node_indices()
             .find(|i| self.g[*i] == Quant::and(r.clone()))
     }
-
 
     /// Add derivative of a node in the graph
     fn add_derivatives(&mut self, from: NodeIndex<u32>, q: &Regex) {
@@ -128,7 +121,6 @@ impl SAFA<char> {
                 self.g.add_edge(cached_node, cached_node, SAFA::epsilon());
                 // Reflexive step
                 self.g.add_edge(from, cached_node, SAFA::epsilon());
-
             }
         };
 
@@ -158,26 +150,24 @@ impl SAFA<char> {
 
     fn add(&mut self, from: NodeIndex<u32>, q: &Regex) {
         re::extract_skip(q, &self.ab)
-         .map(|(skip, rem)| self.add_skip(from, skip, &rem))
-         .or_else(|| {
-            let children = re::extract_and(q)?;
-            self.to_and(from);
-            children
-               .into_iter()
-               .for_each(|q_c|
-                    self.add_skip(from, Skip::epsilon(), &q_c));
-            Some(())
-         })
-         .or_else(|| {
-            let children = re::extract_alt(q)?;
-            self.to_or(from);
-            children
-                .into_iter()
-                .for_each(|q_c|
-                    self.add_skip(from, Skip::epsilon(), &q_c));
-            Some(())
-         })
-         .or_else(|| Some(self.add_derivatives(from, q))); // Catch-all
+            .map(|(skip, rem)| self.add_skip(from, skip, &rem))
+            .or_else(|| {
+                let children = re::extract_and(q)?;
+                self.to_and(from);
+                children
+                    .into_iter()
+                    .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
+                Some(())
+            })
+            .or_else(|| {
+                let children = re::extract_alt(q)?;
+                self.to_or(from);
+                children
+                    .into_iter()
+                    .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
+                Some(())
+            })
+            .or_else(|| Some(self.add_derivatives(from, q))); // Catch-all
     }
 
     /// From SAFA<char> -> SAFA<String>
@@ -196,15 +186,56 @@ impl SAFA<char> {
     }
 }
 
-type Trace<C> = Option<
-    LinkedList<(
-        NodeIndex<u32>,
-        Either<C, Skip>,
-        NodeIndex<u32>,
-        usize,
-        usize,
-    )>,
->;
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct TraceElem<C> {
+    pub from_node: NodeIndex<u32>,
+    pub edge: Either<C, Skip>,
+    pub to_node: NodeIndex<u32>,
+    pub from_cur: usize,
+    pub to_cur: usize,
+}
+
+impl<C: Clone> TraceElem<C> {
+    pub fn new(
+        from: NodeIndex<u32>,
+        e: &Either<C, Skip>,
+        to: NodeIndex<u32>,
+        i: usize,
+        j: usize,
+    ) -> Self {
+        Self {
+            from_node: from,
+            edge: e.clone(),
+            to_node: to,
+            from_cur: i,
+            to_cur: j,
+        }
+    }
+
+    pub fn is_epsilon(&self) -> bool {
+        match self.edge.0 {
+            Ok(_) => false,
+            Err(ref e) => e.is_epsilon(),
+        }
+    }
+}
+
+impl<C: Display> Display for TraceElem<C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{{} -[ {} ]-> {} @ Doc[{} - {}]}}",
+            self.from_node.index(),
+            self.edge,
+            self.to_node.index(),
+            self.from_cur,
+            self.to_cur
+        )
+    }
+}
+
+/// Type of solver result, a matchign [Trace]
+pub type Trace<C> = LinkedList<TraceElem<C>>;
 
 impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
     /// To regular expression (root node)
@@ -277,28 +308,27 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
         to: NodeIndex<u32>,
         i: usize,
         doc: &Vec<C>,
-    ) -> Trace<C> {
-
+    ) -> Option<Trace<C>> {
         let res = match e.0.clone() {
             // Sink state, cannot succeed
             Ok(_) if self.is_sink(to) => None,
             // Character match
             Ok(c) if c == doc[i] => Self::prepend(
                 &mut self.solve_rec(to, i + 1, doc)?,
-                (from, e.clone(), to, i, i + 1),
+                TraceElem::new(from, e, to, i, i + 1),
             ),
             // Character non-match
             Ok(_) => None,
             Err(Skip::Choice(ref ns)) => ns.into_par_iter().find_map_any(|n| {
                 Self::prepend(
                     &mut self.solve_rec(to, i + n, doc)?,
-                    (from, e.clone(), to, i, i + n),
+                    TraceElem::new(from, e, to, i, i + n),
                 )
             }),
-            Err(Skip::Star(n)) => (i+n..=doc.len()).into_par_iter().find_map_any(|j| {
+            Err(Skip::Star(n)) => (i + n..=doc.len()).into_par_iter().find_map_any(|j| {
                 Self::prepend(
                     &mut self.solve_rec(to, j, doc)?,
-                    (from, e.clone(), to, i + n, j),
+                    TraceElem::new(from, e, to, i, j),
                 )
             }),
         };
@@ -307,7 +337,7 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
 
     /// Find a non-empty list of continuous matching document strings,
     /// as well as the sub-automaton that matched them
-    fn solve_rec(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> Trace<C> {
+    fn solve_rec(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> Option<Trace<C>> {
         // Check accepting condition
         if self.is_accept(n, i, doc) {
             return Some(LinkedList::new());
@@ -341,7 +371,7 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
     }
 
     /// Solve at the root
-    pub fn solve(&self, doc: &Vec<C>) -> Trace<C> {
+    pub fn solve(&self, doc: &Vec<C>) -> Option<Trace<C>> {
         self.solve_rec(self.get_init(), 0, doc)
     }
 }
@@ -374,10 +404,59 @@ impl SAFA<String> {
 #[cfg(test)]
 mod tests {
     use crate::regex::{re, Regex};
+    use crate::safa::{Either, Trace, TraceElem, SAFA};
     use crate::skip::Skip;
-    use crate::safa::{Either, SAFA};
+    use std::fmt::Display;
     use petgraph::graph::NodeIndex;
     use std::collections::LinkedList;
+
+    fn print_states<C: Display + Clone>(safa: &SAFA<C>) {
+        safa.g.node_indices().for_each(|i|
+            println!("({}) -> {}", i.index(), safa.g[i])
+        )
+    }
+
+    /// Equivalent solutions up to epsilon steps
+    fn equiv_upto_epsilon(oa: &Option<Trace<char>>, ob: &Option<Trace<char>>) {
+        fn fmt_trace(t: &Trace<char>) -> String {
+            let mut s = Vec::new();
+            for x in t {
+                s.push(format!("{}", x));
+            }
+            s.join(", ")
+        }
+
+        if let Some(a) = oa {
+            if let Some(b) = ob {
+                let mut ia = a.iter();
+                let mut ib = b.iter();
+                let mut res = LinkedList::new();
+                while let Some(x) = ia.next() {
+                    if !x.is_epsilon() {
+                        while let Some(y) = ib.next() {
+                            if !y.is_epsilon() {
+                                if x == y {
+                                    res.push_back(x.clone());
+                                    break;
+                                } else {
+                                    assert!(
+                                        false,
+                                        "\nTraceAssert: {} != {},
+                                            \nMatch {} = \n\nleft := {}\nright := {}\n",
+                                        x,
+                                        y,
+                                        fmt_trace(&res),
+                                        fmt_trace(a),
+                                        fmt_trace(b)
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_safa_match_exact() {
@@ -386,14 +465,14 @@ mod tests {
         let strdoc = "baa";
         let doc = strdoc.chars().collect();
 
-        assert_eq!(
-            safa.solve(&doc),
-            Some(LinkedList::from([
-                (NodeIndex::new(0), SAFA::epsilon(), NodeIndex::new(1), 0, 0),
-                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 0, 1),
-                (NodeIndex::new(3), Either(Ok('a')), NodeIndex::new(4), 1, 2),
-                (NodeIndex::new(4), Either(Ok('a')), NodeIndex::new(5), 2, 3)
-            ]))
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
+                TraceElem::new(NodeIndex::new(0), &SAFA::epsilon(), NodeIndex::new(1), 0, 0),
+                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 0, 1),
+                TraceElem::new(NodeIndex::new(3), &Either(Ok('a')), NodeIndex::new(4), 1, 2),
+                TraceElem::new(NodeIndex::new(4), &Either(Ok('a')), NodeIndex::new(5), 2, 3),
+            ])),
         );
     }
 
@@ -403,20 +482,20 @@ mod tests {
         let safa = SAFA::new("ab", &r);
         let strdoc = "ababbbaa";
         let doc: Vec<_> = strdoc.chars().collect();
-        assert_eq!(
-            safa.solve(&doc),
-            Some(LinkedList::from([
-                (
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
+                TraceElem::new(
                     NodeIndex::new(0),
-                    Either(Err(Skip::star())),
+                    &Either(Err(Skip::star())),
                     NodeIndex::new(1),
                     0,
-                    5
+                    5,
                 ),
-                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 5, 6),
-                (NodeIndex::new(3), Either(Ok('a')), NodeIndex::new(4), 6, 7),
-                (NodeIndex::new(4), Either(Ok('a')), NodeIndex::new(5), 7, 8)
-            ]))
+                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 5, 6),
+                TraceElem::new(NodeIndex::new(3), &Either(Ok('a')), NodeIndex::new(4), 6, 7),
+                TraceElem::new(NodeIndex::new(4), &Either(Ok('a')), NodeIndex::new(5), 7, 8),
+            ])),
         );
     }
 
@@ -428,40 +507,47 @@ mod tests {
         let doc: Vec<_> = strdoc.chars().collect();
         assert_eq!(
             safa.solve(&doc),
-            Some(LinkedList::from([(NodeIndex::new(0),
-                   SAFA::epsilon(),
-                   NodeIndex::new(1), 0, 0),
-                  (NodeIndex::new(1),
-                   Either::left('a'),
-                   NodeIndex::new(1), 0, 1),
-                  (NodeIndex::new(1),
-                   Either::left('a'),
-                   NodeIndex::new(1), 1, 2)])))
+            Some(LinkedList::from([
+                TraceElem::new(NodeIndex::new(0), &SAFA::epsilon(), NodeIndex::new(1), 0, 0),
+                TraceElem::new(
+                    NodeIndex::new(1),
+                    &Either::left('a'),
+                    NodeIndex::new(1),
+                    0,
+                    1
+                ),
+                TraceElem::new(
+                    NodeIndex::new(1),
+                    &Either::left('a'),
+                    NodeIndex::new(1),
+                    1,
+                    2
+                )
+            ]))
+        )
     }
 
     #[test]
-    fn test_safa_alt() {
+    fn test_safa_alt_pure() {
         let r = re::new("baa(a|c)$");
         let safa = SAFA::new("abc", &r);
-        safa.write_pdf("safa_alt").unwrap();
         let strdoc = "abababaac";
         let doc: Vec<_> = strdoc.chars().collect();
-        assert_eq!(
-            safa.solve(&doc),
-            Some(LinkedList::from([
-                (
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
+                TraceElem::new(
                     NodeIndex::new(0),
-                    Either(Err(Skip::star())),
+                    &Either(Err(Skip::star())),
                     NodeIndex::new(1),
                     0,
-                    5
+                    5,
                 ),
-                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 5, 6),
-                (NodeIndex::new(3), Either(Ok('a')), NodeIndex::new(4), 6, 7),
-                (NodeIndex::new(4), Either(Ok('a')), NodeIndex::new(5), 7, 8),
-                (NodeIndex::new(5), SAFA::epsilon(), NodeIndex::new(8), 8, 8),
-                (NodeIndex::new(8), Either(Ok('c')), NodeIndex::new(7), 8, 9)
-            ]))
+                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 5, 6),
+                TraceElem::new(NodeIndex::new(3), &Either(Ok('a')), NodeIndex::new(4), 6, 7),
+                TraceElem::new(NodeIndex::new(4), &Either(Ok('a')), NodeIndex::new(5), 7, 8),
+                TraceElem::new(NodeIndex::new(5), &Either(Ok('c')), NodeIndex::new(6), 8, 9),
+            ])),
         )
     }
 
@@ -469,24 +555,22 @@ mod tests {
     fn test_safa_alt_merge() {
         let r = re::new("^.*baa(a|b)$");
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
         let strdoc = "abababaab";
         let doc: Vec<_> = strdoc.chars().collect();
-        assert_eq!(
-            safa.solve(&doc),
-            Some(LinkedList::from([
-                (
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
+                TraceElem::new(
                     NodeIndex::new(0),
-                    Either(Err(Skip::star())),
+                    &Either(Err(Skip::star())),
                     NodeIndex::new(1),
                     0,
                     5
                 ),
-                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 5, 6),
-                (NodeIndex::new(3), Either(Ok('a')), NodeIndex::new(4), 6, 7),
-                (NodeIndex::new(4), Either(Ok('a')), NodeIndex::new(5), 7, 8),
-                (NodeIndex::new(5), SAFA::epsilon(), NodeIndex::new(8), 8, 8),
-                (NodeIndex::new(8), Either(Ok('b')), NodeIndex::new(7), 8, 9)
+                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 5, 6),
+                TraceElem::new(NodeIndex::new(3), &Either(Ok('a')), NodeIndex::new(4), 6, 7),
+                TraceElem::new(NodeIndex::new(4), &Either(Ok('a')), NodeIndex::new(5), 7, 8),
+                TraceElem::new(NodeIndex::new(5), &Either(Ok('b')), NodeIndex::new(6), 8, 9)
             ]))
         )
     }
@@ -495,44 +579,64 @@ mod tests {
     fn test_safa_range_exact() {
         let r = re::new("^.{3}b$");
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
         let doc: Vec<_> = "aaab".chars().collect();
-        assert_eq!(
-            safa.solve(&doc),
-            Some(LinkedList::from([
-                (
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
+                TraceElem::new(
                     NodeIndex::new(0),
-                    Either(Err(Skip::offset(3))),
+                    &Either(Err(Skip::offset(3))),
                     NodeIndex::new(1),
                     0,
                     3
                 ),
-                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 3, 4)
+                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 3, 4)
             ]))
         )
     }
 
     #[test]
-    fn test_safa_range_starplus() {
-        let r = re::new("^.{2,}b$");
+    fn test_safa_range_interval() {
+        let r = re::new("^.{1,3}b$");
         let safa = SAFA::new("ab", &r);
         safa.write_pdf("safa").unwrap();
+        print_states(&safa);
         let doc: Vec<_> = "aaab".chars().collect();
-        assert_eq!(
-            safa.solve(&doc),
-            Some(LinkedList::from([
-                (
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
+                TraceElem::new(
                     NodeIndex::new(0),
-                    Either(Err(Skip::starplus(2))),
+                    &Either(Err(Skip::range(1,3))),
                     NodeIndex::new(1),
                     0,
                     3
                 ),
-                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 3, 4)
+                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 3, 4)
             ]))
         )
     }
 
+
+    #[test]
+    fn test_safa_range_starplus() {
+        let r = re::new("^.{2,}b$");
+        let safa = SAFA::new("ab", &r);
+        let doc: Vec<_> = "aaab".chars().collect();
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
+                TraceElem::new(
+                    NodeIndex::new(0),
+                    &Either(Err(Skip::starplus(2))),
+                    NodeIndex::new(1),
+                    0,
+                    3
+                ),
+                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 3, 4)
+            ]))
+        )
+    }
 
     #[test]
     fn test_safa_range_nested() {
@@ -540,17 +644,17 @@ mod tests {
         let r = re::new("^(.{1,3}){1,2}b$");
         let safa = SAFA::new("ab", &r);
         let doc: Vec<_> = "aaaab".chars().collect();
-        assert_eq!(
-            safa.solve(&doc),
-            Some(LinkedList::from([
-                (
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
+                TraceElem::new(
                     NodeIndex::new(0),
-                    Either(Err(Skip::choice(&[1, 2, 3, 4, 6]))),
+                    &Either(Err(Skip::choice(&[1, 2, 3, 4, 6]))),
                     NodeIndex::new(1),
                     0,
                     4
                 ),
-                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 4, 5)
+                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 4, 5)
             ]))
         )
     }
@@ -558,22 +662,22 @@ mod tests {
     #[test]
     fn test_safa_range_alt() {
         unsafe { backtrace_on_stack_overflow::enable() };
-        let r = re::new("^((.{1,2}.)(.{4,5}b))a$");
+        let r = re::new("^((.{1,2}.)|(.{4,5}b))$");
         let safa = SAFA::new("ab", &r);
-
-        safa.write_pdf("safa_alt").unwrap();
+        safa.write_pdf("safa").unwrap();
+        print_states(&safa);
         let doc: Vec<_> = "aaaab".chars().collect();
-        assert_eq!(
-            safa.solve(&doc),
-            Some(LinkedList::from([
-                (
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
+                TraceElem::new(
                     NodeIndex::new(0),
-                    Either(Err(Skip::choice(&[1, 2, 3, 4, 6]))),
+                    &Either(Err(Skip::choice(&[1, 2, 3, 4, 6]))),
                     NodeIndex::new(1),
                     0,
                     4
                 ),
-                (NodeIndex::new(1), Either(Ok('b')), NodeIndex::new(3), 4, 5)
+                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 4, 5)
             ]))
         )
     }

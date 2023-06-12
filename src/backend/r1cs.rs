@@ -1,6 +1,6 @@
 use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
-use crate::safa::{Either, SAFA};
+use crate::safa::{Either, SAFA, Trace, TraceElem};
 use crate::skip::Skip;
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
@@ -37,7 +37,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     pub doc_extend: usize,
-    pub moves: Option<LinkedList<(NodeIndex<u32>, Either<char, Skip>, NodeIndex<u32>, usize, usize)>>,
+    pub moves: Option<Trace<char>>,
     is_match: bool,
     //pub substring: (usize, usize), // todo getters
     pub pc: PoseidonConstants<F, typenum::U4>,
@@ -102,7 +102,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut sel_batch_size = 1;
         for m in moves.clone().unwrap() {
-            sel_batch_size = max(sel_batch_size, m.4 - m.3);
+            sel_batch_size = max(sel_batch_size, m.to_cur - m.from_cur);
         }
         println!("BATCH {:#?}", sel_batch_size);
 
@@ -1664,10 +1664,10 @@ mod tests {
                     let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().into_iter().collect();
                     let num_steps = moves.len();
 
-                    let mut current_state = moves[0].0.index();
+                    let mut current_state = moves[0].from_node.index();
 
                     for i in 0..num_steps {
-                        let move_i = (moves[i].3, moves[i].4);
+                        let move_i = (moves[i].from_cur, moves[i].to_cur);
 
                         (
                             values,
