@@ -362,8 +362,6 @@ impl RegexF {
             RegexF::App(ref a, ref b) => a
                 .extract_alt()
                 .map(|children| children.into_iter().map(|c| RegexF::app(&c, &*b)).collect()),
-            // Reduce ranges to [alt], since there are no skips at this point
-            RegexF::Range(ref a, i, j) => Some((*i..=*j).map(|x| a.repeat(x)).collect()),
             _ => None,
         }
     }

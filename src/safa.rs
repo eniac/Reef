@@ -664,20 +664,19 @@ mod tests {
         unsafe { backtrace_on_stack_overflow::enable() };
         let r = re::new("^((.{1,2}.)|(.{4,5}b))$");
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
         print_states(&safa);
         let doc: Vec<_> = "aaaab".chars().collect();
         equiv_upto_epsilon(
             &safa.solve(&doc),
             &Some(LinkedList::from([
                 TraceElem::new(
-                    NodeIndex::new(0),
-                    &Either(Err(Skip::choice(&[1, 2, 3, 4, 6]))),
-                    NodeIndex::new(1),
+                    NodeIndex::new(4),
+                    &Either(Err(Skip::choice(&[4, 5]))),
+                    NodeIndex::new(5),
                     0,
                     4
                 ),
-                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 4, 5)
+                TraceElem::new(NodeIndex::new(5), &Either(Ok('b')), NodeIndex::new(2), 4, 5)
             ]))
         )
     }
