@@ -152,20 +152,24 @@ impl SAFA<char> {
         re::extract_skip(q, &self.ab)
             .map(|(skip, rem)| self.add_skip(from, skip, &rem))
             .or_else(|| {
-                let children = re::extract_and(q)?;
-                self.to_and(from);
-                children
-                    .into_iter()
-                    .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
-                Some(())
+                let children = re::to_and_set(q);
+                if !children.is_empty() {
+                    self.to_and(from);
+                    children
+                        .into_iter()
+                        .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
+                    Some(())
+                } else { None }
             })
             .or_else(|| {
-                let children = re::extract_alt(q)?;
-                self.to_or(from);
-                children
-                    .into_iter()
-                    .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
-                Some(())
+                let children = re::to_alt_set(q);
+                if !children.is_empty() {
+                    self.to_or(from);
+                    children
+                        .into_iter()
+                        .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
+                    Some(())
+                } else { None }
             })
             .or_else(|| Some(self.add_derivatives(from, q))); // Catch-all
     }
@@ -403,13 +407,14 @@ impl SAFA<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::regex::{re, Regex};
+    use crate::regex::re;
     use crate::safa::{Either, Trace, TraceElem, SAFA};
     use crate::skip::Skip;
     use std::fmt::Display;
     use petgraph::graph::NodeIndex;
     use std::collections::LinkedList;
 
+    /// Helper function to output states
     fn print_states<C: Display + Clone>(safa: &SAFA<C>) {
         safa.g.node_indices().for_each(|i|
             println!("({}) -> {}", i.index(), safa.g[i])

@@ -137,7 +137,6 @@ impl CharClass {
                 v.push(((prev_upper+1) as char, (curr_lower-1) as char));
             }
         }
-        println!("Negation of ({:?}) => ({:?})", self, v);
         Self(v)
     }
 }
