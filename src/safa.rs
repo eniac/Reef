@@ -710,8 +710,11 @@ mod tests {
             let strdoc = "MaJ@*n%!vx24";
             let doc = strdoc.chars().collect();
 
+            let sol = safa.solve(&doc);
+
             println!("SOLUTION for: {}", strdoc);
-            println!("{:?}", safa.solve(&doc));
+            println!("{:?}", sol);
+            assert_ne!(sol,None);
         }
     }
 
@@ -823,17 +826,17 @@ mod tests {
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = re::new("^[a-c]*b$");
-        let safa = SAFA::new("abcd", &r);
-        safa.write_pdf("safa2").unwrap();
-        let strdoc = "baababab";
-        let doc = strdoc.chars().collect();
+        let r = re::new("(?=a.*b.*)acb$");
+        let safa = SAFA::new("abc", &r);
+        safa.write_pdf("safa3").unwrap();
+        // let strdoc = "baababab";
+        // let doc = strdoc.chars().collect();
 
-        println!("DELTAS");
-        for d in safa.deltas() {
-            println!("{}, {}, {}", d.0, d.1, d.2.index());
-        }
-        println!("SOLUTION for: {}", strdoc);
-        println!("{:?}", safa.solve(&doc));
+        // println!("DELTAS");
+        // for d in safa.deltas() {
+        //     println!("{}, {}, {}", d.0, d.1, d.2.index());
+        // }
+        // println!("SOLUTION for: {}", strdoc);
+        // println!("{:?}", safa.solve(&doc));
     }
 }
