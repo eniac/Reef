@@ -5,10 +5,7 @@ use core::fmt::Formatter;
 
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Skip {
-    Choice(BTreeSet<usize>), // {a,c,d,...,e}
-    Star(usize)              // {n,n+1,....}
-}
+pub struct Skip(BTreeSet<(usize,Option<usize>)>);
 
 /// Combinators on skips; monoid (app, epsilon,star,range)
 impl Skip {

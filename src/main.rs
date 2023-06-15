@@ -51,17 +51,6 @@ fn main() {
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA", "DFA");
 
-    // Try to use k-stride
-    if let Some(k) = opt.k_stride {
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "DFA", "K Stride");
-
-        todo!();
-        //doc = nfa.k_stride(k, &doc);
-
-        #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "DFA", "K Stride");
-    };
     #[cfg(feature = "plot")]
     safa.as_str_safa().write_pdf("main")
         .expect("Failed to plot NFA to a pdf file");
