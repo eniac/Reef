@@ -1,6 +1,7 @@
 use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
-use crate::safa::{Either, SAFA, Trace, TraceElem};
+use crate::safa::{Either, SAFA};
+use crate::trace::{Trace, TraceElem};
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
@@ -100,7 +101,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let is_match = moves.is_some();
 
         let mut sel_batch_size = 1;
-        for m in moves.clone().unwrap() {
+        for m in moves.clone().unwrap().0 {
             sel_batch_size = max(sel_batch_size, m.to_cur - m.from_cur);
         }
         println!("BATCH {:#?}", sel_batch_size);
@@ -167,7 +168,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // TODO range check
         let mut table = vec![];
 
-        safa.as_str_safa().write_pdf("safa").unwrap();
+        safa.write_pdf("safa").unwrap();
 
         println!("ACCEPTING {:#?}", safa.accepting);
         //        println!("DELTAS {:#?}", safa.deltas());
@@ -1659,7 +1660,7 @@ mod tests {
                     let mut next_state;
 
                     let mut _start_epsilons;
-                    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().into_iter().collect();
+                    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().0.into_iter().collect();
                     let num_steps = moves.len();
 
                     let mut current_state = moves[0].from_node.index();

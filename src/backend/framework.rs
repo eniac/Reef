@@ -263,7 +263,7 @@ fn setup<'a>(
     );
 
 
-    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().into_iter().collect();
+    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().0.into_iter().collect();
     let move_0 = (moves[0].from_cur, moves[0].to_cur);
 
     // this variable could be two different types of things, which is potentially dicey, but
@@ -330,7 +330,7 @@ fn setup<'a>(
         }
     };
 
-    let num_steps = r1cs_converter.moves.clone().unwrap().len();
+    let num_steps = r1cs_converter.moves.clone().unwrap().0.len();
     assert!(num_steps > 0, "trying to prove something about 0 foldings");
 
     (num_steps, z0_primary, pp)
@@ -363,7 +363,7 @@ fn solve<'a>(
     let mut next_doc_running_q;
     let mut next_doc_running_v;
 
-    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().into_iter().collect();
+    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().0.into_iter().collect();
     let mut start_of_epsilons;
     let mut prev_doc_idx = None;
     let mut next_doc_idx;

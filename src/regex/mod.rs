@@ -165,7 +165,8 @@ impl RegexF {
             (RegexF::Star(d), x) | (x, RegexF::Star(d)) if **d == RegexF::dot() => x.clone(),
             // Left-associative [and]
             (x, RegexF::And(y, z)) => RegexF::and(&RegexF::and(x, y), z),
-            (_, _) => RegexF::And(G.mk(a.clone()), G.mk(b.clone())),
+            // Whenever (a & b) -> (a.* & b) we don't need to check postfixes twice
+            (_, _) => RegexF::And(G.mk(RegexF::app(&a.clone(), &RegexF::dotstar())), G.mk(b.clone())),
         }
     }
 
@@ -529,6 +530,22 @@ fn test_regex_negate_class() {
 #[test]
 fn test_regex_lookahead() {
     assert_eq!(re::app(re::character('a'), re::dotstar()), re::simpl(re::new("^(?=a)")))
+}
+
+#[test]
+fn test_regex_lookahead_app() {
+    assert_eq!(re::and(
+            re::app(re::character('a'), re::dotstar()),
+            re::app(re::character('b'), re::app(re::character('c'), re::dotstar()))),
+        re::simpl(re::new("^(?=a)bc")))
+}
+
+#[test]
+fn test_regex_lookahead_dotstar() {
+    assert_eq!(re::and(
+        re::app(re::character('a'), re::dotstar()),
+        re::app(re::dotstar(), re::app(re::character('b'), re::dotstar()))),
+    re::simpl(re::new(r"^(?=a).*b")))
 }
 
 #[test]

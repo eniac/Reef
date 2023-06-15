@@ -36,7 +36,7 @@ pub fn get_padding(doc_len: usize, batch_size: usize, commit: JCommit) -> usize 
     epsilon_to_add + 1
 }
 
-pub fn accepting_circuit<'a>(nfa: &'a SAFA<String>, is_match: Option<(usize, usize)>) -> usize {
+pub fn accepting_circuit<'a>(nfa: &'a SAFA<char>, is_match: Option<(usize, usize)>) -> usize {
     // vanishing selection for final check
     // poly of degree (# final states - 1)
     // (alt, # non final states - 1)
@@ -149,7 +149,7 @@ fn commit_circuit_hash(
 }
 
 pub fn naive_cost_model_nohash<'a>(
-    nfa: &'a SAFA<String>,
+    nfa: &'a SAFA<char>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_len: usize,
@@ -167,7 +167,7 @@ pub fn naive_cost_model_nohash<'a>(
 }
 
 pub fn nlookup_cost_model_nohash<'a>(
-    nfa: &'a SAFA<String>,
+    nfa: &'a SAFA<char>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_len: usize,
@@ -211,7 +211,7 @@ pub fn nlookup_cost_model_nohash<'a>(
 }
 
 pub fn nlookup_cost_model_hash<'a>(
-    nfa: &'a SAFA<String>,
+    nfa: &'a SAFA<char>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_len: usize,
@@ -241,7 +241,7 @@ pub fn nlookup_cost_model_hash<'a>(
 }
 
 pub fn full_round_cost_model_nohash<'a>(
-    nfa: &'a SAFA<String>,
+    nfa: &'a SAFA<char>,
     batch_size: usize,
     lookup_type: JBatching,
     is_match: Option<(usize, usize)>,
@@ -260,7 +260,7 @@ pub fn full_round_cost_model_nohash<'a>(
 }
 
 pub fn full_round_cost_model<'a>(
-    nfa: &'a SAFA<String>,
+    nfa: &'a SAFA<char>,
     batch_size: usize,
     lookup_type: JBatching,
     is_match: Option<(usize, usize)>,
@@ -296,7 +296,7 @@ pub fn get_folded_cost(cost: usize, doc_len: usize, batch_size: usize) -> usize 
 }
 
 pub fn opt_cost_model_select_with_commit<'a>(
-    nfa: &'a SAFA<String>,
+    nfa: &'a SAFA<char>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_length: usize,
@@ -378,7 +378,7 @@ pub fn opt_cost_model_select_with_commit<'a>(
 }
 
 pub fn opt_cost_model_select_with_batch<'a>(
-    nfa: &'a SAFA<String>,
+    nfa: &'a SAFA<char>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_length: usize,
@@ -479,7 +479,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
 }
 
 pub fn opt_commit_select_with_batch<'a>(
-    nfa: &'a SAFA<String>,
+    nfa: &'a SAFA<char>,
     batch_size: usize,
     is_match: Option<(usize, usize)>,
     doc_length: usize,
@@ -546,7 +546,7 @@ pub fn opt_commit_select_with_batch<'a>(
 }
 
 pub fn opt_cost_model_select<'a>(
-    nfa: &'a SAFA<String>,
+    nfa: &'a SAFA<char>,
     batch_range_lower: usize,
     batch_range_upper: usize,
     is_match: Option<(usize, usize)>,
