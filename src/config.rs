@@ -43,12 +43,12 @@ pub struct Options {
     )]
     pub batch_size: usize,
     #[arg(
-        short = 'k',
-        long = "k-stride length",
-        value_name = "K STRIDE LENGTH",
-        help = "Take 2^k steps at one NFA step"
+        short = 'n',
+        long = "negate",
+        value_name = "NEGATE",
+        help = "Negate the match result"
     )]
-    pub k_stride: Option<usize>
+    pub negate: bool,
 }
 
 #[derive(Debug, Subcommand)]

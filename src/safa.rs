@@ -10,9 +10,8 @@ use petgraph::Graph;
 use std::result::Result;
 
 use crate::quantifier::Quant;
-use crate::regex::{re, Regex};
-use crate::skip::Skip;
-
+use crate::regex::{re, Regex, RegexF};
+use crate::openset::OpenSet;
 use rayon::iter::*;
 
 use core::fmt;
@@ -40,6 +39,9 @@ impl<A: Display, B: Display> Display for Either<A, B> {
         }
     }
 }
+
+/// A skip is a set of ranges
+pub type Skip = OpenSet<usize>;
 
 #[derive(Debug, Clone)]
 pub struct SAFA<C: Clone> {
@@ -77,9 +79,9 @@ impl SAFA<char> {
         s
     }
 
-    /// Add a regex to position [from] (an Or by default)
+    /// Add a regex to position [from]
     fn add_skip(&mut self, n: NodeIndex<u32>, skip: Skip, q_c: &Regex) {
-        if let Some(n_c) = self.find_or(q_c) {
+        if let Some(n_c) = self.find(q_c) {
             self.g.add_edge(n, n_c, Either::right(skip));
         } else {
             // Add to graph if not already there
@@ -93,85 +95,106 @@ impl SAFA<char> {
     }
 
     /// Find an [or] node
-    pub fn find_or(&self, r: &Regex) -> Option<NodeIndex<u32>> {
+    pub fn find(&self, r: &Regex) -> Option<NodeIndex<u32>> {
         self.g
             .node_indices()
-            .find(|i| self.g[*i] == Quant::or(r.clone()))
+            .find(|i| &self.g[*i].get() == r)
     }
 
-    /// Find an [and] node
-    pub fn find_and(&self, r: &Regex) -> Option<NodeIndex<u32>> {
-        self.g
-            .node_indices()
-            .find(|i| self.g[*i] == Quant::and(r.clone()))
-    }
 
     /// Add derivative of a node in the graph
     fn add_derivatives(&mut self, from: NodeIndex<u32>, q: &Regex) {
-        let mut cached_node = from;
-        if let Some(n) = self.find_or(q) {
-            if n != from {
-                self.g.add_edge(from, n, SAFA::epsilon());
-                cached_node = n;
-            }
-        } else {
-            if !self.g[from].is_or() {
-                // Add an OR node to graph if not already there
-                cached_node = self.g.add_node(Quant::or(q.clone()));
-                self.g.add_edge(cached_node, cached_node, SAFA::epsilon());
-                // Reflexive step
-                self.g.add_edge(from, cached_node, SAFA::epsilon());
-            }
-        };
+        // TODO: Make sure it works
+        let n_q = self.find(q).unwrap_or_else(|| {
+            let n_q = self.g.add_node(Quant::or(q.clone()));
+            // Reflexive step
+            self.g.add_edge(n_q, n_q, SAFA::epsilon());
+            self.g.add_edge(from, n_q, SAFA::epsilon());
+            n_q
+        });
+        // Make [or] node
+        self.g[n_q] = Quant::or(self.g[n_q].get());
 
         // Take all the single character steps
         for c in self.ab.clone().iter() {
             let q_c = re::deriv(q, &c);
-            if let Some(n_c) = self.find_or(&q_c) {
-                self.g.add_edge(cached_node, n_c, Either::left(*c));
+            if let Some(n_c) = self.find(&q_c) {
+                self.g.add_edge(n_q, n_c, Either::left(*c));
             } else {
                 // Add to graph if not already there
                 let n_c = self.g.add_node(Quant::or(q_c.clone()));
                 // Reflexive step
                 self.g.add_edge(n_c, n_c, SAFA::epsilon());
-                self.g.add_edge(cached_node, n_c, Either::left(*c));
+                self.g.add_edge(n_q, n_c, Either::left(*c));
                 self.add(n_c, &q_c);
             }
         }
     }
 
-    fn to_and(&mut self, from: NodeIndex<u32>) {
-        self.g[from] = Quant::and(self.g[from].get());
+    /// Insert an [and] or [alt] fork in the safa
+    fn add_fork(&mut self, is_and: bool, from: NodeIndex<u32>, q: &Regex) -> Option<()> {
+        fn to_set(r: &Regex, is_and: bool) -> BTreeSet<Regex> {
+            match **r {
+                // (r | r' | ...) => [r, r', ...]
+                RegexF::And(ref a, ref b) if is_and => {
+                    let mut l = to_set(a, is_and);
+                    let mut r = to_set(b, is_and);
+                    l.append(&mut r);
+                    l
+                },
+                RegexF::Alt(ref a, ref b) if !is_and => {
+                    let mut l = to_set(a, is_and);
+                    let mut r = to_set(b, is_and);
+                    l.append(&mut r);
+                    l
+                },
+                _ => BTreeSet::from([r.clone()])
+            }
+        }
+
+        let children = to_set(q, is_and);
+        if children.len() > 1 {
+            self.g[from] = Quant::new(self.g[from].get(), is_and);
+            children
+                .into_iter()
+                .for_each(|q_c| self.add_skip(from, Skip::nil(), &q_c));
+            Some(())
+        } else { None }
     }
 
-    fn to_or(&mut self, from: NodeIndex<u32>) {
-        self.g[from] = Quant::or(self.g[from].get());
-    }
-
+    /// Add a new regex starting at [from]
     fn add(&mut self, from: NodeIndex<u32>, q: &Regex) {
         re::extract_skip(q, &self.ab)
             .map(|(skip, rem)| self.add_skip(from, skip, &rem))
-            .or_else(|| {
-                let children = re::to_and_set(q);
-                if !children.is_empty() {
-                    self.to_and(from);
-                    children
-                        .into_iter()
-                        .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
-                    Some(())
-                } else { None }
-            })
-            .or_else(|| {
-                let children = re::to_alt_set(q);
-                if !children.is_empty() {
-                    self.to_or(from);
-                    children
-                        .into_iter()
-                        .for_each(|q_c| self.add_skip(from, Skip::epsilon(), &q_c));
-                    Some(())
-                } else { None }
-            })
+            .or_else(|| self.add_fork(true, from, q))  // Add [and] fork
+            .or_else(|| self.add_fork(false, from, q)) // Add [or] fork
             .or_else(|| Some(self.add_derivatives(from, q))); // Catch-all
+    }
+
+    /// Negation of SAFAs
+    pub fn negate(&mut self) -> Self {
+        let mut s = Self {
+            ab: self.ab.clone(),
+            g: self.g.clone(),
+            accepting: BTreeSet::new()
+        };
+
+        // Copy the graph
+        let mut dfs = Dfs::new(&s.g, s.get_init());
+        while let Some(nx) = dfs.next(&s.g) {
+            // Negate the node
+            s.g[nx].negate();
+            for e in self.g.edges(nx) {
+                if let Err(ref skip) = e.weight().0 {
+                    s.add_skip(nx, skip.negate(), &re::empty());
+                    s.accepting.insert(s.find(&re::empty()).unwrap());
+                }
+            }
+        }
+
+        // Switch accepting and non-accepting states
+        s.accepting.append(&mut self.non_accepting());
+        s
     }
 
     /// From SAFA<char> -> SAFA<String>
@@ -216,10 +239,10 @@ impl<C: Clone> TraceElem<C> {
         }
     }
 
-    pub fn is_epsilon(&self) -> bool {
+    pub fn is_nil(&self) -> bool {
         match self.edge.0 {
             Ok(_) => false,
-            Err(ref e) => e.is_epsilon(),
+            Err(ref e) => e.is_nil(),
         }
     }
 }
@@ -249,7 +272,7 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
 
     /// An epsilon transition
     fn epsilon() -> Either<C, Skip> {
-        Either::right(Skip::offset(0))
+        Either::right(Skip::nil())
     }
 
     /// Get initial state
@@ -267,11 +290,14 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
         self.g
             .node_indices()
             .flat_map(|n| {
-                self.g.edges(n).map(|e| {
-                    if self.g[e.source()].is_and() {
-                        (Quant::and(e.source()), e.weight().clone(), e.target())
+                self.g.edges(n).filter_map(|e| {
+                    // Filter out sink state transitions
+                    if self.is_sink(e.source()) || self.is_sink(e.target()) {
+                        None
+                    } else if self.g[e.source()].is_and() {
+                        Some((Quant::and(e.source()), e.weight().clone(), e.target()))
                     } else {
-                        (Quant::or(e.source()), e.weight().clone(), e.target())
+                        Some((Quant::or(e.source()), e.weight().clone(), e.target()))
                     }
                 })
             })
@@ -285,10 +311,6 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
             .all(|e| e.target() == n && !self.accepting.contains(&e.target()))
     }
 
-    fn prepend<'a, A: Clone + Debug>(v: &'a mut LinkedList<A>, a: A) -> Option<LinkedList<A>> {
-        v.push_front(a.clone());
-        Some(v.clone())
-    }
 
     /// Accepting criterion for a node, document and cursor
     pub fn is_accept(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<C>) -> bool {
@@ -311,28 +333,30 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
         from: NodeIndex<u32>,
         to: NodeIndex<u32>,
         i: usize,
-        doc: &Vec<C>,
+        doc: &Vec<C>
     ) -> Option<Trace<C>> {
+        fn prepend<'a, A: Clone + Debug>(v: &'a mut LinkedList<A>, a: A) -> Option<LinkedList<A>> {
+            v.push_front(a.clone());
+            Some(v.clone())
+        }
         let res = match e.0.clone() {
             // Sink state, cannot succeed
             Ok(_) if self.is_sink(to) => None,
             // Character match
-            Ok(c) if c == doc[i] => Self::prepend(
+            Ok(c) if c == doc[i] => prepend(
                 &mut self.solve_rec(to, i + 1, doc)?,
                 TraceElem::new(from, e, to, i, i + 1),
             ),
             // Character non-match
             Ok(_) => None,
-            Err(Skip::Choice(ref ns)) => ns.into_par_iter().find_map_any(|n| {
-                Self::prepend(
+            Err(skip) => skip
+                .into_iter().take_while(|n|i+n <= doc.len())
+                .collect::<Vec<_>>() // Serialize to parallelize again
+                .into_par_iter()
+                .find_map_any(|n| {
+                prepend(
                     &mut self.solve_rec(to, i + n, doc)?,
                     TraceElem::new(from, e, to, i, i + n),
-                )
-            }),
-            Err(Skip::Star(n)) => (i + n..=doc.len()).into_par_iter().find_map_any(|j| {
-                Self::prepend(
-                    &mut self.solve_rec(to, j, doc)?,
-                    TraceElem::new(from, e, to, i, j),
                 )
             }),
         };
@@ -360,7 +384,6 @@ impl<C: Clone + Eq + Ord + Debug + Display + Hash + Sync + Send> SAFA<C> {
                 .into_iter()
                 .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
                 .collect();
-
             // All of them need to be set
             if subsolutions.iter().all(Option::is_some) {
                 Some(subsolutions.into_iter().flat_map(Option::unwrap).collect())
@@ -409,7 +432,7 @@ impl SAFA<String> {
 mod tests {
     use crate::regex::re;
     use crate::safa::{Either, Trace, TraceElem, SAFA};
-    use crate::skip::Skip;
+    use crate::safa::Skip;
     use std::fmt::Display;
     use petgraph::graph::NodeIndex;
     use std::collections::LinkedList;
@@ -437,9 +460,9 @@ mod tests {
                 let mut ib = b.iter();
                 let mut res = LinkedList::new();
                 while let Some(x) = ia.next() {
-                    if !x.is_epsilon() {
+                    if !x.is_nil() {
                         while let Some(y) = ib.next() {
-                            if !y.is_epsilon() {
+                            if !y.is_nil() {
                                 if x == y {
                                     res.push_back(x.clone());
                                     break;
@@ -465,7 +488,7 @@ mod tests {
 
     #[test]
     fn test_safa_match_exact() {
-        let r = re::new("^baa$");
+        let r = re::simpl(re::new("^baa$"));
         let safa = SAFA::new("ab", &r);
         let strdoc = "baa";
         let doc = strdoc.chars().collect();
@@ -473,17 +496,16 @@ mod tests {
         equiv_upto_epsilon(
             &safa.solve(&doc),
             &Some(LinkedList::from([
-                TraceElem::new(NodeIndex::new(0), &SAFA::epsilon(), NodeIndex::new(1), 0, 0),
-                TraceElem::new(NodeIndex::new(1), &Either(Ok('b')), NodeIndex::new(3), 0, 1),
-                TraceElem::new(NodeIndex::new(3), &Either(Ok('a')), NodeIndex::new(4), 1, 2),
-                TraceElem::new(NodeIndex::new(4), &Either(Ok('a')), NodeIndex::new(5), 2, 3),
+                TraceElem::new(NodeIndex::new(0), &Either(Ok('b')), NodeIndex::new(2), 0, 1),
+                TraceElem::new(NodeIndex::new(2), &Either(Ok('a')), NodeIndex::new(3), 1, 2),
+                TraceElem::new(NodeIndex::new(3), &Either(Ok('a')), NodeIndex::new(4), 2, 3),
             ])),
         );
     }
 
     #[test]
     fn test_safa_match_partial() {
-        let r = re::new("baa");
+        let r = re::simpl(re::new("baa"));
         let safa = SAFA::new("ab", &r);
         let strdoc = "ababbbaa";
         let doc: Vec<_> = strdoc.chars().collect();
@@ -506,25 +528,24 @@ mod tests {
 
     #[test]
     fn test_safa_match_star() {
-        let r = re::new("^a*$");
+        let r = re::simpl(re::new("^a*$"));
         let safa = SAFA::new("ab", &r);
         let strdoc = "aa";
         let doc: Vec<_> = strdoc.chars().collect();
-        assert_eq!(
-            safa.solve(&doc),
-            Some(LinkedList::from([
-                TraceElem::new(NodeIndex::new(0), &SAFA::epsilon(), NodeIndex::new(1), 0, 0),
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Some(LinkedList::from([
                 TraceElem::new(
-                    NodeIndex::new(1),
+                    NodeIndex::new(0),
                     &Either::left('a'),
-                    NodeIndex::new(1),
+                    NodeIndex::new(0),
                     0,
                     1
                 ),
                 TraceElem::new(
-                    NodeIndex::new(1),
+                    NodeIndex::new(0),
                     &Either::left('a'),
-                    NodeIndex::new(1),
+                    NodeIndex::new(0),
                     1,
                     2
                 )
@@ -534,7 +555,7 @@ mod tests {
 
     #[test]
     fn test_safa_alt_pure() {
-        let r = re::new("baa(a|c)$");
+        let r = re::simpl(re::new("baa(a|c)$"));
         let safa = SAFA::new("abc", &r);
         let strdoc = "abababaac";
         let doc: Vec<_> = strdoc.chars().collect();
@@ -558,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_safa_alt_merge() {
-        let r = re::new("^.*baa(a|b)$");
+        let r = re::simpl(re::new("^.*baa(a|b)$"));
         let safa = SAFA::new("ab", &r);
         let strdoc = "abababaab";
         let doc: Vec<_> = strdoc.chars().collect();
@@ -582,7 +603,7 @@ mod tests {
 
     #[test]
     fn test_safa_range_exact() {
-        let r = re::new("^.{3}b$");
+        let r = re::simpl(re::new("^.{3}b$"));
         let safa = SAFA::new("ab", &r);
         let doc: Vec<_> = "aaab".chars().collect();
         equiv_upto_epsilon(
@@ -590,7 +611,7 @@ mod tests {
             &Some(LinkedList::from([
                 TraceElem::new(
                     NodeIndex::new(0),
-                    &Either(Err(Skip::offset(3))),
+                    &Either(Err(Skip::single(3))),
                     NodeIndex::new(1),
                     0,
                     3
@@ -602,17 +623,15 @@ mod tests {
 
     #[test]
     fn test_safa_range_interval() {
-        let r = re::new("^.{1,3}b$");
+        let r = re::simpl(re::new("^.{1,3}b$"));
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
-        print_states(&safa);
         let doc: Vec<_> = "aaab".chars().collect();
         equiv_upto_epsilon(
             &safa.solve(&doc),
             &Some(LinkedList::from([
                 TraceElem::new(
                     NodeIndex::new(0),
-                    &Either(Err(Skip::range(1,3))),
+                    &Either(Err(Skip::closed(1,3))),
                     NodeIndex::new(1),
                     0,
                     3
@@ -625,7 +644,7 @@ mod tests {
 
     #[test]
     fn test_safa_range_starplus() {
-        let r = re::new("^.{2,}b$");
+        let r = re::simpl(re::new("^.{2,}b$"));
         let safa = SAFA::new("ab", &r);
         let doc: Vec<_> = "aaab".chars().collect();
         equiv_upto_epsilon(
@@ -633,7 +652,7 @@ mod tests {
             &Some(LinkedList::from([
                 TraceElem::new(
                     NodeIndex::new(0),
-                    &Either(Err(Skip::starplus(2))),
+                    &Either(Err(Skip::open(2))),
                     NodeIndex::new(1),
                     0,
                     3
@@ -646,7 +665,7 @@ mod tests {
     #[test]
     fn test_safa_range_nested() {
         // unsafe { backtrace_on_stack_overflow::enable() };
-        let r = re::new("^(.{1,3}){1,2}b$");
+        let r = re::simpl(re::new("^(.{1,3}){1,2}b$"));
         let safa = SAFA::new("ab", &r);
         let doc: Vec<_> = "aaaab".chars().collect();
         equiv_upto_epsilon(
@@ -654,7 +673,7 @@ mod tests {
             &Some(LinkedList::from([
                 TraceElem::new(
                     NodeIndex::new(0),
-                    &Either(Err(Skip::choice(&[1, 2, 3, 4, 6]))),
+                    &Either(Err(Skip::closed(1, 4).union(&Skip::single(6)))),
                     NodeIndex::new(1),
                     0,
                     4
@@ -667,7 +686,7 @@ mod tests {
     #[test]
     fn test_safa_range_alt() {
         unsafe { backtrace_on_stack_overflow::enable() };
-        let r = re::new("^((.{1,2}.)|(.{4,5}b))$");
+        let r = re::simpl(re::new("^((.{1,2}.)|(.{4,5}b))$"));
         let safa = SAFA::new("ab", &r);
         print_states(&safa);
         let doc: Vec<_> = "aaaab".chars().collect();
@@ -676,7 +695,7 @@ mod tests {
             &Some(LinkedList::from([
                 TraceElem::new(
                     NodeIndex::new(4),
-                    &Either(Err(Skip::choice(&[4, 5]))),
+                    &Either(Err(Skip::closed(4, 5))),
                     NodeIndex::new(5),
                     0,
                     4
@@ -689,7 +708,7 @@ mod tests {
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = re::new("^[a-c]*b$");
+        let r = re::simpl(re::new("^[a-c]*b$"));
         let safa = SAFA::new("abcd", &r);
         safa.write_pdf("safa2").unwrap();
         let strdoc = "baababab";

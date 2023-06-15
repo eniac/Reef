@@ -5,17 +5,17 @@ use std::collections::BTreeSet;
 
 use core::fmt;
 use core::fmt::Formatter;
-use crate::skip::Skip;
-use crate::regex::charclass::CharClass;
-use crate::regex::parser::RegexParser;
+use crate::openset::{OpenSet,OpenRange};
+use crate::safa::Skip;
 
 #[cfg(fuzz)]
 pub mod arbitrary;
 
-pub mod charclass;
 pub mod parser;
 pub mod ord;
 
+/// the type of character classes
+pub type CharClass = OpenSet<char>;
 
 /// Hash-consed regex terms
 pub type Regex = HConsed<RegexF>;
@@ -25,7 +25,6 @@ pub enum RegexF {
     Nil,
     Dot,
     CharClass(CharClass),
-    Not(Regex),
     App(Regex, Regex),
     Alt(Regex, Regex),
     And(Regex, Regex),
@@ -44,15 +43,8 @@ impl fmt::Display for RegexF {
             RegexF::Nil => write!(f, "ε"),
             RegexF::Dot => write!(f, "."),
             RegexF::CharClass(c) => write!(f, "{}", c),
-            RegexF::Not(c) => write!(f, "(! {})", c),
             RegexF::App(x, y) => write!(f, "{}{}", x, y),
-            RegexF::Alt(ref x, ref y) =>
-                match (&*x.clone(), &*y.clone()) {
-                    (RegexF::Nil, RegexF::Range(a, 1, j)) |
-                    (RegexF::Range(a, 1, j), RegexF::Nil) =>
-                        write!(f, "{}{{0,{}}}", a, j),
-                    (x, y) => write!(f, "({} | {})", x, y)
-                },
+            RegexF::Alt(ref x, ref y) => write!(f, "({} | {})", x, y),
             RegexF::Star(a) => write!(f, "{}*", a),
             RegexF::And(a, b) => write!(f, "(?={}){}", a, b),
             RegexF::Range(a, 0, 1) => write!(f, "{}?", a),
@@ -67,7 +59,6 @@ impl RegexF {
     pub fn simpl(&self) -> RegexF {
         match self {
             RegexF::Nil | RegexF::Dot | RegexF::CharClass(_) => self.clone(),
-            RegexF::Not(c) => RegexF::not(&c.simpl()),
             RegexF::App(x, y) => RegexF::app(&x.simpl(), &y.simpl()),
             RegexF::Alt(x, y) => RegexF::alt(&x.simpl(), &y.simpl()),
             RegexF::Star(a) => RegexF::star(&a.simpl()),
@@ -86,7 +77,7 @@ impl RegexF {
 
     /// Empty set
     pub fn empty() -> RegexF {
-        RegexF::CharClass(CharClass(vec![]))
+        RegexF::CharClass(CharClass::empty())
     }
 
     /// Matches empty string (ε)
@@ -110,21 +101,19 @@ impl RegexF {
     }
 
     /// Create a character class
-    pub fn charclass(v: Vec<(char, char)>) -> RegexF {
-        let c = CharClass::new(v);
-        let size = c.interv_len();
-        let char_max: usize = std::char::MAX as usize;
-        if size == 0 {
-            RegexF::empty() //empty
-        } else if size >= char_max && c.len() == 1 {
-            RegexF::dot() //check that this is correct
+    pub fn charclass(v: Vec<(char, Option<char>)>) -> RegexF {
+        let c = CharClass::from_iter(v.into_iter());
+        if c.negate().is_empty() {
+            RegexF::dot()
+        } else if c.is_empty() {
+            RegexF::empty()
         } else {
             RegexF::CharClass(c.clone())
         }
     }
 
     /// Subset relation is a partial order
-    /// a <= b -> true (a indeeed <= b)
+    /// a <= b -> true (a <= b)
     /// a <= b -> false (don't know!)
     pub fn partial_le(a: &Self, b: &Self) -> bool {
         match (a, b) {
@@ -159,6 +148,7 @@ impl RegexF {
         }
     }
 
+    /// a == b  = a <= b && b <= a
     pub fn partial_eq(a: &Self, b: &Self) -> bool {
         RegexF::partial_le(a, b) && RegexF::partial_le(b, a)
     }
@@ -172,7 +162,6 @@ impl RegexF {
             (_, _) if RegexF::partial_le(&a, &b) => a.clone(),
             // a & b and a >= b -> b
             (_, _) if RegexF::partial_le(&b, &a) => b.clone(),
-            (RegexF::Not(o), x)  | (x, RegexF::Not(o))  if o.is_empty() => x.clone(),
             (RegexF::Star(d), x) | (x, RegexF::Star(d)) if **d == RegexF::dot() => x.clone(),
             // Left-associative [and]
             (x, RegexF::And(y, z)) => RegexF::and(&RegexF::and(x, y), z),
@@ -182,7 +171,7 @@ impl RegexF {
 
     /// Smart constructor [app] for approx. notion of equivalence
     pub fn app(a: &Self, b: &Self) -> Self {
-        let res = match (a, b) {
+        match (a, b) {
             // Monoid on Nil
             (x, RegexF::Nil) | (RegexF::Nil, x) => x.clone(),
             // Empty absorbs everything
@@ -205,10 +194,7 @@ impl RegexF {
             // Right-associative [app]
             (RegexF::App(x, y), z) => RegexF::app(x, &RegexF::app(y, z)),
             (_, _) => RegexF::App(G.mk(a.clone()), G.mk(b.clone())),
-        };
-
-        println!("Appending {} ++ {} = {}", a, b, res);
-        res
+        }
     }
 
     /// Smart constructor [alt] for approx. notion of equivalence
@@ -240,6 +226,14 @@ impl RegexF {
         }
     }
 
+    /// Shallow not
+    pub fn not(a: &Self) -> Self {
+        match a {
+            RegexF::CharClass(c) => RegexF::CharClass(c.negate()),
+            _ => panic!("Negation of {} not implemented!", a)
+        }
+    }
+
     /// At least [n] times [a]
     pub fn starplus(a: &Self, n: usize) -> Self {
         RegexF::app(&RegexF::range(a, 0, n), &RegexF::star(a))
@@ -266,36 +260,6 @@ impl RegexF {
         }
     }
 
-    /// Negation of regex
-    pub fn not(a: &Self) -> Self {
-        let res = match a {
-            RegexF::Not(ref a) => (**a).clone(),
-            RegexF::CharClass(c) => RegexF::CharClass(c.negate()),
-            // ! . = nil | .. .*
-            // RegexF::Dot => RegexF::alt(&RegexF::nil(), &RegexF::starplus(&RegexF::Dot, 2)),
-            RegexF::Alt(a, b) => RegexF::and(&RegexF::not(a), &RegexF::not(b)),
-            RegexF::And(a, b) => RegexF::alt(&RegexF::not(a), &RegexF::not(b)),
-            // The negation of !(ab) = (!a) b | b (!a) | (!a)(!b)
-            RegexF::App(x, y) =>
-                RegexF::alts(&[
-                    RegexF::app(x, &RegexF::not(&y)),
-                    RegexF::app(&RegexF::not(&x), y),
-                    RegexF::app(&RegexF::not(&x), &RegexF::not(&y))
-                ]),
-            // The negation of !r{i,j} = .{0,i-1} | {i,j}!r | .{j+1, *}
-            RegexF::Range(ref x, i, j) =>
-                RegexF::alts(&[
-                    RegexF::range(&RegexF::not(x), *i, *j),
-                    RegexF::range(x, 0, i - 1),
-                    RegexF::starplus(&RegexF::dot(), j + 1)
-                ]),
-            _ if a.is_empty() => RegexF::dotstar(),
-            _ => RegexF::Not(G.mk(a.clone())),
-        };
-        println!("Negating ! ({}) = {}", a, res);
-        res
-    }
-
     /// Is regex exactly [nil]
     pub fn is_nil(&self) -> bool {
         self == &RegexF::Nil
@@ -308,7 +272,6 @@ impl RegexF {
             RegexF::Nil | RegexF::Star(_) => true,
             RegexF::Range(_, i, _) if *i == 0 => true,
             RegexF::CharClass(_) | RegexF::Dot | RegexF::Range(_, _, _) => false,
-            RegexF::Not(ref r) => !r.nullable(),
             RegexF::And(ref a, ref b) | RegexF::App(ref a, ref b) => a.nullable() && b.nullable(),
             RegexF::Alt(ref a, ref b) => a.nullable() || b.nullable(),
         }
@@ -319,52 +282,22 @@ impl RegexF {
         ab.iter().all(|c| self.deriv(&c).nullable())
     }
 
-    /// Extract an [and] set from a regex, for [(a & b)c => [a, bc]]
-    pub fn to_and_set(&self) -> BTreeSet<RegexF> {
-        match self {
-            // (r | r' | ...) => [r, r', ...]
-            RegexF::And(ref a, ref b) => {
-                let mut l = a.to_and_set();
-                let mut r = b.to_and_set();
-                l.append(&mut r);
-                l
-            },
-            o => BTreeSet::from([o.clone()])
-        }
-    }
-
-    /// Extract an [alt] set from a regex, use distributivity to append the rest
-    pub fn to_alt_set(&self) -> BTreeSet<RegexF> {
-        match self {
-            // (r | r' | ...) => [r, r', ...]
-            RegexF::Alt(ref a, ref b) => {
-                let mut l = a.to_alt_set();
-                let mut r = b.to_alt_set();
-                l.append(&mut r);
-                l
-            },
-            o => BTreeSet::from([o.clone()])
-        }
-    }
-
     /// Extract a skip from a regex and return the rest
     pub fn extract_skip(&self, ab: &Vec<char>) -> Option<(Skip, Self)> {
-        match self {
-            RegexF::Dot => Some((Skip::single(), RegexF::nil())),
+        let res = match self {
+            RegexF::Dot => Some((Skip::single(1), RegexF::nil())),
             // .*
             RegexF::Star(ref a) => {
                 let (sa, rem) = a.extract_skip(ab)?;
                 if rem.is_nil() {
-                    Some((sa.star_of(0), RegexF::nil()))
-                } else {
-                    None
-                }
+                    Some((sa.kleene(), RegexF::nil()))
+                } else { None }
             }
             // .{i,j}
             RegexF::Range(ref a, x, y) => {
                 let (sa, rem) = a.extract_skip(ab)?;
                 if rem.is_nil() {
-                    Some((sa.range_of(*x, *y), RegexF::nil()))
+                    Some((sa.repeat(*x, *y), RegexF::nil()))
                 } else {
                     None
                 }
@@ -378,7 +311,8 @@ impl RegexF {
                 }
             }
             _ => None,
-        }
+        };
+        res
     }
 
     /// Make [self] given [n] into [rrrr....r] n-times.
@@ -397,7 +331,6 @@ impl RegexF {
             RegexF::CharClass(cs) if cs.is_empty() => RegexF::empty(),
             RegexF::CharClass(cs) if cs.contains(c) => RegexF::nil(),
             RegexF::CharClass(_) => RegexF::empty(),
-            RegexF::Not(ref r) => RegexF::not(&r.deriv(c)),
             RegexF::App(ref a, ref b) if a.nullable() => {
                 RegexF::alt(&RegexF::app(&a.deriv(c), b), &b.deriv(c))
             }
@@ -411,16 +344,21 @@ impl RegexF {
 
 /// Top level module with hash-consing constructors
 pub mod re {
-    use crate::regex::charclass::CharClass;
-    use crate::regex::G;
+    use crate::regex::{G, CharClass};
+    use crate::safa::Skip;
+    use crate::openset::OpenSet;
     use crate::regex::{parser::RegexParser,Regex, RegexF};
-    use crate::skip::Skip;
     use hashconsing::HashConsign;
     use std::collections::BTreeSet;
 
     /// Constructor
     pub fn new<'a>(s: &'a str) -> Regex {
         RegexParser::parse(s)
+    }
+
+    /// Algebraic simplification
+    pub fn simpl(a: Regex) -> Regex {
+        G.mk(RegexF::simpl(&*a))
     }
 
     /// Matches empty string (ε)
@@ -436,6 +374,11 @@ pub mod re {
     /// A single character ([c] character class)
     pub fn character(c: char) -> Regex {
         G.mk(RegexF::CharClass(CharClass::single(c)))
+    }
+
+    /// Range of characters
+    pub fn charclass(v: &[(char,Option<char>)]) -> Regex {
+        G.mk(RegexF::CharClass(OpenSet::from_iter(v.into_iter().map(|(a,b)| (*a, *b)))))
     }
 
     /// Concatenation
@@ -487,10 +430,6 @@ pub mod re {
         G.mk(RegexF::starplus(&*a, n))
     }
 
-    /// A list of character ranges
-    pub fn charclass(v: Vec<(char,char)>) -> Regex {
-        G.mk(RegexF::charclass(v))
-    }
     /// Derivative
     pub fn deriv(a: &Regex, c: &char) -> Regex {
         G.mk(RegexF::deriv(&*a, c))
@@ -506,18 +445,6 @@ pub mod re {
         let (s, rem) = (*a).extract_skip(ab)?;
         Some((s, G.mk(rem)))
     }
-
-    /// Extract an [alt] set from a regex, use distributivity to append the rest
-    pub fn to_alt_set(a: &Regex) -> BTreeSet<Regex> {
-        (*a).to_alt_set()
-            .into_iter().map(|rf| G.mk(rf)).collect()
-    }
-
-    /// Extract an [and] set from a regex, for [(a & b)c => [a, bc]]
-    pub fn to_and_set(a: &Regex) -> BTreeSet<Regex> {
-        (*a).to_and_set()
-            .into_iter().map(|rf| G.mk(rf)).collect()
-    }
 }
 
 #[test]
@@ -532,7 +459,7 @@ fn test_regex_zero_length() {
             re::app(re::character('F'), re::character('o')),
             re::character('o')
         ),
-        re::new("^Foo$")
+        re::simpl(re::new("^Foo$"))
     );
 }
 
@@ -546,7 +473,7 @@ fn test_regex_ranges() {
             ),
             re::dotstar()
         ),
-        re::new("[a-b]")
+        re::simpl(re::new("[a-b]"))
     );
 }
 
@@ -554,20 +481,20 @@ fn test_regex_ranges() {
 fn test_regex_dot_star() {
     assert_eq!(
         re::app(re::app(re::dotstar(), re::character('c')), re::dotstar()),
-        re::new("^.*c")
+        re::simpl(re::new("^.*c"))
     );
 }
 
 #[test]
 fn regex_parser_test_repetition_range() {
-    assert_eq!(re::range(re::character('a'), 1, 3), re::new("^a{1,3}$"));
+    assert_eq!(re::range(re::character('a'), 1, 3), re::simpl(re::new("^a{1,3}$")));
 }
 
 #[test]
 fn test_regex_negative_char_class() {
     assert_eq!(
         re::app(re::not(re::character('a')), re::character('b')),
-        re::new("^[^a]b$")
+        re::simpl(re::new("^[^a]b$"))
     );
 }
 
@@ -585,43 +512,23 @@ fn test_regex_negative_char_class2() {
             ),
             re::dotstar()
         ),
-        re::new("[^ab]c")
+        re::simpl(re::new("[^ab]c"))
     );
 }
 
 #[test]
 fn test_regex_dot() {
-    assert_eq!(re::app(re::dot(), re::character('a'),), re::new("^.a$"));
+    assert_eq!(re::app(re::dot(), re::character('a'),), re::simpl(re::new("^.a$")));
 }
 
 #[test]
 fn test_regex_negate_class() {
-    assert_eq!(re::charclass(vec![('\0', '`'), ('b', '\u{10ffff}')]), re::new("^[^a]$"))
+    assert_eq!(re::charclass(&[('\0', Some('`')), ('b', None)]), re::simpl(re::new("^[^a]$")))
 }
 
 #[test]
 fn test_regex_lookahead() {
-    assert_eq!(re::app(re::character('a'), re::dotstar()), re::new("^(?=a)"))
-}
-
-#[test]
-fn test_regex_negative_lookahead() {
-    assert_eq!(re::and(re::not(re::character('a')), re::nil()), re::new("^(?!a)$"))
-}
-
-#[test]
-fn test_regex_negative_range() {
-    let r = re::new("^(?=.{2,3}a)");
-    let rn =re::new("^(?!.{2,3}a)");
-   println!("Pos {}, Neg {}", r, rn);
-   println!("Pos Simpl {}, Neg Simpl {}", r.simpl(), rn.simpl());
-
-    assert_eq!(re::alt(
-        re::alt(
-            re::range(re::dot(), 0, 1),
-            re::range(re::not(re::character('a')), 2,3)),
-        re::starplus(re::character('a'), 4)),
-        re::new("^(?!.{2,3}a)"))
+    assert_eq!(re::app(re::character('a'), re::dotstar()), re::simpl(re::new("^(?=a)")))
 }
 
 #[test]
@@ -631,19 +538,13 @@ fn test_regex_negative_char_class_range() {
             re::app(
                 re::app(
                     re::dotstar(),
-                    re::not(re::alt(
-                        re::character('a'),
-                        re::alt(
-                            re::character('b'),
-                            re::alt(re::character('c'), re::character('d'),)
-                        )
-                    ))
+                    re::not(re::charclass(&[('a', Some('d'))]))
                 ),
                 re::character('e')
             ),
             re::dotstar()
         ),
-        re::new("[^a-d]e")
+        re::simpl(re::new("[^a-d]e"))
     );
 }
 //add test for :space:, alphanum, etc

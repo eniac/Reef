@@ -1,40 +1,5 @@
 #![allow(missing_docs)]
-use crate::regex::{CharClass, RegexF, RegexF::*};
-
-impl Ord for CharClass {
-    fn cmp(&self, other: &CharClass) -> std::cmp::Ordering {
-        if self.is_empty() && other.is_empty() {
-            std::cmp::Ordering::Equal
-        } else if let Some(s) = self.is_single() {
-            if let Some(o) = other.is_single() {
-                s.cmp(&o)
-            } else if let Some(h) = other.head() {
-                s.cmp(&h.0)
-            } else { // [other] empty
-                std::cmp::Ordering::Greater
-            }
-        } else {
-            for x in self.0.iter() {
-                for y in other.0.iter() {
-                    let r0 = x.0.cmp(&y.0);
-                    let r1 = x.1.cmp(&y.1);
-                    if r0 != std::cmp::Ordering::Equal {
-                        return r0;
-                    } else if r1 != std::cmp::Ordering::Equal {
-                        return r1;
-                    }
-                }
-            }
-            std::cmp::Ordering::Equal
-        }
-    }
-}
-
-impl PartialOrd for CharClass {
-    fn partial_cmp(&self, other: &CharClass) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
+use crate::regex::{RegexF, RegexF::*};
 
 impl PartialOrd for RegexF {
     fn partial_cmp(&self, other: &RegexF) -> Option<std::cmp::Ordering> {
@@ -42,7 +7,6 @@ impl PartialOrd for RegexF {
             (Nil, Nil) => Some(std::cmp::Ordering::Equal),
             (Dot, Dot) => Some(std::cmp::Ordering::Equal),
             (RegexF::CharClass(a), RegexF::CharClass(b)) => a.partial_cmp(b),
-            (Not(ref a), Not(ref b)) => a.partial_cmp(b),
             (App(ref a, ref b), App(ref c, ref d)) => match a.partial_cmp(c) {
                 Some(std::cmp::Ordering::Equal) => b.partial_cmp(d),
                 ordering => ordering,
@@ -74,7 +38,6 @@ impl Ord for RegexF {
             (Nil, Nil) => std::cmp::Ordering::Equal,
             (Dot, Dot) => std::cmp::Ordering::Equal,
             (RegexF::CharClass(a), RegexF::CharClass(b)) => a.cmp(&b),
-            (Not(ref a), Not(ref b)) => a.cmp(b),
             (App(ref a, ref b), App(ref c, ref d)) => match a.cmp(c) {
                 std::cmp::Ordering::Equal => b.cmp(d),
                 ordering => ordering,
@@ -102,8 +65,6 @@ impl Ord for RegexF {
             (_, Dot) => std::cmp::Ordering::Greater,
             (RegexF::CharClass(_), _) => std::cmp::Ordering::Less,
             (_, RegexF::CharClass(_)) => std::cmp::Ordering::Greater,
-            (Not(_), _) => std::cmp::Ordering::Less,
-            (_, Not(_)) => std::cmp::Ordering::Greater,
             (App(_, _), _) => std::cmp::Ordering::Less,
             (_, App(_, _)) => std::cmp::Ordering::Greater,
             (Alt(_, _), _) => std::cmp::Ordering::Less,

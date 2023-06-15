@@ -1,7 +1,6 @@
 use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
 use crate::safa::{Either, SAFA, Trace, TraceElem};
-use crate::skip::Skip;
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
@@ -176,12 +175,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         //        println!("DOC {:#?}", doc.clone());
 
         for (in_node, edge, out_node) in safa.deltas() {
-            let in_state = in_node.0.index(); // check AND/OR?
+            let in_state = in_node.inner.index(); // check AND/OR?
             let out_state = out_node.index();
             let c = match edge {
-                Either(Err(e)) if e.is_epsilon() => num_ab[&None],       //EPSILON
-                Either(Err(Skip::Choice(us))) => todo!(),                //num_ab(us),
-                Either(Err(Skip::Star(n))) => todo!(),                   //write!(f, "*"),
+                Either(Err(e)) if e.is_nil() => num_ab[&None],       //EPSILON
+                Either(Err(e)) => todo!(),                               //num_ab(us),
                 Either(Ok(ch)) => num_ab[&Some(ch)],
             };
 

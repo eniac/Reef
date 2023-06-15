@@ -48,10 +48,6 @@ impl RegexParser {
                 Ok(RegexF::And(Self::to_regex(g)?, G.mk(b))),
             Expr::LookAround(g, LookAround::LookBehind) =>
                 Ok(RegexF::App(Self::to_regex(g)?, G.mk(b))),
-            Expr::LookAround(g, LookAround::LookAheadNeg) =>
-                Ok(RegexF::And(G.mk(RegexF::Not(Self::to_regex(g)?)), G.mk(b))),
-            Expr::LookAround(g, LookAround::LookBehindNeg) =>
-                Ok(RegexF::App(G.mk(RegexF::Not(Self::to_regex(g)?)), G.mk(b))),
             Expr::Group(g) => Self::shallow_app(g, b),
             _ => Ok(RegexF::App(Self::to_regex(a)?, G.mk(b)))
         }
@@ -96,8 +92,6 @@ impl RegexParser {
             Expr::Group(g) => Self::to_regex(&g),
             Expr::LookAround(g, LookAround::LookAhead) => Self::to_regex(g),
             Expr::LookAround(g, LookAround::LookBehind) => Self::to_regex(g),
-            Expr::LookAround(g, LookAround::LookAheadNeg) => Self::to_regex(g),
-            Expr::LookAround(g, LookAround::LookBehindNeg) => Self::to_regex(g),
             Expr::Delegate { inner, .. } => {
                 let re = regex_syntax::Parser::new().parse(inner).unwrap();
                 match re.kind() {
@@ -106,8 +100,11 @@ impl RegexParser {
                           RegexF::charclass(
                             ranges.ranges()
                                   .into_iter()
-                                  .map(|s| (s.start(), s.end()))
-                                  .collect()))),
+                                  .map(|s| if s.end() == '\u{10ffff}' {
+                                      (s.start(), None)
+                                    } else {
+                                      (s.start(), Some(s.end()))
+                                    }).collect()))),
                     HirKind::Literal(Literal::Unicode(c)) => Ok(re::character(*c)),
                     _ => Err(format!("Unsupported regex (regex_syntax) {:#?}", re.kind())),
                 }
