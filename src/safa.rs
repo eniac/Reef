@@ -567,8 +567,8 @@ mod tests {
     fn test_safa_range_nested() {
         // unsafe { backtrace_on_stack_overflow::enable() };
         let r = re::simpl(re::new("^(.{1,3}){1,2}b$"));
-        println!("REGEX {}", r);
         let safa = SAFA::new("ab", &r);
+        safa.write_pdf("safa").unwrap();
         let doc: Vec<_> = "aaaab".chars().collect();
         equiv_upto_epsilon(
             &safa.solve(&doc),

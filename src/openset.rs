@@ -52,15 +52,18 @@ impl<C: Display + Debug + Step + Default + Ord + Copy + Clone> OpenRange<C> {
     pub fn union(&self, o: &Self) -> OpenSet<C> {
         match (self.end, o.end) {
             (None, None) => OpenSet::open(self.start.min(o.start)),
-            (Some(e), None) if e < o.start => OpenSet(BTreeSet::from([self.clone(), o.clone()])), // no overlap
-            (None, Some(e)) if e < self.start => OpenSet(BTreeSet::from([self.clone(), o.clone()])), // no overlap
+            (Some(e), None) if Step::forward(e, 1) < o.start => {
+                OpenSet(BTreeSet::from([self.clone(), o.clone()]))
+            } // no overlap
+            (None, Some(e)) if Step::forward(e, 1) < self.start => {
+                OpenSet(BTreeSet::from([self.clone(), o.clone()]))
+            } // no overlap
             (Some(_), None) | (None, Some(_)) => OpenSet::open(self.start.min(o.start)),
             (Some(se), Some(oe)) => {
                 let start = self.start.max(o.start);
                 let end = se.min(oe);
-
-                if start <= end {
-                    OpenSet::closed(start, end)
+                if start <= Step::forward(end, 1) {
+                    OpenSet::closed(self.start.min(o.start), se.max(oe))
                 } else {
                     OpenSet(BTreeSet::from([self.clone(), o.clone()]))
                 }
@@ -144,7 +147,7 @@ impl<C: Debug + Step + Ord + Eq + Display + Default + Copy> fmt::Display for Ope
         }
         let mut it = self.0.iter();
         if let Some(v) = it.next() {
-            write!(f, "[ {}", v)?;
+            write!(f, "[{}", v)?;
             for r in it {
                 write!(f, ", {}", r)?;
             }
@@ -275,17 +278,16 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
 
     /// Insert an interval in the range set
     pub fn insert(&mut self, r: &OpenRange<C>) {
-        if let Some(h) = self.0.pop_first() {
-            let rset = r.union(&h);
-            if rset.len() == 2 {
-                self.insert(r);
-                self.0.insert(h);
-            } else { // len == 1
-                self.insert(rset.0.first().unwrap())
-            }
-        } else {
-            *self = OpenSet(BTreeSet::from([r.clone()]))
+        let mut v: BTreeSet<_> = self.0.clone();
+        v.insert(r.clone());
+        // Guaranteed to have at least one elem
+        let mut next: OpenRange<_> = v.first().unwrap().clone();
+        let mut acc = next.union(&next);
+        for i in v {
+            next = acc.0.pop_last().unwrap().clone();
+            acc.0.append(&mut next.union(&i).0);
         }
+        *self = acc;
     }
 
     /// The union of two open sets
@@ -412,6 +414,21 @@ fn test_openrange_app() {
         OpenRange::closed(1, 2).app(&OpenRange::closed(4, 6)),
         OpenRange::closed(5, 8)
     )
+}
+
+#[test]
+fn test_openrange_merge() {
+    assert_eq!(
+        OpenRange::closed(1, 2).union(&OpenRange::closed(3, 4)),
+        OpenSet::closed(1, 4)
+    )
+}
+
+#[test]
+fn test_openset_insert() {
+    let mut s = OpenSet::closed(1, 2);
+    s.insert(&OpenRange::closed(3, 4));
+    assert_eq!(s, OpenSet::closed(1, 4))
 }
 
 #[test]
