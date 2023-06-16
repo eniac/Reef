@@ -682,6 +682,7 @@ mod tests {
             "^stat(s|istics)?[0-9]*[_.-]",
         ] {
             let r = re::simpl(re::new(s));
+            println!("PIHOLE {}",r);
             let safa = SAFA::new(&ab, &r);
             println! {"Regex: {:#?}",s};
             let mut states = HashSet::new();

@@ -331,6 +331,7 @@ impl RegexF {
             RegexF::Nil => RegexF::empty(),
             RegexF::CharClass(cs) if cs.is_empty() => RegexF::empty(),
             RegexF::CharClass(cs) if cs.contains(c) => RegexF::nil(),
+            RegexF::Dot => RegexF::nil(),
             RegexF::CharClass(_) => RegexF::empty(),
             RegexF::App(ref a, ref b) if a.nullable() => {
                 RegexF::alt(&RegexF::app(&a.deriv(c), b), &b.deriv(c))
