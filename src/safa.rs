@@ -325,11 +325,11 @@ impl SAFA<char> {
         }
         if self.g[n].is_and() {
             // All of the next entries must have solutions
-            let subsolutions: Vec<_> =
-                self.edges(n)
-                    .into_iter()
-                    .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
-                    .collect();
+            let subsolutions: Vec<_> = self
+                .edges(n)
+                .into_iter()
+                .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
+                .collect();
             // All of them need to be set
             if subsolutions.iter().all(Option::is_some) {
                 Some(Trace(
@@ -343,7 +343,8 @@ impl SAFA<char> {
             }
         } else {
             // One of the next entries must has a solution
-            self.edges(n).into_par_iter()
+            self.edges(n)
+                .into_par_iter()
                 .find_map_any(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
         }
     }
@@ -573,13 +574,7 @@ mod tests {
         equiv_upto_epsilon(
             &safa.solve(&doc),
             &Trace::new(&[
-                TraceElem::new(
-                    0,
-                    &Either(Err(Skip::closed(1, 6))),
-                    1,
-                    0,
-                    4,
-                ),
+                TraceElem::new(0, &Either(Err(Skip::closed(1, 6))), 1, 0, 4),
                 TraceElem::new(1, &Either(Ok('b')), 3, 4, 5),
             ]),
         )
@@ -593,13 +588,7 @@ mod tests {
         equiv_upto_epsilon(
             &safa.solve(&doc),
             &Trace::new(&[
-                TraceElem::new(
-                    4,
-                    &Either(Err(Skip::closed(4, 5))),
-                    5,
-                    0,
-                    4,
-                ),
+                TraceElem::new(4, &Either(Err(Skip::closed(4, 5))), 5, 0, 4),
                 TraceElem::new(5, &Either(Ok('b')), 2, 4, 5),
             ]),
         )
@@ -618,7 +607,7 @@ mod tests {
                 TraceElem::new(6, &Either(Ok('b')), 3, 1, 2),
                 TraceElem::new(0, &SAFA::epsilon(), 1, 0, 0),
                 TraceElem::new(1, &Either(Ok('a')), 2, 0, 1),
-                TraceElem::new(2, &Either(Err(Skip::open(0))), 3, 1, 2)
+                TraceElem::new(2, &Either(Err(Skip::open(0))), 3, 1, 2),
             ]),
         )
     }
@@ -682,7 +671,7 @@ mod tests {
             "^stat(s|istics)?[0-9]*[_.-]",
         ] {
             let r = re::simpl(re::new(s));
-            println!("PIHOLE {}",r);
+            println!("PIHOLE {}", r);
             let safa = SAFA::new(&ab, &r);
             println! {"Regex: {:#?}",s};
             let mut states = HashSet::new();

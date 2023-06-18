@@ -1,6 +1,7 @@
 use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
-use crate::safa::{Either, SAFA};
+use crate::openset::OpenSet;
+use crate::safa::{Either, Skip, SAFA};
 use crate::trace::{Trace, TraceElem};
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
@@ -13,7 +14,11 @@ use neptune::{
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
 };
-use petgraph::graph::NodeIndex;
+use petgraph::{
+    graph::{EdgeReference, NodeIndex},
+    prelude::Dfs,
+    visit::EdgeRef,
+};
 use rug::{integer::Order, ops::RemRounding, Integer};
 use std::cmp::max;
 use std::collections::LinkedList;
@@ -41,6 +46,10 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     is_match: bool,
     //pub substring: (usize, usize), // todo getters
     pub pc: PoseidonConstants<F, typenum::U4>,
+}
+
+fn type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F, char> {
@@ -101,9 +110,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let is_match = moves.is_some();
 
         let mut sel_batch_size = 1;
-        for m in moves.clone().unwrap().0 {
+        /*for m in moves.clone().unwrap().0 {
             sel_batch_size = max(sel_batch_size, m.to_cur - m.from_cur);
-        }
+        }*/
         println!("BATCH {:#?}", sel_batch_size);
 
         println!(
@@ -159,40 +168,213 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             i += 1;
         }
         num_ab.insert(None, i); // EPSILON
+        num_ab.insert(Some('*'), i + 1); // STAR
 
         // generate T
         let num_states = safa.g.node_count();
         let num_chars = safa.ab.len();
-        let mut delta = FxHashMap::default(); //TODO (rm duplicates)
+        let max_offsets = 1; //TODO!!
 
         // TODO range check
         let mut table = vec![];
 
-        safa.write_pdf("safa").unwrap();
+        safa.write_pdf("safa1").unwrap();
 
         println!("ACCEPTING {:#?}", safa.accepting);
-        //        println!("DELTAS {:#?}", safa.deltas());
-        println!("SOLVE {:#?}", safa.solve(&doc));
+        //println!("DELTAS {:#?}", safa.deltas());
+        //println!("SOLVE {:#?}", safa.solve(&doc));
         //        println!("DOC {:#?}", doc.clone());
+        println!(
+            "STATES {:#?}",
+            safa.g
+                .node_indices()
+                .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
+        );
 
-        for (in_node, edge, out_node) in safa.deltas() {
-            let in_state = in_node.inner.index(); // check AND/OR?
-            let out_state = out_node.index();
-            let c = match edge {
-                Either(Err(e)) if e.is_nil() => num_ab[&None],       //EPSILON
-                Either(Err(e)) => todo!(),                               //num_ab(us),
-                Either(Ok(ch)) => num_ab[&Some(ch)],
-            };
+        let mut dfs = Dfs::new(&safa.g, safa.get_init());
 
-            table.push(
-                Integer::from((in_state * num_states * num_chars) + (out_state * num_chars) + c)
-                    .rem_floor(cfg().field().modulus()),
-            );
+        let mut mappings: LinkedList<LinkedList<(usize, usize)>> = LinkedList::new();
+        let mut accepting_map_state = None;
 
-            delta.insert((in_state, c), out_state);
+        while let Some(state) = dfs.next(&safa.g) {
+            if safa.g[state].is_and() {
+                let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
+                    .g
+                    .edges(state)
+                    .filter(|e| e.source() != e.target())
+                    .collect();
+                and_edges.sort_by(|a, b| a.target().partial_cmp(&b.target()).unwrap());
+                let mut and_states = vec![];
+
+                for i in 0..and_edges.len() {
+                    match and_edges[i].weight().clone() {
+                        Either(Err(openset)) => {
+                            let single = openset.is_single(); // single offset/epsilon
+                            if single.is_some() {
+                                // is single
+                                let offset = single.unwrap();
+                                if offset == 0 {
+                                    // epsilon
+                                    and_states.push(and_edges[i].target().index());
+                                } else {
+                                    panic!("a");
+                                }
+                            } else {
+                                panic!("b");
+                            }
+                        }
+                        _ => {
+                            panic!("Weird edge coming from ForAll node {:#?}", state);
+                        }
+                    }
+                }
+
+                let mut new_map = LinkedList::new();
+                for i in 1..and_states.len() {
+                    new_map.push_back((and_states[i - 1], and_states[i]));
+                }
+                if mappings.len() > 0 {
+                    let mut last_map: LinkedList<(usize, usize)> = mappings.pop_back().unwrap();
+                    new_map.push_back((
+                        and_states[and_states.len() - 1],
+                        last_map.pop_back().unwrap().1,
+                    ));
+                    mappings.push_back(last_map);
+                }
+                mappings.push_back(new_map);
+            } else {
+                // other state
+                let in_state = state.index();
+                match mappings.back().clone() {
+                    Some(lm) => {
+                        let last_map: LinkedList<(usize, usize)> = lm.clone();
+                        let mut lm_iter = last_map.iter();
+                        let mut map = lm_iter.next();
+                        while map.is_some() {
+                            let (s, e) = map.unwrap();
+                            if s.clone() == in_state {
+                                accepting_map_state = Some(e.clone());
+                            }
+                            map = lm_iter.next();
+                        }
+                    }
+                    None => {}
+                }
+
+                for edge in safa.g.edges(state) {
+                    let out_state = edge.target().index();
+
+                    match edge.weight().clone() {
+                        Either(Err(openset)) => {
+                            let single = openset.is_single(); // single offset/epsilon
+                            if single.is_some() {
+                                // is single
+                                let offset = single.unwrap();
+                                // if offset == 0 { -> doesn't matter, always use epsilon for actual
+                                // epsilon and for jumps
+
+                                let c = num_ab[&None]; //EPSILON
+                                let rel = 0;
+                                table.push(
+                                    Integer::from(
+                                        (in_state * num_states * num_chars * max_offsets * 2)
+                                            + (out_state * num_chars * max_offsets * 2)
+                                            + (c * max_offsets * 2)
+                                            + (offset * 2)
+                                            + rel,
+                                    )
+                                    .rem_floor(cfg().field().modulus()),
+                                );
+                            } else if openset.is_full() {
+                                // [0,*]
+                                let c = num_ab[&Some('*')];
+                                let offset = 0; // TODO?
+                                let rel = 0;
+
+                                table.push(
+                                    Integer::from(
+                                        (in_state * num_states * num_chars * max_offsets * 2)
+                                            + (out_state * num_chars * max_offsets * 2)
+                                            + (c * max_offsets * 2)
+                                            + (offset * 2)
+                                            + rel,
+                                    )
+                                    .rem_floor(cfg().field().modulus()),
+                                );
+                            } else {
+                                // ranges
+                                let mut iter = openset.0.iter();
+                                if let Some(r) = iter.next() {
+                                    let mut offset = r.start;
+                                    while offset <= r.end.unwrap() {
+                                        let c = num_ab[&None]; //EPSILON
+                                        let rel = 0;
+
+                                        table.push(
+                                            Integer::from(
+                                                (in_state
+                                                    * num_states
+                                                    * num_chars
+                                                    * max_offsets
+                                                    * 2)
+                                                    + (out_state * num_chars * max_offsets * 2)
+                                                    + (c * max_offsets * 2)
+                                                    + (offset * 2)
+                                                    + rel,
+                                            )
+                                            .rem_floor(cfg().field().modulus()),
+                                        );
+                                        offset += 1;
+                                    }
+                                }
+                            }
+                        }
+                        Either(Ok(ch)) => {
+                            let c = num_ab[&Some(ch)];
+                            let offset = 1;
+                            let rel = 0;
+                            table.push(
+                                Integer::from(
+                                    (in_state * num_states * num_chars * max_offsets * 2)
+                                        + (out_state * num_chars * max_offsets * 2)
+                                        + (c * max_offsets * 2)
+                                        + (offset * 2)
+                                        + rel,
+                                )
+                                .rem_floor(cfg().field().modulus()),
+                            );
+                        }
+                    }
+                }
+
+                if safa.accepting.contains(&state) {
+                    if accepting_map_state.is_none() {
+                        assert!(mappings.len() == 0); // just one path
+                    } else {
+                        let in_state = state.index();
+                        let out_state = accepting_map_state.unwrap();
+                        let c = num_ab[&None]; //EPSILON
+                        let offset = 1; // TODO refers to the level of stack to pop from
+                        let rel = 1;
+
+                        println!("FAKE {:#?} -> {:#?}", in_state, out_state);
+                        // "fake" forall ordering edge
+                        table.push(
+                            Integer::from(
+                                (in_state * num_states * num_chars * max_offsets * 2)
+                                    + (out_state * num_chars * max_offsets * 2)
+                                    + (c * max_offsets * 2)
+                                    + (offset * 2)
+                                    + rel,
+                            )
+                            .rem_floor(cfg().field().modulus()),
+                        );
+                    }
+                }
+            }
         }
 
-        // need to round out table size
+        // need to round out table size ?
         let base: usize = 2;
         while table.len() < base.pow(logmn(table.len()) as u32) {
             table.push(
@@ -224,9 +406,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         Self {
             safa,
             num_ab,
-            table, // TODO fix else
-            delta,
-            batching, // TODO
+            table,                       // TODO fix else
+            delta: FxHashMap::default(), // TODO elim
+            batching,                    // TODO
             commit_type: commit,
             reef_commit: None,
             assertions: Vec::new(),
@@ -242,7 +424,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             pc: pcs,
         }
     }
-
     pub fn set_commitment(&mut self, rc: ReefCommitment<F>) {
         match (&rc, self.commit_type) {
             (ReefCommitment::HashChain(_), JCommit::HashChain) => {
@@ -1619,7 +1800,7 @@ mod tests {
         batch_sizes: Vec<usize>,
         expected_match: bool,
     ) {
-        let r = re::new(&rstr);
+        let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
 
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
@@ -1660,7 +1841,13 @@ mod tests {
                     let mut next_state;
 
                     let mut _start_epsilons;
-                    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().0.into_iter().collect();
+                    let moves: Vec<_> = r1cs_converter
+                        .moves
+                        .clone()
+                        .unwrap()
+                        .0
+                        .into_iter()
+                        .collect();
                     let num_steps = moves.len();
 
                     let mut current_state = moves[0].from_node.index();

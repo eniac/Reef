@@ -134,7 +134,7 @@ impl<C: Display + Eq + Default> fmt::Display for OpenRange<C> {
 }
 
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct OpenSet<C>(BTreeSet<OpenRange<C>>);
+pub struct OpenSet<C>(pub BTreeSet<OpenRange<C>>);
 
 impl<C: Debug + Step + Ord + Eq + Display + Default + Copy> fmt::Display for OpenSet<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
