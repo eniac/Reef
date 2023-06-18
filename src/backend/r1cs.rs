@@ -27,6 +27,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub safa: &'a SAFA<C>,
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
+    max_offsets: usize,
     delta: FxHashMap<(usize, usize), usize>, // in state, char as num, out state
     pub batching: JBatching,
     pub commit_type: JCommit,
@@ -173,24 +174,40 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // generate T
         let num_states = safa.g.node_count();
         let num_chars = safa.ab.len();
-        let max_offsets = 1; //TODO!!
+        let mut max_offsets = 1;
+        for (_, edge, _) in safa.deltas() {
+            match edge {
+                Either(Err(openset)) => {
+                    if openset.is_single().is_none() && !openset.is_full() {
+                        // ranges
+                        let mut num_offsets = 0;
+                        let mut iter = openset.0.iter();
+                        if let Some(r) = iter.next() {
+                            num_offsets += r.end.unwrap() - r.start;
+                        }
+                        max_offsets = max(max_offsets, num_offsets);
+                    }
+                }
+                _ => {}
+            }
+        }
 
         // TODO range check
         let mut table = vec![];
 
         safa.write_pdf("safa1").unwrap();
 
-        println!("ACCEPTING {:#?}", safa.accepting);
+        //        println!("ACCEPTING {:#?}", safa.accepting);
         //println!("DELTAS {:#?}", safa.deltas());
         //println!("SOLVE {:#?}", safa.solve(&doc));
         //        println!("DOC {:#?}", doc.clone());
-        println!(
-            "STATES {:#?}",
-            safa.g
-                .node_indices()
-                .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-        );
-
+        /*      println!(
+                    "STATES {:#?}",
+                    safa.g
+                        .node_indices()
+                        .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
+                );
+        */
         let mut dfs = Dfs::new(&safa.g, safa.get_init());
 
         let mut mappings: LinkedList<LinkedList<(usize, usize)>> = LinkedList::new();
@@ -406,7 +423,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         Self {
             safa,
             num_ab,
-            table,                       // TODO fix else
+            table, // TODO fix else
+            max_offsets,
             delta: FxHashMap::default(), // TODO elim
             batching,                    // TODO
             commit_type: commit,
@@ -533,24 +551,55 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         Op::PfNaryOp(PfNaryOp::Add),
                         vec![
                             term(
-                                Op::PfNaryOp(PfNaryOp::Mul),
+                                Op::PfNaryOp(PfNaryOp::Add),
                                 vec![
-                                    new_var(format!("state_{}", i - 1)),
-                                    new_const(num_states * num_chars),
+                                    term(
+                                        Op::PfNaryOp(PfNaryOp::Add),
+                                        vec![
+                                            term(
+                                                Op::PfNaryOp(PfNaryOp::Mul),
+                                                vec![
+                                                    new_var(format!("state_{}", i - 1)),
+                                                    new_const(
+                                                        num_states
+                                                            * num_chars
+                                                            * self.max_offsets
+                                                            * 2,
+                                                    ),
+                                                ],
+                                            ),
+                                            term(
+                                                Op::PfNaryOp(PfNaryOp::Mul),
+                                                vec![
+                                                    new_var(format!("state_{}", i)),
+                                                    new_const(num_chars * self.max_offsets * 2),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
+                                    term(
+                                        Op::PfNaryOp(PfNaryOp::Mul),
+                                        vec![
+                                            new_var(format!("char_{}", i - 1)),
+                                            new_const(self.max_offsets * 2),
+                                        ],
+                                    ),
                                 ],
                             ),
                             term(
                                 Op::PfNaryOp(PfNaryOp::Mul),
-                                vec![new_var(format!("state_{}", i)), new_const(num_chars)],
+                                vec![new_var(format!("offset_{}", i - 1)), new_const(2)],
                             ),
                         ],
                     ),
-                    new_var(format!("char_{}", i - 1)),
+                    new_var(format!("rel_{}", i - 1)),
                 ],
             );
             v.push(v_i.clone());
             self.pub_inputs.push(new_var(format!("state_{}", i - 1)));
             self.pub_inputs.push(new_var(format!("char_{}", i - 1)));
+            self.pub_inputs.push(new_var(format!("offset_{}", i - 1)));
+            self.pub_inputs.push(new_var(format!("rel_{}", i - 1)));
 
             if include_vs {
                 let match_v = term(Op::Eq, vec![new_var(format!("v_{}", i)), v_i]);
@@ -642,7 +691,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     pub fn to_circuit(&mut self) -> (ProverData, VerifierData) {
         match self.batching {
-            JBatching::NaivePolys => self.to_polys(),
+            JBatching::NaivePolys => unimplemented!(), //self.to_polys(),
             JBatching::Nlookup => self.to_nlookup(),
         }
     }
@@ -668,7 +717,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         match self.commit_type {
             JCommit::HashChain => {
-                self.hashchain_commit();
+                unimplemented!(); //self.hashchain_commit();
             }
             JCommit::Nlookup => {
                 self.nlookup_doc_commit();
@@ -897,7 +946,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         match self.commit_type {
             JCommit::HashChain => {
-                self.hashchain_commit();
+                unimplemented!(); //self.hashchain_commit();
             }
             JCommit::Nlookup => {
                 self.nlookup_doc_commit();
@@ -1045,33 +1094,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         Option<isize>,
     ) {
         match self.batching {
-            JBatching::NaivePolys => {
-                let (
-                    wits,
-                    next_state,
-                    next_doc_running_claim_q,
-                    next_doc_running_claim_v,
-                    start_epsilons,
-                    next_doc_idx,
-                ) = self.gen_wit_i_polys(
-                    move_num,
-                    batch_num,
-                    current_state,
-                    prev_doc_running_claim_q,
-                    prev_doc_running_claim_v,
-                    prev_doc_idx,
-                );
-                (
-                    wits,
-                    next_state,
-                    None,
-                    None,
-                    next_doc_running_claim_q,
-                    next_doc_running_claim_v,
-                    start_epsilons,
-                    next_doc_idx,
-                )
-            }
+            JBatching::NaivePolys => unimplemented!(),
             JBatching::Nlookup => self.gen_wit_i_nlookup(
                 move_num,
                 batch_num,
@@ -1082,27 +1105,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 prev_doc_running_claim_v,
                 prev_doc_idx,
             ),
-        }
-    }
-
-    fn access_doc_at(&self, move_num: (usize, usize), batch_num: usize, i: usize) -> (usize, bool) {
-        let access_at = i; //batch_num * self.batch_size + i;
-
-        match self.commit_type {
-            JCommit::HashChain => {
-                println!("access {}", access_at);
-                (access_at, access_at >= move_num.1)
-            }
-
-            JCommit::Nlookup => {
-                if access_at >= move_num.1 {
-                    println!("access {}", self.udoc.len() - 1);
-                    (self.udoc.len() - 1, true)
-                } else {
-                    println!("access {}", access_at);
-                    (access_at, false)
-                }
-            }
         }
     }
 
@@ -1198,22 +1200,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         match self.commit_type {
             JCommit::HashChain => {
-                /*  for i in 0..=self.batch_size {
-                    wits.insert(
-                        format!("i_{}", i),
-                        new_wit(batch_num * self.batch_size + i + move_num.0),
-                    );
-                }*/
-                (
-                    wits,
-                    next_state,
-                    Some(next_running_q),
-                    Some(next_running_v),
-                    None,
-                    None,
-                    start_epsilons,
-                    None,
-                )
+                unimplemented!();
             }
             JCommit::Nlookup => {
                 assert!(doc_running_q.is_some() || batch_num == 0);
@@ -1514,6 +1501,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         (wits, next_running_q, next_running_v)
     }
 
+    /*
     // TODO BATCH SIZE (rn = 1)
     fn gen_wit_i_polys(
         &self,
@@ -1572,14 +1560,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         match self.commit_type {
             JCommit::HashChain => {
-                /*  for i in 0..=self.batch_size {
-                    wits.insert(
-                        format!("i_{}", i),
-                        new_wit(batch_num * self.batch_size + i + move_num.0),
-                    );
-                }*/
-                // values not actually checked or used
-                (wits, next_state, None, None, start_epsilons, None)
+                unimplemented!()
             }
             JCommit::Nlookup => {
                 assert!(doc_running_q.is_some() || batch_num == 0);
@@ -1604,7 +1585,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 )
             }
         }
-    }
+    }*/
 }
 
 pub fn ceil_div(a: usize, b: usize) -> usize {
@@ -1806,8 +1787,8 @@ mod tests {
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
 
         for s in batch_sizes {
-            for c in vec![JCommit::HashChain, JCommit::Nlookup] {
-                for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
+            for c in vec![JCommit::Nlookup] {
+                for b in vec![JBatching::Nlookup] {
                     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(
                         Strength::Standard,
                     );
