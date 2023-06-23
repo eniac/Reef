@@ -727,12 +727,54 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.r1cs_conv()
     }
 
-    // TODO get rid of i compares
     fn hashchain_commit(&mut self) {
         /*    self.pub_inputs.push(new_var(format!("i_0")));
         for idx in 1..=self.batch_size {
             self.pub_inputs.push(new_var(format!("i_{}", idx)));
         }*/ //uneeded I believe
+    }
+
+    fn cursor_circuit(&mut self) {
+        for j in 0..self.batch_size {
+            // if star, geq
+            // else normal
+            // i_j+1 = i_j + offset
+
+            let cursor_plus = term(
+                Op::Eq,
+                vec![
+                    new_var(format!("i_{}", j + 1)), // vanishing
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Add),
+                        vec![
+                            new_var(format!("i_{}", j)),
+                            new_var(format!("offset_{}", j)),
+                        ],
+                    ),
+                ],
+            );
+
+            let cursor_geq = term(
+                Op::IntBinPred(IntBinPred::Ge),
+                vec![new_var(format!("i_{}", j + 1)), new_var(format!("i_{}", j))],
+            );
+
+            let ite_term = term(
+                Op::Ite,
+                vec![
+                    term(
+                        Op::Eq,
+                        vec![
+                            new_const(self.num_ab[&Some('*')]),
+                            new_var(format!("offest_{}", j)),
+                        ],
+                    ),
+                    cursor_geq,
+                    cursor_plus,
+                ],
+            );
+            self.assertions.push(ite_term);
+        }
     }
 
     // for use at the end of sum check
@@ -941,6 +983,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs(true);
         self.nlookup_gadget(lookups, self.table.len(), "nl"); // len correct? TODO
+        self.cursor_circuit();
 
         self.accepting_state_circuit(); // TODO
 
