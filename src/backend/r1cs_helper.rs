@@ -1,11 +1,16 @@
 use crate::backend::nova::int_to_ff;
+use crate::safa::{Either, Skip, SAFA};
+use crate::trace::{Trace, TraceElem};
 use circ::cfg;
 use circ::cfg::*;
 use circ::ir::term::*;
 use ff::PrimeField;
 use generic_array::typenum;
 use neptune::sponge::{api::SpongeAPI, vanilla::Sponge};
+use petgraph::{graph::EdgeReference, prelude::Dfs, visit::EdgeRef};
 use rug::{integer::Order, ops::RemRounding, Assign, Integer};
+use std::collections::HashSet;
+use std::collections::LinkedList;
 use std::sync::Once;
 
 pub static INIT: Once = Once::new();
@@ -49,6 +54,82 @@ where
 }
 
 // PROVER WORK
+pub(crate) fn trace_preprocessing(
+    trace: &Option<Trace<char>>,
+    safa: &SAFA<char>,
+) -> Vec<LinkedList<TraceElem<char>>> {
+    // split
+    let mut sols: HashSet<LinkedList<TraceElem<char>>> = HashSet::new();
+    let mut sol = trace.clone().unwrap().0;
+    let mut i = 0;
+    let mut state_i = 0;
+    for e in sol.clone().iter() {
+        if state_i != e.from_node.index() {
+            let new_sol = sol.split_off(i);
+            sols.insert(sol);
+            sol = new_sol;
+            i = 0;
+
+            //println!("sols {:#?}, sol {:#?}", sols, sol);
+        }
+
+        state_i = e.to_node.index();
+        i += 1;
+    }
+
+    sols.insert(sol);
+
+    // sort
+    let mut sorted_sols = vec![];
+    let mut dfs = Dfs::new(&safa.g, safa.get_init());
+
+    while let Some(state) = dfs.next(&safa.g) {
+        if safa.g[state].is_and() {
+            let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
+                .g
+                .edges(state)
+                .filter(|e| e.source() != e.target())
+                .collect();
+            and_edges.sort_by(|a, b| a.target().partial_cmp(&b.target()).unwrap());
+
+            for i in 0..and_edges.len() {
+                match and_edges[i].weight().clone() {
+                    Either(Err(openset)) => {
+                        let single = openset.is_single(); // single offset/epsilon
+                        if single.is_some() {
+                            // is single
+                            let offset = single.unwrap();
+                            if offset == 0 {
+                                // epsilon
+
+                                // find solution in vec
+                                for e in sols.clone() {
+                                    let front = e.front().unwrap();
+                                    if and_edges[i].source() == front.from_node
+                                        && and_edges[i].target() == front.to_node
+                                    {
+                                        assert_eq!(and_edges[i].weight().clone(), front.edge);
+                                        sorted_sols.push(e);
+                                    }
+                                }
+                            } else {
+                                panic!("a");
+                            }
+                        } else {
+                            panic!("b");
+                        }
+                    }
+                    _ => {
+                        panic!("Weird edge coming from ForAll node {:#?}", state);
+                    }
+                }
+            }
+        }
+    }
+
+    assert_eq!(sorted_sols.len(), sols.len());
+    sorted_sols
+}
 
 // a starts with evals on hypercube
 pub(crate) fn linear_mle_product<F: PrimeField>(

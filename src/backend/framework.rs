@@ -262,10 +262,6 @@ fn setup<'a>(
         pp.num_variables().1
     );
 
-
-    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().0.into_iter().collect();
-    let move_0 = (moves[0].from_cur, moves[0].to_cur);
-
     // this variable could be two different types of things, which is potentially dicey, but
     // literally whatever
     let blind = match r1cs_converter.reef_commit.clone().unwrap() {
@@ -274,7 +270,7 @@ fn setup<'a>(
     };
     // TODO only do this for HC
     let prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
-        ReefCommitment::HashChain(_) => r1cs_converter.prover_calc_hash(blind, true, 0, move_0.0),
+        ReefCommitment::HashChain(_) => unimplemented!(),
         ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
     };
 
@@ -284,7 +280,7 @@ fn setup<'a>(
         (JBatching::NaivePolys, JCommit::HashChain) => {
             vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(move_0.0 as u64),
+                <G1 as Group>::Scalar::from(0 as u64), //wrong
                 prev_hash.clone(),
                 <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(current_state)),
             ]
@@ -292,7 +288,7 @@ fn setup<'a>(
         (JBatching::Nlookup, JCommit::HashChain) => {
             let mut z = vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(move_0.0 as u64), //<G1 as Group>::Scalar::from(0), //nfa.ab_to_num(&doc[0]) as u64),
+                <G1 as Group>::Scalar::from(0 as u64), // wrong <G1 as Group>::Scalar::from(0), //nfa.ab_to_num(&doc[0]) as u64),
                 prev_hash.clone(),
             ];
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
@@ -305,7 +301,7 @@ fn setup<'a>(
         (JBatching::NaivePolys, JCommit::Nlookup) => {
             let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
 
-            z.push(<G1 as Group>::Scalar::from(move_0.0 as u64));
+            z.push(<G1 as Group>::Scalar::from(0 as u64)); // wrong
 
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
             z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
@@ -320,7 +316,7 @@ fn setup<'a>(
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
             z.push(int_to_ff(r1cs_converter.table[0].clone()));
 
-            z.push(<G1 as Group>::Scalar::from(move_0.0 as u64));
+            z.push(<G1 as Group>::Scalar::from(0 as u64)); //wrong
             z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
             z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
             z.push(<G1 as Group>::Scalar::from(
@@ -330,7 +326,7 @@ fn setup<'a>(
         }
     };
 
-    let num_steps = r1cs_converter.moves.clone().unwrap().0.len();
+    let num_steps = 1; // TODO r1cs_converter.moves.clone().unwrap().0.len();
     assert!(num_steps > 0, "trying to prove something about 0 foldings");
 
     (num_steps, z0_primary, pp)
@@ -342,7 +338,7 @@ fn solve<'a>(
     circ_data: &'a ProverData,
     num_steps: usize,
 ) {
-    let q_len = logmn(r1cs_converter.table.len());
+    /* let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());
 
     // this variable could be two different types of things, which is potentially dicey, but
@@ -608,7 +604,7 @@ fn solve<'a>(
         doc_running_q = next_doc_running_q;
         doc_running_v = next_doc_running_v;
         prev_doc_idx = next_doc_idx;
-    }
+    }*/
 }
 
 fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof_info: ProofInfo) {
@@ -805,8 +801,8 @@ mod tests {
 
     use crate::backend::framework::*;
     use crate::backend::r1cs_helper::init;
-    use crate::safa::SAFA;
     use crate::regex::{re, Regex};
+    use crate::safa::SAFA;
 
     fn backend_test(
         ab: String,

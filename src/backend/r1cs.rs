@@ -43,8 +43,8 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     pub doc_extend: usize,
-    pub moves: Option<Trace<char>>,
     is_match: bool,
+    pub sol_num: usize,
     //pub substring: (usize, usize), // todo getters
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
@@ -107,10 +107,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         //      let sel_batch_size = opt_batch_size;
 
         // TODO timing here
-        let moves = safa.solve(&doc);
-        let is_match = moves.is_some();
+        let sol = safa.solve(&doc);
+        let is_match = sol.is_some();
 
-        let mut sel_batch_size = 1;
+        let mut sel_batch_size = sol.unwrap().0.len();
         /*for m in moves.clone().unwrap().0 {
             sel_batch_size = max(sel_batch_size, m.to_cur - m.from_cur);
         }*/
@@ -201,13 +201,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         //println!("DELTAS {:#?}", safa.deltas());
         //println!("SOLVE {:#?}", safa.solve(&doc));
         //        println!("DOC {:#?}", doc.clone());
-        /*      println!(
-                    "STATES {:#?}",
-                    safa.g
-                        .node_indices()
-                        .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-                );
-        */
+        println!(
+            "STATES {:#?}",
+            safa.g
+                .node_indices()
+                .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
+        );
+
         let mut dfs = Dfs::new(&safa.g, safa.get_init());
 
         let mut mappings: LinkedList<LinkedList<(usize, usize)>> = LinkedList::new();
@@ -371,7 +371,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         let in_state = state.index();
                         let out_state = accepting_map_state.unwrap();
                         let c = num_ab[&None]; //EPSILON
-                        let offset = 1; // TODO refers to the level of stack to pop from
+                        let offset = 0; // TODO refers to the level of stack to pop from
                         let rel = 1;
 
                         println!("FAKE {:#?} -> {:#?}", in_state, out_state);
@@ -420,6 +420,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             int_doc.push(Integer::from(u));
         }
 
+        println!("TABLE {:#?}", table);
+
         Self {
             safa,
             num_ab,
@@ -436,8 +438,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
             doc_extend: epsilon_to_add,
-            moves,
             is_match,
+            sol_num: 0,
             //substring,
             pc: pcs,
         }
@@ -456,7 +458,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
-    // IN THE CLEAR
     pub fn prover_calc_hash(
         &self,
         start_hash_or_blind: F,
@@ -754,9 +755,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
 
+            // TODO LIMIT bits here
             let cursor_geq = term(
-                Op::IntBinPred(IntBinPred::Ge),
-                vec![new_var(format!("i_{}", j + 1)), new_var(format!("i_{}", j))],
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(Op::PfToBv(254), vec![new_var(format!("i_{}", j + 1))]),
+                    term(Op::PfToBv(254), vec![new_var(format!("i_{}", j))]),
+                ],
             );
 
             let ite_term = term(
@@ -766,7 +771,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         Op::Eq,
                         vec![
                             new_const(self.num_ab[&Some('*')]),
-                            new_var(format!("offest_{}", j)),
+                            new_var(format!("offset_{}", j)),
                         ],
                     ),
                     cursor_geq,
@@ -1117,8 +1122,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     pub fn gen_wit_i(
-        &self,
-        move_num: (usize, usize),
+        &mut self,
+        solution: &mut Vec<LinkedList<TraceElem<char>>>,
         batch_num: usize,
         current_state: usize,
         prev_running_claim_q: Option<Vec<Integer>>,
@@ -1139,7 +1144,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         match self.batching {
             JBatching::NaivePolys => unimplemented!(),
             JBatching::Nlookup => self.gen_wit_i_nlookup(
-                move_num,
+                solution,
                 batch_num,
                 current_state,
                 prev_running_claim_q,
@@ -1151,11 +1156,34 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
+    // returns char_num, is_star
+    fn get_char_num(&self, edge: Either<char, OpenSet<usize>>) -> (usize, bool) {
+        match edge {
+            Either(Err(openset)) => {
+                let single = openset.is_single(); // single offset/epsilon
+                if single.is_some() {
+                    // is single
+                    // if offset == 0 { -> doesn't matter, always use epsilon for actual
+                    // epsilon and for jumps
+
+                    (self.num_ab[&None], false) //EPSILON
+                } else if openset.is_full() {
+                    // [0,*]
+                    (self.num_ab[&Some('*')], true)
+                } else {
+                    // ranges
+                    (self.num_ab[&None], false) //EPSILON
+                }
+            }
+            Either(Ok(ch)) => (self.num_ab[&Some(ch)], false),
+        }
+    }
+
     fn gen_wit_i_nlookup(
-        &self,
-        move_num: (usize, usize),
+        &mut self,
+        sols: &mut Vec<LinkedList<TraceElem<char>>>, //move_num: (usize, usize),
         batch_num: usize,
-        current_state: usize,
+        current_state: usize, // TODO DEL, and TODO DEL start_epsilons
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
         doc_running_q: Option<Vec<Integer>>,
@@ -1174,57 +1202,119 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut wits = FxHashMap::default();
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
-        let mut state_i = current_state;
+        let mut state_i = 0;
         let mut next_state = 0;
 
         let mut v = vec![];
         let mut q = vec![];
         let mut start_epsilons = -1;
-        for i in 1..=self.batch_size {
-            let (access_at, is_epsilon) =
-                self.access_doc_at(move_num, batch_num, i - 1 + move_num.0);
+        let mut i = 1;
+        while i <= self.batch_size {
+            let mut char_num = self.num_ab[&None];
+            next_state = state_i;
+            let mut offset_i = 0;
+            let mut rel_i = 0;
+            let mut is_star = false;
 
-            let char_num;
-
-            //println!("is EPSILON? {:#?}", is_epsilon);
-            if is_epsilon {
-                next_state = self.delta[&(state_i, self.num_ab[&None])];
-                char_num = self.num_ab[&None]; // TODO
+            if self.sol_num >= sols.len()
+                || (self.sol_num == sols.len() - 1 && sols[self.sol_num].is_empty())
+            {
+                // pad epsilons (above vals) bc we're done
             } else {
-                next_state = self.delta[&(state_i, self.udoc[access_at])];
-                char_num = self.udoc[access_at];
-                println!(
-                    "search for ({:#?},{:#?}) in delta",
-                    state_i,
-                    self.udoc[access_at].clone(),
-                    //self.delta.clone()
-                );
+                if sols[self.sol_num].is_empty() {
+                    self.sol_num += 1;
+                }
+                let te = sols[self.sol_num].pop_front().unwrap();
+                println!("{:#?}", te);
+                (char_num, is_star) = self.get_char_num(te.edge);
+                next_state = te.to_node.index();
+                offset_i = te.to_cur - te.from_cur;
+                rel_i = 0;
+
+                if self.safa.g[te.from_node].is_and() {
+                    //ForAll
+                    // see if we need to insert fake edge in the solution
+                    if state_i != te.from_node.index() {
+                        rel_i = 1;
+                        offset_i = 0; // TODO!!
+
+                        wits.insert(format!("char_{}", i - 1), new_wit(char_num));
+                        wits.insert(format!("state_{}", i - 1), new_wit(state_i));
+                        wits.insert(format!("offset_{}", i - 1), new_wit(offset_i));
+                        wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
+
+                        // v_i =
+                        let num_states = self.safa.g.node_count();
+                        let num_chars = self.safa.ab.len();
+
+                        // TODO check overflow
+                        let v_i = Integer::from(
+                            (state_i * num_states * num_chars * self.max_offsets * 2)
+                                + (next_state * num_chars * self.max_offsets * 2)
+                                + (char_num * self.max_offsets * 2)
+                                + (offset_i * 2)
+                                + (rel_i),
+                        )
+                        .rem_floor(cfg().field().modulus());
+                        v.push(v_i.clone());
+                        wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
+
+                        println!(
+                            "V_I = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?}",
+                            v_i, state_i, next_state, char_num, offset_i, rel_i
+                        );
+                        q.push(self.table.iter().position(|val| val == &v_i).unwrap());
+
+                        i += 1;
+                    } else {
+                        // we don't need to prove this edge's exsistence
+                        assert_eq!(offset_i, 0);
+                        assert_eq!(char_num, self.num_ab[&None]);
+                    }
+                } else {
+                    //check from last loop
+                    assert_eq!(state_i, te.from_node.index());
+                    // state_i = te.from_node.index(); // current
+
+                    // potentially, the edge is a *, and we are provided a concrete offset
+                    println!("is star {:#?}", is_star);
+                    if is_star {
+                        offset_i = 0; //TODO
+                    }
+
+                    // back to normal
+
+                    wits.insert(format!("char_{}", i - 1), new_wit(char_num));
+                    wits.insert(format!("state_{}", i - 1), new_wit(state_i));
+                    wits.insert(format!("offset_{}", i - 1), new_wit(offset_i));
+                    wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
+
+                    // v_i =
+                    let num_states = self.safa.g.node_count();
+                    let num_chars = self.safa.ab.len();
+
+                    // TODO check overflow
+                    let v_i = Integer::from(
+                        (state_i * num_states * num_chars * self.max_offsets * 2)
+                            + (next_state * num_chars * self.max_offsets * 2)
+                            + (char_num * self.max_offsets * 2)
+                            + (offset_i * 2)
+                            + (rel_i),
+                    )
+                    .rem_floor(cfg().field().modulus());
+                    v.push(v_i.clone());
+                    wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
+
+                    println!(
+                        "V_I = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?}",
+                        v_i, state_i, next_state, char_num, offset_i, rel_i
+                    );
+                    q.push(self.table.iter().position(|val| val == &v_i).unwrap());
+
+                    i += 1;
+                }
+                state_i = next_state;
             }
-
-            //println!("Char {:#?}", char_num);
-            //println!("Next State {:#?}", next_state);
-
-            wits.insert(format!("char_{}", i - 1), new_wit(char_num));
-            wits.insert(format!("state_{}", i - 1), new_wit(state_i));
-
-            if (start_epsilons == -1) && is_epsilon {
-                start_epsilons = (i - 1) as isize;
-            }
-
-            // v_i = (state_i * (#states*#chars)) + (state_i+1 * #chars) + char_i
-            let num_states = self.safa.g.node_count();
-            let num_chars = self.safa.ab.len();
-
-            let v_i = Integer::from(
-                (state_i * num_states * num_chars) + (next_state * num_chars) + char_num,
-            )
-            .rem_floor(cfg().field().modulus());
-            v.push(v_i.clone());
-            wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-
-            q.push(self.table.iter().position(|val| val == &v_i).unwrap());
-
-            state_i = next_state;
         }
 
         // last state
@@ -1251,7 +1341,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let (w, next_doc_running_q, next_doc_running_v, next_doc_idx) = self
                     .wit_nlookup_doc_commit(
                         wits,
-                        move_num,
                         batch_num,
                         doc_running_q,
                         doc_running_v,
@@ -1275,7 +1364,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     fn wit_nlookup_doc_commit(
         &self,
         mut wits: FxHashMap<String, Value>,
-        move_num: (usize, usize),
         batch_num: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
@@ -1284,7 +1372,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut v = vec![];
         let mut q = vec![];
         for i in 0..self.batch_size {
-            let (access_at, _is_epsilon) = self.access_doc_at(move_num, batch_num, i + move_num.0);
+            let (access_at, _is_epsilon) = (1, false); //TODO self.access_doc_at(move_num, batch_num, i + move_num.0);
             q.push(access_at);
 
             v.push(self.idoc[access_at].clone());
@@ -1293,10 +1381,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // q relations
         let prev_round_lookup = if prev_idx.is_some() {
             Integer::from(prev_idx.unwrap())
-        } else if move_num.0 == 0 {
+        } else if batch_num == 0 {
+            // not sure if correct replacement
             Integer::from(-1)
         } else {
-            Integer::from(move_num.0 - 1)
+            Integer::from(batch_num - 1)
         };
 
         println!("PREV ROUND Q LOOKUP {:#?}", prev_round_lookup.clone());
@@ -1865,20 +1954,18 @@ mod tests {
                     let mut next_state;
 
                     let mut _start_epsilons;
-                    let moves: Vec<_> = r1cs_converter
-                        .moves
-                        .clone()
-                        .unwrap()
-                        .0
-                        .into_iter()
-                        .collect();
-                    let num_steps = moves.len();
 
-                    let mut current_state = moves[0].from_node.index();
+                    let trace = safa.solve(&chars);
+                    println!("TRACE {:#?}", trace);
+
+                    let mut sols = trace_preprocessing(&trace, &safa);
+                    println!("SOLS {:#?}", sols);
+
+                    let num_steps = 1; //sol.len();
+                    println!("NUM STEPS {:#?}", num_steps);
+                    let mut current_state = 0; // TODOmoves[0].from_node.index();
 
                     for i in 0..num_steps {
-                        let move_i = (moves[i].from_cur, moves[i].to_cur);
-
                         (
                             values,
                             next_state,
@@ -1889,7 +1976,7 @@ mod tests {
                             _start_epsilons,
                             doc_idx,
                         ) = r1cs_converter.gen_wit_i(
-                            move_i,
+                            &mut sols,
                             0, // i, TODO
                             current_state,
                             running_q.clone(),
@@ -1975,7 +2062,7 @@ mod tests {
         init();
         test_func_no_hash(
             "abcd".to_string(),
-            "^abcd$".to_string(),
+            "^(?=a)abcd$".to_string(),
             "abcd".to_string(),
             vec![1], // 2],
             true,
