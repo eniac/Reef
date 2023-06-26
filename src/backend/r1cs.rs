@@ -603,10 +603,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.pub_inputs.push(new_var(format!("rel_{}", i - 1)));
 
             if include_vs {
-                let match_v = term(Op::Eq, vec![new_var(format!("v_{}", i)), v_i]);
+                let match_v = term(Op::Eq, vec![new_var(format!("v_{}", i - 1)), v_i]);
 
                 self.assertions.push(match_v);
-                self.pub_inputs.push(new_var(format!("v_{}", i)));
+                self.pub_inputs.push(new_var(format!("v_{}", i - 1)));
             }
         }
         self.pub_inputs
@@ -683,9 +683,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
         // LEAVE THIS IN HERE FOR DEBUGGING >:(
-        /*for r in circ_r1cs.constraints().clone() {
+        for r in circ_r1cs.constraints().clone() {
             println!("{:#?}", circ_r1cs.format_qeq(&r));
-        }*/
+        }
 
         circ_r1cs.finalize(&final_cs)
     }
@@ -1179,6 +1179,55 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
+    fn normal_v(
+        &self,
+        wits: &mut FxHashMap<String, Value>,
+        q: &mut Vec<usize>,
+        char_num: usize,
+        state_i: usize,
+        next_state: usize,
+        offset_i: usize,
+        rel_i: usize,
+        i: usize,
+    ) -> Integer {
+        wits.insert(format!("char_{}", i - 1), new_wit(char_num));
+        wits.insert(format!("state_{}", i - 1), new_wit(state_i));
+        wits.insert(format!("offset_{}", i - 1), new_wit(offset_i));
+        wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
+
+        // v_i =
+        let num_states = self.safa.g.node_count();
+        let num_chars = self.safa.ab.len();
+
+        // TODO check overflow
+        let v_i = Integer::from(
+            (state_i * num_states * num_chars * self.max_offsets * 2)
+                + (next_state * num_chars * self.max_offsets * 2)
+                + (char_num * self.max_offsets * 2)
+                + (offset_i * 2)
+                + (rel_i),
+        )
+        .rem_floor(cfg().field().modulus());
+
+        //v.push(v_i.clone());
+        wits.insert(format!("v_{}", i - 1), new_wit(v_i.clone()));
+
+        println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?}",
+            i - 1,
+            v_i,
+            state_i,
+            next_state,
+            char_num,
+            offset_i,
+            rel_i
+        );
+
+        q.push(self.table.iter().position(|val| val == &v_i).unwrap());
+
+        v_i
+    }
+
     fn gen_wit_i_nlookup(
         &mut self,
         sols: &mut Vec<LinkedList<TraceElem<char>>>, //move_num: (usize, usize),
@@ -1220,6 +1269,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 || (self.sol_num == sols.len() - 1 && sols[self.sol_num].is_empty())
             {
                 // pad epsilons (above vals) bc we're done
+                v.push(self.normal_v(
+                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, i,
+                ));
+                i += 1;
             } else {
                 if sols[self.sol_num].is_empty() {
                     self.sol_num += 1;
@@ -1236,35 +1289,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     // see if we need to insert fake edge in the solution
                     if state_i != te.from_node.index() {
                         rel_i = 1;
-                        offset_i = 0; // TODO!!
 
-                        wits.insert(format!("char_{}", i - 1), new_wit(char_num));
-                        wits.insert(format!("state_{}", i - 1), new_wit(state_i));
-                        wits.insert(format!("offset_{}", i - 1), new_wit(offset_i));
-                        wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
-
-                        // v_i =
-                        let num_states = self.safa.g.node_count();
-                        let num_chars = self.safa.ab.len();
-
-                        // TODO check overflow
-                        let v_i = Integer::from(
-                            (state_i * num_states * num_chars * self.max_offsets * 2)
-                                + (next_state * num_chars * self.max_offsets * 2)
-                                + (char_num * self.max_offsets * 2)
-                                + (offset_i * 2)
-                                + (rel_i),
-                        )
-                        .rem_floor(cfg().field().modulus());
-                        v.push(v_i.clone());
-                        wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-
-                        println!(
-                            "V_I = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?}",
-                            v_i, state_i, next_state, char_num, offset_i, rel_i
-                        );
-                        q.push(self.table.iter().position(|val| val == &v_i).unwrap());
-
+                        v.push(self.normal_v(
+                            &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, i,
+                        ));
                         i += 1;
                     } else {
                         // we don't need to prove this edge's exsistence
@@ -1283,39 +1311,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     }
 
                     // back to normal
-
-                    wits.insert(format!("char_{}", i - 1), new_wit(char_num));
-                    wits.insert(format!("state_{}", i - 1), new_wit(state_i));
-                    wits.insert(format!("offset_{}", i - 1), new_wit(offset_i));
-                    wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
-
-                    // v_i =
-                    let num_states = self.safa.g.node_count();
-                    let num_chars = self.safa.ab.len();
-
-                    // TODO check overflow
-                    let v_i = Integer::from(
-                        (state_i * num_states * num_chars * self.max_offsets * 2)
-                            + (next_state * num_chars * self.max_offsets * 2)
-                            + (char_num * self.max_offsets * 2)
-                            + (offset_i * 2)
-                            + (rel_i),
-                    )
-                    .rem_floor(cfg().field().modulus());
-                    v.push(v_i.clone());
-                    wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-
-                    println!(
-                        "V_I = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?}",
-                        v_i, state_i, next_state, char_num, offset_i, rel_i
-                    );
-                    q.push(self.table.iter().position(|val| val == &v_i).unwrap());
-
+                    v.push(self.normal_v(
+                        &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, i,
+                    ));
                     i += 1;
                 }
                 state_i = next_state;
             }
         }
+        println!("DONE LOOP");
 
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
@@ -1326,6 +1330,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
         wits = w;
 
+        println!("LU GAD");
         wits.insert(
             format!("accepting"),
             new_wit(self.prover_accepting_state(batch_num)),
@@ -1977,7 +1982,7 @@ mod tests {
                             doc_idx,
                         ) = r1cs_converter.gen_wit_i(
                             &mut sols,
-                            0, // i, TODO
+                            i,
                             current_state,
                             running_q.clone(),
                             running_v.clone(),
@@ -1987,6 +1992,7 @@ mod tests {
                         );
 
                         pd.check_all(&values);
+
                         // for next i+1 round
                         current_state = next_state;
                     }
