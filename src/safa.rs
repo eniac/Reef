@@ -632,6 +632,84 @@ mod tests {
     }
 
     #[test]
+    fn test_safa_basic_lookahead() {
+        for s in vec![r"(?=a.*).*ed$"] {
+            let r = re::simpl(re::new(s));
+            let safa = SAFA::new("abcde", &r);
+            println!{"Regex: {:#?}",r};
+
+            print_states(&safa);
+            println!("DELTAS");
+            for d in safa.deltas() {
+                println!("{}, {}, {}", d.0, d.1, d.2.index());
+            }
+
+            let strdoc = "aed";
+            let doc = strdoc.chars().collect();
+
+            let sol = safa.solve(&doc);
+
+            println!("SOLUTION for: {}", strdoc);
+            println!("{:?}", sol);
+            assert_ne!(sol,None);
+        }
+    }
+
+    #[test]
+    fn test_safa_negative() {
+        for s in vec![
+            r"^(A|BCD).{3}hello$"
+            //r"abcd",r"a.*bd"
+        ] {
+            let r = re::simpl(re::new(s));
+            let safa = SAFA::new("ACBDhello", &r);
+            println! {"Regex: {:#?}",s};
+            print_states(&safa);
+            println!("DELTAS");
+                for d in safa.deltas() {
+                    println!("{}, {}, {}", d.0, d.1, d.2.index());
+            }
+            let strdoc = "abbb";
+            let doc = strdoc.chars().collect();
+
+            let sol = safa.solve(&doc);
+
+            println!("SOLUTION for: {}", strdoc);
+            println!("{:?}", sol);
+            assert_ne!(sol, None);
+        }
+    }
+
+    #[test]
+    fn test_safa_negative_password() {
+        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+        let ab: String = abvec.iter().collect();
+        for s in vec![
+            r"(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$",
+        ] {
+            let r = re::simpl(re::new(s));
+            let safa = (SAFA::new(&ab, &r)).negate();
+            println! {"Regex: {:#?}",s};
+            // let mut states = HashSet::new();
+            // let mut ntrans: usize = 0;
+            // for d in safa.deltas() {
+            //     states.insert(d.0);
+            //     ntrans = ntrans + 1;
+            // }
+            // println! {"N States: {:#?}",states.len()};
+            // println! {"N Trans: {:#?}",ntrans};
+
+            let strdoc = "password123";
+            let doc = strdoc.chars().collect();
+
+            let sol = safa.solve(&doc);
+
+            println!("SOLUTION for: {}", strdoc);
+            println!("{:?}", sol);
+            assert_ne!(sol, None);
+        }
+    }
+    #[test]
     fn test_safa_validate_password() {
         let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
         let ab: String = abvec.iter().collect();
@@ -773,9 +851,10 @@ mod tests {
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = re::new("(?=a.*b.*)acb$");
-        let safa = SAFA::new("abc", &r);
-        safa.write_pdf("safa3").unwrap();
+        let r = re::simpl(re::new(".*hello.*$"));
+        let mut safa = SAFA::new("hello", &r);
+        // safa = safa.negate();
+        safa.write_pdf("safa7").unwrap();
         // let strdoc = "baababab";
         // let doc = strdoc.chars().collect();
 

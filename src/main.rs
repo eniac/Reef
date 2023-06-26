@@ -51,9 +51,9 @@ fn main() {
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA", "DFA");
 
-    #[cfg(feature = "plot")]
-    safa.as_str_safa().write_pdf("main")
-        .expect("Failed to plot NFA to a pdf file");
+    // #[cfg(feature = "plot")]
+    // safa.as_str_safa().write_pdf("main")
+    //     .expect("Failed to plot NFA to a pdf file");
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "DFA Solving", "Clear Match");

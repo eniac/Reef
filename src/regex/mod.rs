@@ -565,4 +565,78 @@ fn test_regex_negative_char_class_range() {
         re::simpl(re::new("[^a-d]e"))
     );
 }
-//add test for :space:, alphanum, etc
+
+pub fn get_proj_size(r: &RegexF, size: u32) -> i32{
+    let mut out = -1;
+    match &r {
+        RegexF::Nil | RegexF::Dot | RegexF::CharClass(_) => {
+            out = 1;
+        },
+        RegexF::App(x, y) => {
+            let l = get_proj_size(&x.simpl(), size);
+            let r = get_proj_size(&y.simpl(), size);
+            if l > 0 { 
+                out = l + r;
+            } else {
+                out = l;
+            }
+        }
+        RegexF::Alt(x, y) => {
+            let l = get_proj_size(&x.simpl(), size); 
+            let r = get_proj_size(&x.simpl(), size); 
+            if l==r {
+                out = 0;
+            } else {
+                out = l;
+            }
+        }
+        RegexF::Star(a) => {out = 0},
+        RegexF::And(x, y) => {
+            let l = get_proj_size(&x.simpl(), size);
+            let r = get_proj_size(&y.simpl(), size);
+            if l > 0 { 
+                out = l + r;
+            } else {
+                out = l;
+            }
+        }
+        RegexF::Range(a, i, j) => {
+            if i == j {
+                out = get_proj_size(&a.simpl(), size) * (*i as i32);
+            } else {
+                out = 0;
+            }
+        }
+    }
+    return out;
+}
+
+#[test]
+fn test_for_proj() {
+    let r = re::simpl(re::new(r"^[a-c]*d"));
+    match &(r.get()) {
+        RegexF::App(x,y) =>  println!("{:#?}",x),
+        _ => println!("pass")
+    };
+    println!("{:#?}",r);
+   
+}
+
+#[test]
+fn test_for_proj2() {
+    let r = re::simpl(re::new(r"^[a-c]{4}d"));
+    match &(r.get()) {
+        RegexF::App(x,y) =>  println!("{:#?}",x),
+        _ => println!("pass")
+    };
+    println!("{:#?}",r);
+   
+}
+
+#[test]
+fn test_for_proj3() {
+    let r = re::simpl(re::new(r"^[a-c]*d"));
+    println!("{:#?}",r);
+    println!("{:#?}",get_proj_size(r.get(), 0));
+   
+}
