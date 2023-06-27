@@ -448,11 +448,14 @@ pub mod re {
         Some((s, G.mk(rem)))
     }
 
-    pub fn get_proj_size(r: &RegexF, size: u32) -> i32{
-        let mut out = -1;
+    pub fn get_proj_size(r: &RegexF, size: u32) -> u32{
+        let mut out = 0;
         match &r {
-            RegexF::Nil | RegexF::Dot | RegexF::CharClass(_) => {
+            RegexF::Dot => {
                 out = 1;
+            }
+            RegexF::Nil | RegexF::CharClass(_) => {
+                out = 0;
             },
             RegexF::App(x, y) => {
                 let l = get_proj_size(&x.simpl(), size);
@@ -484,15 +487,26 @@ pub mod re {
             }
             RegexF::Range(a, i, j) => {
                 if i == j {
-                    out = get_proj_size(&a.simpl(), size) * (*i as i32);
+                    out = get_proj_size(&a.simpl(), size) * (*i as u32);
                 } else {
                     out = 0;
                 }
             }
         }
         return out;
-    }    
+    }   
+
+    pub fn projection_pow2(r: &RegexF) -> u32 {
+        let mut proj_size = get_proj_size(r, 0);
+        if proj_size <= 1 {
+            1
+        } else {
+            (u32::MAX >> (proj_size - 1).leading_zeros()) + 1
+        }
+    }
+
 }
+
 
 #[test]
 fn test_regex_ord() {
@@ -635,8 +649,8 @@ fn test_for_proj2() {
 
 #[test]
 fn test_for_proj3() {
-    let r = re::simpl(re::new(r"^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"));
+    let r = re::simpl(re::new(r"^.{10}abcd.{5}"));
     // println!("{:#?}",r);
     println!("{:#?}",re::get_proj_size(r.get(), 0));
-   
+    println!("{:#?}",re::projection_pow2(r.get()));
 }
