@@ -214,6 +214,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut mappings: LinkedList<LinkedList<(usize, usize)>> = LinkedList::new();
         let mut fake_to_level: FxHashMap<(usize, usize), usize> = FxHashMap::default();
         let mut accepting_map_state = None;
+        let mut alert_dups: FxHashMap<usize, usize> = FxHashMap::default(); // dup -> accepting
 
         while let Some(state) = dfs.next(&safa.g) {
             if safa.g[state].is_and() {
@@ -399,8 +400,34 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             // there's a path to this
                             // accepting state that has not
                             // been visited
-                            println!("JDFKLSDJ {:#?}", e.source());
+                            println!("ALERT DUP {:#?}", e.source());
+                            alert_dups.insert(e.source().index(), e.target().index());
                         }
+                    }
+                } else if alert_dups.contains_key(&state.index()) {
+                    let in_state = alert_dups.remove(&state.index()).unwrap(); // accepting state
+                    if accepting_map_state.is_none() {
+                        assert!(mappings.len() == 0); // just one path
+                    } else {
+                        let out_state = accepting_map_state.unwrap();
+                        let c = num_ab[&None]; //EPSILON
+                        let offset = 0; // TODO refers to the level of stack to pop from
+                        let rel = 1;
+
+                        println!("FAKE {:#?} -> {:#?}", in_state, out_state);
+                        fake_to_level.insert((in_state, out_state), offset);
+
+                        // "fake" forall ordering edge
+                        table.push(
+                            Integer::from(
+                                (in_state * num_states * num_chars * max_offsets * 2)
+                                    + (out_state * num_chars * max_offsets * 2)
+                                    + (c * max_offsets * 2)
+                                    + (offset * 2)
+                                    + rel,
+                            )
+                            .rem_floor(cfg().field().modulus()),
+                        );
                     }
                 }
             }
