@@ -17,7 +17,8 @@ use neptune::{
 use petgraph::{
     graph::{EdgeReference, NodeIndex},
     prelude::Dfs,
-    visit::EdgeRef,
+    visit::{EdgeRef, VisitMap},
+    Incoming,
 };
 use rug::{integer::Order, ops::RemRounding, Integer};
 use std::cmp::max;
@@ -28,7 +29,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     max_offsets: usize,
-    delta: FxHashMap<(usize, usize), usize>, // in state, char as num, out state
+    fake_to_level: FxHashMap<(usize, usize), usize>, // fake edge -> stack level
     pub batching: JBatching,
     pub commit_type: JCommit,
     pub reef_commit: Option<ReefCommitment<F>>,
@@ -197,7 +198,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         safa.write_pdf("safa1").unwrap();
 
-        //        println!("ACCEPTING {:#?}", safa.accepting);
+        println!("ACCEPTING {:#?}", safa.accepting);
         //println!("DELTAS {:#?}", safa.deltas());
         //println!("SOLVE {:#?}", safa.solve(&doc));
         //        println!("DOC {:#?}", doc.clone());
@@ -211,6 +212,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut dfs = Dfs::new(&safa.g, safa.get_init());
 
         let mut mappings: LinkedList<LinkedList<(usize, usize)>> = LinkedList::new();
+        let mut fake_to_level: FxHashMap<(usize, usize), usize> = FxHashMap::default();
         let mut accepting_map_state = None;
 
         while let Some(state) = dfs.next(&safa.g) {
@@ -252,13 +254,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
                 if mappings.len() > 0 {
                     let mut last_map: LinkedList<(usize, usize)> = mappings.pop_back().unwrap();
-                    new_map.push_back((
-                        and_states[and_states.len() - 1],
-                        last_map.pop_back().unwrap().1,
-                    ));
+                    new_map
+                        .push_back((and_states[and_states.len() - 1], last_map.back().unwrap().1));
                     mappings.push_back(last_map);
                 }
                 mappings.push_back(new_map);
+                println!("MAPPINGS: {:#?}", mappings);
             } else {
                 // other state
                 let in_state = state.index();
@@ -375,6 +376,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         let rel = 1;
 
                         println!("FAKE {:#?} -> {:#?}", in_state, out_state);
+                        fake_to_level.insert((in_state, out_state), offset);
+
                         // "fake" forall ordering edge
                         table.push(
                             Integer::from(
@@ -386,6 +389,18 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             )
                             .rem_floor(cfg().field().modulus()),
                         );
+                    }
+
+                    // have to make sure that other forall paths count these guys if there are
+                    // multiple paths there
+                    let mut incoming = safa.g.edges_directed(state, Incoming);
+                    while let Some(e) = incoming.next() {
+                        if !dfs.discovered.is_visited(&e.source()) {
+                            // there's a path to this
+                            // accepting state that has not
+                            // been visited
+                            println!("JDFKLSDJ {:#?}", e.source());
+                        }
                     }
                 }
             }
@@ -427,8 +442,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_ab,
             table, // TODO fix else
             max_offsets,
-            delta: FxHashMap::default(), // TODO elim
-            batching,                    // TODO
+            fake_to_level,
+            batching, // TODO
             commit_type: commit,
             reef_commit: None,
             assertions: Vec::new(),
@@ -683,9 +698,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
         // LEAVE THIS IN HERE FOR DEBUGGING >:(
-        for r in circ_r1cs.constraints().clone() {
+        /*for r in circ_r1cs.constraints().clone() {
             println!("{:#?}", circ_r1cs.format_qeq(&r));
-        }
+        }*/
 
         circ_r1cs.finalize(&final_cs)
     }
@@ -744,11 +759,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let cursor_plus = term(
                 Op::Eq,
                 vec![
-                    new_var(format!("i_{}", j + 1)), // vanishing
+                    new_var(format!("cursor_{}", j + 1)), // vanishing
                     term(
                         Op::PfNaryOp(PfNaryOp::Add),
                         vec![
-                            new_var(format!("i_{}", j)),
+                            new_var(format!("cursor_{}", j)),
                             new_var(format!("offset_{}", j)),
                         ],
                     ),
@@ -759,8 +774,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let cursor_geq = term(
                 Op::BvBinPred(BvBinPred::Uge),
                 vec![
-                    term(Op::PfToBv(254), vec![new_var(format!("i_{}", j + 1))]),
-                    term(Op::PfToBv(254), vec![new_var(format!("i_{}", j))]),
+                    term(Op::PfToBv(254), vec![new_var(format!("cursor_{}", j + 1))]),
+                    term(Op::PfToBv(254), vec![new_var(format!("cursor_{}", j))]),
                 ],
             );
 
@@ -1028,38 +1043,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 next_slot *= Integer::from(2);
             }
 
-            let q_eq = term(Op::Eq, vec![full_q.clone(), new_var(format!("i_{}", i))]);
-            self.assertions.push(q_eq);
-            self.pub_inputs.push(new_var(format!("i_{}", i)));
-
-            // TODO make ep num = 0?
-            let q_ordering = term(
-                Op::BoolNaryOp(BoolNaryOp::Or),
-                vec![
-                    term(
-                        Op::Eq,
-                        vec![
-                            new_const(self.udoc.len() - 1), // EPSILON num
-                            new_var(format!("i_{}", i + 1)),
-                        ],
-                    ),
-                    term(
-                        Op::Eq,
-                        vec![
-                            new_var(format!("i_{}", i + 1)),
-                            term(
-                                Op::PfNaryOp(PfNaryOp::Add),
-                                vec![new_var(format!("i_{}", i)), new_const(1)],
-                            ),
-                        ],
-                    ),
-                ],
+            let q_eq = term(
+                Op::Eq,
+                vec![full_q.clone(), new_var(format!("cursor_{}", i))],
             );
-
-            self.assertions.push(q_ordering);
+            self.assertions.push(q_eq);
+            self.pub_inputs.push(new_var(format!("cursor_{}", i)));
         }
         self.pub_inputs
-            .push(new_var(format!("i_{}", self.batch_size)));
+            .push(new_var(format!("cursor_{}", self.batch_size)));
     }
 
     fn nlookup_doc_commit(&mut self) {
@@ -1130,7 +1122,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         prev_running_claim_v: Option<Integer>,
         prev_doc_running_claim_q: Option<Vec<Integer>>,
         prev_doc_running_claim_v: Option<Integer>,
-        prev_doc_idx: Option<isize>,
+        prev_doc_idx: usize,
     ) -> (
         FxHashMap<String, Value>,
         usize,
@@ -1139,7 +1131,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         Option<Vec<Integer>>,
         Option<Integer>,
         isize,
-        Option<isize>,
+        usize,
     ) {
         match self.batching {
             JBatching::NaivePolys => unimplemented!(),
@@ -1188,12 +1180,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         next_state: usize,
         offset_i: usize,
         rel_i: usize,
-        i: usize,
+        cursor_i: usize,
+        i: usize, // this is for naming
     ) -> Integer {
         wits.insert(format!("char_{}", i - 1), new_wit(char_num));
         wits.insert(format!("state_{}", i - 1), new_wit(state_i));
         wits.insert(format!("offset_{}", i - 1), new_wit(offset_i));
         wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
+        wits.insert(format!("cursor_{}", i - 1), new_wit(cursor_i));
 
         // v_i =
         let num_states = self.safa.g.node_count();
@@ -1237,7 +1231,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         running_v: Option<Integer>,
         doc_running_q: Option<Vec<Integer>>,
         doc_running_v: Option<Integer>,
-        prev_doc_idx: Option<isize>,
+        cursor_0: usize,
     ) -> (
         FxHashMap<String, Value>,
         usize,
@@ -1246,7 +1240,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         Option<Vec<Integer>>,
         Option<Integer>,
         isize,
-        Option<isize>,
+        usize,
     ) {
         let mut wits = FxHashMap::default();
 
@@ -1258,6 +1252,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut q = vec![];
         let mut start_epsilons = -1;
         let mut i = 1;
+        let mut cursor_i = cursor_0;
+
         while i <= self.batch_size {
             let mut char_num = self.num_ab[&None];
             next_state = state_i;
@@ -1270,7 +1266,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             {
                 // pad epsilons (above vals) bc we're done
                 v.push(self.normal_v(
-                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, i,
+                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, cursor_i, i,
                 ));
                 i += 1;
             } else {
@@ -1289,9 +1285,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     // see if we need to insert fake edge in the solution
                     if state_i != te.from_node.index() {
                         rel_i = 1;
-
+                        cursor_i = self.get_cursor_wit();
                         v.push(self.normal_v(
-                            &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, i,
+                            &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i,
+                            cursor_i, i,
                         ));
                         i += 1;
                     } else {
@@ -1304,15 +1301,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     assert_eq!(state_i, te.from_node.index());
                     // state_i = te.from_node.index(); // current
 
-                    // potentially, the edge is a *, and we are provided a concrete offset
+                    // potentially, the edge is a *, but we are provided a concrete offset
                     println!("is star {:#?}", is_star);
-                    if is_star {
-                        offset_i = 0; //TODO
-                    }
+                    cursor_i += offset_i;
 
                     // back to normal
                     v.push(self.normal_v(
-                        &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, i,
+                        &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i,
+                        cursor_i, i,
                     ));
                     i += 1;
                 }
@@ -1336,6 +1332,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             new_wit(self.prover_accepting_state(batch_num)),
         );
 
+        let cursor_n = cursor_i; // TODO?
+
         match self.commit_type {
             JCommit::HashChain => {
                 unimplemented!();
@@ -1343,14 +1341,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             JCommit::Nlookup => {
                 assert!(doc_running_q.is_some() || batch_num == 0);
                 assert!(doc_running_v.is_some() || batch_num == 0);
-                let (w, next_doc_running_q, next_doc_running_v, next_doc_idx) = self
-                    .wit_nlookup_doc_commit(
-                        wits,
-                        batch_num,
-                        doc_running_q,
-                        doc_running_v,
-                        prev_doc_idx,
-                    );
+                let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
+                    wits,
+                    batch_num,
+                    doc_running_q,
+                    doc_running_v,
+                    cursor_0,
+                );
                 wits = w;
                 (
                     wits,
@@ -1360,10 +1357,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     Some(next_doc_running_q),
                     Some(next_doc_running_v),
                     start_epsilons,
-                    Some(next_doc_idx),
+                    cursor_n,
                 )
             }
         }
+    }
+
+    // for fake edges
+    fn get_cursor_wit(&self) -> usize {
+        0 // TODO
     }
 
     fn wit_nlookup_doc_commit(
@@ -1372,8 +1374,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         batch_num: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
-        prev_idx: Option<isize>,
-    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer, isize) {
+        cursor_0: usize,
+    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let mut v = vec![];
         let mut q = vec![];
         for i in 0..self.batch_size {
@@ -1384,14 +1386,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // q relations
-        let prev_round_lookup = if prev_idx.is_some() {
-            Integer::from(prev_idx.unwrap())
-        } else if batch_num == 0 {
-            // not sure if correct replacement
-            Integer::from(-1)
-        } else {
-            Integer::from(batch_num - 1)
-        };
+        let prev_round_lookup = Integer::from(cursor_0);
 
         println!("PREV ROUND Q LOOKUP {:#?}", prev_round_lookup.clone());
         wits.insert(
@@ -1399,22 +1394,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             new_wit(prev_round_lookup),
         );
 
-        for i in 0..q.len() {
-            // not final q (running claim)
-            println!("FULL Q {:#?} = {:#?}", i, q[i]);
-
-            wits.insert(format!("i_{}", i), new_wit(q[i]));
-        }
-        wits.insert(format!("i_{}", q.len()), new_wit(q[q.len() - 1] + 1)); // MUST CHANGE with SNFA, very
-                                                                            // hacky
-
-        let next_idx = q[q.len() - 1] as isize;
-
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
         wits = w;
 
-        (wits, next_running_q, next_running_v, next_idx)
+        (wits, next_running_q, next_running_v)
     }
 
     fn wit_nlookup_gadget(
@@ -1951,7 +1935,7 @@ mod tests {
                     let mut running_v = None;
                     let mut doc_running_q = None;
                     let mut doc_running_v = None;
-                    let mut doc_idx = None;
+                    let mut doc_idx = 0;
 
                     let (pd, _vd) = r1cs_converter.to_circuit();
 
@@ -2068,7 +2052,7 @@ mod tests {
         init();
         test_func_no_hash(
             "abcd".to_string(),
-            "^(?=a)abcd$".to_string(),
+            "^(?=a)ab(?=c)cd$".to_string(),
             "abcd".to_string(),
             vec![1], // 2],
             true,
