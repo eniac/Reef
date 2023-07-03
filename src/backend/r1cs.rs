@@ -50,7 +50,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     path_count: usize,
     stack_level: usize,
     from_state: usize,
-    cursor_stack: Vec<usize>,
+    cursor_stack: LinkedList<usize>,
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
@@ -475,7 +475,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             path_count: 0, //TODO
             stack_level: 0,
             from_state: 0,
-            cursor_stack: vec![0],
+            cursor_stack: LinkedList::new(),
             //substring,
             pc: pcs,
         }
@@ -1286,7 +1286,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             if sol_done {
                 sol_done = false;
                 rel_i = 1;
-                cursor_i = self.cursor_stack[self.stack_level];
+                println!("CURSOR STACK POP {:#?}", self.cursor_stack);
+                cursor_i = self.cursor_stack.pop_front().unwrap();
 
                 v.push(self.normal_v(
                     &mut wits,
@@ -1319,13 +1320,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 sol_done = sols[self.sol_num].is_empty(); // are we on the last one?
                 if self.safa.g[te.from_node].is_and() {
                     self.from_state = te.to_node.index();
-                    self.cursor_stack[self.stack_level] = cursor_i;
+                    self.cursor_stack.push_front(cursor_i);
                     self.stack_level += 1;
-                    println!("CURSOR STACK {:#?}", self.cursor_stack);
+                    println!("CURSOR STACK PUSH {:#?}", self.cursor_stack);
                 }
 
                 //normal
                 (char_num, is_star) = self.get_char_num(te.edge);
+                state_i = te.from_node.index();
                 next_state = te.to_node.index();
                 offset_i = te.to_cur - te.from_cur;
                 rel_i = 0;
@@ -1344,7 +1346,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, cursor_i, i,
                 ));
                 i += 1;
-                state_i = next_state;
+                state_i = next_state; // not necessary anymore
             }
         }
         println!("DONE LOOP");
