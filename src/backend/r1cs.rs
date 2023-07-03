@@ -45,9 +45,12 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub idoc: Vec<Integer>,
     pub doc_extend: usize,
     is_match: bool,
+    // witness crap
     pub sol_num: usize,
     path_count: usize,
-    //pub substring: (usize, usize), // todo getters
+    stack_level: usize,
+    from_state: usize,
+    cursor_stack: Vec<usize>,
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
@@ -245,6 +248,23 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 if offset == 0 {
                                     // epsilon
                                     and_states.insert(and_edges[i].target().index());
+
+                                    // add table
+                                    let in_state = all_state.index();
+                                    let out_state = and_edges[i].target().index();
+                                    let c = num_ab[&None]; //EPSILON
+                                    let rel = 0;
+
+                                    set_table.insert(
+                                        Integer::from(
+                                            (in_state * num_states * num_chars * max_offsets * 2)
+                                                + (out_state * num_chars * max_offsets * 2)
+                                                + (c * max_offsets * 2)
+                                                + (offset * 2)
+                                                + rel,
+                                        )
+                                        .rem_floor(cfg().field().modulus()),
+                                    );
                                 } else {
                                     panic!("a");
                                 }
@@ -263,16 +283,17 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             // normal processing for state
-            let in_state = all_state.index();
+            let all_state_idx = all_state.index();
 
             for stack_lvl in 0..forall_children.len() {
-                if forall_children[stack_lvl].contains(&in_state) {
-                    current_path_state = in_state;
+                if forall_children[stack_lvl].contains(&all_state_idx) {
+                    current_path_state = all_state_idx;
 
                     // dupicate safa, run this path
                     let mut dfs_small = Dfs::new(&safa.g, all_state);
 
                     while let Some(state) = dfs_small.next(&safa.g) {
+                        let in_state = state.index();
                         println!("SMALL DFA STATE {:#?}", state);
                         for edge in safa.g.edges(state) {
                             let out_state = edge.target().index();
@@ -308,7 +329,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                         let c = num_ab[&Some('*')];
                                         let offset = 0; // TODO?
                                         let rel = 0;
-
+                                        println!(
+                                            "STAR EDGE {:#?} -{:#?}-> {:#?}",
+                                            in_state, c, out_state
+                                        );
                                         set_table.insert(
                                             Integer::from(
                                                 (in_state
@@ -379,6 +403,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             let rel = 1;
                             let in_state = state.index();
                             let out_state = current_path_state; // FROM state
+                                                                // TODO we have to make sure the multipliers are big enough
+
                             println!("ADDITIONAL FOR ACCEPTING: path count {:#?}, stack_lvl {:#?}, path_state {:#?}, in_state {:#?}", current_path_count, current_stack_level, current_path_state, in_state);
                             set_table.insert(
                                 Integer::from(
@@ -447,6 +473,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             is_match,
             sol_num: 0,
             path_count: 0, //TODO
+            stack_level: 0,
+            from_state: 0,
+            cursor_stack: vec![0],
             //substring,
             pc: pcs,
         }
@@ -1246,9 +1275,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut i = 1;
         let mut cursor_i = cursor_0;
         let mut sol_done = false; //single path almost done?
-        let mut cursor_stack = vec![]; //TODO
-        let mut stack_level = 0; //TODO
-        let mut from_state = 0; // TODO!!!!
 
         while i <= self.batch_size {
             let mut char_num = self.num_ab[&None];
@@ -1260,21 +1286,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             if sol_done {
                 sol_done = false;
                 rel_i = 1;
-                cursor_i = cursor_stack[stack_level];
+                cursor_i = self.cursor_stack[self.stack_level];
 
                 v.push(self.normal_v(
                     &mut wits,
                     &mut q,
                     self.path_count,
                     state_i,
-                    from_state,
-                    stack_level,
+                    self.from_state,
+                    self.stack_level,
                     rel_i,
                     cursor_i,
                     i,
                 ));
                 i += 1;
                 self.path_count += 1;
+                self.stack_level = 0;
             } else if self.sol_num >= sols.len()
                 || (self.sol_num == sols.len() - 1 && sols[self.sol_num].is_empty())
             {
@@ -1290,6 +1317,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let te = sols[self.sol_num].pop_front().unwrap();
                 println!("{:#?}", te);
                 sol_done = sols[self.sol_num].is_empty(); // are we on the last one?
+                if self.safa.g[te.from_node].is_and() {
+                    self.from_state = te.to_node.index();
+                    self.cursor_stack[self.stack_level] = cursor_i;
+                    self.stack_level += 1;
+                    println!("CURSOR STACK {:#?}", self.cursor_stack);
+                }
 
                 //normal
                 (char_num, is_star) = self.get_char_num(te.edge);
@@ -1297,9 +1330,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 offset_i = te.to_cur - te.from_cur;
                 rel_i = 0;
 
-                //check from last loop
-                assert_eq!(state_i, te.from_node.index());
-                // state_i = te.from_node.index(); // current
                 cursor_i += offset_i;
 
                 // potentially, the edge is a *, but we are provided a concrete offset
