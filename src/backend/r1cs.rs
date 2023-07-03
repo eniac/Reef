@@ -46,6 +46,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub doc_extend: usize,
     is_match: bool,
     pub sol_num: usize,
+    path_count: usize,
     //pub substring: (usize, usize), // todo getters
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
@@ -194,7 +195,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // TODO range check
-        let mut table = vec![];
+        let mut set_table: HashSet<Integer> = HashSet::default();
 
         safa.write_pdf("safa1").unwrap();
 
@@ -209,7 +210,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
         );
 
-        let mut dfs = Dfs::new(&safa.g, safa.get_init());
+        let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         /*let mut mappings: LinkedList<LinkedList<(usize, usize)>> = LinkedList::new();
         let mut fake_to_level: FxHashMap<(usize, usize), usize> = FxHashMap::default();
@@ -217,15 +218,18 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut alert_dups: FxHashMap<usize, usize> = FxHashMap::default(); // dup -> accepting
         */
 
-        let mut forall_children: LinkedList<HashSet<usize>> = LinkedList::new();
+        // stack level, states
+        let mut forall_children: Vec<HashSet<usize>> = Vec::new();
         let mut current_path_state = 0;
         let mut current_stack_level = 0;
+        let mut current_path_count = 0;
 
-        while let Some(state) = dfs.next(&safa.g) {
-            if safa.g[state].is_and() {
+        while let Some(all_state) = dfs_alls.next(&safa.g) {
+            println!("PROCESS STATE {:#?}", all_state);
+            if safa.g[all_state].is_and() {
                 let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
-                    .edges(state)
+                    .edges(all_state)
                     .filter(|e| e.source() != e.target())
                     .collect();
                 and_edges.sort_by(|a, b| a.target().partial_cmp(&b.target()).unwrap());
@@ -249,88 +253,112 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             }
                         }
                         _ => {
-                            panic!("Weird edge coming from ForAll node {:#?}", state);
+                            panic!("Weird edge coming from ForAll node {:#?}", all_state);
                         }
                     }
                 }
 
-                if forall_children.len() > 0 {
-                    current_stack_level += 1;
-                }
-                forall_children.push_back(and_states);
+                forall_children.push(and_states);
+                current_stack_level += 1;
             }
 
             // normal processing for state
-            let in_state = state.index();
+            let in_state = all_state.index();
 
-            let mut mod_list = forall_children.pop_front();
-            match mod_list {
-                Some(mut ml) => {
-                    if ml.contains(&in_state) {
-                        current_path_state = in_state;
+            for stack_lvl in 0..forall_children.len() {
+                if forall_children[stack_lvl].contains(&in_state) {
+                    current_path_state = in_state;
 
-                        ml.remove(&in_state);
-                    }
-                    if ml.len() > 0 {
-                        forall_children.push_front(ml);
-                    }
-                }
-                None => {}
-            }
+                    // dupicate safa, run this path
+                    let mut dfs_small = Dfs::new(&safa.g, all_state);
 
-            println!("FORALL LIST {:#?}", forall_children);
+                    while let Some(state) = dfs_small.next(&safa.g) {
+                        println!("SMALL DFA STATE {:#?}", state);
+                        for edge in safa.g.edges(state) {
+                            let out_state = edge.target().index();
 
-            for edge in safa.g.edges(state) {
-                let out_state = edge.target().index();
+                            match edge.weight().clone() {
+                                Either(Err(openset)) => {
+                                    let single = openset.is_single(); // single offset/epsilon
+                                    if single.is_some() {
+                                        // is single
+                                        let offset = single.unwrap();
+                                        // if offset == 0 { -> doesn't matter, always use epsilon for actual
+                                        // epsilon and for jumps
 
-                match edge.weight().clone() {
-                    Either(Err(openset)) => {
-                        let single = openset.is_single(); // single offset/epsilon
-                        if single.is_some() {
-                            // is single
-                            let offset = single.unwrap();
-                            // if offset == 0 { -> doesn't matter, always use epsilon for actual
-                            // epsilon and for jumps
+                                        let c = num_ab[&None]; //EPSILON
+                                        let rel = 0;
 
-                            let c = num_ab[&None]; //EPSILON
-                            let rel = 0;
+                                        set_table.insert(
+                                            Integer::from(
+                                                (in_state
+                                                    * num_states
+                                                    * num_chars
+                                                    * max_offsets
+                                                    * 2)
+                                                    + (out_state * num_chars * max_offsets * 2)
+                                                    + (c * max_offsets * 2)
+                                                    + (offset * 2)
+                                                    + rel,
+                                            )
+                                            .rem_floor(cfg().field().modulus()),
+                                        );
+                                    } else if openset.is_full() {
+                                        // [0,*]
+                                        let c = num_ab[&Some('*')];
+                                        let offset = 0; // TODO?
+                                        let rel = 0;
 
-                            table.push(
-                                Integer::from(
-                                    (in_state * num_states * num_chars * max_offsets * 2)
-                                        + (out_state * num_chars * max_offsets * 2)
-                                        + (c * max_offsets * 2)
-                                        + (offset * 2)
-                                        + rel,
-                                )
-                                .rem_floor(cfg().field().modulus()),
-                            );
-                        } else if openset.is_full() {
-                            // [0,*]
-                            let c = num_ab[&Some('*')];
-                            let offset = 0; // TODO?
-                            let rel = 0;
+                                        set_table.insert(
+                                            Integer::from(
+                                                (in_state
+                                                    * num_states
+                                                    * num_chars
+                                                    * max_offsets
+                                                    * 2)
+                                                    + (out_state * num_chars * max_offsets * 2)
+                                                    + (c * max_offsets * 2)
+                                                    + (offset * 2)
+                                                    + rel,
+                                            )
+                                            .rem_floor(cfg().field().modulus()),
+                                        );
+                                    } else {
+                                        // ranges
+                                        let mut iter = openset.0.iter();
+                                        if let Some(r) = iter.next() {
+                                            let mut offset = r.start;
+                                            while offset <= r.end.unwrap() {
+                                                let c = num_ab[&None]; //EPSILON
+                                                let rel = 0;
 
-                            table.push(
-                                Integer::from(
-                                    (in_state * num_states * num_chars * max_offsets * 2)
-                                        + (out_state * num_chars * max_offsets * 2)
-                                        + (c * max_offsets * 2)
-                                        + (offset * 2)
-                                        + rel,
-                                )
-                                .rem_floor(cfg().field().modulus()),
-                            );
-                        } else {
-                            // ranges
-                            let mut iter = openset.0.iter();
-                            if let Some(r) = iter.next() {
-                                let mut offset = r.start;
-                                while offset <= r.end.unwrap() {
-                                    let c = num_ab[&None]; //EPSILON
+                                                set_table.insert(
+                                                    Integer::from(
+                                                        (in_state
+                                                            * num_states
+                                                            * num_chars
+                                                            * max_offsets
+                                                            * 2)
+                                                            + (out_state
+                                                                * num_chars
+                                                                * max_offsets
+                                                                * 2)
+                                                            + (c * max_offsets * 2)
+                                                            + (offset * 2)
+                                                            + rel,
+                                                    )
+                                                    .rem_floor(cfg().field().modulus()),
+                                                );
+                                                offset += 1;
+                                            }
+                                        }
+                                    }
+                                }
+                                Either(Ok(ch)) => {
+                                    let c = num_ab[&Some(ch)];
+                                    let offset = 1;
                                     let rel = 0;
-
-                                    table.push(
+                                    set_table.insert(
                                         Integer::from(
                                             (in_state * num_states * num_chars * max_offsets * 2)
                                                 + (out_state * num_chars * max_offsets * 2)
@@ -340,47 +368,35 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                         )
                                         .rem_floor(cfg().field().modulus()),
                                     );
-                                    offset += 1;
                                 }
                             }
                         }
-                    }
-                    Either(Ok(ch)) => {
-                        let c = num_ab[&Some(ch)];
-                        let offset = 1;
-                        let rel = 0;
-                        table.push(
-                            Integer::from(
-                                (in_state * num_states * num_chars * max_offsets * 2)
-                                    + (out_state * num_chars * max_offsets * 2)
-                                    + (c * max_offsets * 2)
-                                    + (offset * 2)
-                                    + rel,
-                            )
-                            .rem_floor(cfg().field().modulus()),
-                        );
+
+                        if safa.accepting.contains(&state) {
+                            // add check entries to table
+                            let c = current_path_count; // path count
+                            let offset = current_stack_level;
+                            let rel = 1;
+                            let in_state = state.index();
+                            let out_state = current_path_state; // FROM state
+                            println!("ADDITIONAL FOR ACCEPTING: path count {:#?}, stack_lvl {:#?}, path_state {:#?}, in_state {:#?}", current_path_count, current_stack_level, current_path_state, in_state);
+                            set_table.insert(
+                                Integer::from(
+                                    (in_state * num_states * num_chars * max_offsets * 2)
+                                        + (out_state * num_chars * max_offsets * 2)
+                                        + (c * max_offsets * 2)
+                                        + (offset * 2)
+                                        + rel,
+                                )
+                                .rem_floor(cfg().field().modulus()),
+                            );
+                        }
                     }
                 }
             }
-
-            if safa.accepting.contains(&state) {
-                // add check entries to table
-                let c = num_ab[&None];
-                let offset = current_stack_level;
-                let rel = 1;
-                let out_state = current_path_state; // FROM state
-                table.push(
-                    Integer::from(
-                        (in_state * num_states * num_chars * max_offsets * 2)
-                            + (out_state * num_chars * max_offsets * 2)
-                            + (c * max_offsets * 2)
-                            + (offset * 2)
-                            + rel,
-                    )
-                    .rem_floor(cfg().field().modulus()),
-                );
-            }
         }
+
+        let mut table: Vec<Integer> = set_table.into_iter().collect();
 
         // need to round out table size ?
         let base: usize = 2;
@@ -430,6 +446,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             doc_extend: epsilon_to_add,
             is_match,
             sol_num: 0,
+            path_count: 0, //TODO
             //substring,
             pc: pcs,
         }
@@ -1228,6 +1245,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut start_epsilons = -1;
         let mut i = 1;
         let mut cursor_i = cursor_0;
+        let mut sol_done = false; //single path almost done?
+        let mut cursor_stack = vec![]; //TODO
+        let mut stack_level = 0; //TODO
+        let mut from_state = 0; // TODO!!!!
 
         while i <= self.batch_size {
             let mut char_num = self.num_ab[&None];
@@ -1236,7 +1257,25 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let mut rel_i = 0;
             let mut is_star = false;
 
-            if self.sol_num >= sols.len()
+            if sol_done {
+                sol_done = false;
+                rel_i = 1;
+                cursor_i = cursor_stack[stack_level];
+
+                v.push(self.normal_v(
+                    &mut wits,
+                    &mut q,
+                    self.path_count,
+                    state_i,
+                    from_state,
+                    stack_level,
+                    rel_i,
+                    cursor_i,
+                    i,
+                ));
+                i += 1;
+                self.path_count += 1;
+            } else if self.sol_num >= sols.len()
                 || (self.sol_num == sols.len() - 1 && sols[self.sol_num].is_empty())
             {
                 // pad epsilons (above vals) bc we're done
@@ -1250,49 +1289,31 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
                 let te = sols[self.sol_num].pop_front().unwrap();
                 println!("{:#?}", te);
+                sol_done = sols[self.sol_num].is_empty(); // are we on the last one?
+
+                //normal
                 (char_num, is_star) = self.get_char_num(te.edge);
                 next_state = te.to_node.index();
                 offset_i = te.to_cur - te.from_cur;
                 rel_i = 0;
 
-                if self.safa.g[te.from_node].is_and() {
-                    println!("FORALL");
-                    //ForAll
-                    // see if we need to insert fake edge in the solution
-                    if state_i != te.from_node.index() {
-                        rel_i = 1;
-                        cursor_i = self.get_cursor_wit();
-                        v.push(self.normal_v(
-                            &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i,
-                            cursor_i, i,
-                        ));
-                        i += 1;
-                    } else {
-                        // we don't need to prove this edge's exsistence
-                        assert_eq!(offset_i, 0);
-                        assert_eq!(char_num, self.num_ab[&None]);
-                    }
-                } else {
-                    println!("OTHER");
-                    //check from last loop
-                    assert_eq!(state_i, te.from_node.index());
-                    // state_i = te.from_node.index(); // current
-                    cursor_i += offset_i;
+                //check from last loop
+                assert_eq!(state_i, te.from_node.index());
+                // state_i = te.from_node.index(); // current
+                cursor_i += offset_i;
 
-                    // potentially, the edge is a *, but we are provided a concrete offset
-                    if is_star {
-                        offset_i = 0;
-                    }
-
-                    println!("is star {:#?}", is_star);
-
-                    // back to normal
-                    v.push(self.normal_v(
-                        &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i,
-                        cursor_i, i,
-                    ));
-                    i += 1;
+                // potentially, the edge is a *, but we are provided a concrete offset
+                if is_star {
+                    offset_i = 0;
                 }
+
+                println!("is star {:#?}", is_star);
+
+                // back to normal
+                v.push(self.normal_v(
+                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, cursor_i, i,
+                ));
+                i += 1;
                 state_i = next_state;
             }
         }
