@@ -448,18 +448,22 @@ pub mod re {
         Some((s, G.mk(rem)))
     }
 
-    pub fn get_proj_size(r: &RegexF, size: u32) -> u32{
+    pub fn get_proj_size(r: &RegexF, size: u32, and_char: bool) -> u32{
         let mut out = 0;
         match &r {
             RegexF::Dot => {
                 out = 1;
             }
             RegexF::Nil | RegexF::CharClass(_) => {
-                out = 0;
+                if and_char {
+                    out = 1;
+                } else {
+                    out = 0;
+                }
             },
             RegexF::App(x, y) => {
-                let l = get_proj_size(&x.simpl(), size);
-                let r = get_proj_size(&y.simpl(), size);
+                let l = get_proj_size(&x.simpl(), size,and_char);
+                let r = get_proj_size(&y.simpl(), size,and_char);
                 if l > 0 { 
                     out = l + r;
                 } else {
@@ -467,8 +471,8 @@ pub mod re {
                 }
             }
             RegexF::Alt(x, y) => {
-                let l = get_proj_size(&x.simpl(), size); 
-                let r = get_proj_size(&x.simpl(), size); 
+                let l = get_proj_size(&x.simpl(), size,and_char); 
+                let r = get_proj_size(&x.simpl(), size,and_char); 
                 if l==r {
                     out = 0;
                 } else {
@@ -477,8 +481,8 @@ pub mod re {
             }
             RegexF::Star(a) => {out = 0},
             RegexF::And(x, y) => {
-                let l = get_proj_size(&x.simpl(), size);
-                let r = get_proj_size(&y.simpl(), size);
+                let l = get_proj_size(&x.simpl(), size,and_char);
+                let r = get_proj_size(&y.simpl(), size,and_char);
                 if l > 0 { 
                     out = l + r;
                 } else {
@@ -487,7 +491,7 @@ pub mod re {
             }
             RegexF::Range(a, i, j) => {
                 if i == j {
-                    out = get_proj_size(&a.simpl(), size) * (*i as u32);
+                    out = get_proj_size(&a.simpl(), size,and_char) * (*i as u32);
                 } else {
                     out = 0;
                 }
@@ -496,12 +500,18 @@ pub mod re {
         return out;
     }   
 
-    pub fn projection_pow2(r: &RegexF) -> u32 {
-        let mut proj_size = get_proj_size(r, 0);
-        if proj_size <= 1 {
-            1
+    pub fn projection_pow2(r: &RegexF) -> (u32,u32) {
+        let dot_proj_size = get_proj_size(r, 0, false);
+        let mut proj_size = get_proj_size(r, 0, true);
+        let mut start = dot_proj_size;
+        if dot_proj_size == proj_size {
+            (0,0)
         } else {
-            (u32::MAX >> (proj_size - 1).leading_zeros()) + 1
+            if proj_size - dot_proj_size == 1 {
+                (start, 1)
+            } else {
+                (start, (u32::MAX >> (proj_size - dot_proj_size - 1).leading_zeros()) + 1)
+            }
         }
     }
 
@@ -627,30 +637,9 @@ fn test_regex_negative_char_class_range() {
 
 #[test]
 fn test_for_proj() {
-    let r = re::simpl(re::new(r"^[a-c]*d"));
-    match &(r.get()) {
-        RegexF::App(x,y) =>  println!("{:#?}",x),
-        _ => println!("pass")
-    };
-    println!("{:#?}",r);
-   
-}
-
-#[test]
-fn test_for_proj2() {
-    let r = re::simpl(re::new(r"^[a-c]{4}d"));
-    match &(r.get()) {
-        RegexF::App(x,y) =>  println!("{:#?}",x),
-        _ => println!("pass")
-    };
-    println!("{:#?}",r);
-   
-}
-
-#[test]
-fn test_for_proj3() {
     let r = re::simpl(re::new(r"^.{10}abcd.{5}"));
     // println!("{:#?}",r);
-    println!("{:#?}",re::get_proj_size(r.get(), 0));
+    println!("{:#?}",re::get_proj_size(r.get(), 0, false));
+    println!("{:#?}",re::get_proj_size(r.get(), 0, true));
     println!("{:#?}",re::projection_pow2(r.get()));
 }

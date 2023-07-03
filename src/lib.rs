@@ -6,6 +6,7 @@ pub mod safa;
 pub mod quantifier;
 pub mod openset;
 pub mod regex;
+pub mod naive;
 
 #[cfg(feature = "metrics")]
 pub mod metrics;
