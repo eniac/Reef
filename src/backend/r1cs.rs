@@ -22,6 +22,7 @@ use petgraph::{
 };
 use rug::{integer::Order, ops::RemRounding, Integer};
 use std::cmp::max;
+use std::collections::HashSet;
 use std::collections::LinkedList;
 
 pub struct R1CS<'a, F: PrimeField, C: Clone> {
@@ -29,7 +30,6 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     max_offsets: usize,
-    fake_to_level: FxHashMap<(usize, usize), usize>, // fake edge -> stack level
     pub batching: JBatching,
     pub commit_type: JCommit,
     pub reef_commit: Option<ReefCommitment<F>>,
@@ -211,10 +211,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut dfs = Dfs::new(&safa.g, safa.get_init());
 
-        let mut mappings: LinkedList<LinkedList<(usize, usize)>> = LinkedList::new();
+        /*let mut mappings: LinkedList<LinkedList<(usize, usize)>> = LinkedList::new();
         let mut fake_to_level: FxHashMap<(usize, usize), usize> = FxHashMap::default();
         let mut accepting_map_state = None;
         let mut alert_dups: FxHashMap<usize, usize> = FxHashMap::default(); // dup -> accepting
+        */
+
+        let mut forall_children: LinkedList<HashSet<usize>> = LinkedList::new();
+        let mut current_path_state = 0;
+        let mut current_stack_level = 0;
 
         while let Some(state) = dfs.next(&safa.g) {
             if safa.g[state].is_and() {
@@ -224,7 +229,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     .filter(|e| e.source() != e.target())
                     .collect();
                 and_edges.sort_by(|a, b| a.target().partial_cmp(&b.target()).unwrap());
-                let mut and_states = vec![];
+                let mut and_states = HashSet::default();
 
                 for i in 0..and_edges.len() {
                     match and_edges[i].weight().clone() {
@@ -235,7 +240,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 let offset = single.unwrap();
                                 if offset == 0 {
                                     // epsilon
-                                    and_states.push(and_edges[i].target().index());
+                                    and_states.insert(and_edges[i].target().index());
                                 } else {
                                     panic!("a");
                                 }
@@ -249,109 +254,47 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     }
                 }
 
-                let mut new_map = LinkedList::new();
-                for i in 1..and_states.len() {
-                    new_map.push_back((and_states[i - 1], and_states[i]));
+                if forall_children.len() > 0 {
+                    current_stack_level += 1;
                 }
-                if mappings.len() > 0 {
-                    let mut last_map: LinkedList<(usize, usize)> = mappings.pop_back().unwrap();
-                    new_map
-                        .push_back((and_states[and_states.len() - 1], last_map.back().unwrap().1));
-                    mappings.push_back(last_map);
-                }
-                mappings.push_back(new_map);
-                println!("MAPPINGS: {:#?}", mappings);
-            } else {
-                // other state
-                let in_state = state.index();
-                match mappings.back().clone() {
-                    Some(lm) => {
-                        let last_map: LinkedList<(usize, usize)> = lm.clone();
-                        let mut lm_iter = last_map.iter();
-                        let mut map = lm_iter.next();
-                        while map.is_some() {
-                            let (s, e) = map.unwrap();
-                            if s.clone() == in_state {
-                                accepting_map_state = Some(e.clone());
-                            }
-                            map = lm_iter.next();
-                        }
+                forall_children.push_back(and_states);
+            }
+
+            // normal processing for state
+            let in_state = state.index();
+
+            let mut mod_list = forall_children.pop_front();
+            match mod_list {
+                Some(mut ml) => {
+                    if ml.contains(&in_state) {
+                        current_path_state = in_state;
+
+                        ml.remove(&in_state);
                     }
-                    None => {}
+                    if ml.len() > 0 {
+                        forall_children.push_front(ml);
+                    }
                 }
+                None => {}
+            }
 
-                for edge in safa.g.edges(state) {
-                    let out_state = edge.target().index();
+            println!("FORALL LIST {:#?}", forall_children);
 
-                    match edge.weight().clone() {
-                        Either(Err(openset)) => {
-                            let single = openset.is_single(); // single offset/epsilon
-                            if single.is_some() {
-                                // is single
-                                let offset = single.unwrap();
-                                // if offset == 0 { -> doesn't matter, always use epsilon for actual
-                                // epsilon and for jumps
+            for edge in safa.g.edges(state) {
+                let out_state = edge.target().index();
 
-                                let c = num_ab[&None]; //EPSILON
-                                let rel = 0;
-                                table.push(
-                                    Integer::from(
-                                        (in_state * num_states * num_chars * max_offsets * 2)
-                                            + (out_state * num_chars * max_offsets * 2)
-                                            + (c * max_offsets * 2)
-                                            + (offset * 2)
-                                            + rel,
-                                    )
-                                    .rem_floor(cfg().field().modulus()),
-                                );
-                            } else if openset.is_full() {
-                                // [0,*]
-                                let c = num_ab[&Some('*')];
-                                let offset = 0; // TODO?
-                                let rel = 0;
+                match edge.weight().clone() {
+                    Either(Err(openset)) => {
+                        let single = openset.is_single(); // single offset/epsilon
+                        if single.is_some() {
+                            // is single
+                            let offset = single.unwrap();
+                            // if offset == 0 { -> doesn't matter, always use epsilon for actual
+                            // epsilon and for jumps
 
-                                table.push(
-                                    Integer::from(
-                                        (in_state * num_states * num_chars * max_offsets * 2)
-                                            + (out_state * num_chars * max_offsets * 2)
-                                            + (c * max_offsets * 2)
-                                            + (offset * 2)
-                                            + rel,
-                                    )
-                                    .rem_floor(cfg().field().modulus()),
-                                );
-                            } else {
-                                // ranges
-                                let mut iter = openset.0.iter();
-                                if let Some(r) = iter.next() {
-                                    let mut offset = r.start;
-                                    while offset <= r.end.unwrap() {
-                                        let c = num_ab[&None]; //EPSILON
-                                        let rel = 0;
-
-                                        table.push(
-                                            Integer::from(
-                                                (in_state
-                                                    * num_states
-                                                    * num_chars
-                                                    * max_offsets
-                                                    * 2)
-                                                    + (out_state * num_chars * max_offsets * 2)
-                                                    + (c * max_offsets * 2)
-                                                    + (offset * 2)
-                                                    + rel,
-                                            )
-                                            .rem_floor(cfg().field().modulus()),
-                                        );
-                                        offset += 1;
-                                    }
-                                }
-                            }
-                        }
-                        Either(Ok(ch)) => {
-                            let c = num_ab[&Some(ch)];
-                            let offset = 1;
+                            let c = num_ab[&None]; //EPSILON
                             let rel = 0;
+
                             table.push(
                                 Integer::from(
                                     (in_state * num_states * num_chars * max_offsets * 2)
@@ -362,62 +305,50 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 )
                                 .rem_floor(cfg().field().modulus()),
                             );
+                        } else if openset.is_full() {
+                            // [0,*]
+                            let c = num_ab[&Some('*')];
+                            let offset = 0; // TODO?
+                            let rel = 0;
+
+                            table.push(
+                                Integer::from(
+                                    (in_state * num_states * num_chars * max_offsets * 2)
+                                        + (out_state * num_chars * max_offsets * 2)
+                                        + (c * max_offsets * 2)
+                                        + (offset * 2)
+                                        + rel,
+                                )
+                                .rem_floor(cfg().field().modulus()),
+                            );
+                        } else {
+                            // ranges
+                            let mut iter = openset.0.iter();
+                            if let Some(r) = iter.next() {
+                                let mut offset = r.start;
+                                while offset <= r.end.unwrap() {
+                                    let c = num_ab[&None]; //EPSILON
+                                    let rel = 0;
+
+                                    table.push(
+                                        Integer::from(
+                                            (in_state * num_states * num_chars * max_offsets * 2)
+                                                + (out_state * num_chars * max_offsets * 2)
+                                                + (c * max_offsets * 2)
+                                                + (offset * 2)
+                                                + rel,
+                                        )
+                                        .rem_floor(cfg().field().modulus()),
+                                    );
+                                    offset += 1;
+                                }
+                            }
                         }
                     }
-                }
-
-                if safa.accepting.contains(&state) {
-                    if accepting_map_state.is_none() {
-                        assert!(mappings.len() == 0); // just one path
-                    } else {
-                        let in_state = state.index();
-                        let out_state = accepting_map_state.unwrap();
-                        let c = num_ab[&None]; //EPSILON
-                        let offset = 0; // TODO refers to the level of stack to pop from
-                        let rel = 1;
-
-                        println!("FAKE {:#?} -> {:#?}", in_state, out_state);
-                        fake_to_level.insert((in_state, out_state), offset);
-
-                        // "fake" forall ordering edge
-                        table.push(
-                            Integer::from(
-                                (in_state * num_states * num_chars * max_offsets * 2)
-                                    + (out_state * num_chars * max_offsets * 2)
-                                    + (c * max_offsets * 2)
-                                    + (offset * 2)
-                                    + rel,
-                            )
-                            .rem_floor(cfg().field().modulus()),
-                        );
-                    }
-
-                    // have to make sure that other forall paths count these guys if there are
-                    // multiple paths there
-                    let mut incoming = safa.g.edges_directed(state, Incoming);
-                    while let Some(e) = incoming.next() {
-                        if !dfs.discovered.is_visited(&e.source()) {
-                            // there's a path to this
-                            // accepting state that has not
-                            // been visited
-                            println!("ALERT DUP {:#?}", e.source());
-                            alert_dups.insert(e.source().index(), e.target().index());
-                        }
-                    }
-                } else if alert_dups.contains_key(&state.index()) {
-                    let in_state = alert_dups.remove(&state.index()).unwrap(); // accepting state
-                    if accepting_map_state.is_none() {
-                        assert!(mappings.len() == 0); // just one path
-                    } else {
-                        let out_state = accepting_map_state.unwrap();
-                        let c = num_ab[&None]; //EPSILON
-                        let offset = 0; // TODO refers to the level of stack to pop from
-                        let rel = 1;
-
-                        println!("FAKE {:#?} -> {:#?}", in_state, out_state);
-                        fake_to_level.insert((in_state, out_state), offset);
-
-                        // "fake" forall ordering edge
+                    Either(Ok(ch)) => {
+                        let c = num_ab[&Some(ch)];
+                        let offset = 1;
+                        let rel = 0;
                         table.push(
                             Integer::from(
                                 (in_state * num_states * num_chars * max_offsets * 2)
@@ -430,6 +361,24 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         );
                     }
                 }
+            }
+
+            if safa.accepting.contains(&state) {
+                // add check entries to table
+                let c = num_ab[&None];
+                let offset = current_stack_level;
+                let rel = 1;
+                let out_state = current_path_state; // FROM state
+                table.push(
+                    Integer::from(
+                        (in_state * num_states * num_chars * max_offsets * 2)
+                            + (out_state * num_chars * max_offsets * 2)
+                            + (c * max_offsets * 2)
+                            + (offset * 2)
+                            + rel,
+                    )
+                    .rem_floor(cfg().field().modulus()),
+                );
             }
         }
 
@@ -469,7 +418,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_ab,
             table, // TODO fix else
             max_offsets,
-            fake_to_level,
             batching, // TODO
             commit_type: commit,
             reef_commit: None,
@@ -1308,6 +1256,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 rel_i = 0;
 
                 if self.safa.g[te.from_node].is_and() {
+                    println!("FORALL");
                     //ForAll
                     // see if we need to insert fake edge in the solution
                     if state_i != te.from_node.index() {
@@ -1324,13 +1273,18 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         assert_eq!(char_num, self.num_ab[&None]);
                     }
                 } else {
+                    println!("OTHER");
                     //check from last loop
                     assert_eq!(state_i, te.from_node.index());
                     // state_i = te.from_node.index(); // current
+                    cursor_i += offset_i;
 
                     // potentially, the edge is a *, but we are provided a concrete offset
+                    if is_star {
+                        offset_i = 0;
+                    }
+
                     println!("is star {:#?}", is_star);
-                    cursor_i += offset_i;
 
                     // back to normal
                     v.push(self.normal_v(
