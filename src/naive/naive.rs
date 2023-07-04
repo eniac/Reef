@@ -12,6 +12,9 @@ use crate::naive::naive_parser::*;
 use circ::front::zsharp::{self, ZSharpFE};
 use circ::front::{FrontEnd, Mode};
 use circ::ir::{opt::{opt, Opt}};
+use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
+use circ::cfg;
+use circ::cfg::*;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum DeterminedLanguage {
@@ -60,16 +63,8 @@ pub fn make_zok(dfa: DFA<'_>) -> std::io::Result<()> {
     Ok(())
 }
 
-fn naive(r: &str, alpha: String) {
-    init();
 
-    let regex = regex_parser(&String::from(r), &alpha);
-
-    let mut dfa = DFA::new(&alpha[..], regex);
-    // println!("{:#?}",dfa.get_init_state());
-    println!("{:#?}",dfa.get_final_states());
-    make_zok(dfa);
-
+pub fn gen_r1cs() -> (ProverData, VerifierData){
     let mut path_buf = PathBuf::from("match.zok");
     let inputs = zsharp::Inputs {
         file: path_buf,
@@ -88,7 +83,6 @@ fn naive(r: &str, alpha: String) {
     opts.push(Opt::ConstantFold(Box::new([])));
     opts.push(Opt::Tuple);
     opts.push(Opt::Obliv);
-            // The obliv elim pass produces more tuples, that must be eliminated
     opts.push(Opt::Tuple);
     opts.push(Opt::LinearScan);
     opts.push(Opt::Tuple);
@@ -97,78 +91,26 @@ fn naive(r: &str, alpha: String) {
 
     let cs = opt(cs, opts);
 
-    //     }
-    // };
-    // println!("Done with IR optimization");
+    let cs = cs.get("main");
 
-    // match options.backend {
-    //     #[cfg(feature = "r1cs")]
-    //     Backend::R1cs {
-    //         action,
-    //         prover_key,
-    //         verifier_key,
-    //         proof_impl,
-    //         ..
-    //     } => {
-    //         println!("Converting to r1cs");
-    //         let cs = cs.get("main");
-    //         trace!("IR: {}", circ::ir::term::text::serialize_computation(cs));
-    //         let mut r1cs = to_r1cs(cs, cfg());
+    let mut r1cs = to_r1cs(cs, cfg());
+    r1cs = reduce_linearities(r1cs, cfg());
+    r1cs.finalize(&cs)
+}
 
-    //         println!("Pre-opt R1cs size: {}", r1cs.constraints().len());
-    //         r1cs = reduce_linearities(r1cs, cfg());
+fn naive(r: &str, alpha: String) {
+    init();
 
-    //         println!("Final R1cs size: {}", r1cs.constraints().len());
-    //         let (prover_data, verifier_data) = r1cs.finalize(cs);
-    //         match action {
-    //             ProofAction::Count => (),
-    //             #[cfg(feature = "bellman")]
-    //             ProofAction::Setup => {
-    //                 println!("Generating Parameters");
-    //                 match proof_impl {
-    //                     ProofImpl::Groth16 => Bellman::<Bls12>::setup_fs(
-    //                         prover_data,
-    //                         verifier_data,
-    //                         prover_key,
-    //                         verifier_key,
-    //                     )
-    //                     .unwrap(),
-    //                     ProofImpl::Mirage => Mirage::<Bls12>::setup_fs(
-    //                         prover_data,
-    //                         verifier_data,
-    //                         prover_key,
-    //                         verifier_key,
-    //                     )
-    //                     .unwrap(),
-    //                 };
-    //             }
-    //             #[cfg(not(feature = "bellman"))]
-    //             ProofAction::Setup => panic!("Missing feature: bellman"),
-    //             #[cfg(feature = "bellman")]
-    //             ProofAction::CpSetup => {
-    //                 println!("Generating Parameters");
-    //                 match proof_impl {
-    //                     ProofImpl::Groth16 => panic!("Groth16 is not CP"),
-    //                     ProofImpl::Mirage => Mirage::<Bls12>::cp_setup_fs(
-    //                         prover_data,
-    //                         verifier_data,
-    //                         prover_key,
-    //                         verifier_key,
-    //                     )
-    //                     .unwrap(),
-    //                 };
-    //             }
-    //             #[cfg(not(feature = "bellman"))]
-    //             ProofAction::CpSetup => panic!("Missing feature: bellman"),
-    //             #[cfg(feature = "spartan")]
-    //             ProofAction::SpartanSetup => {
-    //                 write_data::<_, _>(prover_key, verifier_key, &prover_data, &verifier_data)
-    //                     .unwrap();
-    //             }
-    //             #[cfg(not(feature = "spartan"))]
-    //             ProofAction::SpartanSetup => panic!("Missing feature: spartan"),
-    //         }
-    //     }
+    let regex = regex_parser(&String::from(r), &alpha);
+
+    let mut dfa = DFA::new(&alpha[..], regex);
+    // println!("{:#?}",dfa.get_init_state());
+    println!("{:#?}",dfa.get_final_states());
+    make_zok(dfa);
+
+    let (P,V) = gen_r1cs();
+    //Shoudl at least generate the r1cs have to figure out witnesses as well as
+    //other issues re commitment 
 }
 
 

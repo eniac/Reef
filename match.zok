@@ -1,20 +1,20 @@
-def delta(field state, field cur_char) -> field:
+def delta(private field state, private field cur_char) -> field:
     	 field out = -1
-	 out = if (state==0 && cur_char==98) then 2 else out fi
+	 out = if (state==2 && cur_char==97) then 2 else out fi
+	 out = if (state==3 && cur_char==99) then 2 else out fi
 	 out = if (state==0 && cur_char==97) then 1 else out fi
 	 out = if (state==1 && cur_char==97) then 2 else out fi
-	 out = if (state==2 && cur_char==97) then 2 else out fi
 	 out = if (state==2 && cur_char==98) then 2 else out fi
-	 out = if (state==1 && cur_char==98) then 3 else out fi
-	 out = if (state==3 && cur_char==97) then 2 else out fi
-	 out = if (state==3 && cur_char==98) then 2 else out fi
-	 out = if (state==3 && cur_char==99) then 2 else out fi
-	 out = if (state==0 && cur_char==99) then 2 else out fi
-	 out = if (state==1 && cur_char==99) then 2 else out fi
 	 out = if (state==2 && cur_char==99) then 2 else out fi
+	 out = if (state==1 && cur_char==98) then 3 else out fi
+	 out = if (state==3 && cur_char==98) then 2 else out fi
+	 out = if (state==0 && cur_char==98) then 2 else out fi
+	 out = if (state==0 && cur_char==99) then 2 else out fi
+	 out = if (state==3 && cur_char==97) then 2 else out fi
+	 out = if (state==1 && cur_char==99) then 2 else out fi
 	 return out
 
-def main(field commit, field blind) -> field: 
+def main(field commit, private field blind) -> field: 
     	 field size = 3
     	 field[size] document = [0,0,0]
     	 field state = 0
