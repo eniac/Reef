@@ -24,11 +24,11 @@ pub enum DeterminedLanguage {
 }
 
 pub fn make_delta(state:u64, c: u32, next: u64) -> String{
-    format!("\t out = if (state=={state} && cur_char=={c}) then {next} else out fi\n")
+    format!("\t out = if (state=={state} && cur_char=={c}) then {next} else out-0 fi\n")
 }
 
 pub fn make_match(state:u64) -> String{
-    format!("\t match = if state=={state} then 1 else match fi\n")
+    format!("\t match = if state=={state} then 1 else match-0 fi\n")
 }
 pub fn make_zok(dfa: DFA<'_>) -> std::io::Result<()> {
     let mut delta_base_string = "def delta(private field state, private field cur_char) -> field:
