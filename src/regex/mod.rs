@@ -6,8 +6,9 @@ use std::collections::BTreeSet;
 use core::fmt;
 use core::fmt::Formatter;
 use crate::openset::{OpenSet,OpenRange};
-use crate::regex::re::projv2;
 use crate::safa::Skip;
+
+use self::re::projection;
 
 #[cfg(fuzz)]
 pub mod arbitrary;
@@ -450,40 +451,7 @@ pub mod re {
         Some((s, G.mk(rem)))
     }
 
-    pub fn strip(r: &RegexF, start: i32)->RegexF{
-        let mut outR = r.clone(); 
-        let mut counter = start; 
-        println!("{:#?}",outR);
-        while counter > 0 {
-            outR = match outR {
-                RegexF::App(l, r) => {
-                    match l.simpl() {
-                        RegexF::Range(c,i ,j ) => {
-                            if i ==j {
-                              counter = counter - (i as i32);  
-                            }
-                        },
-                        RegexF::CharClass(_) => {
-                            counter = counter - 1;
-                        }
-                        _ => {
-                            counter = counter;
-                        }
-                    }
-                    let out = r.simpl();
-                    out.to_owned()
-                },
-                _ => outR
-            };
-            println!("-----------",);
-            println!("{:#?}",outR);
-            println!("{:#?}",counter);
-        }
-        outR
-    }
-
-
-    pub fn projv2(r: &RegexF)->Vec<(u32, u32)> {
+    pub fn projection_intervals(r: &RegexF)->Vec<(u32, u32)> {
         let mut intervals = Vec::new();
         let mut outR = r.clone(); 
         let mut start: u32 = 0;
@@ -588,9 +556,6 @@ pub mod re {
                 }
                 _ => outR
             };
-            println!("-----------",);
-            println!("{:#?}",outR);
-            println!("{:#?},{:#?},{:#?}",start,end, trailing_dot);
         }
         intervals
     }
@@ -647,19 +612,51 @@ pub mod re {
         return out;
     }   
 
-    pub fn projection_pow2(r: &RegexF) -> (u32,u32) {
-        let dot_proj_size = get_len(r, 0, false);
-        let mut proj_size = get_len(r, 0, true);
-        let mut start = dot_proj_size;
-        if dot_proj_size == proj_size {
-            (0,0)
+    pub fn projection(r: &RegexF) -> Vec<(u32, u32)>{
+        let mut intervals = projection_intervals(r);
+        intervals.dedup_by(|(a,b), (c,d)| a==c);
+        println!("{:#?}",intervals);
+        let mut pow2_intervals = Vec::new();
+        if intervals[0].0 == 0 && intervals[0].1 == 0 {
+            return vec![(0,0)];
+        }
+        if intervals.len()==1 {
+            let original_size = intervals[0].1-intervals[0].0-1; 
+            pow2_intervals.push((intervals[0].0, intervals[0].0+(u32::MAX >> (original_size-1).leading_zeros())+1));
         } else {
-            if proj_size - dot_proj_size == 1 {
-                (start, 1)
-            } else {
-                (start, (u32::MAX >> (proj_size - dot_proj_size - 1).leading_zeros()) + 1)
+            for i in 0..intervals.len() {
+                println!("{:#?}",i);
+                //always try and draw from the left 
+                let l = intervals[i].0;
+                let r = intervals[i].1;
+                let original_size = r-l;
+                let mut pow2padding = (u32::MAX >> (original_size-1).leading_zeros())+1 - original_size;
+                println!("{:#?},{:#?},{:#?}",l,r,pow2padding);
+                let last_interval = pow2_intervals.pop();
+                let mut new_interval:(u32,u32);
+                match last_interval {
+                    None => {
+                        if l < pow2padding {
+                            new_interval = (0,r+(pow2padding-l));
+                        } else {
+                            new_interval = (l-pow2padding,r);
+                        }
+                    }
+                    Some(v) => {
+                        if l-pow2padding < v.1 {
+                            new_interval = (v.1+1,r+(pow2padding-(l-v.1)));
+                        } else {
+                            new_interval = (l-pow2padding,r);
+                        }
+                        pow2_intervals.push(v);
+                    }
+                }
+                pow2_intervals.push(new_interval)
+
             }
         }
+ 
+        pow2_intervals
     }
 
 }
@@ -784,11 +781,12 @@ fn test_regex_negative_char_class_range() {
 
 #[test]
 fn test_for_proj() {
-    let r = re::simpl(re::new(r"^.a(b|c)d{2}.{5}ef"));
-    println!("{:#?}",r);
-    println!("{:#?}", projv2(r.get()));
+    let r = re::simpl(re::new(r"^.{10}abc.{5}efg{3}"));
+    // println!("{:#?}",r);
+    println!("{:#?}",projection(r.get()));
     // println!("{:#?}",re::get_proj_size(r.get(), 0, false));
     // println!("{:#?}",re::get_proj_size(r.get(), 0, true));
     // println!("{:#?}",re::projection_pow2(r.get()));
     // println!("{:#?}",re::strip(r.get(),2));
+    // ..........abc.....efgg
 }
