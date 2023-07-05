@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use core::fmt;
 use core::fmt::Formatter;
 use crate::openset::{OpenSet,OpenRange};
+use crate::regex::re::projv2;
 use crate::safa::Skip;
 
 #[cfg(fuzz)]
@@ -351,6 +352,7 @@ pub mod re {
     use crate::openset::OpenSet;
     use crate::regex::{parser::RegexParser,Regex, RegexF};
     use hashconsing::HashConsign;
+    use std::array::TryFromSliceError;
     use std::collections::BTreeSet;
 
     /// Constructor
@@ -448,7 +450,137 @@ pub mod re {
         Some((s, G.mk(rem)))
     }
 
-    pub fn get_proj_size(r: &RegexF, size: u32, and_char: bool) -> u32{
+    pub fn strip(r: &RegexF, start: i32)->RegexF{
+        let mut outR = r.clone(); 
+        let mut counter = start; 
+        println!("{:#?}",outR);
+        while counter > 0 {
+            outR = match outR {
+                RegexF::App(l, r) => {
+                    match l.simpl() {
+                        RegexF::Range(c,i ,j ) => {
+                            if i ==j {
+                              counter = counter - (i as i32);  
+                            }
+                        },
+                        RegexF::CharClass(_) => {
+                            counter = counter - 1;
+                        }
+                        _ => {
+                            counter = counter;
+                        }
+                    }
+                    let out = r.simpl();
+                    out.to_owned()
+                },
+                _ => outR
+            };
+            println!("-----------",);
+            println!("{:#?}",outR);
+            println!("{:#?}",counter);
+        }
+        outR
+    }
+
+
+    pub fn projv2(r: &RegexF)->(u32,u32) {
+        let mut outR = r.clone(); 
+        let mut start: u32 = 0;
+        let mut end: u32 = 0;
+        let mut trailing_dot: u32 = 0;
+        while !outR.is_empty(){
+            outR = match outR {
+                RegexF::App(l, r) => {
+                    match l.simpl() {
+                        RegexF::Range(c,i ,j ) => {
+                            if i ==j {
+                                match c.simpl() {
+                                    RegexF::Dot => {
+                                        if start == 0 && end == 0{
+                                            start = start + (i as u32); 
+                                            end = end + (i as u32);
+                                            
+                                        } else {
+                                            trailing_dot = trailing_dot + (i as u32);
+                                        }
+                                    },
+                                    RegexF::CharClass(_) => {
+                                        end = end + (i as u32);
+                                        if trailing_dot != 0 {
+                                            end = end + trailing_dot;
+                                            trailing_dot = 0;
+                                        }
+                                    }
+                                    _ => ()
+                                }  
+                            }
+                        },
+                        RegexF::CharClass(_) => {
+                            if trailing_dot != 0 {
+                                end = end + trailing_dot+1;
+                                trailing_dot = 0;
+                            } else {
+                                end = end + 1
+                            }
+                        },
+                        RegexF::Dot => {
+                            if start == 0 && end ==0 {
+                                start = start + 1; 
+                                end = end + 1
+                            } else {
+                                trailing_dot = trailing_dot + 1
+                            }
+                        }
+                        RegexF::Star(_) => {
+                            return (0,0);
+                        }
+                        RegexF::Alt(opt1,opt2) =>{
+                            let opt1_len = get_len(&opt1,0,true);
+                            let opt2_len = get_len(&opt2,0,true);
+                            if  opt1_len == opt2_len {
+                                end = end + opt1_len;
+                                if trailing_dot != 0 {
+                                    end = end + trailing_dot; 
+                                    trailing_dot = 0;
+                                } 
+                            } else {
+                                return (0,0)
+                            }
+                        }
+                        _ => {
+                        }
+                    }
+                    let out = r.simpl();
+                    out.to_owned()
+                },
+                RegexF::Star(c) => {
+                    match c.simpl() {
+                        RegexF::Dot => {
+                            return (start, end);
+                        }
+                        _ => {
+                            return (0,0);
+                        }
+                    }
+
+                },
+                RegexF::CharClass(_) => {
+                    end = end +1;
+                    if trailing_dot!=0 {
+                        end = end + trailing_dot;
+                    }
+                    return (start,end);
+                }
+                _ => outR
+            };
+            println!("-----------",);
+            println!("{:#?}",outR);
+            println!("{:#?},{:#?},{:#?}",start,end, trailing_dot);
+        }
+        (start,end)
+    }
+
+    pub fn get_len(r: &RegexF, size: u32, and_char: bool) -> u32{
         let mut out = 0;
         match &r {
             RegexF::Dot => {
@@ -462,17 +594,17 @@ pub mod re {
                 }
             },
             RegexF::App(x, y) => {
-                let l = get_proj_size(&x.simpl(), size,and_char);
-                let r = get_proj_size(&y.simpl(), size,and_char);
+                let l = get_len(&x.simpl(), size,and_char);
+                let r = get_len(&y.simpl(), size,and_char);
                 if l > 0 { 
                     out = l + r;
                 } else {
                     out = l;
                 }
-            }
+            },
             RegexF::Alt(x, y) => {
-                let l = get_proj_size(&x.simpl(), size,and_char); 
-                let r = get_proj_size(&x.simpl(), size,and_char); 
+                let l = get_len(&x.simpl(), size,and_char); 
+                let r = get_len(&x.simpl(), size,and_char); 
                 if l==r {
                     out = 0;
                 } else {
@@ -481,8 +613,8 @@ pub mod re {
             }
             RegexF::Star(a) => {out = 0},
             RegexF::And(x, y) => {
-                let l = get_proj_size(&x.simpl(), size,and_char);
-                let r = get_proj_size(&y.simpl(), size,and_char);
+                let l = get_len(&x.simpl(), size,and_char);
+                let r = get_len(&y.simpl(), size,and_char);
                 if l > 0 { 
                     out = l + r;
                 } else {
@@ -491,7 +623,7 @@ pub mod re {
             }
             RegexF::Range(a, i, j) => {
                 if i == j {
-                    out = get_proj_size(&a.simpl(), size,and_char) * (*i as u32);
+                    out = get_len(&a.simpl(), size,and_char) * (*i as u32);
                 } else {
                     out = 0;
                 }
@@ -501,8 +633,8 @@ pub mod re {
     }   
 
     pub fn projection_pow2(r: &RegexF) -> (u32,u32) {
-        let dot_proj_size = get_proj_size(r, 0, false);
-        let mut proj_size = get_proj_size(r, 0, true);
+        let dot_proj_size = get_len(r, 0, false);
+        let mut proj_size = get_len(r, 0, true);
         let mut start = dot_proj_size;
         if dot_proj_size == proj_size {
             (0,0)
@@ -637,9 +769,11 @@ fn test_regex_negative_char_class_range() {
 
 #[test]
 fn test_for_proj() {
-    let r = re::simpl(re::new(r"^.{10}abcd.{5}"));
-    // println!("{:#?}",r);
-    println!("{:#?}",re::get_proj_size(r.get(), 0, false));
-    println!("{:#?}",re::get_proj_size(r.get(), 0, true));
-    println!("{:#?}",re::projection_pow2(r.get()));
+    let r = re::simpl(re::new(r"^.a(b|c)d{2}.{5}e{2}"));
+    println!("{:#?}",r);
+    println!("{:#?}", projv2(r.get()));
+    // println!("{:#?}",re::get_proj_size(r.get(), 0, false));
+    // println!("{:#?}",re::get_proj_size(r.get(), 0, true));
+    // println!("{:#?}",re::projection_pow2(r.get()));
+    // println!("{:#?}",re::strip(r.get(),2));
 }
