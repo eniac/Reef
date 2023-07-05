@@ -5,6 +5,7 @@ use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
 use reef::regex::re;
 use reef::safa::SAFA;
+// use reef::naive::*;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
