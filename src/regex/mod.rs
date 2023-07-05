@@ -352,6 +352,7 @@ pub mod re {
     use crate::safa::Skip;
     use crate::openset::OpenSet;
     use crate::regex::{parser::RegexParser,Regex, RegexF};
+    use gmp_mpfr_sys::mpc::pow;
     use hashconsing::HashConsign;
     use std::array::TryFromSliceError;
     use std::collections::BTreeSet;
@@ -553,7 +554,32 @@ pub mod re {
                     end = end +1;
                     intervals.push((start,end));
                     return intervals;
-                }
+                },
+                RegexF::Range(c,i ,j ) => {
+                    if i ==j {
+                        match c.simpl() {
+                            RegexF::Dot => {
+                                if trailing_dot == 0 {
+                                        intervals.push((start,end));
+                                    }
+                                },
+                            RegexF::CharClass(_) => {
+                                if trailing_dot != 0 {
+                                    start = end + trailing_dot;
+                                    end = end + trailing_dot + (i as u32);
+                                    trailing_dot = 0;
+                                } else {
+                                    end = end + (i as u32);
+                                }
+                                intervals.push((start,end));
+                            }
+                            _ => ()
+                        }
+                        return intervals;  
+                    } else {
+                        return vec![(0,0)];
+                    }
+                },
                 _ => outR
             };
         }
@@ -616,46 +642,45 @@ pub mod re {
         let mut intervals = projection_intervals(r);
         intervals.dedup_by(|(a,b), (c,d)| a==c);
         println!("{:#?}",intervals);
-        let mut pow2_intervals = Vec::new();
+        let mut pow2_intervals:Vec<(u32, u32)> = Vec::new();
         if intervals[0].0 == 0 && intervals[0].1 == 0 {
             return vec![(0,0)];
         }
-        if intervals.len()==1 {
-            let original_size = intervals[0].1-intervals[0].0-1; 
-            pow2_intervals.push((intervals[0].0, intervals[0].0+(u32::MAX >> (original_size-1).leading_zeros())+1));
-        } else {
-            for i in 0..intervals.len() {
-                println!("{:#?}",i);
-                //always try and draw from the left 
-                let l = intervals[i].0;
-                let r = intervals[i].1;
-                let original_size = r-l;
-                let mut pow2padding = (u32::MAX >> (original_size-1).leading_zeros())+1 - original_size;
-                println!("{:#?},{:#?},{:#?}",l,r,pow2padding);
-                let last_interval = pow2_intervals.pop();
-                let mut new_interval:(u32,u32);
-                match last_interval {
-                    None => {
-                        if l < pow2padding {
-                            new_interval = (0,r+(pow2padding-l));
-                        } else {
-                            new_interval = (l-pow2padding,r);
-                        }
-                    }
-                    Some(v) => {
-                        if l-pow2padding < v.1 {
-                            new_interval = (v.1+1,r+(pow2padding-(l-v.1)));
-                        } else {
-                            new_interval = (l-pow2padding,r);
-                        }
-                        pow2_intervals.push(v);
+        let mut l;
+        let mut r;
+        let mut original_size;
+        let mut pow2padding;
+        let base:i32 = 2;
+        for i in 0..intervals.len() {
+            println!("{:#?}",i);
+            //always try and draw from the left 
+            l = intervals[i].0;
+            r = intervals[i].1;
+            original_size = r-l;
+            pow2padding = (base.pow((original_size as f32).log2().ceil() as u32) as u32) - original_size;
+            println!("{:#?},{:#?},{:#?}",l,r,pow2padding);
+            let last_interval = pow2_intervals.pop();
+            let mut new_interval:(u32,u32);
+            match last_interval {
+                None => {
+                    if l < pow2padding {
+                        new_interval = (0,r+(pow2padding-l)-1);
+                    } else {
+                        new_interval = (l-pow2padding,r-1);
                     }
                 }
-                pow2_intervals.push(new_interval)
-
+                Some(v) => {
+                    if l-pow2padding < v.1 {
+                        new_interval = (v.1+1,r+(pow2padding-(l-v.1))-1);
+                    } else {
+                        new_interval = (l-pow2padding,r-1);
+                    }
+                    pow2_intervals.push(v);
+                }
             }
+            pow2_intervals.push(new_interval)
+
         }
- 
         pow2_intervals
     }
 
@@ -781,12 +806,12 @@ fn test_regex_negative_char_class_range() {
 
 #[test]
 fn test_for_proj() {
-    let r = re::simpl(re::new(r"^.{10}abc.{5}efg{3}"));
+    let r = re::simpl(re::new(r"^.a(b|c)d{2}.{5}e{3}$"));
     // println!("{:#?}",r);
     println!("{:#?}",projection(r.get()));
     // println!("{:#?}",re::get_proj_size(r.get(), 0, false));
     // println!("{:#?}",re::get_proj_size(r.get(), 0, true));
     // println!("{:#?}",re::projection_pow2(r.get()));
     // println!("{:#?}",re::strip(r.get(),2));
-    // ..........abc.....efgg
+    // .abdd.....eee
 }
