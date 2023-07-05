@@ -1208,7 +1208,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("state_{}", i - 1), new_wit(state_i));
         wits.insert(format!("offset_{}", i - 1), new_wit(offset_i));
         wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
-        wits.insert(format!("cursor_{}", i - 1), new_wit(cursor_i));
+        wits.insert(format!("cursor_{}", i), new_wit(cursor_i)); // alreaded "added" here
 
         // v_i =
         let num_states = self.safa.g.node_count();
@@ -1276,6 +1276,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut cursor_i = cursor_0;
         let mut sol_done = false; //single path almost done?
 
+        wits.insert(format!("cursor_0"), new_wit(cursor_i));
+
         while i <= self.batch_size {
             let mut char_num = self.num_ab[&None];
             next_state = state_i;
@@ -1292,7 +1294,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 v.push(self.normal_v(
                     &mut wits,
                     &mut q,
-                    self.path_count,
+                    0, //self.path_count, // TODO
                     state_i,
                     self.from_state,
                     self.stack_level,
