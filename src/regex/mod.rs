@@ -483,7 +483,8 @@ pub mod re {
     }
 
 
-    pub fn projv2(r: &RegexF)->(u32,u32) {
+    pub fn projv2(r: &RegexF)->Vec<(u32, u32)> {
+        let mut intervals = Vec::new();
         let mut outR = r.clone(); 
         let mut start: u32 = 0;
         let mut end: u32 = 0;
@@ -501,14 +502,19 @@ pub mod re {
                                             end = end + (i as u32);
                                             
                                         } else {
+                                            if trailing_dot == 0 {
+                                                intervals.push((start,end));
+                                            }
                                             trailing_dot = trailing_dot + (i as u32);
                                         }
                                     },
                                     RegexF::CharClass(_) => {
-                                        end = end + (i as u32);
                                         if trailing_dot != 0 {
-                                            end = end + trailing_dot;
+                                            start = end + trailing_dot;
+                                            end = end + trailing_dot + (i as u32);
                                             trailing_dot = 0;
+                                        } else {
+                                            end = end + (i as u32);
                                         }
                                     }
                                     _ => ()
@@ -517,7 +523,8 @@ pub mod re {
                         },
                         RegexF::CharClass(_) => {
                             if trailing_dot != 0 {
-                                end = end + trailing_dot+1;
+                                start = end + trailing_dot;
+                                end = end + trailing_dot + 1;
                                 trailing_dot = 0;
                             } else {
                                 end = end + 1
@@ -528,23 +535,27 @@ pub mod re {
                                 start = start + 1; 
                                 end = end + 1
                             } else {
+                                if trailing_dot == 0 {
+                                    intervals.push((start,end));
+                                }
                                 trailing_dot = trailing_dot + 1
                             }
                         }
                         RegexF::Star(_) => {
-                            return (0,0);
+                            return vec![(0,0)];
                         }
                         RegexF::Alt(opt1,opt2) =>{
                             let opt1_len = get_len(&opt1,0,true);
                             let opt2_len = get_len(&opt2,0,true);
                             if  opt1_len == opt2_len {
-                                end = end + opt1_len;
                                 if trailing_dot != 0 {
-                                    end = end + trailing_dot; 
+                                    start = end + trailing_dot;
+                                    end = end + trailing_dot;
                                     trailing_dot = 0;
-                                } 
+                                }
+                                end = end + opt1_len; 
                             } else {
-                                return (0,0)
+                                return vec![(0,0)]
                             }
                         }
                         _ => {
@@ -556,20 +567,24 @@ pub mod re {
                 RegexF::Star(c) => {
                     match c.simpl() {
                         RegexF::Dot => {
-                            return (start, end);
+                            intervals.push((start,end));
+                            return intervals;
                         }
                         _ => {
-                            return (0,0);
+                            return vec![(0,0)];
                         }
                     }
 
                 },
                 RegexF::CharClass(_) => {
-                    end = end +1;
-                    if trailing_dot!=0 {
+                    if trailing_dot != 0 {
+                        start = end + trailing_dot;
                         end = end + trailing_dot;
+                        trailing_dot = 0;
                     }
-                    return (start,end);
+                    end = end +1;
+                    intervals.push((start,end));
+                    return intervals;
                 }
                 _ => outR
             };
@@ -577,7 +592,7 @@ pub mod re {
             println!("{:#?}",outR);
             println!("{:#?},{:#?},{:#?}",start,end, trailing_dot);
         }
-        (start,end)
+        intervals
     }
 
     pub fn get_len(r: &RegexF, size: u32, and_char: bool) -> u32{
@@ -769,7 +784,7 @@ fn test_regex_negative_char_class_range() {
 
 #[test]
 fn test_for_proj() {
-    let r = re::simpl(re::new(r"^.a(b|c)d{2}.{5}e{2}"));
+    let r = re::simpl(re::new(r"^.a(b|c)d{2}.{5}ef"));
     println!("{:#?}",r);
     println!("{:#?}", projv2(r.get()));
     // println!("{:#?}",re::get_proj_size(r.get(), 0, false));
