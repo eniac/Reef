@@ -1,17 +1,17 @@
 def delta(private field state, private field cur_char) -> field:
     	 field out = -1
-	 out = if (state==0 && cur_char==98) then 2 else out fi
-	 out = if (state==2 && cur_char==97) then 2 else out fi
-	 out = if (state==1 && cur_char==98) then 3 else out fi
-	 out = if (state==3 && cur_char==97) then 2 else out fi
-	 out = if (state==2 && cur_char==98) then 2 else out fi
-	 out = if (state==3 && cur_char==99) then 2 else out fi
-	 out = if (state==1 && cur_char==99) then 2 else out fi
-	 out = if (state==3 && cur_char==98) then 2 else out fi
-	 out = if (state==0 && cur_char==99) then 2 else out fi
-	 out = if (state==0 && cur_char==97) then 1 else out fi
-	 out = if (state==1 && cur_char==97) then 2 else out fi
-	 out = if (state==2 && cur_char==99) then 2 else out fi
+	 out = if (state==0 && cur_char==97) then 1 else out-0 fi
+	 out = if (state==2 && cur_char==99) then 2 else out-0 fi
+	 out = if (state==3 && cur_char==98) then 2 else out-0 fi
+	 out = if (state==2 && cur_char==97) then 2 else out-0 fi
+	 out = if (state==1 && cur_char==98) then 3 else out-0 fi
+	 out = if (state==3 && cur_char==97) then 2 else out-0 fi
+	 out = if (state==0 && cur_char==98) then 2 else out-0 fi
+	 out = if (state==0 && cur_char==99) then 2 else out-0 fi
+	 out = if (state==3 && cur_char==99) then 2 else out-0 fi
+	 out = if (state==1 && cur_char==97) then 2 else out-0 fi
+	 out = if (state==2 && cur_char==98) then 2 else out-0 fi
+	 out = if (state==1 && cur_char==99) then 2 else out-0 fi
 	 return out
 
 def main(field commit, private field blind) -> field: 
@@ -22,5 +22,5 @@ def main(field commit, private field blind) -> field:
     		 state = delta(state, i)
     	 endfor 
     	 field match = 0
-	 match = if state==3 then 1 else match fi
+	 match = if state==3 then 1 else match-0 fi
 	 return match
