@@ -51,6 +51,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     stack_level: usize,
     from_state: usize,
     cursor_stack: LinkedList<usize>,
+    path_count_lookup: FxHashMap<usize, usize>,
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
@@ -226,6 +227,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut current_path_state = 0;
         let mut current_stack_level = 0;
         let mut current_path_count = 0;
+        let mut path_count_lookup: FxHashMap<usize, usize> = FxHashMap::default();
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             println!("PROCESS STATE {:#?}", all_state);
@@ -398,7 +400,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                         if safa.accepting.contains(&state) {
                             // add check entries to table
-                            let c = current_path_count; // path count
+                            let base: i32 = 2; // an explicit type is required
+
+                            let c = base.pow(current_path_count) as usize; // path count
                             let offset = current_stack_level;
                             let rel = 1;
                             let in_state = state.index();
@@ -416,6 +420,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 )
                                 .rem_floor(cfg().field().modulus()),
                             );
+
+                            path_count_lookup.insert(out_state, c);
+                            current_path_count += 1;
                         }
                     }
                 }
@@ -453,7 +460,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             int_doc.push(Integer::from(u));
         }
 
-        println!("TABLE {:#?}", table);
+        //println!("TABLE {:#?}", table);
 
         Self {
             safa,
@@ -476,7 +483,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             stack_level: 0,
             from_state: 0,
             cursor_stack: LinkedList::new(),
-            //substring,
+            path_count_lookup,
             pc: pcs,
         }
     }
@@ -1192,6 +1199,65 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
+    fn transition_v(
+        &self,
+        wits: &mut FxHashMap<String, Value>,
+        q: &mut Vec<usize>,
+        path_count_add: usize,    // char_num
+        accepting_state_b: usize, // state_i
+        from_state: usize,        // next_state
+        stack_lvl: usize,         // offset_i
+        rel_i: usize,
+        cursor_i: usize,
+        i: usize, // this is for naming
+    ) -> Integer {
+        // sanity
+        let mut or = false;
+        for n in self.safa.accepting.clone().into_iter() {
+            or = or || n.index() == accepting_state_b;
+        }
+        assert!(or);
+
+        wits.insert(format!("path_count_add"), new_wit(path_count_add));
+        wits.insert(format!("state_{}", i - 1), new_wit(accepting_state_b));
+        wits.insert(format!("from_state"), new_wit(from_state));
+        wits.insert(format!("stack_lvl"), new_wit(stack_lvl));
+        wits.insert(format!("rel_{}", i), new_wit(rel_i));
+        wits.insert(format!("cursor_{}", i), new_wit(cursor_i)); // alreaded "added" here
+
+        // v_i =
+        let num_states = self.safa.g.node_count();
+        let num_chars = self.safa.ab.len();
+
+        // TODO check overflow
+        let v_i = Integer::from(
+            (accepting_state_b * num_states * num_chars * self.max_offsets * 2)
+                + (from_state * path_count_add * self.max_offsets * 2)
+                + (path_count_add * self.max_offsets * 2)
+                + (stack_lvl * 2)
+                + (rel_i),
+        )
+        .rem_floor(cfg().field().modulus());
+
+        //v.push(v_i.clone());
+        wits.insert(format!("v_{}", i - 1), new_wit(v_i.clone()));
+
+        println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?}",
+            i - 1,
+            v_i,
+            accepting_state_b,
+            from_state,
+            path_count_add,
+            stack_lvl,
+            rel_i
+        );
+
+        q.push(self.table.iter().position(|val| val == &v_i).unwrap());
+
+        v_i
+    }
+
     fn normal_v(
         &self,
         wits: &mut FxHashMap<String, Value>,
@@ -1278,34 +1344,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("cursor_0"), new_wit(cursor_i));
 
-        while i <= self.batch_size {
+        while i < self.batch_size {
             let mut char_num = self.num_ab[&None];
             next_state = state_i;
             let mut offset_i = 0;
             let mut rel_i = 0;
             let mut is_star = false;
 
-            if sol_done {
-                sol_done = false;
-                rel_i = 1;
-                println!("CURSOR STACK POP {:#?}", self.cursor_stack);
-                cursor_i = self.cursor_stack.pop_front().unwrap();
-
-                v.push(self.normal_v(
-                    &mut wits,
-                    &mut q,
-                    0, //self.path_count, // TODO
-                    state_i,
-                    self.from_state,
-                    self.stack_level,
-                    rel_i,
-                    cursor_i,
-                    i,
-                ));
-                i += 1;
-                self.path_count += 1;
-                self.stack_level = 0;
-            } else if self.sol_num >= sols.len()
+            if self.sol_num >= sols.len()
                 || (self.sol_num == sols.len() - 1 && sols[self.sol_num].is_empty())
             {
                 // pad epsilons (above vals) bc we're done
@@ -1351,6 +1397,38 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 state_i = next_state; // not necessary anymore
             }
         }
+
+        if sol_done {
+            sol_done = false;
+            let rel_i = 1;
+            println!("CURSOR STACK POP {:#?}", self.cursor_stack);
+            cursor_i = self.cursor_stack.pop_front().unwrap();
+
+            v.push(self.transition_v(
+                &mut wits,
+                &mut q,
+                self.path_count_lookup[&self.from_state],
+                state_i, // accepting
+                self.from_state,
+                self.stack_level,
+                rel_i,
+                cursor_i,
+                i,
+            ));
+            i += 1;
+            self.path_count += 1;
+            self.stack_level = 0;
+        } else {
+            // padding
+            let char_num = self.num_ab[&None];
+            next_state = state_i;
+
+            v.push(self.normal_v(
+                &mut wits, &mut q, char_num, state_i, next_state, 0, 0, cursor_i, i,
+            ));
+            i += 1;
+        }
+
         println!("DONE LOOP");
 
         // last state
@@ -1385,6 +1463,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     cursor_0,
                 );
                 wits = w;
+                println!("WITS {:#?}", wits);
                 (
                     wits,
                     next_state,
@@ -1981,10 +2060,10 @@ mod tests {
                     let mut _start_epsilons;
 
                     let trace = safa.solve(&chars);
-                    println!("TRACE {:#?}", trace);
+                    //println!("TRACE {:#?}", trace);
 
                     let mut sols = trace_preprocessing(&trace, &safa);
-                    println!("SOLS {:#?}", sols);
+                    //println!("SOLS {:#?}", sols);
 
                     let num_steps = 1; //sol.len();
                     println!("NUM STEPS {:#?}", num_steps);
