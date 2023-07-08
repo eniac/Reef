@@ -851,10 +851,10 @@ mod tests {
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = re::simpl(re::new(".*hello.*$"));
-        let mut safa = SAFA::new("hello", &r);
+        let r = re::simpl(re::new("^(?=.*a.*)(?=.*b.*).{4}$"));
+        let mut safa = SAFA::new("abc", &r);
         // safa = safa.negate();
-        safa.write_pdf("safa7").unwrap();
+        safa.write_pdf("safa8").unwrap();
         // let strdoc = "baababab";
         // let doc = strdoc.chars().collect();
 

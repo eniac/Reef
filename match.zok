@@ -1,26 +1,25 @@
 def delta(private field state, private field cur_char) -> field:
-    	 field out = -1
-	 out = if (state==0 && cur_char==97) then 1 else out-0 fi
-	 out = if (state==2 && cur_char==99) then 2 else out-0 fi
-	 out = if (state==3 && cur_char==98) then 2 else out-0 fi
-	 out = if (state==2 && cur_char==97) then 2 else out-0 fi
-	 out = if (state==1 && cur_char==98) then 3 else out-0 fi
-	 out = if (state==3 && cur_char==97) then 2 else out-0 fi
-	 out = if (state==0 && cur_char==98) then 2 else out-0 fi
-	 out = if (state==0 && cur_char==99) then 2 else out-0 fi
-	 out = if (state==3 && cur_char==99) then 2 else out-0 fi
-	 out = if (state==1 && cur_char==97) then 2 else out-0 fi
-	 out = if (state==2 && cur_char==98) then 2 else out-0 fi
-	 out = if (state==1 && cur_char==99) then 2 else out-0 fi
-	 return out
+    	field out = -1
+	out = if (state==2 && cur_char==98) then 2 else out-0 fi
+	out = if (state==0 && cur_char==97) then 1 else out-0 fi
+	out = if (state==2 && cur_char==99) then 2 else out-0 fi
+	out = if (state==1 && cur_char==99) then 2 else out-0 fi
+	out = if (state==1 && cur_char==98) then 3 else out-0 fi
+	out = if (state==3 && cur_char==98) then 2 else out-0 fi
+	out = if (state==3 && cur_char==97) then 2 else out-0 fi
+	out = if (state==2 && cur_char==97) then 2 else out-0 fi
+	out = if (state==0 && cur_char==98) then 2 else out-0 fi
+	out = if (state==0 && cur_char==99) then 2 else out-0 fi
+	out = if (state==3 && cur_char==99) then 2 else out-0 fi
+	out = if (state==1 && cur_char==97) then 2 else out-0 fi
+	return out
 
-def main(field commit, private field blind) -> field: 
-    	 field size = 3
-    	 field[size] document = [0,0,0]
-    	 field state = 0
-    	 for field i in 0..size do
-    		 state = delta(state, i)
-    	 endfor 
-    	 field match = 0
-	 match = if state==3 then 1 else match-0 fi
-	 return match
+def main(private field[10] document) -> field: 
+    	field size = 1
+    	field state = 0
+    	for field i in 0..size do
+    		state = delta(state, document[i])
+    	endfor 
+    	field match = 0
+	match = if state==3 then 1 else match-0 fi
+	return match

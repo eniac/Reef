@@ -1,9 +1,5 @@
 #![allow(missing_docs, non_snake_case)]
-use clap::Parser;
-use csv::Writer;
-use crate::backend::{framework::*, r1cs_helper::init};
-use std::fs::OpenOptions;
-use std::path::Path;
+use crate::backend::{r1cs_helper::init};
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
@@ -13,7 +9,6 @@ use circ::front::zsharp::{self, ZSharpFE};
 use circ::front::{FrontEnd, Mode};
 use circ::ir::{opt::{opt, Opt}};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
-use circ::cfg;
 use circ::cfg::*;
 
 #[derive(PartialEq, Eq, Debug)]
@@ -24,36 +19,35 @@ pub enum DeterminedLanguage {
 }
 
 pub fn make_delta(state:u64, c: u32, next: u64) -> String{
-    format!("\t out = if (state=={state} && cur_char=={c}) then {next} else out-0 fi\n")
+    format!("\tout = if (state=={state} && cur_char=={c}) then {next} else out-0 fi\n")
 }
 
 pub fn make_match(state:u64) -> String{
-    format!("\t match = if state=={state} then 1 else match-0 fi\n")
+    format!("\tmatch = if state=={state} then 1 else match-0 fi\n")
 }
 pub fn make_zok(dfa: DFA<'_>) -> std::io::Result<()> {
     let mut delta_base_string = "def delta(private field state, private field cur_char) -> field:
-    \t field out = -1\n".to_owned();
+    \tfield out = -1\n".to_owned();
 
-    let mut main_base_string = "\n\ndef main(field commit, private field blind) -> field: 
-    \t field size = 3
-    \t field[size] document = [0,0,0]
-    \t field state = 0
-    \t for field i in 0..size do
-    \t\t state = delta(state, i)
-    \t endfor 
-    \t field match = 0\n".to_owned();
+    let mut main_base_string = "\n\ndef main(private field[10] document) -> field: 
+    \tfield size = 1
+    \tfield state = 0
+    \tfor field i in 0..size do
+    \t\tstate = delta(state, document[i])
+    \tendfor 
+    \tfield match = 0\n".to_owned();
 
     for match_state in dfa.get_final_states() {
         main_base_string.push_str(&(make_match(match_state).to_owned()));
     }
-    main_base_string.push_str("\t return match");
+    main_base_string.push_str("\treturn match");
 
 
     for delta in dfa.deltas() {
         let line = make_delta(delta.0, (delta.1 as u32), delta.2).to_owned();
         delta_base_string.push_str(&line);
     }
-    delta_base_string.push_str("\t return out");
+    delta_base_string.push_str("\treturn out");
 
     let mut final_string = delta_base_string; 
     final_string.push_str(&main_base_string);
@@ -95,6 +89,7 @@ pub fn gen_r1cs() -> (ProverData, VerifierData){
 
     let mut r1cs = to_r1cs(cs, cfg());
     r1cs = reduce_linearities(r1cs, cfg());
+    println!{"{:#?}",r1cs.constraints().len()};
     r1cs.finalize(&cs)
 }
 
