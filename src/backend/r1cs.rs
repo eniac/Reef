@@ -170,7 +170,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         safa.write_pdf("safa").unwrap();
 
-        println!("ACCEPTING {:#?}", safa.accepting);
+        println!("ACCEPTING {:#?}", safa.accepting());
         //        println!("DELTAS {:#?}", safa.deltas());
         println!("SOLVE {:#?}", safa.solve(&doc));
         //        println!("DOC {:#?}", doc.clone());
@@ -320,7 +320,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         if self.is_match {
             // proof of membership
-            for a in self.safa.accepting.iter() {
+            for a in self.safa.accepting().iter() {
                 out = out || a.index() == state;
             }
         } else {
@@ -387,7 +387,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     fn accepting_state_circuit(&mut self) {
         // final state (non) match check
         let vanishing_poly;
-        let final_states = &self.safa.accepting;
+        let final_states = &self.safa.accepting();
         //    let non_final_states = self.nfa.non_accepting();
         let mut vanish_on = vec![];
 
