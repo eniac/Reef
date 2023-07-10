@@ -253,26 +253,32 @@ impl SAFA<char> {
     pub fn is_sink(&self, n: NodeIndex<u32>) -> bool {
         self.g
             .edges(n)
-            .all(|e| e.target() == n && !self.g[e.target()].get().nullable())
+            .all(|e| e.target() == n && self.non_accepting().contains(&n))
     }
 
     /// Accepting criterion for a node, document and cursor
     pub fn is_accept(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<char>) -> bool {
-        self.g[n].get().nullable() && i == doc.len()
+        self.accepting().contains(&n) && i == doc.len()
     }
 
     /// Non accepting states
     pub fn non_accepting(&self) -> BTreeSet<NodeIndex<u32>> {
         self.g.node_indices()
-            .filter(|i| !self.g[*i].get().nullable())
+            .filter(|i| !self.accepting().contains(i))
             .collect()
     }
 
     /// Accepting states
     pub fn accepting(&self) -> BTreeSet<NodeIndex<u32>> {
-        self.g.node_indices()
-            .filter(|i| self.g[*i].get().nullable())
-            .collect()
+        if self.positive {
+            self.g.node_indices()
+                .filter(|i| self.g[*i].get().nullable())
+                .collect()
+        } else {
+            self.g.node_indices()
+                .filter(|i| !self.g[*i].get().nullable())
+                .collect()
+        }
     }
 
     /// Recursively solve an edge and all the children coming off of it
@@ -691,6 +697,18 @@ mod tests {
         assert_eq!(safa, safa.negate().negate());
     }
 
+    #[test]
+    fn test_safa_negate_range_interval() {
+        let r = re::simpl(re::new("^.{1,3}b$"));
+        let safa = SAFA::new("ab", &r).negate();
+        let doc: Vec<_> = "aaaa".chars().collect();
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Trace::new(&[
+                TraceElem::new(0, &Either(Err(Skip::open(4))), 2, 0, 4)
+            ]),
+        )
+    }
 
     #[test]
     fn test_safa_negative() {
