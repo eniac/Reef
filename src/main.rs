@@ -31,7 +31,6 @@ fn main() {
             .map(|c| c.clone()) //to_string())
             .collect()
     } else {
-        //opt.input.chars().map(|c| c.to_string()).collect()
         opt.input.chars().collect()
     };
 
@@ -44,7 +43,12 @@ fn main() {
     let r = re::new(&opt.re);
     //    println!("REGEX: {:#?}", r));
 
-    let mut safa = SAFA::new(&ab, &r);
+    // Compile regex to SAFA
+    let safa = if opt.negate {
+        SAFA::new(&ab, &r).negate()
+    } else {
+        SAFA::new(&ab, &r)
+    };
 
     // Is document well-formed
     // nfa.well_formed(&doc);
@@ -52,9 +56,9 @@ fn main() {
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA", "DFA");
 
-    // #[cfg(feature = "plot")]
-    // safa.as_str_safa().write_pdf("main")
-    //     .expect("Failed to plot NFA to a pdf file");
+    #[cfg(feature = "plot")]
+    safa.write_pdf("main")
+        .expect("Failed to plot NFA to a pdf file");
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "DFA Solving", "Clear Match");

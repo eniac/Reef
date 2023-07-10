@@ -10,19 +10,18 @@ use petgraph::graph::NodeIndex;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Quant<A>{
     pub inner: A,
-    is_and: bool,
-    is_neg: bool
+    is_and: bool
 }
 
 impl<A: Clone> Quant<A> {
     pub fn new(inner: A, is_and: bool) -> Self {
-        Self { inner, is_and, is_neg: false }
+        Self { inner, is_and}
     }
     pub fn and(inner: A) -> Self {
-        Self { inner, is_and: true, is_neg: false }
+        Self { inner, is_and: true }
     }
     pub fn or(inner: A) -> Self {
-        Self { inner, is_and: false, is_neg: false }
+        Self { inner, is_and: false }
     }
     pub fn is_and(&self) -> bool {
         self.is_and
@@ -30,14 +29,10 @@ impl<A: Clone> Quant<A> {
     pub fn is_or(&self) -> bool {
         !self.is_and
     }
-    pub fn is_neg(&self) -> bool {
-        self.is_neg
-    }
     pub fn negate(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            is_and: !self.is_and,
-            is_neg: !self.is_neg
+            is_and: !self.is_and
         }
     }
     pub fn get(&self) -> A {
@@ -46,19 +41,14 @@ impl<A: Clone> Quant<A> {
     pub fn map<B, F>(&self, f: F) -> Quant<B> where F: Fn(A)-> B {
         Quant {
             inner: f(self.inner.clone()),
-            is_and: self.is_and,
-            is_neg: self.is_neg
+            is_and: self.is_and
         }
     }
 }
 
 impl Display for Quant<String> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.is_and && self.is_neg {
-            write!(f, "∀ ¬ {}", self.get())
-        } else if !self.is_and && self.is_neg {
-            write!(f, "∃ ¬ {}", self.get())
-        } else if self.is_and {
+        if self.is_and {
             write!(f, "∀ {}", self.get())
         } else {
             write!(f, "∃ {}", self.get())
