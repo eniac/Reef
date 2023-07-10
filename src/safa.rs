@@ -74,6 +74,16 @@ pub struct SAFA<C: Clone> {
     pub positive: bool
 }
 
+impl PartialEq for SAFA<char> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ab == other.ab &&
+        self.positive == other.positive &&
+        self.deltas() == other.deltas()
+    }
+}
+
+impl Eq for SAFA<char> {}
+
 impl SAFA<char> {
     /// Deep Constructor
     pub fn new<'a>(alphabet: &'a str, re: &Regex) -> Self {
@@ -98,7 +108,7 @@ impl SAFA<char> {
         let n_c = self.find_or_add(q_c, false);
         self.g.add_edge(n, n_c, Either::right(skip.clone()));
         // Also add the complement skip since we know it always fails
-        if !skip.is_full() {
+        if !skip.is_full() && !skip.is_nil() {
             let n_empty = self.find_or_add(&re::empty(), false);
             self.g.add_edge(n, n_empty, Either::right(skip.negate().diff(&OpenSet::nil())));
         }
@@ -392,7 +402,7 @@ mod tests {
     use std::fmt::Display;
 
     /// Helper function to output states
-    fn print_states<C: Display + Clone>(safa: &SAFA<C>) {
+    fn print_states<C: Display + Clone + Eq>(safa: &SAFA<C>) {
         safa.g
             .node_indices()
             .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
@@ -439,7 +449,6 @@ mod tests {
     fn test_safa_match_exact() {
         let r = re::simpl(re::new("^baa$"));
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
         let strdoc = "baa";
         let doc = strdoc.chars().collect();
 
@@ -507,7 +516,6 @@ mod tests {
     fn test_safa_alt_merge() {
         let r = re::simpl(re::new("^.*baa(a|b)$"));
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
         let strdoc = "abababaab";
         let doc: Vec<_> = strdoc.chars().collect();
         equiv_upto_epsilon(
@@ -569,7 +577,6 @@ mod tests {
         // unsafe { backtrace_on_stack_overflow::enable() };
         let r = re::simpl(re::new("^(.{1,3}){1,2}b$"));
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
         let doc: Vec<_> = "aaaab".chars().collect();
         equiv_upto_epsilon(
             &safa.solve(&doc),
@@ -590,7 +597,6 @@ mod tests {
     fn test_safa_range_alt() {
         let r = re::simpl(re::new("^((.{1,2}.)|(.{4,5}b))$"));
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
         let doc: Vec<_> = "aaaab".chars().collect();
         equiv_upto_epsilon(
             &safa.solve(&doc),
@@ -611,6 +617,7 @@ mod tests {
     fn test_safa_lookahead_weird() {
         let r = re::simpl(re::new(r"^(?=a).*b$"));
         let safa = SAFA::new("ab", &r);
+        safa.write_pdf("safa").unwrap();
         let doc: Vec<_> = "ab".chars().collect();
         equiv_upto_epsilon(
             &safa.solve(&doc),
@@ -658,13 +665,32 @@ mod tests {
     }
 
     #[test]
-    fn test_safa_negate() {
+    fn test_safa_double_negate() {
         let r = re::simpl(re::new("(a|b).{1,3}a"));
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("pos").unwrap();
-        safa.negate().write_pdf("neg").unwrap();
-        safa.negate().negate().write_pdf("dneg").unwrap();
+        assert_eq!(safa, safa.negate().negate());
     }
+
+    #[test]
+    fn test_safa_double_negate_alt() {
+        let r = re::simpl(re::new("(a.*|.*b)a"));
+        let safa = SAFA::new("ab", &r);
+        // safa.write_pdf("pos").unwrap();
+        // safa.negate().write_pdf("neg").unwrap();
+        // safa.negate().negate().write_pdf("dneg").unwrap();
+        assert_eq!(safa, safa.negate().negate());
+    }
+
+    #[test]
+    fn test_safa_double_negate_and() {
+        let r = re::simpl(re::new("^(?=ab)ba$"));
+        let safa = SAFA::new("ab", &r);
+        // safa.write_pdf("pos").unwrap();
+        // safa.negate().write_pdf("neg").unwrap();
+        // safa.negate().negate().write_pdf("dneg").unwrap();
+        assert_eq!(safa, safa.negate().negate());
+    }
+
 
     #[test]
     fn test_safa_negative() {

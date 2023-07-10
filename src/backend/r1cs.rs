@@ -18,7 +18,7 @@ use rug::{integer::Order, ops::RemRounding, Integer};
 use std::cmp::max;
 use std::collections::LinkedList;
 
-pub struct R1CS<'a, F: PrimeField, C: Clone> {
+pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub safa: &'a SAFA<C>,
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
