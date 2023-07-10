@@ -843,15 +843,15 @@ fn test_for_proj() {
 
 #[test]
 fn test_proj_cons() {
-    let r = re::simpl(re::new(r"^.{3}.{4}a$"));
-    println!("Regex {:#?}", r);
-    println!("Intervals {:#?}", projection(r.get()));
-    // LEF: Should be [(7, 8)]
+    let r = re::simpl(re::new(r"^.{3}.{4}$"));
+    // LEF: Should be (7,8) no?
+    assert_eq!(projection(r.get()), vec![(7,8)]);
 }
 
 #[test]
 fn test_proj_alt() {
-    let r = re::simpl(re::new(r"^(.{3}|.{4})a$"));
+    let r = re::simpl(re::new(r"^(.{3})|(.{2})$"));
     println!("Intervals {:#?}", projection(r.get()));
-    // LEF: Unsure what the answer should be, either [(3,4)] or [(3,5)]
+    // LEF: Unsure what the answer should be, either [(2,3)] or [(3,4)] probably the union interval (2,4)?
+    assert_eq!(projection(r.get()), vec![(2,4)]);
 }
