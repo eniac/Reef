@@ -224,6 +224,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // stack level, states
         let mut forall_children: Vec<HashSet<usize>> = Vec::new();
+        let mut forall_children_first: Vec<bool> = Vec::new();
         let mut current_path_state = 0;
         let mut current_stack_level = 0;
         let mut current_path_count = 0;
@@ -281,6 +282,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
 
                 forall_children.push(and_states);
+                forall_children_first.push(true);
                 current_stack_level += 1;
             }
 
@@ -289,6 +291,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             for stack_lvl in 0..forall_children.len() {
                 if forall_children[stack_lvl].contains(&all_state_idx) {
+                    if forall_children_first[stack_lvl] == false {
+                        current_path_count += 1;
+                    } else {
+                        forall_children_first[stack_lvl] = false;
+                    }
+
                     current_path_state = all_state_idx;
 
                     // dupicate safa, run this path
@@ -410,6 +418,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                                                 // TODO we have to make sure the multipliers are big enough
 
                             println!("ADDITIONAL FOR ACCEPTING: path count {:#?}, stack_lvl {:#?}, path_state {:#?}, in_state {:#?}", current_path_count, current_stack_level, current_path_state, in_state);
+                            println!(
+                                "V from {:#?},{:#?},{:#?},{:#?},{:#?}",
+                                in_state, out_state, c, offset, rel,
+                            );
+                            println!(
+                                "V is {:#?}",
+                                Integer::from(
+                                    (in_state * num_states * num_chars * max_offsets * 2)
+                                        + (out_state * num_chars * max_offsets * 2)
+                                        + (c * max_offsets * 2)
+                                        + (offset * 2)
+                                        + rel,
+                                )
+                                .rem_floor(cfg().field().modulus())
+                            );
+
                             set_table.insert(
                                 Integer::from(
                                     (in_state * num_states * num_chars * max_offsets * 2)
@@ -422,7 +446,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             );
 
                             path_count_lookup.insert(out_state, c);
-                            current_path_count += 1;
                         }
                     }
                 }
@@ -1232,7 +1255,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // TODO check overflow
         let v_i = Integer::from(
             (accepting_state_b * num_states * num_chars * self.max_offsets * 2)
-                + (from_state * path_count_add * self.max_offsets * 2)
+                + (from_state * num_chars * self.max_offsets * 2)
                 + (path_count_add * self.max_offsets * 2)
                 + (stack_lvl * 2)
                 + (rel_i),
@@ -1340,7 +1363,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut start_epsilons = -1;
         let mut i = 1;
         let mut cursor_i = cursor_0;
-        let mut sol_done = false; //single path almost done?
 
         wits.insert(format!("cursor_0"), new_wit(cursor_i));
 
@@ -1359,13 +1381,45 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, cursor_i, i,
                 ));
                 i += 1;
-            } else {
-                if sols[self.sol_num].is_empty() {
-                    self.sol_num += 1;
+            } else if sols[self.sol_num].is_empty() && i > 0 {
+                // if we are not at a beginning, pad to the end
+                self.sol_num += 1;
+
+                while i < self.batch_size - 1 {
+                    println!("REACHED END OF ONE SOL, PADDING");
+
+                    // pad epsilons (above vals)
+                    v.push(self.normal_v(
+                        &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i,
+                        cursor_i, i,
+                    ));
+                    i += 1;
                 }
+
+                // end condition
+                let rel_i = 1;
+                println!("CURSOR STACK POP {:#?}", self.cursor_stack);
+                cursor_i = self.cursor_stack.pop_front().unwrap();
+
+                v.push(self.transition_v(
+                    &mut wits,
+                    &mut q,
+                    self.path_count_lookup[&self.from_state],
+                    state_i, // accepting
+                    self.from_state,
+                    self.stack_level,
+                    rel_i,
+                    cursor_i,
+                    i,
+                ));
+                i += 1;
+                self.path_count += 1;
+                self.stack_level = 0;
+            } else if sols[self.sol_num].is_empty() {
+                self.sol_num += 1;
+            } else {
                 let te = sols[self.sol_num].pop_front().unwrap();
                 println!("{:#?}", te);
-                sol_done = sols[self.sol_num].is_empty(); // are we on the last one?
                 if self.safa.g[te.from_node].is_and() {
                     self.from_state = te.to_node.index();
                     self.cursor_stack.push_front(cursor_i);
@@ -1377,6 +1431,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 (char_num, is_star) = self.get_char_num(te.edge);
                 state_i = te.from_node.index();
                 next_state = te.to_node.index();
+                println!("NEXT STATE IS {:#?}", next_state);
                 offset_i = te.to_cur - te.from_cur;
                 rel_i = 0;
 
@@ -1397,38 +1452,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 state_i = next_state; // not necessary anymore
             }
         }
-
-        if sol_done {
-            sol_done = false;
-            let rel_i = 1;
-            println!("CURSOR STACK POP {:#?}", self.cursor_stack);
-            cursor_i = self.cursor_stack.pop_front().unwrap();
-
-            v.push(self.transition_v(
-                &mut wits,
-                &mut q,
-                self.path_count_lookup[&self.from_state],
-                state_i, // accepting
-                self.from_state,
-                self.stack_level,
-                rel_i,
-                cursor_i,
-                i,
-            ));
-            i += 1;
-            self.path_count += 1;
-            self.stack_level = 0;
-        } else {
-            // padding
-            let char_num = self.num_ab[&None];
-            next_state = state_i;
-
-            v.push(self.normal_v(
-                &mut wits, &mut q, char_num, state_i, next_state, 0, 0, cursor_i, i,
-            ));
-            i += 1;
-        }
-
         println!("DONE LOOP");
 
         // last state
