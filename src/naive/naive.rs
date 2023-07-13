@@ -1,5 +1,6 @@
 #![allow(missing_docs, non_snake_case)]
 use crate::backend::{r1cs_helper::init};
+use crate::naive::naive_nova::{naive_spartan_snark_setup};
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
@@ -29,8 +30,8 @@ pub fn make_zok(dfa: DFA<'_>) -> std::io::Result<()> {
     let mut delta_base_string = "def delta(private field state, private field cur_char) -> field:
     \tfield out = -1\n".to_owned();
 
-    let mut main_base_string = "\n\ndef main(private field[10] document) -> field: 
-    \tfield size = 1
+    let mut main_base_string = "\n\ndef main(private field[2] document) -> field: 
+    \tfield size = 2
     \tfield state = 0
     \tfor field i in 0..size do
     \t\tstate = delta(state, document[i])
@@ -104,6 +105,8 @@ fn naive(r: &str, alpha: String) {
     make_zok(dfa);
 
     let (P,V) = gen_r1cs();
+
+    naive_spartan_snark_setup(P.r1cs, None);
     //Shoudl at least generate the r1cs have to figure out witnesses as well as
     //other issues re commitment 
 }
@@ -114,6 +117,6 @@ fn test_1() {
     let s  = "ab";
     //let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
     //let ab: String = abvec.iter().collect();
-    let ab = "abc".to_owned();
+    let ab = "ab".to_owned();
     naive(s,ab);
 }

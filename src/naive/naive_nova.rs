@@ -127,11 +127,10 @@ where
 
             let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
             vars.insert(var, alloc_v.get_variable());
-
-            if s.starts_with("char_") { // doc.0_n587
+            if s.starts_with("document.") { // doc.0_n587
                 let char_j = Some(alloc_v.clone()); //.get_variable();
         
-                let s_sub: Vec<&str> = s.split("_").collect(); // name = char_i
+                let s_sub: Vec<&str> = s.split(['.','_']).collect(); // name = char_i
                 let j: usize = s_sub[1].parse().unwrap();
         
                 if j < self.doc_length {
@@ -193,33 +192,33 @@ where
     }
 }
 
-pub fn naive_spartan_snark(r1cs: R1csFinal, wits: Vec<Value>) {
+pub fn naive_spartan_snark_setup(r1cs: R1csFinal, wits: Option<Vec<Value>>) {
     let pc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-    let circuit = NaiveCircuit::new(r1cs, Some(wits),10,pc);
+    let circuit = NaiveCircuit::new(r1cs, wits,2,pc);
 
-    // produce keys
+    // // produce keys
     let (pk, vk) =
       SpartanSNARK::<G1, EE, NaiveCircuit<<G1 as Group>::Scalar>>::setup(circuit.clone()).unwrap();
 
-    // setup inputs
-    let input = vec![<G1 as Group>::Scalar::one()];
+    // // setup inputs
+    // let input = vec![<G1 as Group>::Scalar::one()];
 
-    // produce a SNARK
-    let res = SpartanSNARK::prove(&pk, circuit.clone(), &input);
-    assert!(res.is_ok());
+    // // produce a SNARK
+    // let res = SpartanSNARK::prove(&pk, circuit.clone(), &input);
+    // assert!(res.is_ok());
 
-    let output = circuit.output(&input);
+    // let output = circuit.output(&input);
 
-    let snark = res.unwrap();
+    // let snark = res.unwrap();
 
-    // verify the SNARK
-    let io = input
-      .into_iter()
-      .chain(output.clone().into_iter())
-      .collect::<Vec<_>>();
-    let res = snark.verify(&vk, &io);
-    assert!(res.is_ok());
+    // // verify the SNARK
+    // let io = input
+    //   .into_iter()
+    //   .chain(output.clone().into_iter())
+    //   .collect::<Vec<_>>();
+    // let res = snark.verify(&vk, &io);
+    // assert!(res.is_ok());
 
-    // sanity: check the claimed output with a direct computation of the same
-    assert_eq!(output, vec![<G1 as Group>::Scalar::one()]);
+    // // sanity: check the claimed output with a direct computation of the same
+    // assert_eq!(output, vec![<G1 as Group>::Scalar::one()]);
   }
