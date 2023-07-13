@@ -1,6 +1,8 @@
 #![allow(missing_docs)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
+type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+
 use ::bellperson::{
     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
     Variable,
@@ -19,10 +21,11 @@ use neptune::{
 use nova_snark::{
     traits::{circuit::StepCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+    spartan::direct::*,
 };
 use rug::integer::{IsPrime, Order};
 use rug::Integer;
-use std::collections::HashMap;
+use std::{collections::HashMap, default};
 use crate::backend::nova;
 use core::marker::PhantomData;
 
@@ -47,6 +50,7 @@ impl<F: PrimeField> NaiveCircuit<F> {
         NaiveCircuit {
             r1cs: r1cs, //&prover_data.r1cs, // def get rid of this crap
             values: values,
+            _p: Default::default(),
         }
     }
 
@@ -80,7 +84,9 @@ where
         StepCounterType::Incremental
     }
 
-    
+    fn output(&self, z: &[F]) -> Vec<F> {
+        vec![z[0]]
+      }
 
     // nova wants this to return the "output" of each step
     fn synthesize<CS>(
@@ -118,7 +124,7 @@ where
                 |z| nova::lc_to_bellman::<F, CS>(&vars, c, z),
             );
         }
-        Ok(out)
+        Ok(z.to_vec())
 
     }
 }
