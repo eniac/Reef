@@ -16,7 +16,8 @@ use neptune::{
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::circuit::SpongeCircuit,
-    sponge::vanilla::{Mode, SpongeTrait},
+    sponge::vanilla::{Mode, SpongeTrait,Sponge},
+    Strength,
 };
 use nova_snark::{
     traits::{circuit::StepCircuit, Group},
@@ -25,6 +26,7 @@ use nova_snark::{
 };
 use rug::integer::{IsPrime, Order};
 use rug::Integer;
+use serde::__private::doc;
 use std::{collections::HashMap, default};
 use crate::backend::nova;
 use core::marker::PhantomData;
@@ -34,6 +36,8 @@ pub struct NaiveCircuit<F: PrimeField> {
     r1cs: R1csFinal, // TODO later ref
     values: Option<Vec<Value>>,
     _p: PhantomData<F>,
+    doc_length: usize,
+    pc: PoseidonConstants<F, typenum::U4>,
     //prover_data: &'a ProverData,
     //wits: Option<'a FxHashMap<String, Value>>,
 }
@@ -46,11 +50,15 @@ impl<F: PrimeField> NaiveCircuit<F> {
         //        wits: Option<FxHashMap<String, Value>>, //Option<&'a FxHashMap<String, Value>>,
         r1cs: R1csFinal,
         values: Option<Vec<Value>>,
+        doc_length: usize,
+        pc: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
         NaiveCircuit {
             r1cs: r1cs, //&prover_data.r1cs, // def get rid of this crap
             values: values,
             _p: Default::default(),
+            doc_length: doc_length,
+            pc: pc
         }
     }
 
@@ -88,6 +96,8 @@ where
         vec![z[0]]
       }
 
+
+
     // nova wants this to return the "output" of each step
     fn synthesize<CS>(
         &self,
@@ -101,6 +111,9 @@ where
     {
         let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
 
+         // find chars
+        let mut alloc_chars = vec![None;self.doc_length];
+
         for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
             let (name_f, s) = self.generate_variable_info(var);
             let val_f = || {
@@ -111,9 +124,21 @@ where
                     ff_val
                 })
             };
- 
+
             let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
             vars.insert(var, alloc_v.get_variable());
+
+            if s.starts_with("char_") { // doc.0_n587
+                let char_j = Some(alloc_v.clone()); //.get_variable();
+        
+                let s_sub: Vec<&str> = s.split("_").collect(); // name = char_i
+                let j: usize = s_sub[1].parse().unwrap();
+        
+                if j < self.doc_length {
+                    alloc_chars[j] = char_j;
+                }
+        
+            }
         }
 
         for (i, (a, b, c)) in self.r1cs.constraints.iter().enumerate() {
@@ -124,13 +149,53 @@ where
                 |z| nova::lc_to_bellman::<F, CS>(&vars, c, z),
             );
         }
-        Ok(z.to_vec())
+
+                // make hash
+                let mut hash_ns = cs.namespace(|| format!("poseidon hash"));
+
+                let mut elts = vec![];
+        
+                for x in alloc_chars {
+                    elts.push(Elt::Allocated(x.clone().unwrap()));
+                }
+        
+                let hashed = {
+                    let acc = &mut hash_ns;
+                    let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+                    
+                    sponge.start(
+                        IOPattern(vec![SpongeOp::Absorb(self.doc_length as u32), SpongeOp::Squeeze(1)]),
+                        None,
+                        acc,
+                    );
+        
+                    SpongeAPI::absorb(
+                        &mut sponge,
+                        self.doc_length as u32,
+                        &elts,
+                        acc
+                    );
+        
+                    let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
+        
+                    sponge.finish(acc).unwrap();
+        
+                    Elt::ensure_allocated(
+                        &output[0],
+                        &mut hash_ns.namespace(|| "ensure allocated"),
+                        true,
+                    )?
+                };
+
+        let out = vec![hashed,z[0].clone()];
+        Ok(out)
 
     }
 }
 
 pub fn naive_spartan_snark(r1cs: R1csFinal, wits: Vec<Value>) {
-    let circuit = NaiveCircuit::new(r1cs, Some(wits));
+    let pc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+    let circuit = NaiveCircuit::new(r1cs, Some(wits),10,pc);
 
     // produce keys
     let (pk, vk) =
