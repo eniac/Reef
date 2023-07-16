@@ -214,7 +214,7 @@ pub fn gen_commitment(doc: Vec<u32>, pc: &PoseidonConstants<Fq, typenum::U4>)->H
 
     SpongeAPI::absorb(
         &mut sponge,
-        doc_clone.len() as u32 + 1,
+        doc_clone.len() as u32,
         &doc_clone,
         acc,
     );
