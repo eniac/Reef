@@ -1,25 +1,29 @@
-def delta(private field state, private field cur_char) -> field:
+def delta(private field cur_state, private field cur_char) -> field:
     	field out = -1
-	out = if (state==1 && cur_char==97) then 2 else out-0 fi
-	out = if (state==1 && cur_char==98) then 3 else out-0 fi
-	out = if (state==3 && cur_char==97) then 2 else out-0 fi
-	out = if (state==2 && cur_char==97) then 2 else out-0 fi
-	out = if (state==0 && cur_char==98) then 2 else out-0 fi
-	out = if (state==2 && cur_char==99) then 2 else out-0 fi
-	out = if (state==3 && cur_char==98) then 2 else out-0 fi
-	out = if (state==3 && cur_char==99) then 2 else out-0 fi
-	out = if (state==1 && cur_char==99) then 2 else out-0 fi
-	out = if (state==0 && cur_char==97) then 1 else out-0 fi
-	out = if (state==2 && cur_char==98) then 2 else out-0 fi
-	out = if (state==0 && cur_char==99) then 2 else out-0 fi
+	out = if (cur_state==2 && cur_char==97) then 2 else out-0 fi
+	out = if (cur_state==1 && cur_char==98) then 3 else out-0 fi
+	out = if (cur_state==2 && cur_char==99) then 2 else out-0 fi
+	out = if (cur_state==3 && cur_char==97) then 2 else out-0 fi
+	out = if (cur_state==3 && cur_char==98) then 4 else out-0 fi
+	out = if (cur_state==4 && cur_char==98) then 2 else out-0 fi
+	out = if (cur_state==4 && cur_char==99) then 2 else out-0 fi
+	out = if (cur_state==0 && cur_char==97) then 1 else out-0 fi
+	out = if (cur_state==3 && cur_char==99) then 2 else out-0 fi
+	out = if (cur_state==1 && cur_char==97) then 2 else out-0 fi
+	out = if (cur_state==0 && cur_char==98) then 2 else out-0 fi
+	out = if (cur_state==0 && cur_char==99) then 2 else out-0 fi
+	out = if (cur_state==1 && cur_char==99) then 2 else out-0 fi
+	out = if (cur_state==2 && cur_char==98) then 2 else out-0 fi
+	out = if (cur_state==4 && cur_char==97) then 2 else out-0 fi
 	return out
 
-def main(private field[2] document) -> field: 
-    	field size = 2
+def main(private field[3] document) -> field: 
+    	field size = 3
     	field state = 0
     	for field i in 0..size do
     		state = delta(state, document[i])
     	endfor 
     	field match = 0
-	match = if state==3 then 1 else match-0 fi
+	match = if state==4 then 1 else match-0 fi
+	assert(match==1)
 	return match

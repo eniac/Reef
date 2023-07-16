@@ -31,8 +31,11 @@ use rand::rngs::OsRng;
 use rug::Integer;
 use serde::__private::doc;
 use std::{collections::HashMap, default};
-use crate::backend::{nova, commitment::HashCommitmentStruct};
+use crate::backend::{nova, commitment::HashCommitmentStruct, r1cs_helper::new_wit};
 use core::marker::PhantomData;
+use fxhash::{FxHashMap,FxHasher};
+use std::hash::BuildHasherDefault;
+use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 
 #[derive(Clone, Debug)]
 pub struct NaiveCircuit<F: PrimeField> {
@@ -41,6 +44,8 @@ pub struct NaiveCircuit<F: PrimeField> {
     doc_length: usize,
     pc: PoseidonConstants<F, typenum::U4>,
     blind: F,
+    commitment: F,
+    is_match: F,
     //prover_data: &'a ProverData,
     //wits: Option<'a FxHashMap<String, Value>>,
 }
@@ -55,14 +60,18 @@ impl<F: PrimeField> NaiveCircuit<F> {
         values: Option<Vec<Value>>,
         doc_length: usize,
         pc: PoseidonConstants<F, typenum::U4>,
-        blind: F
+        blind: F,
+        commitment: F,
+        is_match: F,
     ) -> Self {
         NaiveCircuit {
             r1cs: r1cs, //&prover_data.r1cs, // def get rid of this crap
             values: values,
             doc_length: doc_length,
             pc: pc, 
-            blind: blind
+            blind: blind,
+            is_match: is_match,
+            commitment:commitment
         }
     }
 
@@ -98,7 +107,7 @@ where
 
     fn output(&self, z: &[F]) -> Vec<F> {
         vec![z[0]]
-      }
+    }
 
 
 
@@ -117,7 +126,7 @@ where
 
          // find chars
         let mut alloc_chars = vec![None;self.doc_length];
-
+        
         for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
             let (name_f, s) = self.generate_variable_info(var);
             let val_f = || {
@@ -141,7 +150,7 @@ where
                     alloc_chars[j] = char_j;
                 }
         
-            }
+            } 
         }
 
         for (i, (a, b, c)) in self.r1cs.constraints.iter().enumerate() {
@@ -153,46 +162,53 @@ where
             );
         }
 
-                // make hash
-                let mut hash_ns = cs.namespace(|| format!("poseidon hash"));
+        // make hash
+        let mut hash_ns = cs.namespace(|| format!("poseidon hash"));
 
-                let alloc_blind = AllocatedNum::alloc(hash_ns.namespace(|| "blind"), || Ok(self.blind))?;
+        let alloc_blind = AllocatedNum::alloc(hash_ns.namespace(|| "blind"), || Ok(self.blind))?;
 
-                let mut elts = vec![Elt::Allocated(alloc_blind)];
+        let mut elts = vec![Elt::Allocated(alloc_blind)];
         
-                for x in alloc_chars {
-                    elts.push(Elt::Allocated(x.clone().unwrap()));
-                }
+        for x in alloc_chars {
+            elts.push(Elt::Allocated(x.clone().unwrap()));
+        }
         
-                let hashed = {
-                    let acc = &mut hash_ns;
-                    let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
-                    
-                    sponge.start(
-                        IOPattern(vec![SpongeOp::Absorb(self.doc_length as u32 + 1), SpongeOp::Squeeze(1)]),
-                        None,
-                        acc,
-                    );
-        
-                    SpongeAPI::absorb(
-                        &mut sponge,
-                        self.doc_length as u32 + 1,
-                        &elts,
-                        acc
-                    );
-        
-                    let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
-        
-                    sponge.finish(acc).unwrap();
-        
-                    Elt::ensure_allocated(
-                        &output[0],
-                        &mut hash_ns.namespace(|| "ensure allocated"),
-                        true,
-                    )?
-                };
+        let hashed = {
+            let acc = &mut hash_ns;
+            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+            
+            sponge.start(
+                IOPattern(vec![SpongeOp::Absorb(self.doc_length as u32 + 1), SpongeOp::Squeeze(1)]),
+                None,
+                acc,
+            );
 
-        let out = vec![hashed,z[0].clone()];
+            SpongeAPI::absorb(
+                &mut sponge,
+                self.doc_length as u32 + 1,
+                &elts,
+                acc
+            );
+
+            let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
+
+            sponge.finish(acc).unwrap();
+
+            Elt::ensure_allocated(
+                &output[0],
+                &mut hash_ns.namespace(|| "ensure allocated"),
+                true,
+            )?
+        };
+
+        hash_ns.enforce(
+            || format!("commit eq"),
+            |lc| lc + hashed.get_variable(),
+            |lc| lc + CS::one(),
+            |lc| lc+ z[0].get_variable(),
+        );
+
+        let out = vec![hashed];
         Ok(out)
 
     }
@@ -232,31 +248,35 @@ pub fn gen_commitment(doc: Vec<u32>, pc: &PoseidonConstants<Fq, typenum::U4>)->H
 
 } 
 
+pub fn gen_wits<'a>(doc_vec: Vec<u32>, is_match: bool, doc_len: usize, P:&'a ProverData)->Option<Vec<Value>> {
+    let mut wits: HashMap<String, Value, BuildHasherDefault<FxHasher>> = FxHashMap::default();
+    for i in 0..doc_len {
+        wits.insert(format!("document.{}",i), new_wit(doc_vec[i]));
+    }
+    wits.insert(format!("return"), new_wit(is_match as u32));
+
+    P.check_all(&wits);
+
+    let values: Option<Vec<_>> = Some(wits).map(|values| {
+        let mut evaluator = StagedWitCompEvaluator::new(&P.precompute);
+        let mut ffs = Vec::new();
+        ffs.extend(evaluator.eval_stage(values.clone()).into_iter().cloned());
+        ffs.extend(
+            evaluator
+                .eval_stage(Default::default())
+                .into_iter()
+                .cloned(),
+        );
+        ffs
+    });
+
+    values
+}
+
 pub fn naive_spartan_snark_setup(circuit: NaiveCircuit<Fq>)-> (SpartanProverKey<G1, EE>, SpartanVerifierKey<G1, EE>) {
     // // produce keys
     let (pk, vk) =
       SpartanSNARK::<G1, EE, NaiveCircuit<<G1 as Group>::Scalar>>::setup(circuit.clone()).unwrap();
 
     (pk,vk)
-    // // setup inputs
-    // let input = vec![<G1 as Group>::Scalar::one()];
-
-    // // produce a SNARK
-    // let res = SpartanSNARK::prove(&pk, circuit.clone(), &input);
-    // assert!(res.is_ok());
-
-    // let output = circuit.output(&input);
-
-    // let snark = res.unwrap();
-
-    // // verify the SNARK
-    // let io = input
-    //   .into_iter()
-    //   .chain(output.clone().into_iter())
-    //   .collect::<Vec<_>>();
-    // let res = snark.verify(&vk, &io);
-    // assert!(res.is_ok());
-
-    // // sanity: check the claimed output with a direct computation of the same
-    // assert_eq!(output, vec![<G1 as Group>::Scalar::one()]);
   }
