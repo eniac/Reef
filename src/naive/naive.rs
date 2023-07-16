@@ -130,6 +130,7 @@ fn naive(r: &str, alpha: String, doc: String) {
     init();
 
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
+    let doc_len = doc_vec.len();
     let regex = regex_parser(&String::from(r), &alpha);
 
     let mut dfa = DFA::new(&alpha[..], regex);
@@ -141,11 +142,13 @@ fn naive(r: &str, alpha: String, doc: String) {
 
     let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
-    let circuit = gen_circuit(P.r1cs, None, pc.clone());
+    let commitment = gen_commitment(doc_vec, &pc);
+
+    let circuit = NaiveCircuit::new(P.r1cs, None, doc_len, pc.clone(), commitment.blind);
 
     let (pk, vk) = naive_spartan_snark_setup(circuit);
 
-    let commitment = gen_commitment(doc_vec, &pc);
+   
 
 
 }

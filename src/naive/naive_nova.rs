@@ -38,9 +38,9 @@ use core::marker::PhantomData;
 pub struct NaiveCircuit<F: PrimeField> {
     r1cs: R1csFinal, // TODO later ref
     values: Option<Vec<Value>>,
-    _p: PhantomData<F>,
     doc_length: usize,
     pc: PoseidonConstants<F, typenum::U4>,
+    blind: F,
     //prover_data: &'a ProverData,
     //wits: Option<'a FxHashMap<String, Value>>,
 }
@@ -55,13 +55,14 @@ impl<F: PrimeField> NaiveCircuit<F> {
         values: Option<Vec<Value>>,
         doc_length: usize,
         pc: PoseidonConstants<F, typenum::U4>,
+        blind: F
     ) -> Self {
         NaiveCircuit {
             r1cs: r1cs, //&prover_data.r1cs, // def get rid of this crap
             values: values,
-            _p: Default::default(),
             doc_length: doc_length,
-            pc: pc
+            pc: pc, 
+            blind: blind
         }
     }
 
@@ -155,7 +156,9 @@ where
                 // make hash
                 let mut hash_ns = cs.namespace(|| format!("poseidon hash"));
 
-                let mut elts = vec![];
+                let alloc_blind = AllocatedNum::alloc(hash_ns.namespace(|| "blind"), || Ok(self.blind))?;
+
+                let mut elts = vec![Elt::Allocated(alloc_blind)];
         
                 for x in alloc_chars {
                     elts.push(Elt::Allocated(x.clone().unwrap()));
@@ -166,14 +169,14 @@ where
                     let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
                     
                     sponge.start(
-                        IOPattern(vec![SpongeOp::Absorb(self.doc_length as u32), SpongeOp::Squeeze(1)]),
+                        IOPattern(vec![SpongeOp::Absorb(self.doc_length as u32 + 1), SpongeOp::Squeeze(1)]),
                         None,
                         acc,
                     );
         
                     SpongeAPI::absorb(
                         &mut sponge,
-                        self.doc_length as u32,
+                        self.doc_length as u32 + 1,
                         &elts,
                         acc
                     );
@@ -228,11 +231,6 @@ pub fn gen_commitment(doc: Vec<u32>, pc: &PoseidonConstants<Fq, typenum::U4>)->H
 
 
 } 
-
-pub fn gen_circuit(r1cs: R1csFinal, wits: Option<Vec<Value>>, pc: PoseidonConstants<Fq, typenum::U4>) -> NaiveCircuit<Fq> {
-    let circuit = NaiveCircuit::new(r1cs, wits,2,pc); 
-    circuit
-}
 
 pub fn naive_spartan_snark_setup(circuit: NaiveCircuit<Fq>)-> (SpartanProverKey<G1, EE>, SpartanVerifierKey<G1, EE>) {
     // // produce keys
