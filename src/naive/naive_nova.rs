@@ -2,6 +2,7 @@
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+type Fg1 = <G1 as Group>::Scalar;
 
 use ::bellperson::{
     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
@@ -20,15 +21,17 @@ use neptune::{
     Strength,
 };
 use nova_snark::{
-    traits::{circuit::StepCircuit, Group},
+    traits::{circuit::StepCircuit, Group, evaluation::EvaluationEngineTrait},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
     spartan::direct::*,
 };
+use pasta_curves::{Fq, Ep};
 use rug::integer::{IsPrime, Order};
+use rand::rngs::OsRng;
 use rug::Integer;
 use serde::__private::doc;
 use std::{collections::HashMap, default};
-use crate::backend::nova;
+use crate::backend::{nova, commitment::HashCommitmentStruct};
 use core::marker::PhantomData;
 
 #[derive(Clone, Debug)]
@@ -192,14 +195,51 @@ where
     }
 }
 
-pub fn naive_spartan_snark_setup(r1cs: R1csFinal, wits: Option<Vec<Value>>) {
-    let pc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-    let circuit = NaiveCircuit::new(r1cs, wits,2,pc);
+pub fn gen_commitment(doc: Vec<u32>, pc: &PoseidonConstants<Fq, typenum::U4>)->HashCommitmentStruct<pasta_curves::Fq>{
+    let mut hash: Vec<Fq>;
 
+    let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
+    let acc = &mut ();
+
+    sponge.start(
+        IOPattern(vec![SpongeOp::Absorb(doc.len() as u32 + 1), SpongeOp::Squeeze(1)]),
+        None,
+        acc,
+    );
+
+    let blind = <G1 as Group>::Scalar::random(&mut OsRng);
+     
+    let mut doc_clone: Vec<Fq> = doc.into_iter().map(|x| <G1 as Group>::Scalar::from(x as u64)).collect();
+    doc_clone.insert(0, blind);
+
+    SpongeAPI::absorb(
+        &mut sponge,
+        doc_clone.len() as u32 + 1,
+        &doc_clone,
+        acc,
+    );
+
+    hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+    sponge.finish(acc).unwrap();
+    return HashCommitmentStruct{
+        commit: hash[0],
+        blind: blind
+    }
+
+
+} 
+
+pub fn gen_circuit(r1cs: R1csFinal, wits: Option<Vec<Value>>, pc: PoseidonConstants<Fq, typenum::U4>) -> NaiveCircuit<Fq> {
+    let circuit = NaiveCircuit::new(r1cs, wits,2,pc); 
+    circuit
+}
+
+pub fn naive_spartan_snark_setup(circuit: NaiveCircuit<Fq>)-> (SpartanProverKey<G1, EE>, SpartanVerifierKey<G1, EE>) {
     // // produce keys
     let (pk, vk) =
       SpartanSNARK::<G1, EE, NaiveCircuit<<G1 as Group>::Scalar>>::setup(circuit.clone()).unwrap();
 
+    (pk,vk)
     // // setup inputs
     // let input = vec![<G1 as Group>::Scalar::one()];
 

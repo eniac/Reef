@@ -1,6 +1,11 @@
 #![allow(missing_docs, non_snake_case)]
+
+type G1 = pasta_curves::pallas::Point;
+type G2 = pasta_curves::vesta::Point;
+type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+
 use crate::backend::{r1cs_helper::init};
-use crate::naive::naive_nova::{naive_spartan_snark_setup};
+use crate::naive::naive_nova::*;
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
@@ -11,6 +16,33 @@ use circ::front::{FrontEnd, Mode};
 use circ::ir::{opt::{opt, Opt}};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use circ::cfg::*;
+use neptune::circuit;
+use neptune::{
+    circuit2::Elt,
+    poseidon::PoseidonConstants,
+    sponge::api::{IOPattern, SpongeAPI, SpongeOp},
+    sponge::circuit::SpongeCircuit,
+    sponge::vanilla::{SpongeTrait,Sponge},
+    Strength,
+};
+use ::bellperson::{
+    gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
+    Variable,
+};
+use ff::{Field, PrimeField};
+use generic_array::typenum;
+use nova_snark::{
+    traits::{circuit::StepCircuit, Group},
+    CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+    spartan::direct::*,
+};
+use rug::integer::{IsPrime, Order};
+use rug::Integer;
+use serde::__private::doc;
+use std::{collections::HashMap, default};
+use crate::backend::nova;
+use core::marker::PhantomData;
+
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum DeterminedLanguage {
@@ -94,9 +126,10 @@ pub fn gen_r1cs() -> (ProverData, VerifierData){
     r1cs.finalize(&cs)
 }
 
-fn naive(r: &str, alpha: String) {
+fn naive(r: &str, alpha: String, doc: String) {
     init();
 
+    let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
     let regex = regex_parser(&String::from(r), &alpha);
 
     let mut dfa = DFA::new(&alpha[..], regex);
@@ -106,17 +139,24 @@ fn naive(r: &str, alpha: String) {
 
     let (P,V) = gen_r1cs();
 
-    naive_spartan_snark_setup(P.r1cs, None);
-    //Shoudl at least generate the r1cs have to figure out witnesses as well as
-    //other issues re commitment 
+    let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
+    let circuit = gen_circuit(P.r1cs, None, pc.clone());
+
+    let (pk, vk) = naive_spartan_snark_setup(circuit);
+
+    let commitment = gen_commitment(doc_vec, &pc);
+
+
 }
 
 
 #[test]
 fn test_1() {
-    let s  = "ab";
+    let r  = "ab";
     //let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
     //let ab: String = abvec.iter().collect();
-    let ab = "ab".to_owned();
-    naive(s,ab);
+    let ab = "abc".to_owned();
+    let doc = "ab".to_owned();
+    naive(r,ab, doc);
 }
