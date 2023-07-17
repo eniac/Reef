@@ -260,6 +260,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 fn test_1() {
     let r  = "[a-c]{1,3}".to_string();
     let ab = "abcABC0123".to_owned();
-    let doc = "b".to_owned();
+    let doc = "bb".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }

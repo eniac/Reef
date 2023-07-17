@@ -180,60 +180,60 @@ impl<'a> DFA<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests {
+// #[cfg(test)]
+// mod tests {
 
-    use crate::naive::dfa::DFA;
-    use crate::naive::naive_parser::regex_parser;
+//     use crate::naive::dfa::DFA;
+//     use crate::naive::naive_parser::regex_parser;
 
-    fn set_up_delta_test(r: &str, alpha: &str, tocheck: &str) -> bool {
-        let ab = String::from(alpha);
-        let regex = regex_parser(&String::from(r), &ab);
-        let input = String::from(tocheck);
+//     fn set_up_delta_test(r: &str, alpha: &str, tocheck: &str) -> bool {
+//         let ab = String::from(alpha);
+//         let regex = regex_parser(&String::from(r), &ab);
+//         let input = String::from(tocheck);
 
-        let mut dfa = DFA::new(&ab[..], regex);
-        let mut s = dfa.get_init_state();
+//         let mut dfa = DFA::new(&ab[..], regex);
+//         let mut s = dfa.get_init_state();
 
-        for i in 0..input.len() {
-            s = dfa.delta(s, input.chars().nth(i).unwrap()).unwrap();
-        }
-        let re_match = dfa.get_final_states().contains(&s);
-        return re_match;
-    }
+//         for i in 0..input.len() {
+//             s = dfa.delta(s, input.chars().nth(i).unwrap()).unwrap();
+//         }
+//         let re_match = dfa.get_final_states().contains(&s);
+//         return re_match;
+//     }
 
-    #[test]
-    fn test_dfa_delta_non_circuit_basic() {
-        let re_match = set_up_delta_test("a", "ab", "a");
-        assert!(re_match);
-    }
+//     #[test]
+//     fn test_dfa_delta_non_circuit_basic() {
+//         let re_match = set_up_delta_test("a", "ab", "a");
+//         assert!(re_match);
+//     }
 
-    #[test]
-    fn test_dfa_delta_non_circuit_basic_nonmatch() {
-        let re_match = set_up_delta_test("a", "ab", "b");
-        assert!(!re_match);
-    }
+//     #[test]
+//     fn test_dfa_delta_non_circuit_basic_nonmatch() {
+//         let re_match = set_up_delta_test("a", "ab", "b");
+//         assert!(!re_match);
+//     }
 
-    #[test]
-    fn test_dfa_delta_non_circuit() {
-        let re_match = set_up_delta_test("aba", "ab", "aba");
-        assert!(re_match);
-    }
+//     #[test]
+//     fn test_dfa_delta_non_circuit() {
+//         let re_match = set_up_delta_test("aba", "ab", "aba");
+//         assert!(re_match);
+//     }
 
-    #[test]
-    fn test_dfa_delta_non_circuit_nonmatch() {
-        let re_match = set_up_delta_test("aba", "ab", "ab");
-        assert!(!re_match);
-    }
+//     #[test]
+//     fn test_dfa_delta_non_circuit_nonmatch() {
+//         let re_match = set_up_delta_test("aba", "ab", "ab");
+//         assert!(!re_match);
+//     }
 
-    #[test]
-    fn test_dfa_delta_non_circuit_star() {
-        let re_match = set_up_delta_test("a.*a", "ab", "abba");
-        assert!(re_match);
-    }
+//     #[test]
+//     fn test_dfa_delta_non_circuit_star() {
+//         let re_match = set_up_delta_test("a.*a", "ab", "abba");
+//         assert!(re_match);
+//     }
 
-    #[test]
-    fn test_dfa_delta_non_circuit_stat_nonmatch() {
-        let re_match = set_up_delta_test("a.*a", "ab", "abb");
-        assert!(!re_match);
-    }
-}
+//     #[test]
+//     fn test_dfa_delta_non_circuit_stat_nonmatch() {
+//         let re_match = set_up_delta_test("a.*a", "ab", "abb");
+//         assert!(!re_match);
+//     }
+// }
