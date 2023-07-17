@@ -3,7 +3,8 @@
 use regex_syntax::hir::Hir;
 use regex_syntax::hir::HirKind::{Alternation, Class, Concat, Group, Literal, Repetition};
 use regex_syntax::hir::Literal::Unicode;
-use regex_syntax::hir::RepetitionKind::{OneOrMore, ZeroOrMore};
+use regex_syntax::hir::RepetitionKind::{OneOrMore, ZeroOrMore,ZeroOrOne,Range};
+use regex_syntax::hir::RepetitionRange::{Exactly,Bounded, AtLeast};
 use regex_syntax::Parser;
 
 
@@ -106,6 +107,8 @@ pub mod re {
 
 use re::Regex;
 
+use crate::regex::re::app;
+
 /// Parser based on crate regex-syntax
 fn to_regex<'a>(h: &'a Hir, ab: &'a str) -> Regex {
     match h.kind() {
@@ -124,9 +127,37 @@ fn to_regex<'a>(h: &'a Hir, ab: &'a str) -> Regex {
             match r.kind {
                 OneOrMore => re::app(inner.clone(), re::star(inner)),
                 ZeroOrMore => re::star(inner),
-                _ => panic!("Supported repetition operators [+,*]: {:?}", r),
+                ZeroOrOne=> re::alt(inner.clone(), re::nil()),
+                Range(rep_range) => match rep_range {
+                    Exactly(j) => {
+                        let mut repped = inner.clone();
+                        for i in 0..j {
+                            repped = re::app(inner.clone(), repped);
+                        }
+                        repped
+                    }
+                    Bounded(i,j) => {
+                        let mut repped = inner.clone();
+                        for lower in 0..i {
+                            repped = re::app(inner.clone(), repped);
+                        }
+                        repped
+                        // if i==j {
+                        //     repped
+                        // } else {
+                        //     re::alt(repped,to_regex(h, ab))
+                        // }
+                    },
+                    AtLeast(j) => {
+                        let mut repped = inner.clone();
+                        for i in 0..j {
+                            repped = re::app(inner.clone(), repped);
+                        }
+                        re::app(repped, re::star(inner))
+                    }
+                }
             }
-        }
+        },
         Group(g) => to_regex(&g.hir, ab),
         Class(_) => re::dot(),
         Literal(Unicode(c)) => re::character(*c),

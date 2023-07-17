@@ -117,7 +117,7 @@ pub fn gen_r1cs() -> (ProverData, VerifierData){
     return final_r1cs;
 }
 
-fn naive(r: &str, alpha: String, doc: String, out_write: String) {
+pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     init();
 
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
@@ -126,7 +126,7 @@ fn naive(r: &str, alpha: String, doc: String, out_write: String) {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA", "DFA");
 
-    let regex = regex_parser(&String::from(r), &alpha);
+    let regex = regex_parser(&(r.clone()), &alpha);
 
     let dfa = DFA::new(&alpha[..], regex);
     let dfa_ndelta = dfa.deltas().len();
@@ -241,7 +241,7 @@ fn naive(r: &str, alpha: String, doc: String, out_write: String) {
     let mut wtr = Writer::from_writer(file);
     let _ = wtr.write_record(&[
     doc,
-    r.to_string(),
+    r,
     dfa_ndelta.to_string(), //nedges().to_string(),
     dfa_nstate.to_string(), //nstates().to_string(),
     ]);
@@ -257,8 +257,8 @@ fn naive(r: &str, alpha: String, doc: String, out_write: String) {
 
 #[test]
 fn test_1() {
-    let r  = "abb";
-    let ab = "abc".to_owned();
-    let doc = "abb".to_owned();
-    naive(r,ab, doc, "out_test".to_string());
+    let r  = "[a-c]{1,3}".to_string();
+    let ab = "abcABC0123".to_owned();
+    let doc = "b".to_owned();
+    naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }

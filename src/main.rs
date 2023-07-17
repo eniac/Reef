@@ -3,6 +3,7 @@ use clap::Parser;
 use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
+use reef::naive::naive;
 use reef::regex::re;
 use reef::safa::SAFA;
 // use reef::naive::*;
@@ -35,70 +36,70 @@ fn main() {
         opt.input.chars().collect()
     };
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "Compiler", "Full");
+    naive::naive_bench(opt.re,ab,doc,opt.output);
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "DFA", "DFA");
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Compiler, "Compiler", "Full");
 
-    let r = re::new(&opt.re);
-    //    println!("REGEX: {:#?}", r));
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Compiler, "DFA", "DFA");
 
-    let mut safa = SAFA::new(&ab, &r);
+    // let r = re::new(&opt.re);
+    // //    println!("REGEX: {:#?}", r));
 
-    // Is document well-formed
-    // nfa.well_formed(&doc);
+    // let mut safa = SAFA::new(&ab, &r);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "DFA", "DFA");
+    // // Is document well-formed
+    // // nfa.well_formed(&doc);
 
-    // #[cfg(feature = "plot")]
-    // safa.as_str_safa().write_pdf("main")
-    //     .expect("Failed to plot NFA to a pdf file");
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Compiler, "DFA", "DFA");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Solver, "DFA Solving", "Clear Match");
+    // // #[cfg(feature = "plot")]
+    // // safa.as_str_safa().write_pdf("main")
+    // //     .expect("Failed to plot NFA to a pdf file");
 
-    /*
-    println!(
-        "Match: {}",
-        nfa.is_match(&doc)
-            .map(|c| format!("{:?}", c))
-            .unwrap_or(String::from("NONE"))
-    );*/
-    // TODO solving here, pass result to R1CS
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Solver, "DFA Solving", "Clear Match");
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Solver, "DFA Solving", "Clear Match");
+    // /*
+    // println!(
+    //     "Match: {}",
+    //     nfa.is_match(&doc)
+    //         .map(|c| format!("{:?}", c))
+    //         .unwrap_or(String::from("NONE"))
+    // );*/
+    // // TODO solving here, pass result to R1CS
 
-    init();
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Solver, "DFA Solving", "Clear Match");
 
-    run_backend(
-        safa.clone(),
-        doc,
-        opt.eval_type,
-        opt.commit_type,
-        opt.batch_size,
-    ); // auto select batching/commit
+    // init();
 
-    let file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(opt.output.clone())
-        .unwrap();
-    let mut wtr = Writer::from_writer(file);
-    let _ = wtr.write_record(&[
-        opt.input,
-        opt.re,
-        safa.g.edge_count().to_string(), //nedges().to_string(),
-        safa.g.node_count().to_string(), //nstates().to_string(),
-    ]);
-    let spacer = "---------";
-    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-    wtr.flush();
-    #[cfg(feature = "metrics")]
-    log::write_csv(opt.output.to_str().unwrap()).unwrap();
+    // run_backend(
+    //     safa.clone(),
+    //     doc,
+    //     opt.eval_type,
+    //     opt.commit_type,
+    //     opt.batch_size,
+    // ); // auto select batching/commit
 
-    //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
+    // let file = OpenOptions::new()
+    //     .write(true)
+    //     .append(true)
+    //     .create(true)
+    //     .open(opt.output.clone())
+    //     .unwrap();
+    // let mut wtr = Writer::from_writer(file);
+    // let _ = wtr.write_record(&[
+    //     opt.input,
+    //     opt.re,
+    //     safa.g.edge_count().to_string(), //nedges().to_string(),
+    //     safa.g.node_count().to_string(), //nstates().to_string(),
+    // ]);
+    // let spacer = "---------";
+    // let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    // wtr.flush();
+    // #[cfg(feature = "metrics")]
+    // log::write_csv(opt.output.to_str().unwrap()).unwrap();
 }
