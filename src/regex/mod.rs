@@ -349,7 +349,7 @@ pub mod re {
     use crate::regex::{G, CharClass};
     use crate::safa::Skip;
     use crate::openset::OpenSet;
-    use crate::regex::{parser::RegexParser,Regex, RegexF};
+    pub use crate::regex::{parser::RegexParser,Regex, RegexF};
     use hashconsing::HashConsign;
     use std::collections::BTreeSet;
 

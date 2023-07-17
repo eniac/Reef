@@ -10,7 +10,8 @@ use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
 use crate::naive::dfa::*; 
-use crate::naive::naive_parser::*;
+use crate::regex::re;
+use crate::naive::naive_parser as naive_re;
 use circ::front::zsharp::{self, ZSharpFE};
 use circ::front::{FrontEnd, Mode};
 use circ::ir::{opt::{opt, Opt}};
@@ -126,9 +127,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA", "DFA");
 
-    let regex = regex_parser(&(r.clone()), &alpha);
+    let regex = re::simpl(re::new(&(r.clone())));
 
-    let dfa = DFA::new(&alpha[..], regex);
+    let dfa = DFA::new(&alpha[..],naive_re::re::translate(&regex, &alpha[..]));
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
 
