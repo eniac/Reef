@@ -6,7 +6,7 @@ type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
 use crate::backend::{r1cs_helper::init};
 use crate::naive::naive_nova::*;
-use std::path::{PathBuf, Component};
+use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
 use crate::naive::dfa::*; 
@@ -226,7 +226,7 @@ fn naive(r: &str, alpha: String, doc: String, out_write: String) {
 
     // verify the SNARK
     #[cfg(feature = "metrics")]
-    log::tic(Component::Verifer, "Verify", "Verify");
+    log::tic(Component::Verifier, "Verify", "Verify");
 
     let io = z.into_iter()
       .chain(output.clone().into_iter())
@@ -234,10 +234,10 @@ fn naive(r: &str, alpha: String, doc: String, out_write: String) {
     let verifier_result = snark.verify(&vk, &io);
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Verifer, "Verify", "Verify");
+    log::stop(Component::Verifier, "Verify", "Verify");
     assert!(verifier_result.is_ok()); 
 
-    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write).unwrap();
+    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
     let mut wtr = Writer::from_writer(file);
     let _ = wtr.write_record(&[
     doc,
@@ -250,7 +250,7 @@ fn naive(r: &str, alpha: String, doc: String, out_write: String) {
     wtr.flush();
 
     #[cfg(feature = "metrics")]
-    log::write_csv(opt.output.to_str().unwrap()).unwrap();
+    log::write_csv(&out_write).unwrap();
    
 }
 
