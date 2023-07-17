@@ -140,6 +140,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::tic(Component::Solver, "DFA Solving", "Clear Match");
 
     let is_match = dfa.is_match(&doc);
+   
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
 
     #[cfg(feature = "metrics")]
@@ -258,8 +259,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
 #[test]
 fn test_1() {
-    let r  = "[a-c]{1,3}".to_string();
+    let r  = "^[a-c]{1,3}$".to_string();
     let ab = "abcABC0123".to_owned();
-    let doc = "bb".to_owned();
+    let doc = "bbbb".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }
