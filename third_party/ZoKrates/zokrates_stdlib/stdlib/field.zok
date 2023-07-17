@@ -1,0 +1,4 @@
+from "EMBED" import FIELD_SIZE_IN_BITS;
+
+const field FIELD_MIN = 0;
+const field FIELD_MAX = -1;

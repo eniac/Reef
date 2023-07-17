@@ -1,0 +1,12 @@
+struct Foo {
+    field a;
+}
+
+struct Bar {
+    Foo foo;
+}
+
+def main(Bar b) {
+    field a = b.foo.a;
+    return;
+}
