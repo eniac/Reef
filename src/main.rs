@@ -13,12 +13,13 @@ use std::path::PathBuf;
 
 #[cfg(all(not(windows), not(target_env = "musl")))]
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+// static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[cfg(feature = "metrics")]
 use reef::metrics::{log, log::Component};
 
 fn main() {
+    println!("Opts");
     let opt = Options::parse();
 
     // Alphabet
@@ -35,7 +36,7 @@ fn main() {
         //opt.input.chars().map(|c| c.to_string()).collect()
         opt.input.chars().collect()
     };
-
+    println!("Naive");
     naive::naive_bench(opt.re,ab,doc,opt.output);
 
     // #[cfg(feature = "metrics")]

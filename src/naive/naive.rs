@@ -133,6 +133,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
 
+    println!("N States: {:#?}",dfa_nstate);
+
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA", "DFA");
 
@@ -252,15 +254,16 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     wtr.flush();
 
     #[cfg(feature = "metrics")]
-    log::write_csv(&out_write).unwrap();
+    log::write_csv(&out_write.as_path().display().to_string()).unwrap();
    
 }
 
 
 #[test]
 fn test_1() {
-    let r  = "^[a-c]{1,3}$".to_string();
-    let ab = "abcABC0123".to_owned();
-    let doc = "bbbb".to_owned();
+    let r  = "[a-z]{1,5}[A-Z]{10}[0-9]+abc".to_string();
+    let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+    let ab: String = abvec.iter().collect();
+    let doc = "nPPZEKVUVLQ10abc".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }
