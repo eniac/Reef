@@ -6,7 +6,7 @@ type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
 use crate::backend::{r1cs_helper::init};
 use crate::naive::naive_nova::*;
-use std::path::PathBuf;
+use std::path::{PathBuf, Component};
 use std::fs::File;
 use std::io::prelude::*;
 use crate::naive::dfa::*; 
@@ -16,32 +16,23 @@ use circ::front::{FrontEnd, Mode};
 use circ::ir::{opt::{opt, Opt}};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use circ::cfg::*;
-use neptune::circuit;
 use neptune::{
-    circuit2::Elt,
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::circuit::SpongeCircuit,
     sponge::vanilla::{SpongeTrait,Sponge},
     Strength,
 };
-use ::bellperson::{
-    gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
-    Variable,
-};
-use ff::{Field, PrimeField};
 use generic_array::typenum;
 use nova_snark::{
     traits::{circuit::StepCircuit, Group},
-    CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
     spartan::direct::*,
 };
-use rug::integer::{IsPrime, Order};
-use rug::Integer;
-use serde::__private::doc;
-use std::{collections::HashMap, default};
-use crate::backend::nova;
-use core::marker::PhantomData;
+use std::fs::OpenOptions;
+use csv::Writer;
+
+#[cfg(feature = "metrics")]
+use crate::metrics::{log, log::Component};
 
 
 #[derive(PartialEq, Eq, Debug)]
@@ -126,41 +117,98 @@ pub fn gen_r1cs() -> (ProverData, VerifierData){
     return final_r1cs;
 }
 
-fn naive(r: &str, alpha: String, doc: String) {
+fn naive(r: &str, alpha: String, doc: String, out_write: String) {
     init();
 
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
     let doc_len = doc_vec.len();
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "DFA", "DFA");
+
     let regex = regex_parser(&String::from(r), &alpha);
 
     let dfa = DFA::new(&alpha[..], regex);
+    let dfa_ndelta = dfa.deltas().len();
+    let dfa_nstate = dfa.nstates();
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "DFA", "DFA");
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Solver, "DFA Solving", "Clear Match");
+
     let is_match = dfa.is_match(&doc);
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Solver, "DFA Solving", "Clear Match");
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "Circuit Gen", "Zok");
+
     let _ = make_zok(dfa, doc_len);
+    
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "Circuit Gen", "Zok");
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "Circuit Gen", "r1cs");
 
     let (P,V) = gen_r1cs();
+    
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "Circuit Gen", "r1cs");
+
+    #[cfg(feature = "metrics")]
+    log::r1cs(Component::Compiler, "Circuit Gen", "r1cs",P.r1cs.constraints.len());
 
     let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
-    //commitment gen
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS", "Commitment Generations");
     let commitment = gen_commitment(doc_vec.clone(), &pc);
 
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS", "Commitment Generations");
 
-    //empty circuit gen
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS", "To Circuit");
     let circuit = NaiveCircuit::new(P.r1cs.clone(), None, doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
 
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS", "To Circuit");
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS", "Proof Setup");
     let (pk, vk) = naive_spartan_snark_setup(circuit);
 
-    //gen wits/solving
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS", "Proof Setup");
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Solver, "Witnesses", "Generation");
     let witnesses = gen_wits(doc_vec.clone(), is_match, doc_len, &P);
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Solver, "Witnesses", "Generation");
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Prover, "Proof", "Adding witnesses");
 
-    //proving
     let prove_circuit = NaiveCircuit::new(P.r1cs.clone(),witnesses, doc_len, pc.clone(), commitment.blind, commitment.commit, is_match_g);
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Proof", "Adding witnesses");
 
     let z = vec![commitment.commit];
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Prover, "Proof", "Prove");
+
     let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Proof", "Prove");
 
     assert!(result.is_ok());
 
@@ -168,12 +216,41 @@ fn naive(r: &str, alpha: String, doc: String) {
 
     let snark = result.unwrap();
 
+    #[cfg(feature = "metrics")]
+    log::space(
+        Component::Prover,
+        "Proof Size",
+        "Spartan SNARK size",
+        serde_json::to_string(&snark).unwrap().len(),
+    );
+
     // verify the SNARK
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Verifer, "Verify", "Verify");
+
     let io = z.into_iter()
       .chain(output.clone().into_iter())
       .collect::<Vec<_>>();
     let verifier_result = snark.verify(&vk, &io);
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Verifer, "Verify", "Verify");
     assert!(verifier_result.is_ok()); 
+
+    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write).unwrap();
+    let mut wtr = Writer::from_writer(file);
+    let _ = wtr.write_record(&[
+    doc,
+    r.to_string(),
+    dfa_ndelta.to_string(), //nedges().to_string(),
+    dfa_nstate.to_string(), //nstates().to_string(),
+    ]);
+    let spacer = "---------";
+    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    wtr.flush();
+
+    #[cfg(feature = "metrics")]
+    log::write_csv(opt.output.to_str().unwrap()).unwrap();
    
 }
 
@@ -183,5 +260,5 @@ fn test_1() {
     let r  = "abb";
     let ab = "abc".to_owned();
     let doc = "abb".to_owned();
-    naive(r,ab, doc);
+    naive(r,ab, doc, "out_test".to_string());
 }
