@@ -610,7 +610,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let num_states = self.safa.g.node_count();
 
         let mut v = vec![];
-        for i in 1..=self.batch_size {
+        for i in 1..self.batch_size {
             let v_i = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
@@ -662,6 +662,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     new_var(format!("rel_{}", i - 1)),
                 ],
             );
+            println!("CIRC FOR I = {}", i - 1);
             v.push(v_i.clone());
             self.pub_inputs.push(new_var(format!("state_{}", i - 1)));
             self.pub_inputs.push(new_var(format!("char_{}", i - 1)));
@@ -676,7 +677,75 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
         }
         self.pub_inputs
-            .push(new_var(format!("state_{}", self.batch_size)));
+            .push(new_var(format!("state_{}", self.batch_size - 1)));
+
+        let v_b = term(
+            Op::PfNaryOp(PfNaryOp::Add),
+            vec![
+                term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Add),
+                            vec![
+                                term(
+                                    Op::PfNaryOp(PfNaryOp::Add),
+                                    vec![
+                                        term(
+                                            Op::PfNaryOp(PfNaryOp::Mul),
+                                            vec![
+                                                new_var(format!("state_{}", self.batch_size - 1)),
+                                                new_const(
+                                                    num_states * num_chars * self.max_offsets * 2,
+                                                ),
+                                            ],
+                                        ),
+                                        term(
+                                            Op::PfNaryOp(PfNaryOp::Mul),
+                                            vec![
+                                                new_var(format!("from_state")),
+                                                new_const(num_chars * self.max_offsets * 2),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                term(
+                                    Op::PfNaryOp(PfNaryOp::Mul),
+                                    vec![
+                                        new_var(format!("path_count_add")),
+                                        new_const(self.max_offsets * 2),
+                                    ],
+                                ),
+                            ],
+                        ),
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Mul),
+                            vec![new_var(format!("stack_lvl")), new_const(2)],
+                        ),
+                    ],
+                ),
+                new_var(format!("rel_{}", self.batch_size - 1)),
+            ],
+        );
+        v.push(v_b.clone());
+
+        if include_vs {
+            let match_v = term(
+                Op::Eq,
+                vec![new_var(format!("v_{}", self.batch_size - 1)), v_b],
+            );
+
+            self.assertions.push(match_v);
+            self.pub_inputs
+                .push(new_var(format!("v_{}", self.batch_size - 1)));
+        }
+
+        self.pub_inputs.push(new_var(format!("path_count_add")));
+        self.pub_inputs.push(new_var(format!("from_state")));
+        self.pub_inputs.push(new_var(format!("stack_lvl")));
+        self.pub_inputs
+            .push(new_var(format!("rel_{}", self.batch_size - 1)));
+
         v
     }
 
@@ -700,7 +769,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }*/
         }
         vanishing_poly =
-            poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size)));
+            poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size - 1))); // todo?
 
         let match_term = term(
             Op::Ite,
@@ -763,46 +832,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
-    fn to_polys(&mut self) -> (ProverData, VerifierData) {
-        //let l_time = Instant::now();
-        let lookup = self.lookup_idxs(false);
-
-        //Makes big polynomial
-        for i in 0..self.batch_size {
-            let eq = term(
-                Op::Eq,
-                vec![
-                    new_const(0), // vanishing
-                    poly_eval_circuit(self.table.clone(), lookup[i].clone()), // this means repeats, but I think circ
-                                                                              // takes care of; TODO also clones
-                ],
-            );
-            self.assertions.push(eq);
-        }
-
-        // TODO NEW      self.accepting_state_circuit();
-
-        match self.commit_type {
-            JCommit::HashChain => {
-                unimplemented!(); //self.hashchain_commit();
-            }
-            JCommit::Nlookup => {
-                self.nlookup_doc_commit();
-            }
-        }
-
-        self.r1cs_conv()
-    }
-
-    fn hashchain_commit(&mut self) {
-        /*    self.pub_inputs.push(new_var(format!("i_0")));
-        for idx in 1..=self.batch_size {
-            self.pub_inputs.push(new_var(format!("i_{}", idx)));
-        }*/ //uneeded I believe
-    }
-
     fn cursor_circuit(&mut self) {
-        for j in 0..self.batch_size {
+        // TODO add transition
+        for j in 0..(self.batch_size - 1) {
             // if star, geq
             // else normal
             // i_j+1 = i_j + offset
@@ -1110,7 +1142,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // lookups and nl circuit
         let mut char_lookups = vec![];
-        for c in 0..self.batch_size {
+        for c in 0..(self.batch_size - 1) {
             char_lookups.push(new_var(format!("char_{}", c)));
         }
 
@@ -1139,14 +1171,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.sum_check_circuit(lhs, sc_l, id);
 
         let mut eq_evals = vec![new_const(0)]; // dummy for horners
-        for i in 0..self.batch_size + 1 {
+        for i in 0..lookup_vals.len() {
             eq_evals.push(self.bit_eq_circuit(sc_l, i, id));
         }
         let eq_eval = horners_circuit_vars(&eq_evals, new_var(format!("{}_claim_r", id)));
 
         // make combined_q
-        self.combined_q_circuit(self.batch_size, sc_l, id); // running claim q not
-                                                            // included
+        self.combined_q_circuit(lookup_vals.len(), sc_l, id); // running claim q not
+                                                              // included
 
         // last_claim = eq_eval * next_running_claim
         let sum_check_domino = term(
@@ -1230,7 +1262,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         accepting_state_b: usize, // state_i
         from_state: usize,        // next_state
         stack_lvl: usize,         // offset_i
-        rel_i: usize,
         cursor_i: usize,
         i: usize, // this is for naming
     ) -> Integer {
@@ -1241,11 +1272,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
         assert!(or);
 
+        let rel_i = 1;
+
         wits.insert(format!("path_count_add"), new_wit(path_count_add));
         wits.insert(format!("state_{}", i - 1), new_wit(accepting_state_b));
         wits.insert(format!("from_state"), new_wit(from_state));
         wits.insert(format!("stack_lvl"), new_wit(stack_lvl));
-        wits.insert(format!("rel_{}", i), new_wit(rel_i));
+        wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
         wits.insert(format!("cursor_{}", i), new_wit(cursor_i)); // alreaded "added" here
 
         // v_i =
@@ -1289,10 +1322,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         state_i: usize,
         next_state: usize,
         offset_i: usize,
-        rel_i: usize,
         cursor_i: usize,
         i: usize, // this is for naming
     ) -> Integer {
+        let rel_i = 0;
+
         wits.insert(format!("char_{}", i - 1), new_wit(char_num));
         wits.insert(format!("state_{}", i - 1), new_wit(state_i));
         wits.insert(format!("offset_{}", i - 1), new_wit(offset_i));
@@ -1366,7 +1400,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("cursor_0"), new_wit(cursor_i));
 
-        while i < self.batch_size {
+        while i - 1 < self.batch_size {
             let mut char_num = self.num_ab[&None];
             next_state = state_i;
             let mut offset_i = 0;
@@ -1378,20 +1412,19 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             {
                 // pad epsilons (above vals) bc we're done
                 v.push(self.normal_v(
-                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, cursor_i, i,
+                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
                 ));
                 i += 1;
             } else if sols[self.sol_num].is_empty() && i > 0 {
                 // if we are not at a beginning, pad to the end
                 self.sol_num += 1;
 
-                while i < self.batch_size - 1 {
+                while i - 1 < self.batch_size - 1 {
                     println!("REACHED END OF ONE SOL, PADDING");
 
                     // pad epsilons (above vals)
                     v.push(self.normal_v(
-                        &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i,
-                        cursor_i, i,
+                        &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
                     ));
                     i += 1;
                 }
@@ -1408,7 +1441,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     state_i, // accepting
                     self.from_state,
                     self.stack_level,
-                    rel_i,
                     cursor_i,
                     i,
                 ));
@@ -1446,7 +1478,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 // back to normal
                 v.push(self.normal_v(
-                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, rel_i, cursor_i, i,
+                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
                 ));
                 i += 1;
                 state_i = next_state; // not necessary anymore
@@ -1455,7 +1487,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         println!("DONE LOOP");
 
         // last state
-        wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
+        wits.insert(
+            format!("state_{}", self.batch_size - 1),
+            new_wit(next_state),
+        );
 
         assert!(running_q.is_some() || batch_num == 0);
         assert!(running_v.is_some() || batch_num == 0);
