@@ -149,60 +149,23 @@ fn setup<'a>(
     let qd_len = logmn(r1cs_converter.udoc.len());
 
     // use "empty" (witness-less) circuit to generate nova F
-    let empty_glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
-        (JBatching::NaivePolys, JCommit::HashChain) => {
-            vec![
-                GlueOpts::PolyHash((
-                    <G1 as Group>::Scalar::from(0),
-                    <G1 as Group>::Scalar::from(0),
-                )),
-                GlueOpts::PolyHash((
-                    <G1 as Group>::Scalar::from(0),
-                    <G1 as Group>::Scalar::from(0),
-                )),
-            ]
-        }
-        (JBatching::Nlookup, JCommit::HashChain) => {
-            let zero = <G1 as Group>::Scalar::from(0);
+   let q = vec![<G1 as Group>::Scalar::from(0); q_len];
 
-            let q = vec![<G1 as Group>::Scalar::from(0); q_len];
+    let v = <G1 as Group>::Scalar::from(0);
+    let q_idx = <G1 as Group>::Scalar::from(0);
+    let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
 
-            vec![
-                GlueOpts::NlHash((zero.clone(), zero.clone(), q.clone(), zero.clone())),
-                GlueOpts::NlHash((zero.clone(), zero.clone(), q, zero.clone())),
-            ]
-        }
-        (JBatching::NaivePolys, JCommit::Nlookup) => {
-            let q_idx = <G1 as Group>::Scalar::from(0);
-            let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
-
-            let doc_v = <G1 as Group>::Scalar::from(0);
-
-            vec![
-                GlueOpts::PolyNL((q_idx.clone(), doc_q.clone(), doc_v.clone())),
-                GlueOpts::PolyNL((q_idx, doc_q, doc_v)),
-            ]
-        }
-        (JBatching::Nlookup, JCommit::Nlookup) => {
-            let q = vec![<G1 as Group>::Scalar::from(0); q_len];
-
-            let v = <G1 as Group>::Scalar::from(0);
-            let q_idx = <G1 as Group>::Scalar::from(0);
-            let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
-
-            let doc_v = <G1 as Group>::Scalar::from(0);
-            vec![
-                GlueOpts::NlNl((
-                    q.clone(),
-                    v.clone(),
-                    q_idx.clone(),
-                    doc_q.clone(),
-                    doc_v.clone(),
-                )),
-                GlueOpts::NlNl((q, v, q_idx, doc_q, doc_v)),
-            ]
-        }
-    };
+    let doc_v = <G1 as Group>::Scalar::from(0);
+    let empty_glue = vec![
+        GlueOpts::NlNl((
+            q.clone(),
+            v.clone(),
+            q_idx.clone(),
+            doc_q.clone(),
+            doc_v.clone(),
+        )),
+        GlueOpts::NlNl((q, v, q_idx, doc_q, doc_v)),
+    ];
 
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
         circ_data.r1cs.clone(),
@@ -276,55 +239,18 @@ fn setup<'a>(
 
     let current_state = r1cs_converter.safa.get_init().index();
 
-    let z0_primary = match (r1cs_converter.batching, r1cs_converter.commit_type) {
-        (JBatching::NaivePolys, JCommit::HashChain) => {
-            vec![
-                <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(0 as u64), //wrong
-                prev_hash.clone(),
-                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(current_state)),
-            ]
-        }
-        (JBatching::Nlookup, JCommit::HashChain) => {
-            let mut z = vec![
-                <G1 as Group>::Scalar::from(current_state as u64),
-                <G1 as Group>::Scalar::from(0 as u64), // wrong <G1 as Group>::Scalar::from(0), //nfa.ab_to_num(&doc[0]) as u64),
-                prev_hash.clone(),
-            ];
-            z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
-            z.push(int_to_ff(r1cs_converter.table[0].clone()));
-            z.push(<G1 as Group>::Scalar::from(
-                r1cs_converter.prover_accepting_state(current_state),
-            ));
-            z
-        }
-        (JBatching::NaivePolys, JCommit::Nlookup) => {
-            let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
+    let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
 
-            z.push(<G1 as Group>::Scalar::from(0 as u64)); // wrong
+    z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
+    z.push(int_to_ff(r1cs_converter.table[0].clone()));
 
-            z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
-            z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
-            z.push(<G1 as Group>::Scalar::from(
-                r1cs_converter.prover_accepting_state(current_state),
-            ));
-            z
-        }
-        (JBatching::Nlookup, JCommit::Nlookup) => {
-            let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
-
-            z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
-            z.push(int_to_ff(r1cs_converter.table[0].clone()));
-
-            z.push(<G1 as Group>::Scalar::from(0 as u64)); //wrong
-            z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
-            z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
-            z.push(<G1 as Group>::Scalar::from(
-                r1cs_converter.prover_accepting_state(current_state),
-            ));
-            z
-        }
-    };
+    z.push(<G1 as Group>::Scalar::from(0 as u64)); //wrong
+    z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
+    z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
+    z.push(<G1 as Group>::Scalar::from(
+        r1cs_converter.prover_accepting_state(current_state),
+    ));
+    let z0_primary = z;
 
     let num_steps = 1; // TODO r1cs_converter.moves.clone().unwrap().0.len();
     assert!(num_steps > 0, "trying to prove something about 0 foldings");
@@ -412,152 +338,51 @@ fn solve<'a>(
 
         circ_data.check_all(&wits);
 
-        let glue = match (r1cs_converter.batching, r1cs_converter.commit_type) {
-            (JBatching::NaivePolys, JCommit::HashChain) => {
-                #[cfg(feature = "metrics")]
-                log::tic(Component::Solver, &test, "calculate hash");
-                let next_hash = r1cs_converter.prover_calc_hash(
-                    prev_hash,
-                    false,
-                    move_i.0, // TODO + (i * r1cs_converter.batch_size),
-                    r1cs_converter.batch_size,
-                );
-
-                let i_0 = <G1 as Group>::Scalar::from(
-                    move_i.0 as u64, //(r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
-                );
-                let i_last = <G1 as Group>::Scalar::from(
-                    (move_i.0 + r1cs_converter.batch_size) as u64, //(r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
-                );
-                let g = vec![
-                    GlueOpts::PolyHash((i_0, prev_hash)),
-                    GlueOpts::PolyHash((i_last, next_hash)),
-                ];
-                prev_hash = next_hash;
-                #[cfg(feature = "metrics")]
-                log::stop(Component::Solver, &test, "calculate hash");
-                g
-            }
-            (JBatching::Nlookup, JCommit::HashChain) => {
-                #[cfg(feature = "metrics")]
-                log::tic(Component::Solver, &test, "calculate hash");
-                let next_hash = r1cs_converter.prover_calc_hash(
-                    prev_hash,
-                    false,
-                    move_i.0, //r1cs_converter.substring.0 + (i * r1cs_converter.batch_size),
-                    r1cs_converter.batch_size,
-                );
-
-                let q = match running_q {
-                    Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                    None => vec![<G1 as Group>::Scalar::from(0); q_len],
-                };
-
-                let v = match running_v {
-                    Some(rv) => int_to_ff(rv),
-                    None => int_to_ff(r1cs_converter.table[0].clone()),
-                };
-
-                let next_q = next_running_q
-                    .clone()
-                    .unwrap()
-                    .into_iter()
-                    .map(|x| int_to_ff(x))
-                    .collect();
-                let next_v = int_to_ff(next_running_v.clone().unwrap());
-
-                let i_0 = <G1 as Group>::Scalar::from(
-                    move_i.0 as u64, //(r1cs_converter.substring.0 + (i * r1cs_converter.batch_size)) as u64,
-                );
-                let i_last = <G1 as Group>::Scalar::from(
-                    (move_i.0 + r1cs_converter.batch_size) as u64, //(r1cs_converter.substring.0 + ((i + 1) * r1cs_converter.batch_size)) as u64,
-                );
-                let g = vec![
-                    GlueOpts::NlHash((i_0, prev_hash, q, v)),
-                    GlueOpts::NlHash((i_last, next_hash, next_q, next_v)),
-                ];
-                prev_hash = next_hash;
-                g
-            }
-            (JBatching::NaivePolys, JCommit::Nlookup) => {
-                // TODO fix
-                let q_idx = <G1 as Group>::Scalar::from(move_i.0 as u64);
-                println!("Q IDX {:#?}", q_idx);
-
-                let doc_q = match doc_running_q {
-                    Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                    None => vec![<G1 as Group>::Scalar::from(0); qd_len],
-                };
-
-                let doc_v = match doc_running_v {
-                    Some(rv) => int_to_ff(rv),
-                    None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
-                };
-
-                let next_q_idx =
-                    <G1 as Group>::Scalar::from((move_i.0 + r1cs_converter.batch_size) as u64); //<G1 as Group>::Scalar::from(next_doc_idx.unwrap() as u64);
-
-                println!("NEXT Q IDX {:#?}", next_q_idx);
-                let next_doc_q = next_doc_running_q
-                    .clone()
-                    .unwrap()
-                    .into_iter()
-                    .map(|x| int_to_ff(x))
-                    .collect();
-                let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
-                vec![
-                    GlueOpts::PolyNL((q_idx, doc_q, doc_v)),
-                    GlueOpts::PolyNL((next_q_idx, next_doc_q, next_doc_v)),
-                ]
-            }
-            (JBatching::Nlookup, JCommit::Nlookup) => {
-                let q = match running_q {
-                    Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                    None => vec![<G1 as Group>::Scalar::from(0); q_len],
-                };
-
-                let v = match running_v {
-                    Some(rv) => int_to_ff(rv),
-                    None => int_to_ff(r1cs_converter.table[0].clone()),
-                };
-
-                let next_q = next_running_q
-                    .clone()
-                    .unwrap()
-                    .into_iter()
-                    .map(|x| int_to_ff(x))
-                    .collect();
-                let next_v = int_to_ff(next_running_v.clone().unwrap());
-
-                let q_idx = <G1 as Group>::Scalar::from(move_i.0 as u64);
-
-                let next_q_idx =
-                    <G1 as Group>::Scalar::from((move_i.0 + r1cs_converter.batch_size) as u64);
-
-                println!("Q IDX {:#?}", q_idx);
-                println!("NEXT Q IDX {:#?}", next_q_idx);
-                let doc_q = match doc_running_q {
-                    Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                    None => vec![<G1 as Group>::Scalar::from(0); qd_len],
-                };
-
-                let doc_v = match doc_running_v {
-                    Some(rv) => int_to_ff(rv),
-                    None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
-                };
-                let next_doc_q = next_doc_running_q
-                    .clone()
-                    .unwrap()
-                    .into_iter()
-                    .map(|x| int_to_ff(x))
-                    .collect();
-                let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
-                vec![
-                    GlueOpts::NlNl((q, v, q_idx, doc_q, doc_v)),
-                    GlueOpts::NlNl((next_q, next_v, next_q_idx, next_doc_q, next_doc_v)),
-                ]
-            }
+        let q = match running_q {
+            Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+            None => vec![<G1 as Group>::Scalar::from(0); q_len],
         };
+
+        let v = match running_v {
+            Some(rv) => int_to_ff(rv),
+            None => int_to_ff(r1cs_converter.table[0].clone()),
+        };
+
+        let next_q = next_running_q
+            .clone()
+            .unwrap()
+            .into_iter()
+            .map(|x| int_to_ff(x))
+            .collect();
+        let next_v = int_to_ff(next_running_v.clone().unwrap());
+
+        let q_idx = <G1 as Group>::Scalar::from(move_i.0 as u64);
+
+        let next_q_idx =
+            <G1 as Group>::Scalar::from((move_i.0 + r1cs_converter.batch_size) as u64);
+
+        println!("Q IDX {:#?}", q_idx);
+        println!("NEXT Q IDX {:#?}", next_q_idx);
+        let doc_q = match doc_running_q {
+            Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+            None => vec![<G1 as Group>::Scalar::from(0); qd_len],
+        };
+
+        let doc_v = match doc_running_v {
+            Some(rv) => int_to_ff(rv),
+            None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
+        };
+        let next_doc_q = next_doc_running_q
+            .clone()
+            .unwrap()
+            .into_iter()
+            .map(|x| int_to_ff(x))
+            .collect();
+        let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
+        let glue = vec![
+            GlueOpts::NlNl((q, v, q_idx, doc_q, doc_v)),
+            GlueOpts::NlNl((next_q, next_v, next_q_idx, next_doc_q, next_doc_v)),
+        ];
 
         let values: Option<Vec<_>> = Some(wits).map(|values| {
             let mut evaluator = StagedWitCompEvaluator::new(&circ_data.precompute);
@@ -734,64 +559,18 @@ fn verify(
 
     // eval type, reef commitment, accepting state bool, table, doc, final_q, final_v, final_hash,
     // final_doc_q, final_doc_v
-    match (eval_type, commit_type) {
-        (JBatching::NaivePolys, JCommit::HashChain) => {
-            final_clear_checks(
-                eval_type,
-                reef_commit,
-                zn[3],
-                &table, // clones in function?
-                doc_len,
-                None,
-                None,
-                Some(zn[2]),
-                None,
-                None,
-            );
-        }
-        (JBatching::NaivePolys, JCommit::Nlookup) => {
-            final_clear_checks(
-                eval_type,
-                reef_commit,
-                zn[3 + qd_len],
-                &table,
-                doc_len,
-                None,
-                None,
-                None,
-                Some(zn[2..(qd_len + 2)].to_vec()),
-                Some(zn[2 + qd_len]),
-            );
-        }
-        (JBatching::Nlookup, JCommit::HashChain) => {
-            final_clear_checks(
-                eval_type,
-                reef_commit,
-                zn[3 + q_len + 1],
-                &table,
-                doc_len,
-                Some(zn[3..(3 + q_len)].to_vec()),
-                Some(zn[3 + q_len]),
-                Some(zn[2]),
-                None,
-                None,
-            );
-        }
-        (JBatching::Nlookup, JCommit::Nlookup) => {
-            final_clear_checks(
-                eval_type,
-                reef_commit,
-                zn[2 + q_len + 1 + qd_len + 1],
-                &table,
-                doc_len,
-                Some(zn[1..(q_len + 1)].to_vec()),
-                Some(zn[q_len + 1]),
-                None,
-                Some(zn[(2 + q_len + 1)..(2 + q_len + 1 + qd_len)].to_vec()),
-                Some(zn[2 + q_len + 1 + qd_len]),
-            );
-        }
-    }
+    final_clear_checks(
+        eval_type,
+        reef_commit,
+        zn[2 + q_len + 1 + qd_len + 1],
+        &table,
+        doc_len,
+        Some(zn[1..(q_len + 1)].to_vec()),
+        Some(zn[q_len + 1]),
+        None,
+        Some(zn[(2 + q_len + 1)..(2 + q_len + 1 + qd_len)].to_vec()),
+        Some(zn[2 + q_len + 1 + qd_len]),
+    );
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Final Clear Checks");
 }
@@ -853,171 +632,6 @@ mod tests {
             Some(JCommit::Nlookup),
             2,
         );
-
-        backend_test(
-            "ab".to_string(),
-            "bbbaaa".to_string(),
-            ("aaabbbaaa".to_string())
-                .chars()
-                //.map(|c| c.to_string())
-                .collect(),
-            Some(JBatching::NaivePolys),
-            Some(JCommit::HashChain),
-            2,
-        );
-    }
-
-    #[test]
-    fn e2e_poly_hash() {
-        backend_test(
-            "ab".to_string(),
-            "^a*b*$".to_string(),
-            ("aaab".to_string())
-                .chars()
-                //.map(|c| c.to_string())
-                .collect(),
-            Some(JBatching::NaivePolys),
-            Some(JCommit::HashChain),
-            0,
-        );
-        /*        backend_test(
-                  "ab".to_string(),
-                  "^ab*$".to_string(),
-                  &("abbbbbbb".to_string())
-                      .chars()
-                      .map(|c| c.to_string())
-                      .collect(),
-                  Some(JBatching::NaivePolys),
-                  Some(JCommit::HashChain),
-                  vec![0, 2],
-              );
-              backend_test(
-                  "ab".to_string(),
-                  "^a*$".to_string(),
-                  &("aaaaaaaaaaaaaaaa".to_string())
-                      .chars()
-                      .map(|c| c.to_string())
-                      .collect(),
-                  Some(JBatching::NaivePolys),
-                  Some(JCommit::HashChain),
-                  vec![0, 2, 5],
-              );
-        */
-    }
-
-    #[test]
-    fn e2e_poly_nl() {
-        backend_test(
-            "ab".to_string(),
-            "^a*b*$".to_string(),
-            ("aaab".to_string())
-                .chars()
-                //.map(|c| c.to_string())
-                .collect(),
-            Some(JBatching::NaivePolys),
-            Some(JCommit::Nlookup),
-            0,
-        );
-        /*    backend_test(
-                "ab".to_string(),
-                "^a*b*$".to_string(),
-                &("aa".to_string()).chars().map(|c| c.to_string()).collect(),
-                Some(JBatching::NaivePolys),
-                Some(JCommit::Nlookup),
-                vec![0, 1, 2],
-            );
-            backend_test(
-                "ab".to_string(),
-                "^a*b*$".to_string(),
-                &("aaab".to_string())
-                    .chars()
-                    .map(|c| c.to_string())
-                    .collect(),
-                Some(JBatching::NaivePolys),
-                Some(JCommit::Nlookup),
-                vec![0, 2],
-            );
-            backend_test(
-                "ab".to_string(),
-                "^ab*$".to_string(),
-                &("abbbbbbb".to_string())
-                    .chars()
-                    .map(|c| c.to_string())
-                    .collect(),
-                Some(JBatching::NaivePolys),
-                Some(JCommit::Nlookup),
-                vec![0, 2, 5],
-            );
-            backend_test(
-                "ab".to_string(),
-                "^a*$".to_string(),
-                &("aaaaaaaaaaaaaaaa".to_string())
-                    .chars()
-                    .map(|c| c.to_string())
-                    .collect(),
-                Some(JBatching::NaivePolys),
-                Some(JCommit::Nlookup),
-                vec![0, 2, 5],
-            );
-        */
-    }
-
-    #[test]
-    fn e2e_nl_hash() {
-        backend_test(
-            "ab".to_string(),
-            "^a*b*$".to_string(),
-            ("aaab".to_string())
-                .chars()
-                //.map(|c| c.to_string())
-                .collect(),
-            Some(JBatching::Nlookup),
-            Some(JCommit::HashChain),
-            0,
-        );
-        /*  backend_test(
-                "ab".to_string(),
-                "^a*b*$".to_string(),
-                &("aa".to_string()).chars().map(|c| c.to_string()).collect(),
-                Some(JBatching::Nlookup),
-                Some(JCommit::HashChain),
-                vec![0, 1, 2],
-            );
-            backend_test(
-                "ab".to_string(),
-                "^a*b*$".to_string(),
-                &("aaab".to_string())
-                    .chars()
-                    .map(|c| c.to_string())
-                    .collect(),
-                Some(JBatching::Nlookup),
-                Some(JCommit::HashChain),
-                vec![0, 2],
-            );
-            backend_test(
-                "ab".to_string(),
-                "^ab*$".to_string(),
-                &("abbbbbbb".to_string())
-                    .chars()
-                    .map(|c| c.to_string())
-                    .collect(),
-                Some(JBatching::Nlookup),
-                Some(JCommit::HashChain),
-                vec![0, 2],
-            );
-            backend_test(
-                "ab".to_string(),
-                "^a*$".to_string(),
-                &("aaaaaaaaaaaaaaaa".to_string())
-                    .chars()
-                    .map(|c| c.to_string())
-                    .collect(),
-                Some(JBatching::Nlookup),
-                Some(JCommit::HashChain),
-                vec![0, 2, 5],
-                // [1,2,3,4,5,6,7,8,
-            );
-        */
     }
 
     #[test]
