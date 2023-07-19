@@ -95,6 +95,7 @@ pub struct NFAStepCircuit<F: PrimeField> {
     start_of_ep: isize,
     accepting: Vec<F>,
     pc: PoseidonConstants<F, typenum::U4>,
+    claim_blind: F,
 }
 
 // note that this will generate a single round, and no witnesses, unlike nova example code
@@ -114,6 +115,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         accepting: Vec<F>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U4>,
+        claim_blind: F
     ) -> Self {
         // todo check wits line up with the non det advice
 
@@ -141,6 +143,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             start_of_ep: start_of_ep,
             accepting: accepting,
             pc: pcs,
+            claim_blind: claim_blind
         }
     }
 
@@ -795,6 +798,64 @@ where {
             return Ok(true);
         }
         return Ok(false);
+    }
+
+      // todo find and set random Has res, z hash input
+    fn hiding_running_claim<CS>(
+        &self,
+        cs: &mut CS,
+        z: &[AllocatedNum<F>],
+        v: F,
+
+    ) -> Result<AllocatedNum<F>, SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+    {
+        let d_in = z[0].clone();
+
+      //v at index 0 (but technically 1 since io is allocated first)
+      let alloc_v = AllocatedNum::alloc(cs.namespace(|| "v"), || Ok(v))?;
+
+      let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s"), || Ok(self.claim_blind))?;
+
+      //poseidon(v,s) == d
+      let d_calc = {
+        let acc = &mut cs.namespace(|| "d hash circuit");
+        let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+
+        sponge.start(
+          IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
+          None,
+          acc,
+        );
+
+        SpongeAPI::absorb(
+          &mut sponge,
+          2,
+          &[Elt::Allocated(alloc_v), Elt::Allocated(alloc_s)],
+          acc,
+        );
+
+        let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
+        sponge.finish(acc).unwrap();
+        let out =
+          Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
+        out
+      };
+
+      // sanity
+      if d_calc.get_value().is_some() {
+        assert_eq!(d_in.get_value().unwrap(), d_calc.get_value().unwrap());
+      }
+
+      cs.enforce(
+        || "d == d",
+        |z| z + d_in.get_variable(),
+        |z| z + CS::one(),
+        |z| z + d_calc.get_variable(),
+      );
+
+      Ok(d_calc) // doesn't
     }
 }
 

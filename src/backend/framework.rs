@@ -179,6 +179,7 @@ fn setup<'a>(
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         r1cs_converter.pc.clone(),
+        <G1 as Group>::Scalar::from(0), //idk if this is correct
     );
 
     // trivial circuit
