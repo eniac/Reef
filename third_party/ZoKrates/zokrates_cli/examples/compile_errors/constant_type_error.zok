@@ -1,0 +1,5 @@
+const u32[2] A = [1];
+
+def main() -> u32[2] {
+    return A;
+}

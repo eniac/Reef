@@ -1,0 +1,9 @@
+def wtax(field debt, field wealth) -> field {
+    field x = wealth < debt ? 0 : (wealth - debt);
+    return x;
+}
+
+def main(field debt, field wealth) -> field {
+    field tax = wtax(debt, wealth);
+    return tax;
+}

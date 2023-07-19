@@ -800,62 +800,56 @@ where {
         return Ok(false);
     }
 
-      // todo find and set random Has res, z hash input
     fn hiding_running_claim<CS>(
         &self,
         cs: &mut CS,
         z: &[AllocatedNum<F>],
-        v: F,
-
+        v: &AllocatedNum<F>,
     ) -> Result<AllocatedNum<F>, SynthesisError>
     where
         CS: ConstraintSystem<F>,
     {
         let d_in = z[0].clone();
 
-      //v at index 0 (but technically 1 since io is allocated first)
-      let alloc_v = AllocatedNum::alloc(cs.namespace(|| "v"), || Ok(v))?;
+        let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s"), || Ok(self.claim_blind))?;
 
-      let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s"), || Ok(self.claim_blind))?;
+        //poseidon(v,s) == d
+        let d_calc = {
+            let acc = &mut cs.namespace(|| "d hash circuit");
+            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
 
-      //poseidon(v,s) == d
-      let d_calc = {
-        let acc = &mut cs.namespace(|| "d hash circuit");
-        let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+            sponge.start(
+                IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
+                None,
+                acc,
+            );
 
-        sponge.start(
-          IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
-          None,
-          acc,
+            SpongeAPI::absorb(
+                &mut sponge,
+                2,
+                &[Elt::Allocated(v.clone()), Elt::Allocated(alloc_s)],
+                acc,
+            );
+
+            let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            sponge.finish(acc).unwrap();
+            let out = Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
+            out
+        };
+
+        // sanity
+        if d_calc.get_value().is_some() {
+            assert_eq!(d_in.get_value().unwrap(), d_calc.get_value().unwrap());
+        }
+
+        cs.enforce(
+            || "d == d",
+            |z| z + d_in.get_variable(),
+            |z| z + CS::one(),
+            |z| z + d_calc.get_variable(),
         );
 
-        SpongeAPI::absorb(
-          &mut sponge,
-          2,
-          &[Elt::Allocated(alloc_v), Elt::Allocated(alloc_s)],
-          acc,
-        );
-
-        let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
-        sponge.finish(acc).unwrap();
-        let out =
-          Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
-        out
-      };
-
-      // sanity
-      if d_calc.get_value().is_some() {
-        assert_eq!(d_in.get_value().unwrap(), d_calc.get_value().unwrap());
-      }
-
-      cs.enforce(
-        || "d == d",
-        |z| z + d_in.get_variable(),
-        |z| z + CS::one(),
-        |z| z + d_calc.get_variable(),
-      );
-
-      Ok(d_calc) // doesn't
+        Ok(d_calc)
     }
 }
 
@@ -1113,6 +1107,9 @@ where
                 }
             }
         }
+        //Should z be something else here? 
+        let hidden_rc = self.hiding_running_claim(cs, z, &alloc_rc[sc_l].clone().unwrap());
+        alloc_rc[sc_l] = Some(hidden_rc?);
 
         self.nl_eval_fiatshamir(
             cs,
