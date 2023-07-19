@@ -809,6 +809,7 @@ where {
     where
         CS: ConstraintSystem<F>,
     {
+        //This might need to be some other index
         let d_in = z[0].clone();
 
         let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s"), || Ok(self.claim_blind))?;
@@ -1107,7 +1108,7 @@ where
                 }
             }
         }
-        //Should z be something else here? 
+        //Z needs to be replaced
         let hidden_rc = self.hiding_running_claim(cs, z, &alloc_rc[sc_l].clone().unwrap());
         alloc_rc[sc_l] = Some(hidden_rc?);
 
