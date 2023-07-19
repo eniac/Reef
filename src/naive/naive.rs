@@ -127,6 +127,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA", "DFA");
 
+    println!("To DFA");
+
     let regex = re::simpl(re::new(&(r.clone())));
 
     let dfa = DFA::new(&alpha[..],naive_re::re::translate(&regex, &alpha[..]));
@@ -142,6 +144,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::tic(Component::Solver, "DFA Solving", "Clear Match");
 
     let is_match = dfa.is_match(&doc);
+
+    println!("is match: {:#?}",is_match);
    
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
 
@@ -151,6 +155,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "Circuit Gen", "Zok");
 
+    println!("Make Zok");
+
     let _ = make_zok(dfa, doc_len);
     
     #[cfg(feature = "metrics")]
@@ -158,6 +164,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "Circuit Gen", "r1cs");
+
+    println!("gen r1cs");
 
     let (P,V) = gen_r1cs();
     
@@ -171,6 +179,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "R1CS", "Commitment Generations");
+
+    println!("Gen commitment");
+
     let commitment = gen_commitment(doc_vec.clone(), &pc);
 
     #[cfg(feature = "metrics")]
@@ -178,6 +189,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "R1CS", "To Circuit");
+
+    println!("To circuit");
+
     let circuit = NaiveCircuit::new(P.r1cs.clone(), None, doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
 
     #[cfg(feature = "metrics")]
@@ -192,6 +206,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "Witnesses", "Generation");
+    println!("Wit gen");
+
     let witnesses = gen_wits(doc_vec.clone(), is_match, doc_len, &P);
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver, "Witnesses", "Generation");
