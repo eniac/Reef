@@ -164,13 +164,15 @@ impl SAFA<char> {
                     let mut r = to_set(b, is_and);
                     l.append(&mut r);
                     l
-                }
+                },
                 RegexF::Alt(ref a, ref b) if !is_and => {
                     let mut l = to_set(a, is_and);
                     let mut r = to_set(b, is_and);
                     l.append(&mut r);
                     l
-                }
+                },
+                RegexF::Star(ref a) if !is_and =>
+                    BTreeSet::from([re::nil(), re::app(a.clone(), re::star(a.clone()))]),
                 _ => BTreeSet::from([r.clone()]),
             }
         }
@@ -199,6 +201,11 @@ impl SAFA<char> {
     /// Is this node a fork ([alt, and] with epsilon children)
     pub fn is_fork(&self, from: NodeIndex<u32>) -> bool {
         self.edges(from).iter().all(|e| e.weight() == &SAFA::epsilon())
+    }
+
+    /// Number of states
+    pub fn nstates(&self) -> usize {
+        self.g.node_indices().len()
     }
 
     /// Negation of SAFAs
@@ -623,7 +630,6 @@ mod tests {
     fn test_safa_lookahead_weird() {
         let r = re::simpl(re::new(r"^(?=a).*b$"));
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
         let doc: Vec<_> = "ab".chars().collect();
         equiv_upto_epsilon(
             &safa.solve(&doc),
@@ -668,6 +674,14 @@ mod tests {
             println!("{:?}", sol);
             assert_ne!(sol,None);
         }
+    }
+
+    #[test]
+    fn test_safa_lookahead_loop() {
+        let s = r"^((?=a.*).*a)*$";
+        let r = re::simpl(re::new(s));
+        let safa = SAFA::new("ab", &r);
+        assert_eq!(safa.nstates(), 8);
     }
 
     #[test]

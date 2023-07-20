@@ -41,12 +41,23 @@ consign! {
 
 impl fmt::Display for RegexF {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        fn is_long(s: &RegexF) -> bool {
+            match s {
+              RegexF::Nil | RegexF::Dot | RegexF::CharClass(_) =>
+                  false,
+              RegexF::Range(a, _, _) =>
+                  is_long(a),
+              _ => true
+            }
+        }
+
         match self {
             RegexF::Nil => write!(f, "ε"),
             RegexF::Dot => write!(f, "."),
             RegexF::CharClass(c) => write!(f, "{}", c),
             RegexF::App(x, y) => write!(f, "{}{}", x, y),
             RegexF::Alt(ref x, ref y) => write!(f, "({} | {})", x, y),
+            RegexF::Star(a) if is_long(a) => write!(f, "({})*", a),
             RegexF::Star(a) => write!(f, "{}*", a),
             RegexF::And(a, b) => write!(f, "(?={}){}", a, b),
             RegexF::Range(a, 0, 1) => write!(f, "{}?", a),
@@ -204,8 +215,17 @@ impl RegexF {
             // Alt distributivity (explosive!): (a | b)c == ac | bc
             // (RegexF::Alt(a, b), c) =>
             //    RegexF::and(&RegexF::app(a, c), &RegexF::app(b, c)),
-            // Lef-associative [app]
+            // Left-associative [app]
             (x, RegexF::App(y, z)) => RegexF::app(&RegexF::app(x, y), z),
+            // CHEAT
+            (RegexF::App(x, y), z) => {
+                let l: &RegexF = &RegexF::app(y, z);
+                if l == &RegexF::App(y.clone(), G.mk(z.clone())) {
+                    RegexF::App(G.mk(a.clone()), G.mk(b.clone()))
+                } else {
+                    RegexF::app(x, l)
+                }
+            },
             (_, _) => RegexF::App(G.mk(a.clone()), G.mk(b.clone())),
         }
     }
