@@ -42,49 +42,36 @@ pub enum DeterminedLanguage {
     Datalog,
     C,
 }
-
-pub fn make_delta(state:u64, c: u32, next: u64) -> String{
-    format!(" if (cur_state=={state} && cur_char=={c}) then {next} else")
+pub fn make_vanishing(size: usize,name:&str)-> String {
+    format!("def vanishing_{name}(private field cur_index, field[{size}] idxs) -> field:
+	field out = 1
+	for field i in 0..{size} do
+		out = out * (idxs[i]-cur_index)
+	endfor
+	return out\n")
 }
 
-pub fn make_match(state:u64) -> String{
-    format!(" if state=={state} then 1 else")
+pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:usize,name1:&str,name2:&str)->String{
+    format!("def main(private field[{doc_len}] document, private field[{prover_states}] prover_states, field[{deltas}] idxs, field n_states, field n_char, field[{n_accepting}] accepting_states) -> field: 
+    assert(prover_states[0]==0)
+	field valid_state = -1
+	field combined_idx = 0
+    for field i in 1..{prover_states} do
+		combined_idx = prover_states[i-1]*n_states*n_char + document[i-1]*n_states + prover_states[i]
+    	valid_state = vanishing_{name1}(combined_idx,idxs)
+		assert(valid_state==0)
+    endfor 
+    field match = 0
+	match = vanishing_{name2}(prover_states[{doc_len}],accepting_states)
+	assert(match==0)
+	return match")
 }
+
 pub fn make_zok(dfa: DFA<'_>, doc_len: usize) -> std::io::Result<()> {
-    let mut delta_base_string = "def delta(private field cur_state, private field cur_char) -> field:
-    \treturn ".to_owned();
+    let mut final_string = make_vanishing(dfa.deltas().len(),"trans"); 
+    final_string.push_str(&make_vanishing(dfa.get_final_states().len(),"match"));
 
-    let mut main_base_string = format!("\n\ndef main(private field[{doc_len}] document) -> field: 
-    \tfield size = {doc_len}
-    \tfield state = 0
-    \tfor field i in 0..size do
-    \t\tstate = delta(state, document[i])
-    \tendfor 
-    \tfield match =").to_owned();
-
-    for match_state in dfa.get_final_states() {
-        main_base_string.push_str(&(make_match(match_state).to_owned()));
-    }
-    main_base_string.push_str(" 0");
-    for match_state in dfa.get_final_states() {
-        main_base_string.push_str(" fi");
-    }
-    main_base_string.push_str("\n\tassert(match==1)\n\treturn match");
-
-
-    for delta in dfa.deltas() {
-        let line = make_delta(delta.0, (delta.1 as u32), delta.2).to_owned();
-        delta_base_string.push_str(&line);
-    }
-    delta_base_string.push_str(" -1");
-    for delta in dfa.deltas() {
-        delta_base_string.push_str(" fi");
-    }
-    // delta_base_string.push_str("\treturn out");
-
-    let mut final_string = delta_base_string; 
-    final_string.push_str(&main_base_string);
-
+    final_string.push_str(&make_main(doc_len, doc_len+1, dfa.deltas().len(), dfa.get_final_states().len(), "trans","match"));
     let mut file = File::create("match.zok")?;
     file.write_all(final_string.as_bytes())?;
     Ok(())
@@ -184,102 +171,102 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::r1cs(Component::Compiler, "Circuit Gen", "r1cs",P.r1cs.constraints.len());
 
-    let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+    // let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS", "Commitment Generations");
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Compiler, "R1CS", "Commitment Generations");
 
-    println!("Gen commitment");
+    // println!("Gen commitment");
 
-    let commitment = gen_commitment(doc_vec.clone(), &pc);
+    // let commitment = gen_commitment(doc_vec.clone(), &pc);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS", "Commitment Generations");
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Compiler, "R1CS", "Commitment Generations");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS", "To Circuit");
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Compiler, "R1CS", "To Circuit");
 
-    println!("To circuit");
+    // println!("To circuit");
 
-    let circuit = NaiveCircuit::new(P.r1cs.clone(), None, doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
+    // let circuit = NaiveCircuit::new(P.r1cs.clone(), None, doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS", "To Circuit");
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Compiler, "R1CS", "To Circuit");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS", "Proof Setup");
-    let (pk, vk) = naive_spartan_snark_setup(circuit);
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Compiler, "R1CS", "Proof Setup");
+    // let (pk, vk) = naive_spartan_snark_setup(circuit);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS", "Proof Setup");
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Compiler, "R1CS", "Proof Setup");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Solver, "Witnesses", "Generation");
-    println!("Wit gen");
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Solver, "Witnesses", "Generation");
+    // println!("Wit gen");
 
-    let witnesses = gen_wits(doc_vec.clone(), is_match, doc_len, &P);
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Solver, "Witnesses", "Generation");
+    // let witnesses = gen_wits(doc_vec.clone(), is_match, doc_len, &P);
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Solver, "Witnesses", "Generation");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Prover, "Proof", "Adding witnesses");
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Prover, "Proof", "Adding witnesses");
 
-    let prove_circuit = NaiveCircuit::new(P.r1cs.clone(),witnesses, doc_len, pc.clone(), commitment.blind, commitment.commit, is_match_g);
+    // let prove_circuit = NaiveCircuit::new(P.r1cs.clone(),witnesses, doc_len, pc.clone(), commitment.blind, commitment.commit, is_match_g);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Prover, "Proof", "Adding witnesses");
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Prover, "Proof", "Adding witnesses");
 
-    let z = vec![commitment.commit];
+    // let z = vec![commitment.commit];
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Prover, "Proof", "Prove");
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Prover, "Proof", "Prove");
 
-    let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
+    // let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Prover, "Proof", "Prove");
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Prover, "Proof", "Prove");
 
-    assert!(result.is_ok());
+    // assert!(result.is_ok());
 
-    let output = prove_circuit.output(&z);
+    // let output = prove_circuit.output(&z);
 
-    let snark = result.unwrap();
+    // let snark = result.unwrap();
 
-    #[cfg(feature = "metrics")]
-    log::space(
-        Component::Prover,
-        "Proof Size",
-        "Spartan SNARK size",
-        serde_json::to_string(&snark).unwrap().len(),
-    );
+    // #[cfg(feature = "metrics")]
+    // log::space(
+    //     Component::Prover,
+    //     "Proof Size",
+    //     "Spartan SNARK size",
+    //     serde_json::to_string(&snark).unwrap().len(),
+    // );
 
-    // verify the SNARK
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Verifier, "Verify", "Verify");
+    // // verify the SNARK
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Verifier, "Verify", "Verify");
 
-    let io = z.into_iter()
-      .chain(output.clone().into_iter())
-      .collect::<Vec<_>>();
-    let verifier_result = snark.verify(&vk, &io);
+    // let io = z.into_iter()
+    //   .chain(output.clone().into_iter())
+    //   .collect::<Vec<_>>();
+    // let verifier_result = snark.verify(&vk, &io);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Verifier, "Verify", "Verify");
-    assert!(verifier_result.is_ok()); 
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Verifier, "Verify", "Verify");
+    // assert!(verifier_result.is_ok()); 
 
-    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
-    let mut wtr = Writer::from_writer(file);
-    let _ = wtr.write_record(&[
-    doc,
-    r,
-    dfa_ndelta.to_string(), //nedges().to_string(),
-    dfa_nstate.to_string(), //nstates().to_string(),
-    ]);
-    let spacer = "---------";
-    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-    wtr.flush();
+    // let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
+    // let mut wtr = Writer::from_writer(file);
+    // let _ = wtr.write_record(&[
+    // doc,
+    // r,
+    // dfa_ndelta.to_string(), //nedges().to_string(),
+    // dfa_nstate.to_string(), //nstates().to_string(),
+    // ]);
+    // let spacer = "---------";
+    // let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    // wtr.flush();
 
-    #[cfg(feature = "metrics")]
-    log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    // #[cfg(feature = "metrics")]
+    // log::write_csv(&out_write.as_path().display().to_string()).unwrap();
    
 }
 
@@ -292,7 +279,7 @@ fn test_1() {
     let ab: String = "abc".to_string();
     //"abcdefghijklmnopqrstuvwxyz1234567890QWERTYUIOPASDFGHJKLZXCVBNM".to_string();
     //abvec.iter().collect();
-    let doc = "abb".to_string();
+    let doc = "abc".to_string();
     //"nPPZEKVUVLQ10abc".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }
