@@ -212,65 +212,65 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver, "Witnesses", "Generation");
 
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Prover, "Proof", "Adding witnesses");
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Prover, "Proof", "Adding witnesses");
 
-    // let prove_circuit = NaiveCircuit::new(P.r1cs.clone(),witnesses, doc_len, pc.clone(), commitment.blind, commitment.commit, is_match_g);
+    let prove_circuit = NaiveCircuit::new(P.r1cs.clone(),witnesses, doc_len, pc.clone(), commitment.blind, commitment.commit, is_match_g);
 
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Prover, "Proof", "Adding witnesses");
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Proof", "Adding witnesses");
 
-    // let z = vec![commitment.commit];
+    let z = vec![commitment.commit];
 
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Prover, "Proof", "Prove");
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Prover, "Proof", "Prove");
 
-    // let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
+    let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
 
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Prover, "Proof", "Prove");
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Proof", "Prove");
 
-    // assert!(result.is_ok());
+    assert!(result.is_ok());
 
-    // let output = prove_circuit.output(&z);
+    let output = prove_circuit.output(&z);
 
-    // let snark = result.unwrap();
+    let snark = result.unwrap();
 
-    // #[cfg(feature = "metrics")]
-    // log::space(
-    //     Component::Prover,
-    //     "Proof Size",
-    //     "Spartan SNARK size",
-    //     serde_json::to_string(&snark).unwrap().len(),
-    // );
+    #[cfg(feature = "metrics")]
+    log::space(
+        Component::Prover,
+        "Proof Size",
+        "Spartan SNARK size",
+        serde_json::to_string(&snark).unwrap().len(),
+    );
 
-    // // verify the SNARK
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Verifier, "Verify", "Verify");
+    // verify the SNARK
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Verifier, "Verify", "Verify");
 
-    // let io = z.into_iter()
-    //   .chain(output.clone().into_iter())
-    //   .collect::<Vec<_>>();
-    // let verifier_result = snark.verify(&vk, &io);
+    let io = z.into_iter()
+      .chain(output.clone().into_iter())
+      .collect::<Vec<_>>();
+    let verifier_result = snark.verify(&vk, &io);
 
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Verifier, "Verify", "Verify");
-    // assert!(verifier_result.is_ok()); 
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Verifier, "Verify", "Verify");
+    assert!(verifier_result.is_ok()); 
 
-    // let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
-    // let mut wtr = Writer::from_writer(file);
-    // let _ = wtr.write_record(&[
-    // doc,
-    // r,
-    // dfa_ndelta.to_string(), //nedges().to_string(),
-    // dfa_nstate.to_string(), //nstates().to_string(),
-    // ]);
-    // let spacer = "---------";
-    // let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-    // wtr.flush();
+    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
+    let mut wtr = Writer::from_writer(file);
+    let _ = wtr.write_record(&[
+    doc,
+    r,
+    dfa_ndelta.to_string(), //nedges().to_string(),
+    dfa_nstate.to_string(), //nstates().to_string(),
+    ]);
+    let spacer = "---------";
+    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    wtr.flush();
 
-    // #[cfg(feature = "metrics")]
-    // log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    #[cfg(feature = "metrics")]
+    log::write_csv(&out_write.as_path().display().to_string()).unwrap();
    
 }
 
@@ -283,7 +283,7 @@ fn test_1() {
     let ab: String = "abc".to_string();
     //"abcdefghijklmnopqrstuvwxyz1234567890QWERTYUIOPASDFGHJKLZXCVBNM".to_string();
     //abvec.iter().collect();
-    let doc = "abb".to_string();
+    let doc = "abc".to_string();
     //"nPPZEKVUVLQ10abc".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }
