@@ -189,7 +189,7 @@ impl SAFA<char> {
 
     /// Add a new regex starting at [from]
     fn add(&mut self, from: NodeIndex<u32>) {
-        re::extract_skip(&self.g[from].get(), &self.ab)
+        re::extract_skip(&self.g[from].get())
             .map(|(skip, rem)| self.add_skip(from, skip, &rem))
             .or_else(|| self.add_fork(true, from)) // Add [and] fork
             .or_else(|| self.add_fork(false, from)) // Add [or] fork

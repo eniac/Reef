@@ -296,12 +296,12 @@ impl RegexF {
     }
 
     /// Extract a skip from a regex and return the rest
-    pub fn extract_skip(&self, ab: &Vec<char>) -> Option<(Skip, Self)> {
+    pub fn extract_skip(&self) -> Option<(Skip, Self)> {
         let res = match self {
             RegexF::Dot => Some((Skip::single(1), RegexF::nil())),
             // .*
             RegexF::Star(ref a) => {
-                let (sa, rem) = a.extract_skip(ab)?;
+                let (sa, rem) = a.extract_skip()?;
                 if rem.is_nil() {
                     Some((sa.kleene(), RegexF::nil()))
                 } else {
@@ -310,7 +310,7 @@ impl RegexF {
             }
             // .{i,j}
             RegexF::Range(ref a, x, y) => {
-                let (sa, rem) = a.extract_skip(ab)?;
+                let (sa, rem) = a.extract_skip()?;
                 if rem.is_nil() {
                     Some((sa.repeat(*x, *y), RegexF::nil()))
                 } else {
@@ -319,8 +319,8 @@ impl RegexF {
             }
             // r1r2
             RegexF::App(ref a, ref b) => {
-                let (pa, rema) = a.extract_skip(ab)?;
-                match b.extract_skip(ab) {
+                let (pa, rema) = a.extract_skip()?;
+                match b.extract_skip() {
                     Some((pb, remb)) if rema.is_nil() => Some((pa.app(&pb), remb)),
                     _ => Some((pa, RegexF::app(&rema, b))),
                 }
@@ -461,8 +461,8 @@ pub mod re {
     }
 
     /// Extract a skip from a regex and return the rest
-    pub fn extract_skip(a: &Regex, ab: &Vec<char>) -> Option<(Skip, Regex)> {
-        let (s, rem) = (*a).extract_skip(ab)?;
+    pub fn extract_skip(a: &Regex) -> Option<(Skip, Regex)> {
+        let (s, rem) = (*a).extract_skip()?;
         Some((s, G.mk(rem)))
     }
 
