@@ -149,6 +149,18 @@ impl<'a> DFA<'a> {
         self.get_final_states().contains(&s)
     }
 
+    pub fn solve(&self, doc: &String) -> Vec<(u32,u32,u32)> {
+        let mut solution = vec![];
+        let mut cur = self.get_init_state() as u32;
+        for c in doc.chars() {
+            let next = self.delta(cur as u64, c).unwrap() as u32;
+            solution.push((cur,c as u32,next));
+            cur = next;
+        }
+        // If it is in the final states, then success
+        solution
+    }
+
     pub fn equiv_classes(&self) -> HashMap<char, HashSet<char>> {
         let mut char_classes: HashMap<char, HashSet<char>> = HashMap::new();
 

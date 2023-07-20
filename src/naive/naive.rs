@@ -67,7 +67,7 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
 	return match")
 }
 
-pub fn make_zok(dfa: DFA<'_>, doc_len: usize) -> std::io::Result<()> {
+pub fn make_zok(dfa: &DFA<'_>, doc_len: usize) -> std::io::Result<()> {
     let mut final_string = make_vanishing(dfa.deltas().len(),"trans"); 
     final_string.push_str(&make_vanishing(dfa.get_final_states().len(),"match"));
 
@@ -140,8 +140,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::tic(Component::Solver, "DFA Solving", "Clear Match");
 
     let is_match = dfa.is_match(&doc);
+    let solution = dfa.solve(&doc);
 
     println!("is match: {:#?}",is_match);
+    println!("solution: {:#?}",solution);
    
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
 
@@ -153,7 +155,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("Make Zok");
 
-    let _ = make_zok(dfa, doc_len);
+    let _ = make_zok(&dfa, doc_len);
     
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "Circuit Gen", "Zok");
@@ -164,6 +166,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!("gen r1cs");
 
     let (P,V) = gen_r1cs();
+
+    println!("{:#?}",P.r1cs.names);
     
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "Circuit Gen", "r1cs");
@@ -171,42 +175,42 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::r1cs(Component::Compiler, "Circuit Gen", "r1cs",P.r1cs.constraints.len());
 
-    // let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+    let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Compiler, "R1CS", "Commitment Generations");
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS", "Commitment Generations");
 
-    // println!("Gen commitment");
+    println!("Gen commitment");
 
-    // let commitment = gen_commitment(doc_vec.clone(), &pc);
+    let commitment = gen_commitment(doc_vec.clone(), &pc);
 
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Compiler, "R1CS", "Commitment Generations");
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS", "Commitment Generations");
 
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Compiler, "R1CS", "To Circuit");
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS", "To Circuit");
 
-    // println!("To circuit");
+    println!("To circuit");
 
-    // let circuit = NaiveCircuit::new(P.r1cs.clone(), None, doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
+    let circuit = NaiveCircuit::new(P.r1cs.clone(), None, doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
 
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Compiler, "R1CS", "To Circuit");
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS", "To Circuit");
 
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Compiler, "R1CS", "Proof Setup");
-    // let (pk, vk) = naive_spartan_snark_setup(circuit);
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS", "Proof Setup");
+    let (pk, vk) = naive_spartan_snark_setup(circuit);
 
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Compiler, "R1CS", "Proof Setup");
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS", "Proof Setup");
 
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Solver, "Witnesses", "Generation");
-    // println!("Wit gen");
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Solver, "Witnesses", "Generation");
+    println!("Wit gen");
 
-    // let witnesses = gen_wits(doc_vec.clone(), is_match, doc_len, &P);
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Solver, "Witnesses", "Generation");
+    let witnesses = gen_wits(doc_vec.clone(), is_match, doc_len, solution, &dfa, alpha.len(), &P);
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Solver, "Witnesses", "Generation");
 
     // #[cfg(feature = "metrics")]
     // log::tic(Component::Prover, "Proof", "Adding witnesses");
@@ -279,7 +283,7 @@ fn test_1() {
     let ab: String = "abc".to_string();
     //"abcdefghijklmnopqrstuvwxyz1234567890QWERTYUIOPASDFGHJKLZXCVBNM".to_string();
     //abvec.iter().collect();
-    let doc = "abc".to_string();
+    let doc = "abb".to_string();
     //"nPPZEKVUVLQ10abc".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }
