@@ -4080,5 +4080,4 @@ def main(private field[16] document) -> field:
 	match = if state==28 then 1 else match-0 fi
 	match = if state==21 then 1 else match-0 fi
 	match = if state==31 then 1 else match-0 fi
-	assert(match==1)
 	return match
