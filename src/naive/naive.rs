@@ -44,15 +44,15 @@ pub enum DeterminedLanguage {
 }
 
 pub fn make_delta(state:u64, c: u32, next: u64) -> String{
-    format!("\tout = if (cur_state=={state} && cur_char=={c}) then {next} else out-0 fi\n")
+    format!(" if (cur_state=={state} && cur_char=={c}) then {next} else")
 }
 
 pub fn make_match(state:u64) -> String{
-    format!("\tmatch = if state=={state} then 1 else match-0 fi\n")
+    format!(" if state=={state} then 1 else")
 }
 pub fn make_zok(dfa: DFA<'_>, doc_len: usize) -> std::io::Result<()> {
     let mut delta_base_string = "def delta(private field cur_state, private field cur_char) -> field:
-    \tfield out = -1\n".to_owned();
+    \treturn ".to_owned();
 
     let mut main_base_string = format!("\n\ndef main(private field[{doc_len}] document) -> field: 
     \tfield size = {doc_len}
@@ -60,19 +60,27 @@ pub fn make_zok(dfa: DFA<'_>, doc_len: usize) -> std::io::Result<()> {
     \tfor field i in 0..size do
     \t\tstate = delta(state, document[i])
     \tendfor 
-    \tfield match = 0\n").to_owned();
+    \tfield match =").to_owned();
 
     for match_state in dfa.get_final_states() {
         main_base_string.push_str(&(make_match(match_state).to_owned()));
     }
-    main_base_string.push_str("\tassert(match==1)\n\treturn match");
+    main_base_string.push_str(" 0");
+    for match_state in dfa.get_final_states() {
+        main_base_string.push_str(" fi");
+    }
+    main_base_string.push_str("\n\tassert(match==1)\n\treturn match");
 
 
     for delta in dfa.deltas() {
         let line = make_delta(delta.0, (delta.1 as u32), delta.2).to_owned();
         delta_base_string.push_str(&line);
     }
-    delta_base_string.push_str("\treturn out");
+    delta_base_string.push_str(" -1");
+    for delta in dfa.deltas() {
+        delta_base_string.push_str(" fi");
+    }
+    // delta_base_string.push_str("\treturn out");
 
     let mut final_string = delta_base_string; 
     final_string.push_str(&main_base_string);
@@ -136,6 +144,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let dfa_nstate = dfa.nstates();
 
     println!("N States: {:#?}",dfa_nstate);
+    println!("N Delta: {:#?}",dfa_ndelta);
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA", "DFA");
@@ -277,9 +286,13 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
 #[test]
 fn test_1() {
-    let r  = "[a-z]{1,5}[A-Z]{10}[0-9]+abc".to_string();
-    let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
-    let ab: String = abvec.iter().collect();
-    let doc = "nPPZEKVUVLQ10abc".to_owned();
+    let r  = "abb".to_string();
+    //"[a-z]{1,5}[A-Z]{10}[0-9]+abc".to_string();
+    //let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+    let ab: String = "abc".to_string();
+    //"abcdefghijklmnopqrstuvwxyz1234567890QWERTYUIOPASDFGHJKLZXCVBNM".to_string();
+    //abvec.iter().collect();
+    let doc = "abb".to_string();
+    //"nPPZEKVUVLQ10abc".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }
