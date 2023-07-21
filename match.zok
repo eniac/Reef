@@ -1,25 +1,25 @@
-def vanishing_trans(private field cur_index, field[18] idxs) -> field:
+def vanishing_trans(private field cur_index, field[5580] idxs) -> field:
 	field out = 1
-	for field i in 0..18 do
+	for field i in 0..5580 do
 		out = out * (idxs[i]-cur_index)
 	endfor
 	return out
-def vanishing_match(private field cur_index, field[3] idxs) -> field:
+def vanishing_match(private field cur_index, field[71] idxs) -> field:
 	field out = 1
-	for field i in 0..3 do
+	for field i in 0..71 do
 		out = out * (idxs[i]-cur_index)
 	endfor
 	return out
-def main(private field[3] document, private field[4] prover_states, field[18] idxs, field n_states, field n_char, field[3] accepting_states) -> field: 
+def main(private field[16] document, private field[17] prover_states, field[5580] idxs, field n_states, field n_char, field[71] accepting_states) -> field: 
     assert(prover_states[0]==0)
 	field valid_state = -1
 	field combined_idx = 0
-    for field i in 1..4 do
+    for field i in 1..17 do
 		combined_idx = prover_states[i-1]*n_states*n_char + document[i-1]*n_states + prover_states[i]
     	valid_state = vanishing_trans(combined_idx,idxs)
 		assert(valid_state==0)
     endfor 
     field match = 0
-	match = vanishing_match(prover_states[3],accepting_states)
+	match = vanishing_match(prover_states[16],accepting_states)
 	assert(match==0)
 	return match

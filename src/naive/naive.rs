@@ -141,9 +141,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let is_match = dfa.is_match(&doc);
     let solution = dfa.solve(&doc);
-
-    println!("is match: {:#?}",is_match);
-    println!("solution: {:#?}",solution);
    
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
 
@@ -166,8 +163,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!("gen r1cs");
 
     let (P,V) = gen_r1cs();
-
-    println!("{:#?}",P.r1cs.names);
     
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "Circuit Gen", "r1cs");
@@ -277,13 +272,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
 #[test]
 fn test_1() {
-    let r  = "abb".to_string();
-    //"[a-z]{1,5}[A-Z]{10}[0-9]+abc".to_string();
-    //let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
-    let ab: String = "abc".to_string();
-    //"abcdefghijklmnopqrstuvwxyz1234567890QWERTYUIOPASDFGHJKLZXCVBNM".to_string();
+    let r  = "[a-z]{1,5}[A-Z]{10}[0-9]+abc".to_string();
+    let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+    let ab: String = "abcdefghijklmnopqrstuvwxyz1234567890QWERTYUIOPASDFGHJKLZXCVBNM".to_string();
     //abvec.iter().collect();
-    let doc = "abc".to_string();
-    //"nPPZEKVUVLQ10abc".to_owned();
+    let doc = "nPPZEKVUVLQ10abc".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }
