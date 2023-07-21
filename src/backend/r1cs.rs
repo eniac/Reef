@@ -1102,44 +1102,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.r1cs_conv()
     }
 
-    fn q_ordering_circuit(&mut self, id: &str) {
-        // q relations
-        for i in 0..self.batch_size {
-            // not final q (running claim)
-
-            let mut full_q = new_const(0); // dummy
-            let mut next_slot = Integer::from(1);
-            let doc_l = logmn(self.udoc.len());
-            for j in (0..doc_l).rev() {
-                full_q = term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![
-                        full_q,
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Mul),
-                            vec![
-                                new_const(next_slot.clone()),
-                                new_var(format!("{}_eq_{}_q_{}", id, i, j)),
-                            ],
-                        ),
-                    ],
-                );
-                next_slot *= Integer::from(2);
-            }
-
-            let q_eq = term(
-                Op::Eq,
-                vec![full_q.clone(), new_var(format!("cursor_{}", i))],
-            );
-            self.assertions.push(q_eq);
-            self.pub_inputs.push(new_var(format!("cursor_{}", i)));
-        }
-        self.pub_inputs
-            .push(new_var(format!("cursor_{}", self.batch_size)));
-    }
-
     fn nlookup_doc_commit(&mut self) {
-        self.q_ordering_circuit("nldoc");
+        // TODO - this no longer works, need to bind index to doc
+        //self.q_ordering_circuit("nldoc");
 
         // lookups and nl circuit
         let mut char_lookups = vec![];
