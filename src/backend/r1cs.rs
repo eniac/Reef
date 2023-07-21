@@ -931,7 +931,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 eq = term(Op::PfNaryOp(PfNaryOp::Mul), vec![eq, next]);
             }
         }
-        println!("BIT EQ {:#}", eq.clone());
 
         eq
     }
@@ -1368,6 +1367,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut start_epsilons = -1;
         let mut i = 1;
         let mut cursor_i = cursor_0;
+        let mut cursor_access = vec![cursor_0];
 
         wits.insert(format!("cursor_0"), new_wit(cursor_i));
 
@@ -1386,6 +1386,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
                 ));
                 i += 1;
+                cursor_access.push(cursor_i);
             } else if sols[self.sol_num].is_empty() && i > 0 {
                 // if we are not at a beginning, pad to the end
                 self.sol_num += 1;
@@ -1398,6 +1399,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
                     ));
                     i += 1;
+                    cursor_access.push(cursor_i);
                 }
 
                 // end condition
@@ -1453,6 +1455,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ));
                 last_state = next_state;
                 i += 1;
+                cursor_access.push(cursor_i);
                 state_i = next_state; // not necessary anymore
             }
         }
@@ -1498,7 +1501,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     batch_num,
                     doc_running_q,
                     doc_running_v,
-                    cursor_0,
+                    cursor_access,
                 );
                 wits = w;
                 println!("WITS {:#?}", wits);
@@ -1527,25 +1530,21 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         batch_num: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
-        cursor_0: usize,
+        cursor_access: Vec<usize>,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let mut v = vec![];
         let mut q = vec![];
+
+        //let epsilon_idx = self.table.iter().position(|val| val == self.num_ab[&None]).unwrap();
         for i in 0..self.batch_size {
-            let (access_at, _is_epsilon) = (1, false); //TODO self.access_doc_at(move_num, batch_num, i + move_num.0);
+            let access_at = cursor_access[i];
             q.push(access_at);
 
+            // TODO assure epsilon added
             v.push(self.idoc[access_at].clone());
         }
 
-        // q relations
-        let prev_round_lookup = Integer::from(cursor_0);
-
-        println!("PREV ROUND Q LOOKUP {:#?}", prev_round_lookup.clone());
-        wits.insert(
-            format!("nldoc_full_prev_round_q"),
-            new_wit(prev_round_lookup),
-        );
+        println!("DOC NLOOKUP Q V {:#?}, {:#?}", q, v);
 
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
