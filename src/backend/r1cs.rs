@@ -931,6 +931,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 eq = term(Op::PfNaryOp(PfNaryOp::Mul), vec![eq, next]);
             }
         }
+        println!("BIT EQ {:#}", eq.clone());
 
         eq
     }
@@ -1084,6 +1085,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs(true);
+        assert_eq!(lookups.len(), self.batch_size);
         self.nlookup_gadget(lookups, self.table.len(), "nl"); // len correct? TODO
         self.cursor_circuit();
 
@@ -1137,8 +1139,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn nlookup_doc_commit(&mut self) {
-        // TODO UNCOMMENT
-        // self.q_ordering_circuit("nldoc");
+        self.q_ordering_circuit("nldoc");
 
         // lookups and nl circuit
         let mut char_lookups = vec![];
@@ -1146,8 +1147,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             char_lookups.push(new_var(format!("char_{}", c)));
         }
 
-        //TODO UNCOMMENT
-        //self.nlookup_gadget(char_lookups, self.udoc.len(), "nldoc");
+        self.nlookup_gadget(char_lookups, self.udoc.len(), "nldoc");
     }
 
     fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
@@ -1174,7 +1174,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.sum_check_circuit(lhs, sc_l, id);
 
         let mut eq_evals = vec![new_const(0)]; // dummy for horners
-        for i in 0..num_vs {
+        for i in 0..num_vs + 1 {
             eq_evals.push(self.bit_eq_circuit(sc_l, i, id));
         }
         let eq_eval = horners_circuit_vars(&eq_evals, new_var(format!("{}_claim_r", id)));
@@ -1526,9 +1526,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 unimplemented!();
             }
             JCommit::Nlookup => {
-                // TODO UNCOMMENT
-
-                /*
                 assert!(doc_running_q.is_some() || batch_num == 0);
                 assert!(doc_running_v.is_some() || batch_num == 0);
                 let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
@@ -1540,7 +1537,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 );
                 wits = w;
                 println!("WITS {:#?}", wits);
-                */
                 (
                     wits,
                     next_state,
@@ -1827,6 +1823,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             false,
             Some(&prev_running_q),
         );
+        println!("EQ TERM {:#?}", eq_term);
         assert_eq!(
             last_claim,
             (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
