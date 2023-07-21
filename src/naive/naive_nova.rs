@@ -263,29 +263,6 @@ pub fn gen_wits<'a>(doc_vec: Vec<u32>, is_match: bool, doc_len: usize, solution:
     //Final state in solution
     wits.insert(format!("prover_states.{}",solution.len()), new_wit(solution[solution.len()-1].2));
 
-    //Accepting states
-    let mut accepting_state_count = 0;
-    for accepting_state in dfa.get_final_states() {
-        wits.insert(format!("accepting_states.{}",accepting_state_count), new_wit(accepting_state));
-        accepting_state_count += 1;
-    }
-
-    //Transitions
-    let mut transition_count = 0;
-    let n_states = dfa.nstates() as u64;
-    for (in_state, c, out_state) in dfa.deltas() {
-        let value = in_state*n_states*(n_char as u64) + (c as u64)*n_states + out_state;
-        wits.insert(format!("idxs.{}",transition_count), new_wit(value));
-        transition_count += 1;
-    }
-
-    //n_states
-    wits.insert(format!("n_states"), new_wit(n_states as u32));
-
-    //n_char
-    //n_states
-    wits.insert(format!("n_char"), new_wit(n_char as u32));
-
     //Return Value
     wits.insert(format!("return"), new_wit(is_match as u32));
 

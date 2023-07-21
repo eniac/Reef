@@ -42,36 +42,62 @@ pub enum DeterminedLanguage {
     Datalog,
     C,
 }
-pub fn make_vanishing(size: usize,name:&str)-> String {
-    format!("def vanishing_{name}(private field cur_index, field[{size}] idxs) -> field:
+pub fn make_vanishing(size: usize,name:&str,idx_string: String)-> String {
+    format!("def vanishing_{name}(private field cur_index) -> field:
 	field out = 1
+    field[{size}] idxs = {idx_string}
 	for field i in 0..{size} do
 		out = out * (idxs[i]-cur_index)
 	endfor
 	return out\n")
 }
 
-pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:usize,name1:&str,name2:&str)->String{
-    format!("def main(private field[{doc_len}] document, private field[{prover_states}] prover_states, field[{deltas}] idxs, field n_states, field n_char, field[{n_accepting}] accepting_states) -> field: 
+pub fn make_idx_string(dfa: &DFA<'_>, n_char: u64) -> String {
+    let mut out:String = "[".to_string();
+    let n_state = dfa.nstates() as u64;
+    for (in_state, c, out_state) in dfa.deltas() {
+        let value = in_state*n_state*n_char + (c as u64)*n_state + out_state;
+        let single = format!("{},",value);
+        out.push_str(&single);
+    }
+    out.pop();
+    out.push(']');
+    out
+}
+
+
+pub fn make_match_string(dfa: &DFA<'_>) -> String {
+    let mut out:String = "[".to_string();
+    for s in dfa.get_final_states() {
+        let single = format!("{},",s);
+        out.push_str(&single);
+    }
+    out.pop();
+    out.push(']');
+    out
+}
+
+pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:usize, n_char: usize, n_states: usize, name1:&str,name2:&str)->String{
+    format!("def main(private field[{doc_len}] document, private field[{prover_states}] prover_states) -> field: 
     assert(prover_states[0]==0)
 	field valid_state = -1
 	field combined_idx = 0
     for field i in 1..{prover_states} do
-		combined_idx = prover_states[i-1]*n_states*n_char + document[i-1]*n_states + prover_states[i]
-    	valid_state = vanishing_{name1}(combined_idx,idxs)
+		combined_idx = prover_states[i-1]*{n_states}*{n_char} + document[i-1]*{n_states} + prover_states[i]
+    	valid_state = vanishing_{name1}(combined_idx)
 		assert(valid_state==0)
     endfor 
     field match = 0
-	match = vanishing_{name2}(prover_states[{doc_len}],accepting_states)
+	match = vanishing_{name2}(prover_states[{doc_len}])
 	assert(match==0)
 	return match")
 }
 
-pub fn make_zok(dfa: &DFA<'_>, doc_len: usize) -> std::io::Result<()> {
-    let mut final_string = make_vanishing(dfa.deltas().len(),"trans"); 
-    final_string.push_str(&make_vanishing(dfa.get_final_states().len(),"match"));
+pub fn make_zok(dfa: &DFA<'_>, doc_len: usize, n_char: usize) -> std::io::Result<()> {
+    let mut final_string = make_vanishing(dfa.deltas().len(),"trans",make_idx_string(&dfa, n_char as u64)); 
+    final_string.push_str(&make_vanishing(dfa.get_final_states().len(),"match",make_match_string(&dfa)));
 
-    final_string.push_str(&make_main(doc_len, doc_len+1, dfa.deltas().len(), dfa.get_final_states().len(), "trans","match"));
+    final_string.push_str(&make_main(doc_len, doc_len+1, dfa.deltas().len(), dfa.get_final_states().len(), n_char,dfa.nstates(),"trans","match"));
     let mut file = File::create("match.zok")?;
     file.write_all(final_string.as_bytes())?;
     Ok(())
@@ -152,7 +178,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("Make Zok");
 
-    let _ = make_zok(&dfa, doc_len);
+    let _ = make_zok(&dfa, doc_len,alpha.len());
     
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "Circuit Gen", "Zok");
