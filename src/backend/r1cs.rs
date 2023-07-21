@@ -593,7 +593,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             unimplemented!();
         }
 
-        //println!("ACCEPTING? {:#?}", out);
+        println!("{:#?} ACCEPTING? {:#?}", state, out);
 
         if out {
             1
@@ -662,7 +662,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     new_var(format!("rel_{}", i - 1)),
                 ],
             );
-            println!("CIRC FOR I = {}", i - 1);
             v.push(v_i.clone());
             self.pub_inputs.push(new_var(format!("state_{}", i - 1)));
             self.pub_inputs.push(new_var(format!("char_{}", i - 1)));
@@ -833,7 +832,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn cursor_circuit(&mut self) {
-        // TODO add transition
+        // TODO add transition cursor
         for j in 0..(self.batch_size - 1) {
             // if star, geq
             // else normal
@@ -869,7 +868,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         Op::Eq,
                         vec![
                             new_const(self.num_ab[&Some('*')]),
-                            new_var(format!("offset_{}", j)),
+                            new_var(format!("char_{}", j)),
                         ],
                     ),
                     cursor_geq,
@@ -1138,7 +1137,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn nlookup_doc_commit(&mut self) {
-        self.q_ordering_circuit("nldoc");
+        // TODO UNCOMMENT
+        // self.q_ordering_circuit("nldoc");
 
         // lookups and nl circuit
         let mut char_lookups = vec![];
@@ -1146,7 +1146,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             char_lookups.push(new_var(format!("char_{}", c)));
         }
 
-        self.nlookup_gadget(char_lookups, self.udoc.len(), "nldoc");
+        //TODO UNCOMMENT
+        //self.nlookup_gadget(char_lookups, self.udoc.len(), "nldoc");
     }
 
     fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
@@ -1154,6 +1155,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // last state_batch is final "next_state" output
         // v_{batch-1} = (state_{batch-1}, c, state_batch)
         // v_batch = T eval check (optimization)
+
+        let num_vs = lookup_vals.len();
 
         let mut v = vec![new_const(0)]; // dummy constant term for lhs claim
         v.append(&mut lookup_vals);
@@ -1171,14 +1174,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.sum_check_circuit(lhs, sc_l, id);
 
         let mut eq_evals = vec![new_const(0)]; // dummy for horners
-        for i in 0..lookup_vals.len() {
+        for i in 0..num_vs {
             eq_evals.push(self.bit_eq_circuit(sc_l, i, id));
         }
         let eq_eval = horners_circuit_vars(&eq_evals, new_var(format!("{}_claim_r", id)));
 
         // make combined_q
-        self.combined_q_circuit(lookup_vals.len(), sc_l, id); // running claim q not
-                                                              // included
+        self.combined_q_circuit(num_vs, sc_l, id); // running claim q not
+                                                   // included
 
         // last_claim = eq_eval * next_running_claim
         let sum_check_domino = term(
@@ -1299,14 +1302,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("v_{}", i - 1), new_wit(v_i.clone()));
 
         println!(
-            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?}",
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i - 1,
             v_i,
             accepting_state_b,
             from_state,
             path_count_add,
             stack_lvl,
-            rel_i
+            rel_i,
+            cursor_i,
         );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
@@ -1351,14 +1355,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("v_{}", i - 1), new_wit(v_i.clone()));
 
         println!(
-            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?}",
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i - 1,
             v_i,
             state_i,
             next_state,
             char_num,
             offset_i,
-            rel_i
+            rel_i,
+            cursor_i,
         );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
@@ -1391,6 +1396,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
         let mut state_i = 0;
         let mut next_state = 0;
+        let mut last_state = 0;
 
         let mut v = vec![];
         let mut q = vec![];
@@ -1480,6 +1486,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 v.push(self.normal_v(
                     &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
                 ));
+                last_state = next_state;
                 i += 1;
                 state_i = next_state; // not necessary anymore
             }
@@ -1494,14 +1501,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         assert!(running_q.is_some() || batch_num == 0);
         assert!(running_v.is_some() || batch_num == 0);
+
+        println!("Q,V = {:#?}, {:#?}", q, v);
+        println!("TABLE = {:#?}", self.table.clone());
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
         wits = w;
 
-        println!("LU GAD");
+        //testing only
+        /*let (next_running_q, next_running_v) = (
+            vec![Integer::from(0); logmn(self.table.len())],
+            self.table[0].clone(),
+        );*/
+
         wits.insert(
             format!("accepting"),
-            new_wit(self.prover_accepting_state(batch_num)),
+            new_wit(self.prover_accepting_state(last_state)),
         );
 
         let cursor_n = cursor_i; // TODO?
@@ -1511,6 +1526,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 unimplemented!();
             }
             JCommit::Nlookup => {
+                // TODO UNCOMMENT
+
+                /*
                 assert!(doc_running_q.is_some() || batch_num == 0);
                 assert!(doc_running_v.is_some() || batch_num == 0);
                 let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
@@ -1522,13 +1540,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 );
                 wits = w;
                 println!("WITS {:#?}", wits);
+                */
                 (
                     wits,
                     next_state,
                     Some(next_running_q),
                     Some(next_running_v),
-                    Some(next_doc_running_q),
-                    Some(next_doc_running_v),
+                    None, //Some(next_doc_running_q),
+                    None, //Some(next_doc_running_v),
                     start_epsilons,
                     cursor_n,
                 )
@@ -1588,6 +1607,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // running claim about T (optimization)
         // if first (not yet generated)
+        println!("prev running q,v {:#?}, {:#?}", running_q, running_v);
+        println!("table again {:#?}", table);
+
         let prev_running_q = match running_q {
             Some(q) => q,
             None => vec![Integer::from(0); sc_l],
@@ -1596,6 +1618,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             Some(v) => v,
             None => table[0].clone(),
         };
+        println!(
+            "prev running q,v {:#?}, {:#?}",
+            prev_running_q, prev_running_v
+        );
 
         wits.insert(
             format!("{}_prev_running_claim", id),
@@ -1745,9 +1771,23 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut g_const = Integer::from(0);
 
         for i in 1..=sc_l {
+            // sanity
+            let prev_g_r = g_xsq.clone() * sc_r.clone() * sc_r.clone()
+                + g_x.clone() * sc_r.clone()
+                + g_const.clone();
+
             (sc_r, g_xsq, g_x, g_const) =
                 linear_mle_product(&mut sc_table, &mut eq_table, sc_l, i, &mut sponge);
             //prover_mle_sum_eval(table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
+
+            // sanity
+            if i > 1 {
+                assert_eq!(
+                    prev_g_r.clone().rem_floor(cfg().field().modulus()),
+                    (g_xsq.clone() + g_x.clone() + g_const.clone() + g_const.clone())
+                        .rem_floor(cfg().field().modulus())
+                );
+            }
 
             wits.insert(format!("{}_sc_g_{}_xsq", id, i), new_wit(g_xsq.clone()));
             wits.insert(format!("{}_sc_g_{}_x", id, i), new_wit(g_x.clone()));
@@ -1761,6 +1801,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // last claim = g_v(r_v)
         let mut last_claim = g_xsq * &sc_r * &sc_r + g_x * &sc_r + g_const;
         last_claim = last_claim.rem_floor(cfg().field().modulus());
+        println!("LAST CLAIM {:#?}", last_claim);
         wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
 
         // update running claim
@@ -1772,6 +1813,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             None,
         );
         let next_running_q = sc_rs.clone();
+        println!("next running v {:#?}", next_running_v);
         wits.insert(
             format!("{}_next_running_claim", id),
             new_wit(next_running_v.clone()),
@@ -1794,92 +1836,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         (wits, next_running_q, next_running_v)
     }
-
-    /*
-    // TODO BATCH SIZE (rn = 1)
-    fn gen_wit_i_polys(
-        &self,
-        move_num: (usize, usize),
-        batch_num: usize,
-        current_state: usize, // pass in the real one, let's deal with all the dummy stuff under
-        // the hood
-        doc_running_q: Option<Vec<Integer>>,
-        doc_running_v: Option<Integer>,
-        prev_doc_idx: Option<isize>,
-    ) -> (
-        FxHashMap<String, Value>,
-        usize,
-        Option<Vec<Integer>>,
-        Option<Integer>,
-        isize,
-        Option<isize>,
-    ) {
-        let mut wits = FxHashMap::default();
-        let mut state_i = current_state;
-        let mut next_state = 0;
-
-        let mut start_epsilons = -1;
-        for i in 0..self.batch_size {
-            let (access_at, is_epsilon) = self.access_doc_at(move_num, batch_num, i + move_num.0);
-
-            if is_epsilon {
-                wits.insert(format!("char_{}", i), new_wit(self.num_ab[&None]));
-                next_state = self.delta[&(state_i, self.num_ab[&None])];
-            } else {
-                wits.insert(format!("char_{}", i), new_wit(self.udoc[access_at]));
-                println!(
-                    "search for ({:#?},{:#?}) in delta",
-                    state_i,
-                    self.udoc[access_at].clone(),
-                    //self.delta.clone()
-                );
-                next_state = self.delta[&(state_i, self.udoc[access_at].clone())];
-                println!("next state {:#?}", next_state);
-            }
-
-            wits.insert(format!("state_{}", i), new_wit(state_i));
-
-            if (start_epsilons == -1) && is_epsilon {
-                start_epsilons = i as isize;
-            }
-
-            state_i = next_state;
-        }
-        wits.insert(format!("state_{}", self.batch_size), new_wit(state_i));
-
-        wits.insert(
-            format!("accepting"),
-            new_wit(self.prover_accepting_state(batch_num)),
-        );
-
-        match self.commit_type {
-            JCommit::HashChain => {
-                unimplemented!()
-            }
-            JCommit::Nlookup => {
-                assert!(doc_running_q.is_some() || batch_num == 0);
-                assert!(doc_running_v.is_some() || batch_num == 0);
-                let (w, next_doc_running_q, next_doc_running_v, next_doc_idx) = self
-                    .wit_nlookup_doc_commit(
-                        wits,
-                        move_num,
-                        batch_num,
-                        doc_running_q,
-                        doc_running_v,
-                        prev_doc_idx,
-                    );
-                wits = w;
-                (
-                    wits,
-                    next_state,
-                    Some(next_doc_running_q),
-                    Some(next_doc_running_v),
-                    start_epsilons,
-                    Some(next_doc_idx),
-                )
-            }
-        }
-    }*/
 }
 
 pub fn ceil_div(a: usize, b: usize) -> usize {
@@ -2111,6 +2067,7 @@ mod tests {
                     let mut doc_idx = 0;
 
                     let (pd, _vd) = r1cs_converter.to_circuit();
+                    //println!("PD {:#?}", pd);
 
                     let mut values;
                     let mut next_state;
