@@ -43,6 +43,8 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     //pub cdoc: Vec<String>,
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
+    ep_num: usize,
+    star_num: usize,
     pub doc_extend: usize,
     is_match: bool,
     // witness crap
@@ -476,12 +478,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
         println!("udoc {:#?}", usize_doc.clone());
 
-        // EPSILON
-        if matches!(commit, JCommit::Nlookup) {
-            let u = num_ab[&None];
-            usize_doc.push(u);
-            int_doc.push(Integer::from(u));
-        }
+        // EPSILON, STAR
+        let ep_num = usize_doc.len();
+        let u = num_ab[&None];
+        usize_doc.push(u);
+        int_doc.push(Integer::from(u));
+
+        let star_num = usize_doc.len();
+        let u = num_ab[&Some('*')];
+        usize_doc.push(u);
+        int_doc.push(Integer::from(u));
 
         //println!("TABLE {:#?}", table);
 
@@ -499,6 +505,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             //cdoc: batch_doc, //chars
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
+            ep_num,
+            star_num,
             doc_extend: epsilon_to_add,
             is_match,
             sol_num: 0,
@@ -1082,6 +1090,68 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
+    fn q_ordering_circuit(&mut self, id: &str) {
+        // q relations
+        for i in 0..(self.batch_size - 1) {
+            // not final q (running claim)
+
+            let mut full_q = new_const(0); // dummy
+            let mut next_slot = Integer::from(1);
+            let doc_l = logmn(self.udoc.len());
+            for j in (0..doc_l).rev() {
+                full_q = term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        full_q,
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Mul),
+                            vec![
+                                new_const(next_slot.clone()),
+                                new_var(format!("{}_eq_{}_q_{}", id, i, j)),
+                            ],
+                        ),
+                    ],
+                );
+                next_slot *= Integer::from(2);
+            }
+
+            let q_eq = term(
+                Op::Eq,
+                vec![
+                    full_q.clone(),
+                    term(
+                        Op::Ite,
+                        vec![
+                            term(
+                                Op::Eq,
+                                vec![
+                                    new_var(format!("char_{}", i)),
+                                    new_const(self.num_ab[&None]),
+                                ],
+                            ),
+                            new_const(self.ep_num),
+                            term(
+                                Op::Ite,
+                                vec![
+                                    term(
+                                        Op::Eq,
+                                        vec![
+                                            new_var(format!("char_{}", i)),
+                                            new_const(self.num_ab[&Some('*')]),
+                                        ],
+                                    ),
+                                    new_const(self.star_num),
+                                    new_var(format!("cursor_{}", i)),
+                                ],
+                            ),
+                        ],
+                    ),
+                ],
+            );
+            self.assertions.push(q_eq);
+        }
+    }
+
     pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs(true);
         assert_eq!(lookups.len(), self.batch_size);
@@ -1103,7 +1173,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     fn nlookup_doc_commit(&mut self) {
         // TODO - this no longer works, need to bind index to doc
-        //self.q_ordering_circuit("nldoc");
+        self.q_ordering_circuit("nldoc");
 
         // lookups and nl circuit
         let mut char_lookups = vec![];
@@ -1368,6 +1438,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut i = 1;
         let mut cursor_i = cursor_0;
         let mut cursor_access = vec![cursor_0];
+        let mut chars_access = vec![];
 
         wits.insert(format!("cursor_0"), new_wit(cursor_i));
 
@@ -1386,6 +1457,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
                 ));
                 i += 1;
+                chars_access.push(char_num);
                 cursor_access.push(cursor_i);
             } else if sols[self.sol_num].is_empty() && i > 0 {
                 // if we are not at a beginning, pad to the end
@@ -1399,6 +1471,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
                     ));
                     i += 1;
+                    chars_access.push(char_num);
                     cursor_access.push(cursor_i);
                 }
 
@@ -1455,6 +1528,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ));
                 last_state = next_state;
                 i += 1;
+                chars_access.push(char_num);
                 cursor_access.push(cursor_i);
                 state_i = next_state; // not necessary anymore
             }
@@ -1472,6 +1546,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         println!("Q,V = {:#?}, {:#?}", q, v);
         println!("TABLE = {:#?}", self.table.clone());
+        assert_eq!(v.len(), self.batch_size);
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
         wits = w;
@@ -1501,6 +1576,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     batch_num,
                     doc_running_q,
                     doc_running_v,
+                    chars_access,
                     cursor_access,
                 );
                 wits = w;
@@ -1530,18 +1606,24 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         batch_num: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
+        chars: Vec<usize>,
         cursor_access: Vec<usize>,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let mut v = vec![];
         let mut q = vec![];
 
-        //let epsilon_idx = self.table.iter().position(|val| val == self.num_ab[&None]).unwrap();
-        for i in 0..self.batch_size {
-            let access_at = cursor_access[i];
-            q.push(access_at);
-
-            // TODO assure epsilon added
-            v.push(self.idoc[access_at].clone());
+        for i in 0..(self.batch_size - 1) {
+            if chars[i] == self.ep_num {
+                q.push(self.ep_num.clone());
+                v.push(Integer::from(self.num_ab[&None]));
+            } else if chars[i] == self.star_num {
+                q.push(self.star_num.clone());
+                v.push(Integer::from(self.num_ab[&Some('*')]));
+            } else {
+                let access_at = cursor_access[i];
+                q.push(access_at);
+                v.push(self.idoc[access_at].clone());
+            }
         }
 
         println!("DOC NLOOKUP Q V {:#?}, {:#?}", q, v);
@@ -1564,6 +1646,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let sc_l = logmn(table.len()); // sum check rounds
+        let num_vs = v.len();
+        assert_eq!(num_vs, q.len());
 
         // running claim about T (optimization)
         // if first (not yet generated)
@@ -1591,7 +1675,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // q processing
         let mut combined_qs = vec![];
-        let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
+        let num_cqs = ((num_vs * sc_l) as f64 / 254.0).ceil() as usize;
 
         //println!("num cqs {:#?}", num_cqs);
 
@@ -1599,7 +1683,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         while cq < num_cqs {
             let mut combined_q = Integer::from(0);
             let mut next_slot = Integer::from(1);
-            for i in 0..self.batch_size {
+            for i in 0..num_vs {
                 // regular
                 let mut qjs = vec![];
                 let q_name = format!("{}_eq_{}", id, i);
@@ -1611,9 +1695,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 let mut j = 0;
                 for qj in qjs.into_iter().rev() {
-                    if (i * sc_l) + j >= 254 * (cq + 1)
-                        || (i == self.batch_size - 1 && j == sc_l - 1)
-                    {
+                    if (i * sc_l) + j >= 254 * (cq + 1) || (i == num_vs - 1 && j == sc_l - 1) {
                         cq += 1;
                         combined_qs.push(combined_q.clone());
                         combined_q = Integer::from(0);
@@ -1654,11 +1736,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut pattern = match id {
             "nl" => vec![
-                SpongeOp::Absorb((self.batch_size + sc_l + 1 + num_cqs) as u32), // vs, combined_q, running q,v
+                SpongeOp::Absorb((num_vs + sc_l + 1 + num_cqs) as u32), // vs, combined_q, running q,v
                 SpongeOp::Squeeze(1),
             ],
             "nldoc" => vec![
-                SpongeOp::Absorb((self.batch_size + sc_l + 2 + num_cqs) as u32), // doc commit, vs, combined_q, running q,v
+                SpongeOp::Absorb((num_vs + sc_l + 2 + num_cqs) as u32), // doc commit, vs, combined_q, running q,v
                 SpongeOp::Squeeze(1),
             ],
             _ => panic!("weird tag"),
