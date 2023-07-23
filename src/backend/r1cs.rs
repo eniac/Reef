@@ -489,7 +489,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         usize_doc.push(u);
         int_doc.push(Integer::from(u));
 
-        //println!("TABLE {:#?}", table);
+        println!("TABLE {:#?}", table);
 
         Self {
             safa,
@@ -1550,12 +1550,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
         wits = w;
-
-        //testing only
-        /*let (next_running_q, next_running_v) = (
-            vec![Integer::from(0); logmn(self.table.len())],
-            self.table[0].clone(),
-        );*/
 
         wits.insert(
             format!("accepting"),

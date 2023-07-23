@@ -79,8 +79,18 @@ pub(crate) fn trace_preprocessing(
 
     sols.insert(sol);
 
+    println!("SOLS {:#?}", sols);
+
     // sort
     let mut sorted_sols = vec![];
+
+    if sols.len() == 1 {
+        for s in sols {
+            sorted_sols.push(s);
+        }
+        return sorted_sols;
+    }
+
     let mut dfs = Dfs::new(&safa.g, safa.get_init());
 
     while let Some(state) = dfs.next(&safa.g) {
