@@ -1586,8 +1586,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     next_state,
                     Some(next_running_q),
                     Some(next_running_v),
-                    None, //Some(next_doc_running_q),
-                    None, //Some(next_doc_running_v),
+                    Some(next_doc_running_q),
+                    Some(next_doc_running_v),
                     start_epsilons,
                     cursor_n,
                 )
