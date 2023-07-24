@@ -1,15 +1,10 @@
-./target/release/reef --input "nPPZEKVUVLQ10abc" --output ./tests/results/good_pass.txt -r "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
-./target/release/reef --input "ctcCOGVETVRQB13290901abc|CpApLaC" --output ./tests/results/doc_size_naive.txt -r "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
-./target/release/reef --input "jnohMTVBOGTEGK3335990278887703997272653abco!\|{y)|+R-sv_#7)KB@|S" --output ./tests/results/doc_size_naive.txt -r "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
-./target/release/reef --input "GD}whW~/i^eD-:eSDqvy]+1u3E!xFB@\0~3K@G7ticqmTNIILIDUGL9156031046548abc($sH;\O&B_J_J2cP,tcz^vx;-5A?$nI*t6XU*Y. \u(GZx(Wbgrea7mopd" --output ./tests/results/doc_size_naive.txt -r "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
-./target/release/reef --input "GD}whW~/i^]4></FM%kFIL~SJr2MDJ<I)pM4@PI}%{V+44O~W<~oAe]sbMfjJ11\9gcHz^[]]aUEI* m]EqJh+_$jL^8Z^iJ6=i^m4PM6~cyohGNLGXQAEBK555150500570167878998621985907425310971abcD}_y<{Exndeh.Eu !h0a[@*m;Vzr7AZ&iVLR44(OTwgy~I<I4u$cP,tcz^vx;-5A?$nI*t6XU*Y. \u(GZx(Wbgrea7mopd" --output ./tests/results/doc_size_naive.txt -r "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
-./target/release/reef --input ")Iu?@uonHBDQZYJFOR86075905157110008912055845363441240570445935134330778411304566437071407abc<NU*KU]r!6$\AA
-Ox1;F7?]Orx4:h::=107CrRgS&(^ocjSRKCg)s+B+7vAaj|7a_|3]e|=YYp-P'%kNs?FHOJi:82%p_{|=,\- %xX<ccYPPFFXMBFX465428922388abc.\3aZ@Fb(TUPv8%tK
-F!Lz]Ch}lAPc6nBr#WCy:]NtID0*s!|0EA xsjgiRFWVXXGNVT5452216413723735365312747205689abcgD1bRZVM#p67kQ.M4G6rG$h>W}Bf1#W_S
-Qn:Z@CYc;X89]fXo<1V!fle%/I5x3j8=/JM/\lN4~r~mx22}vUTnk~9hsvm~/T([,R<qoyjnXYZBIQUBBV134759776196007820818378133274312903272295674619914757112313964894abcb0" --output ./tests/results/doc_size_naive.txt -r "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
-./target/release/reef --input "N'WN{XaojdObMM^hma(A>^|\VHiCN&hrJj^0QJtOa<#hg&:3F:]_zT@hWt)#mX|]bsHQMRbudxMWZVIHTHRX30695274907793514141abcL6:W)k^imIWVTOe ,L?pIJiR7[|zKKPLh=-neqB7-|V|n;X{,x:
-A,YnV(s}+&X7DUIZ kT y!y(I1hX+2Z$LFji=5u4$fER1C&~mdE<q8KEV<l%v{zJ-5E:Vcfw-RXK7rrr%}CH4f&(No?q{6^dKWI^atsejMYGAFYQJGB0362850587720905680abc/U~8qofYvJy#*/[7@4wY%NYN,PQ&),S9XW[Q3#UgAN k<cua;]c
-dph:mB}EZOYg'=6^SU5i6`}U k'ry?JlgnTyQ*jL0+<~3UR)LK`8{wYQzsaMQHSPEXJVC295208582415346809436333994943027608838176239097059525455998792239934181636abcSf"}VOQd|0&
-o;s5V@F?X&kSs/~c:/oSWYpzl`qH;HOL_y&Xy_*cBVT[97:f_:)u/02`=4ud,`!PSIywybwIXYXGJUCKN106498310667760847020635903104846326195178786789996121978123452037abcnX8EheFzH&;su*'3X3w(2qp2O!1Lm|k1D'y]gNTd!o*N=l
-*G^Z?s-nk&SW{<k!waCuO{6~@'xS(b/H&ZHLFVRo:Hq]0>L|OpnwT1#GXaePr0\budloLSYIHIONDN04818098199091814878043abc.Xy@z$[qG[TZP;XcX|}sC'\5B5w:T-cA]K[`UL+(j'i5?^<:E4ty'xQ9m@rp#U/5qA9Inm-T+6N6=LB]JkT2SS&=.^Kp2
-{rN1'i4q}>jUm1h6:wDSfH%YR4&f]Renc^jVQ[LS6+4EU2T?yNvtoduCIQXMYNWJY58314219868347844054abcy!;^9 THnq1Q(O\>&NMpG0ohMTVBOGTEGK" --output ./tests/results/doc_size_naive.txt -r "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
+./target/release/reef --input "nPPZEKVUVLQ10abc" --output ./tests/results/good_pass.txt --re "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
+
+./target/release/reef --input "ctcCOGVETVRQB13290901abc|CpApLaC" --output ./tests/results/doc_size_naive.txt --re "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
+
+./target/release/reef --input "jnohMTVBOGTEGK3335990278887703997272653abco!\|{y)|+R-sv_#7)KB@|S" --output ./tests/results/doc_size_naive.txt --re "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
+
+./target/release/reef --input ./tests/docs/doclen_2pow8_90state --output ./tests/results/doc_size_naive.txt --re "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
+./target/release/reef --input ./tests/docs/doclen_2pow10_90state --output ./tests/results/doc_size_naive.txt --re "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
+./target/release/reef --input ./tests/docs/doclen_2pow12_90state --output ./tests/results/doc_size_naive.txt --re "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
+./target/release/reef --input ./tests/docs/doclen_2pow14_90state --output ./tests/results/doc_size_naive.txt --re "[a-z]{1,5}[A-Z]{10}[0-9]+abc"
