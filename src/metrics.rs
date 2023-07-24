@@ -114,6 +114,7 @@ pub mod log {
                 ])?;
             }
         }
+        println!("times");
         for ((c, test, subtest), value) in R1CS.clone().into_iter() {
             wtr.write_record(&[
                 c.to_string(),
@@ -123,6 +124,7 @@ pub mod log {
                 "constraints".to_string(),
             ])?;
         }
+        println!("r1cs");
 
         for ((c, test, subtest), value) in SPACE.clone().into_iter() {
             wtr.write_record(&[
@@ -133,6 +135,7 @@ pub mod log {
                 "bytes".to_string(),
             ])?;
         }
+        println!("space");
         wtr.flush()?;
         Ok(())
     }

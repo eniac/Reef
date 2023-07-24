@@ -281,7 +281,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
     let mut wtr = Writer::from_writer(file);
     let _ = wtr.write_record(&[
-    doc,
+    format!("{}_{}",&doc[..10],doc.len()),
     r,
     dfa_ndelta.to_string(), //nedges().to_string(),
     dfa_nstate.to_string(), //nstates().to_string(),
@@ -292,7 +292,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     #[cfg(feature = "metrics")]
     log::write_csv(&out_write.as_path().display().to_string()).unwrap();
-   
+    return   
 }
 
 
