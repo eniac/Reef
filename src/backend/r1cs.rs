@@ -118,10 +118,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let sol = safa.solve(&doc);
         let is_match = sol.is_some();
 
-        let mut sel_batch_size = 5; // TODO!!sol.unwrap().0.len();
-                                    /*for m in moves.clone().unwrap().0 {
-                                        sel_batch_size = max(sel_batch_size, m.to_cur - m.from_cur);
-                                    }*/
+        let mut sel_batch_size = 1; // TODO!!sol.unwrap().0.len();
+        for s in sol.iter() {
+            sel_batch_size = max(sel_batch_size, s.0.len() + 1);
+        }
+        /*for m in moves.clone().unwrap().0 {
+            sel_batch_size = max(sel_batch_size, m.to_cur - m.from_cur);
+        }*/
         println!("BATCH {:#?}", sel_batch_size);
 
         println!(
@@ -1319,7 +1322,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     cursor_access.push(cursor_i);
                 }
                 println!("last 'transition' (fake)");
-                cursor_i = 0;
+                //cursor_i = 0;
                 v.push(self.transition_v(
                     &mut wits,
                     &mut q,
@@ -1991,7 +1994,7 @@ mod tests {
                     let mut sols = trace_preprocessing(&trace, &safa);
                     //println!("SOLS {:#?}", sols);
 
-                    let num_steps = 1; //sol.len();
+                    let num_steps = sols.len();
                     println!("NUM STEPS {:#?}", num_steps);
                     let mut current_state = 0; // TODOmoves[0].from_node.index();
 
