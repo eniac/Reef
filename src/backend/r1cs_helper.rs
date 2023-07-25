@@ -5,8 +5,10 @@ use circ::cfg;
 use circ::cfg::*;
 use circ::ir::term::*;
 use ff::PrimeField;
+use fxhash::FxHashMap;
 use generic_array::typenum;
 use neptune::sponge::{api::SpongeAPI, vanilla::Sponge};
+use petgraph::graph::NodeIndex;
 use petgraph::{graph::EdgeReference, prelude::Dfs, visit::EdgeRef};
 use rug::{integer::Order, ops::RemRounding, Assign, Integer};
 use std::collections::HashSet;
@@ -139,6 +141,152 @@ pub(crate) fn trace_preprocessing(
 
     assert_eq!(sorted_sols.len(), sols.len());
     sorted_sols
+}
+
+pub fn normal_add_table<'a>(
+    safa: &'a SAFA<char>,
+    num_ab: &mut FxHashMap<Option<char>, usize>,
+    path_count_lookup: &mut FxHashMap<usize, usize>,
+    set_table: &mut HashSet<Integer>,
+    num_states: usize,
+    num_chars: usize,
+    max_offsets: usize,
+    current_stack_level: usize,
+    current_path_count: usize,
+    current_path_state: usize,
+    all_state: NodeIndex,
+) {
+    // dupicate safa, run this path
+    let mut dfs_small = Dfs::new(&safa.g, all_state);
+
+    while let Some(state) = dfs_small.next(&safa.g) {
+        let in_state = state.index();
+        println!("SMALL DFA STATE {:#?}", state);
+        for edge in safa.g.edges(state) {
+            let out_state = edge.target().index();
+
+            match edge.weight().clone() {
+                Either(Err(openset)) => {
+                    let single = openset.is_single(); // single offset/epsilon
+                    if single.is_some() {
+                        // is single
+                        let offset = single.unwrap();
+                        // if offset == 0 { -> doesn't matter, always use epsilon for actual
+                        // epsilon and for jumps
+
+                        let c = num_ab[&None]; //EPSILON
+                        let rel = 0;
+
+                        set_table.insert(
+                            Integer::from(
+                                (in_state * num_states * num_chars * max_offsets * 2)
+                                    + (out_state * num_chars * max_offsets * 2)
+                                    + (c * max_offsets * 2)
+                                    + (offset * 2)
+                                    + rel,
+                            )
+                            .rem_floor(cfg().field().modulus()),
+                        );
+                    } else if openset.is_full() {
+                        // [0,*]
+                        let c = num_ab[&Some('*')];
+                        let offset = 0; // TODO?
+                        let rel = 0;
+                        println!("STAR EDGE {:#?} -{:#?}-> {:#?}", in_state, c, out_state);
+                        set_table.insert(
+                            Integer::from(
+                                (in_state * num_states * num_chars * max_offsets * 2)
+                                    + (out_state * num_chars * max_offsets * 2)
+                                    + (c * max_offsets * 2)
+                                    + (offset * 2)
+                                    + rel,
+                            )
+                            .rem_floor(cfg().field().modulus()),
+                        );
+                    } else {
+                        // ranges
+                        let mut iter = openset.0.iter();
+                        if let Some(r) = iter.next() {
+                            let mut offset = r.start;
+                            while offset <= r.end.unwrap() {
+                                let c = num_ab[&None]; //EPSILON
+                                let rel = 0;
+
+                                set_table.insert(
+                                    Integer::from(
+                                        (in_state * num_states * num_chars * max_offsets * 2)
+                                            + (out_state * num_chars * max_offsets * 2)
+                                            + (c * max_offsets * 2)
+                                            + (offset * 2)
+                                            + rel,
+                                    )
+                                    .rem_floor(cfg().field().modulus()),
+                                );
+                                offset += 1;
+                            }
+                        }
+                    }
+                }
+                Either(Ok(ch)) => {
+                    let c = num_ab[&Some(ch)];
+                    let offset = 1;
+                    let rel = 0;
+                    set_table.insert(
+                        Integer::from(
+                            (in_state * num_states * num_chars * max_offsets * 2)
+                                + (out_state * num_chars * max_offsets * 2)
+                                + (c * max_offsets * 2)
+                                + (offset * 2)
+                                + rel,
+                        )
+                        .rem_floor(cfg().field().modulus()),
+                    );
+                }
+            }
+        }
+
+        if safa.accepting.contains(&state) {
+            // add check entries to table
+            let base: i32 = 2; // an explicit type is required
+
+            let c = base.pow(current_path_count as u32) as usize; // path count
+            let offset = current_stack_level;
+            let rel = 1;
+            let in_state = state.index();
+            let out_state = current_path_state; // FROM state
+                                                // TODO we have to make sure the multipliers are big enough
+
+            println!("ADDITIONAL FOR ACCEPTING: path count {:#?}, stack_lvl {:#?}, path_state {:#?}, in_state {:#?}", current_path_count, current_stack_level, current_path_state, in_state);
+            println!(
+                "V from {:#?},{:#?},{:#?},{:#?},{:#?}",
+                in_state, out_state, c, offset, rel,
+            );
+            println!(
+                "V is {:#?}",
+                Integer::from(
+                    (in_state * num_states * num_chars * max_offsets * 2)
+                        + (out_state * num_chars * max_offsets * 2)
+                        + (c * max_offsets * 2)
+                        + (offset * 2)
+                        + rel,
+                )
+                .rem_floor(cfg().field().modulus())
+            );
+
+            set_table.insert(
+                Integer::from(
+                    (in_state * num_states * num_chars * max_offsets * 2)
+                        + (out_state * num_chars * max_offsets * 2)
+                        + (c * max_offsets * 2)
+                        + (offset * 2)
+                        + rel,
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
+
+            path_count_lookup.insert(out_state, c);
+        }
+    }
 }
 
 // a starts with evals on hypercube
