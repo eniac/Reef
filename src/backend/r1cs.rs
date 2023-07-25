@@ -311,6 +311,17 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         println!("PATH COUNT LOOKUP {:#?}", path_count_lookup.clone());
 
+        // last "empty" transition
+        // add check entries to table
+        let base: i32 = 2; // an explicit type is required
+
+        let c = 0; //path count is usually at least 2^0 = 1
+        let offset = 0;
+        let rel = 1;
+        let in_state = 0;
+        let out_state = 0;
+        // TODO we have to make sure the multipliers are big enough
+
         let mut table: Vec<Integer> = set_table.into_iter().collect();
 
         println!("TABLE SET {:#?}", table.clone());
@@ -1326,10 +1337,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 v.push(self.transition_v(
                     &mut wits,
                     &mut q,
-                    self.path_count_lookup[&self.from_state],
+                    0,       //self.path_count_lookup[&self.from_state],
                     state_i, // accepting
                     self.from_state,
-                    self.stack_level,
+                    0, //self.stack_level,
                     cursor_i,
                     i,
                 ));

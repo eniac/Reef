@@ -285,6 +285,24 @@ pub fn normal_add_table<'a>(
             );
 
             path_count_lookup.insert(out_state, c);
+
+            // fake transition
+            let c = 0; // path count
+            let offset = 0;
+            let rel = 1;
+            let in_state = state.index();
+            let out_state = current_path_state;
+
+            set_table.insert(
+                Integer::from(
+                    (in_state * num_states * num_chars * max_offsets * 2)
+                        + (out_state * num_chars * max_offsets * 2)
+                        + (c * max_offsets * 2)
+                        + (offset * 2)
+                        + rel,
+                )
+                .rem_floor(cfg().field().modulus()),
+            );
         }
     }
 }
