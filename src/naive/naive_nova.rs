@@ -52,6 +52,16 @@ pub struct NaiveCircuit<F: PrimeField> {
     //wits: Option<'a FxHashMap<String, Value>>,
 }
 
+pub fn mem_log(s: &str) {
+    if let Some(usage) = memory_stats() {
+        println!("{}",s);
+        println!("Current physical memory usage: {}", usage.physical_mem);
+        println!("Current virtual memory usage: {}", usage.virtual_mem);
+    } else {
+            println!("Couldn't get the current memory usage :(");
+    }
+}
+
 // note that this will generate a single round, and no witnesses, unlike nova example code
 // witness and loops will happen at higher level as to put as little as possible deep in circ
 impl<F: PrimeField> NaiveCircuit<F> {
@@ -124,13 +134,7 @@ where
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,
     {
-        println!("start synth");
-        if let Some(usage) = memory_stats() {
-    println!("Current physical memory usage: {}", usage.physical_mem);
-    println!("Current virtual memory usage: {}", usage.virtual_mem);
-} else {
-    println!("Couldn't get the current memory usage :(");
-}
+        mem_log("start syntr");
         let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
 
          // find chars
@@ -172,6 +176,7 @@ where
         }
 
         // make hash
+        mem_log("pre synth hash");
         let mut hash_ns = cs.namespace(|| format!("poseidon hash"));
 
         let alloc_blind = AllocatedNum::alloc(hash_ns.namespace(|| "blind"), || Ok(self.blind))?;
@@ -216,15 +221,10 @@ where
             |lc| lc + CS::one(),
             |lc| lc+ z[0].get_variable(),
         );
+        mem_log("post synth hash");
 
         let out = vec![hashed];
-        println!("end synth");
-        if let Some(usage) = memory_stats() {
-    println!("Current physical memory usage: {}", usage.physical_mem);
-    println!("Current virtual memory usage: {}", usage.virtual_mem);
-} else {
-    println!("Couldn't get the current memory usage :(");
-}
+        mem_log("end synth");
         Ok(out)
 
     }

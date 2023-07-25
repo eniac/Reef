@@ -111,8 +111,13 @@ pub fn gen_r1cs() -> (ProverData, VerifierData){
         file: path_buf,
         mode: Mode::Proof,
     };
-    println!("gen");
+    
+    mem_log("pre zsharp gen");
     let cs = ZSharpFE::gen(inputs);
+
+    mem_log("post zsharp gen");
+
+
     let mut opts = Vec::new();
 
     opts.push(Opt::ScalarizeVars);
@@ -133,23 +138,12 @@ pub fn gen_r1cs() -> (ProverData, VerifierData){
     let cs = opt(cs, opts);
 
     let cs = cs.get("main");
-    
-    if let Some(usage) = memory_stats() {
-    println!("Current physical memory usage: {}", usage.physical_mem);
-    println!("Current virtual memory usage: {}", usage.virtual_mem);
-} else {
-    println!("Couldn't get the current memory usage :(");
-}
-    println!("tor1cs");
+
+    mem_log("pre to_r1cs");
     let mut r1cs = to_r1cs(cs, cfg());
     r1cs = reduce_linearities(r1cs, cfg());
     let final_r1cs = r1cs.finalize(&cs);
-    if let Some(usage) = memory_stats() {
-    println!("Current physical memory usage: {}", usage.physical_mem);
-    println!("Current virtual memory usage: {}", usage.virtual_mem);
-} else {
-    println!("Couldn't get the current memory usage :(");
-}
+    mem_log("post r1cs finalize");
     return final_r1cs;
 }
 
@@ -161,8 +155,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA", "DFA");
-
-    println!("To DFA");
 
     let regex = re::simpl(re::new(&(r.clone())));
 
@@ -217,13 +209,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("Gen commitment");
 
+    mem_log("pre-commitment");
     let commitment = gen_commitment(doc_vec.clone(), &pc);
-    if let Some(usage) = memory_stats() {
-    println!("Current physical memory usage: {}", usage.physical_mem);
-    println!("Current virtual memory usage: {}", usage.virtual_mem);
-} else {
-    println!("Couldn't get the current memory usage :(");
-}
+    mem_log("post_commitment");
+
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "R1CS", "Commitment Generations");
 
@@ -232,25 +221,19 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("To circuit");
 
+    mem_log("pre circuit new");
     let circuit = NaiveCircuit::new(P.r1cs.clone(), None, doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
-    if let Some(usage) = memory_stats() {
-    println!("Current physical memory usage: {}", usage.physical_mem);
-    println!("Current virtual memory usage: {}", usage.virtual_mem);
-} else {
-    println!("Couldn't get the current memory usage :(");
-}
+    mem_log("post circuit new");
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "R1CS", "To Circuit");
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "R1CS", "Proof Setup");
+
+    mem_log("pre spartan setup");
     let (pk, vk) = naive_spartan_snark_setup(circuit);
-    if let Some(usage) = memory_stats() {
-    println!("Current physical memory usage: {}", usage.physical_mem);
-    println!("Current virtual memory usage: {}", usage.virtual_mem);
-} else {
-    println!("Couldn't get the current memory usage :(");
-}
+    mem_log("post spartan setup");
+
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "R1CS", "Proof Setup");
 
