@@ -7,6 +7,7 @@ type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
 type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
+use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{
     commitment::*,
     costs::{logmn, JBatching, JCommit},
@@ -125,7 +126,7 @@ pub fn run_backend(
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "Compiler", "Full");
 
-        solve(sender, &r1cs_converter, &prover_data, num_steps);
+        solve(sender, &mut r1cs_converter, &prover_data, num_steps, &doc);
     });
 
     //get args
@@ -149,22 +150,15 @@ fn setup<'a>(
     let qd_len = logmn(r1cs_converter.udoc.len());
 
     // use "empty" (witness-less) circuit to generate nova F
-   let q = vec![<G1 as Group>::Scalar::from(0); q_len];
+    let q = vec![<G1 as Group>::Scalar::from(0); q_len];
 
     let v = <G1 as Group>::Scalar::from(0);
-    let q_idx = <G1 as Group>::Scalar::from(0);
     let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
 
     let doc_v = <G1 as Group>::Scalar::from(0);
     let empty_glue = vec![
-        GlueOpts::NlNl((
-            q.clone(),
-            v.clone(),
-            q_idx.clone(),
-            doc_q.clone(),
-            doc_v.clone(),
-        )),
-        GlueOpts::NlNl((q, v, q_idx, doc_q, doc_v)),
+        GlueOpts::NlNl((q.clone(), v.clone(), doc_q.clone(), doc_v.clone())),
+        GlueOpts::NlNl((q, v, doc_q, doc_v)),
     ];
 
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
@@ -173,9 +167,6 @@ fn setup<'a>(
         vec![<G1 as Group>::Scalar::from(0); 2],
         empty_glue,
         <G1 as Group>::Scalar::from(0),
-        true,                                                             //false,
-        <G1 as Group>::Scalar::from(r1cs_converter.safa.ab.len() as u64), // n chars??
-        0,                                                                //nfa.nchars as isize,
         vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
         r1cs_converter.pc.clone(),
@@ -253,7 +244,7 @@ fn setup<'a>(
     ));
     let z0_primary = z;
 
-    let num_steps = 1; // TODO r1cs_converter.moves.clone().unwrap().0.len();
+    let num_steps = r1cs_converter.path_count_lookup.len(); // TODO r1cs_converter.moves.clone().unwrap().0.len();
     assert!(num_steps > 0, "trying to prove something about 0 foldings");
 
     (num_steps, z0_primary, pp)
@@ -261,11 +252,12 @@ fn setup<'a>(
 
 fn solve<'a>(
     sender: Sender<NFAStepCircuit<<G1 as Group>::Scalar>>, //itness<<G1 as Group>::Scalar>>,
-    r1cs_converter: &R1CS<<G1 as Group>::Scalar, char>,
+    r1cs_converter: &mut R1CS<<G1 as Group>::Scalar, char>,
     circ_data: &'a ProverData,
     num_steps: usize,
+    doc: &Vec<char>,
 ) {
-    /* let q_len = logmn(r1cs_converter.table.len());
+    let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());
 
     // this variable could be two different types of things, which is potentially dicey, but
@@ -286,26 +278,18 @@ fn solve<'a>(
     let mut next_doc_running_q;
     let mut next_doc_running_v;
 
-    let moves : Vec<_> = r1cs_converter.moves.clone().unwrap().0.into_iter().collect();
-    let mut start_of_epsilons;
-    let mut prev_doc_idx = None;
-    let mut next_doc_idx;
-
-    // TODO only do this for HC
-    let mut prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
-        ReefCommitment::HashChain(_) => r1cs_converter.prover_calc_hash(
-            blind,
-            true,
-            0,
-            moves[0].from_cur,
-        ),
-        ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
-    };
+    let mut prev_cursor_0 = 0;
+    let mut next_cursor_0;
 
     let mut current_state = r1cs_converter.safa.get_init().index();
     // TODO don't recalc :(
 
     let mut next_state = current_state;
+
+    let mut _start_of_epsilons; // TODO get rid
+
+    let trace = r1cs_converter.safa.solve(doc);
+    let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
 
     for i in 0..num_steps {
         #[cfg(feature = "metrics")]
@@ -314,7 +298,6 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::tic(Component::Solver, &test, "witness generation");
         // allocate real witnesses for round i
-        let move_i = (moves[i].from_cur, moves[i].to_cur);
         (
             wits,
             next_state,
@@ -322,17 +305,17 @@ fn solve<'a>(
             next_running_v,
             next_doc_running_q,
             next_doc_running_v,
-            start_of_epsilons,
-            next_doc_idx,
+            _start_of_epsilons,
+            next_cursor_0,
         ) = r1cs_converter.gen_wit_i(
-            move_i,
-            0, // batch == 0 always right now i,
+            &mut sols,
+            i,
             next_state,
             running_q.clone(),
             running_v.clone(),
             doc_running_q.clone(),
             doc_running_v.clone(),
-            prev_doc_idx.clone(),
+            prev_cursor_0.clone(),
         );
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, &test, "witness generation");
@@ -357,13 +340,6 @@ fn solve<'a>(
             .collect();
         let next_v = int_to_ff(next_running_v.clone().unwrap());
 
-        let q_idx = <G1 as Group>::Scalar::from(move_i.0 as u64);
-
-        let next_q_idx =
-            <G1 as Group>::Scalar::from((move_i.0 + r1cs_converter.batch_size) as u64);
-
-        println!("Q IDX {:#?}", q_idx);
-        println!("NEXT Q IDX {:#?}", next_q_idx);
         let doc_q = match doc_running_q {
             Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
             None => vec![<G1 as Group>::Scalar::from(0); qd_len],
@@ -381,8 +357,8 @@ fn solve<'a>(
             .collect();
         let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
         let glue = vec![
-            GlueOpts::NlNl((q, v, q_idx, doc_q, doc_v)),
-            GlueOpts::NlNl((next_q, next_v, next_q_idx, next_doc_q, next_doc_v)),
+            GlueOpts::NlNl((q, v, doc_q, doc_v)),
+            GlueOpts::NlNl((next_q, next_v, next_doc_q, next_doc_v)),
         ];
 
         let values: Option<Vec<_>> = Some(wits).map(|values| {
@@ -407,15 +383,13 @@ fn solve<'a>(
             ],
             glue,
             blind,
-            move_i.0 == 0,
-            <G1 as Group>::Scalar::from(r1cs_converter.safa.ab.len() as u64),
-            start_of_epsilons,
             vec![
                 <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(current_state)),
                 <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(next_state)),
             ],
             r1cs_converter.batch_size,
             r1cs_converter.pc.clone(),
+            <G1 as Group>::Scalar::from(0 as u64), // PLACEHOLDER!!
         );
 
         #[cfg(feature = "metrics")]
@@ -429,8 +403,8 @@ fn solve<'a>(
         running_v = next_running_v;
         doc_running_q = next_doc_running_q;
         doc_running_v = next_doc_running_v;
-        prev_doc_idx = next_doc_idx;
-    }*/
+        prev_cursor_0 = next_cursor_0;
+    }
 }
 
 fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof_info: ProofInfo) {

@@ -53,7 +53,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     stack_level: usize,
     from_state: usize,
     cursor_stack: LinkedList<usize>,
-    path_count_lookup: FxHashMap<usize, usize>,
+    pub path_count_lookup: FxHashMap<usize, usize>,
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
@@ -1111,7 +1111,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         prev_running_claim_v: Option<Integer>,
         prev_doc_running_claim_q: Option<Vec<Integer>>,
         prev_doc_running_claim_v: Option<Integer>,
-        prev_doc_idx: usize,
+        cursor_0: usize,
     ) -> (
         FxHashMap<String, Value>,
         usize,
@@ -1132,7 +1132,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 prev_running_claim_v,
                 prev_doc_running_claim_q,
                 prev_doc_running_claim_v,
-                prev_doc_idx,
+                cursor_0,
             ),
         }
     }
@@ -2005,6 +2005,7 @@ mod tests {
                 //println!("SOLS {:#?}", sols);
 
                 let num_steps = sols.len();
+                assert_eq!(num_steps, r1cs_converter.path_count_lookup.len());
                 println!("NUM STEPS {:#?}", num_steps);
                 let mut current_state = 0; // TODOmoves[0].from_node.index();
 

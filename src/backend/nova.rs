@@ -74,25 +74,17 @@ fn get_modulus<F: Field + PrimeField>() -> Integer {
 
 #[derive(Clone, Debug)]
 pub enum GlueOpts<F: PrimeField> {
-    // PolyHash((F, F)),                // i, hash
-    // NlHash((F, F, Vec<F>, F)),       // i, hash, q, v
-    // PolyNL((F, Vec<F>, F)),          // idx, doc_q, doc_v
-    NlNl((Vec<F>, F, F, Vec<F>, F)), // q, v, idx, doc_q, doc_v
+    NlNl((Vec<F>, F, Vec<F>, F)), // q, v, doc_q, doc_v
 }
 
 #[derive(Clone, Debug)]
 pub struct NFAStepCircuit<F: PrimeField> {
     r1cs: R1csFinal, // TODO later ref
     values: Option<Vec<Value>>,
-    //prover_data: &'a ProverData,
-    //wits: Option<'a FxHashMap<String, Value>>,
     batch_size: usize,
     states: Vec<F>,
     glue: Vec<GlueOpts<F>>,
     commit_blind: F,
-    first: bool,
-    epsilon_num: F,
-    start_of_ep: isize,
     accepting: Vec<F>,
     pc: PoseidonConstants<F, typenum::U4>,
     claim_blind: F,
@@ -102,20 +94,15 @@ pub struct NFAStepCircuit<F: PrimeField> {
 // witness and loops will happen at higher level as to put as little as possible deep in circ
 impl<F: PrimeField> NFAStepCircuit<F> {
     pub fn new(
-        //        prover_data: &'a ProverData,
-        //        wits: Option<FxHashMap<String, Value>>, //Option<&'a FxHashMap<String, Value>>,
         r1cs: R1csFinal,
         values: Option<Vec<Value>>,
         states: Vec<F>,
         glue: Vec<GlueOpts<F>>,
         commit_blind: F,
-        first: bool,
-        epsilon_num: F,
-        start_of_ep: isize,
         accepting: Vec<F>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U4>,
-        claim_blind: F
+        claim_blind: F,
     ) -> Self {
         // todo check wits line up with the non det advice
 
@@ -138,12 +125,9 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             states: states,
             glue: glue,
             commit_blind: commit_blind,
-            first: first,
-            epsilon_num: epsilon_num,
-            start_of_ep: start_of_ep,
             accepting: accepting,
             pc: pcs,
-            claim_blind: claim_blind
+            claim_blind: claim_blind,
         }
     }
 
@@ -293,265 +277,6 @@ where {
         }
 
         return Ok(false);
-    }
-
-    // todo find and set random Has res, z hash input
-    fn hash_circuit<CS>(
-        &self,
-        cs: &mut CS,
-        first: bool,
-        epsilon_num: F,
-        start_of_ep: isize,
-        z_input_hash: AllocatedNum<F>,
-        i_0_f: F,
-        blind: F,
-        alloc_chars: Vec<Option<AllocatedNum<F>>>,
-        //doc_idxs: Vec<Option<AllocatedNum<F>>>,
-        last_i: &mut Option<AllocatedNum<F>>,
-    ) -> Result<AllocatedNum<F>, SynthesisError>
-    where
-        CS: ConstraintSystem<F>,
-    {
-        // println!("adding hash chain hashes in nova");
-        // allocate blind
-        let alloc_blind = AllocatedNum::alloc(cs.namespace(|| "blind"), || Ok(blind))?;
-
-        let mut ns = cs.namespace(|| format!("poseidon hash start"));
-        let random_hash = {
-            let acc = &mut ns;
-            // "random_hash_result"
-            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
-
-            sponge.start(
-                IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
-                None,
-                acc,
-            );
-
-            SpongeAPI::absorb(
-                &mut sponge,
-                2,
-                &[
-                    Elt::Allocated(alloc_blind),
-                    Elt::num_from_fr::<CS>(F::from(0)),
-                ],
-                acc,
-            );
-
-            let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
-
-            sponge.finish(acc).unwrap();
-
-            Elt::ensure_allocated(&output[0], &mut ns.namespace(|| "ensure allocated"), true)?
-        };
-
-        let mut idx_i = i_0_f;
-        let i_0 = AllocatedNum::alloc(ns.namespace(|| format!("idx 0")), || Ok(i_0_f))?;
-
-        let start_hash;
-        let i_0_inv;
-        let first_sel;
-
-        match first {
-            true => {
-                start_hash = AllocatedNum::alloc(ns.namespace(|| "start_hash"), || {
-                    Ok(random_hash.get_value().unwrap())
-                })?;
-                i_0_inv = AllocatedNum::alloc(ns.namespace(|| "i0 inv"), || Ok(F::from(1)))?;
-                first_sel = AllocatedNum::alloc(ns.namespace(|| "first_sel"), || Ok(F::from(0)))?;
-            }
-            false => {
-                start_hash = AllocatedNum::alloc(ns.namespace(|| "start_hash"), || {
-                    Ok(z_input_hash.get_value().unwrap())
-                })?;
-
-                let inv_opt = i_0.get_value().unwrap().invert();
-                let inv = inv_opt.expect("couldn't invert i_0 for wit");
-                i_0_inv = AllocatedNum::alloc(ns.namespace(|| "io inv"), || Ok(inv))?;
-                first_sel = AllocatedNum::alloc(ns.namespace(|| "first_sel"), || Ok(F::from(1)))?;
-            }
-        };
-
-        // regular hashing
-        let mut prev_hash = start_hash.clone();
-        let mut next_hash = start_hash.clone(); // dummy
-
-        let mut idx = i_0.clone();
-        for i in 0..(self.batch_size) {
-            let unwrap_alloc_char = alloc_chars[i].clone().unwrap();
-            let mut hash_ns = ns.namespace(|| format!("poseidon hash batch {}", i));
-
-            let hashed = {
-                let acc = &mut hash_ns;
-                let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
-
-                sponge.start(
-                    IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]),
-                    None,
-                    acc,
-                );
-
-                SpongeAPI::absorb(
-                    &mut sponge,
-                    3,
-                    &[
-                        Elt::Allocated(prev_hash.clone()),
-                        Elt::Allocated(unwrap_alloc_char.clone()),
-                        Elt::Allocated(idx.clone()),
-                    ],
-                    // TODO "connected"? get rid clones
-                    acc,
-                );
-
-                let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
-
-                sponge.finish(acc).unwrap();
-
-                Elt::ensure_allocated(
-                    &output[0],
-                    &mut hash_ns.namespace(|| "ensure allocated"),
-                    true,
-                )?
-            };
-
-            idx_i += F::from(1);
-            idx = AllocatedNum::alloc(hash_ns.namespace(|| format!("idx {}", i)), || Ok(idx_i))?;
-            //println!("IDX is {:#?} from {:#?}", idx.get_value(), idx_i);
-
-            // wrap each in ite for epsilon in batching (first not necessary)
-            // if EP_SEL then NEXT_HASH = PREV_HASH else NEXT_HASH = HASHED(PREV_HASH)
-            // EP_SEL = (alloc_chars[i] == EPSILON_NUM)
-            // -> r1cs:
-            // NEXT_HASH = PREV_HASH + EP_SEL(HASHED - PREV_HASH)
-            // (epsilon_num - char) * WIT = EP_SEL
-            // (1 - EP_SEL) * (epsilon_num - char) = 0
-
-            let comp_inv;
-            let ep_sel;
-
-            let ep_num = AllocatedNum::alloc(hash_ns.namespace(|| "epsilon"), || Ok(epsilon_num))?;
-
-            if (i as isize) >= start_of_ep && start_of_ep != -1 {
-                next_hash = AllocatedNum::alloc(hash_ns.namespace(|| "next_hash"), || {
-                    Ok(prev_hash.get_value().unwrap())
-                })?;
-
-                comp_inv =
-                    AllocatedNum::alloc(hash_ns.namespace(|| "comp inv"), || Ok(F::from(1)))?;
-                ep_sel = AllocatedNum::alloc(hash_ns.namespace(|| "ep_sel"), || Ok(F::from(0)))?;
-            } else {
-                next_hash = AllocatedNum::alloc(hash_ns.namespace(|| "next_hash"), || {
-                    Ok(hashed.get_value().unwrap())
-                })?;
-
-                let comp_inv_pre = (ep_num.get_value().unwrap()
-                    - unwrap_alloc_char.get_value().unwrap())
-                .invert()
-                .expect("couldn't invert comp for wit");
-                comp_inv =
-                    AllocatedNum::alloc(hash_ns.namespace(|| "comp inv"), || Ok(comp_inv_pre))?;
-                assert_eq!(
-                    comp_inv_pre
-                        * (ep_num.get_value().unwrap() - unwrap_alloc_char.get_value().unwrap()),
-                    F::from(1)
-                );
-
-                ep_sel = AllocatedNum::alloc(hash_ns.namespace(|| "ep_sel"), || Ok(F::from(1)))?;
-            }
-
-            // sanity - get rid of
-            if ep_sel.get_value().is_some() {
-                assert_eq!(
-                    ep_sel.get_value().unwrap()
-                        * (hashed.get_value().unwrap() - prev_hash.get_value().unwrap()),
-                    next_hash.get_value().unwrap() - prev_hash.get_value().unwrap()
-                );
-                assert_eq!(
-                    (ep_num.get_value().unwrap() - unwrap_alloc_char.get_value().unwrap())
-                        * comp_inv.get_value().unwrap(),
-                    ep_sel.get_value().unwrap()
-                );
-                assert_eq!(
-                    (F::from(1) - ep_sel.get_value().unwrap())
-                        * (ep_num.get_value().unwrap() - unwrap_alloc_char.get_value().unwrap()),
-                    F::from(1) - F::from(1)
-                );
-            } else {
-                //println!("NO SANITY CHECK");
-            }
-
-            hash_ns.enforce(
-                || format!("epsilon ite {}", i),
-                |z| z + ep_sel.get_variable(),
-                |z| z + hashed.get_variable() - prev_hash.get_variable(),
-                |z| z + next_hash.get_variable() - prev_hash.get_variable(),
-            );
-
-            hash_ns.enforce(
-                || format!("epsilon sel {}", i),
-                |z| z + ep_num.get_variable() - unwrap_alloc_char.get_variable(),
-                |z| z + comp_inv.get_variable(),
-                |z| z + ep_sel.get_variable(),
-            );
-
-            hash_ns.enforce(
-                || format!("epsilon sel2 {}", i),
-                |z| z + CS::one() - ep_sel.get_variable(),
-                |z| z + ep_num.get_variable() - unwrap_alloc_char.get_variable(),
-                |z| z + CS::one() - CS::one(),
-            );
-
-            prev_hash = next_hash.clone();
-        }
-        *last_i = Some(idx);
-
-        // random start ite
-        // if FIRST_SEL==0 then START_HASH = RANDOM_HASH else START_HASH = Z_INPUT_HASH
-        // FIRST_SEL = !(i_0 == 0)
-        // -> r1cs:
-        // START_HASH = RANDOM_HASH + FIRST_SEL(Z_INPUT_HASH - RANDOM_HASH) <- ite
-        // i_0 * WIT = FIRST_SEL <- wit here is inv(i_0)
-        // (1 - FIRST_SEL) * i_0 = 0
-
-        // sanity - get rid of
-        if i_0.get_value().is_some() {
-            assert_eq!(
-                first_sel.get_value().unwrap()
-                    * (z_input_hash.get_value().unwrap() - random_hash.get_value().unwrap()),
-                start_hash.get_value().unwrap() - random_hash.get_value().unwrap()
-            );
-            assert_eq!(
-                i_0.get_value().unwrap() * i_0_inv.get_value().unwrap(),
-                first_sel.get_value().unwrap()
-            );
-            assert_eq!(
-                (F::from(1) - first_sel.get_value().unwrap()) * i_0.get_value().unwrap(),
-                F::from(1) - F::from(1)
-            );
-        }
-
-        ns.enforce(
-            || format!("ite"),
-            |z| z + first_sel.get_variable(),
-            |z| z + z_input_hash.get_variable() - random_hash.get_variable(),
-            |z| z + start_hash.get_variable() - random_hash.get_variable(),
-        );
-
-        ns.enforce(
-            || format!("sel"),
-            |z| z + i_0.get_variable(),
-            |z| z + i_0_inv.get_variable(),
-            |z| z + first_sel.get_variable(),
-        );
-
-        ns.enforce(
-            || format!("sel 2"),
-            |z| z + CS::one() - first_sel.get_variable(),
-            |z| z + i_0.get_variable(),
-            |z| z + CS::one() - CS::one(),
-        );
-
-        return Ok(next_hash); //last hash
     }
 
     fn intm_fs_parsing(
@@ -834,7 +559,8 @@ where {
 
             let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
             sponge.finish(acc).unwrap();
-            let out = Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
+            let out =
+                Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
             out
         };
 
@@ -862,8 +588,8 @@ where
         // [state, opt<i>, opt<hash>, opt<v,q for eval claim>, opt<v,q for doc claim>, accepting?]
 
         let mut arity = 2;
-        let GlueOpts::NlNl((q, _v1, _v2, dq, _v3)) = &self.glue[0];
-        arity += q.len() + 1 + dq.len() + 1 + 1;
+        let GlueOpts::NlNl((q, _v, dq, _dv)) = &self.glue[0];
+        arity += q.len() + 1 + dq.len() + 1;
         arity
     }
 
@@ -875,15 +601,13 @@ where
                                           //assert_eq!(z[1], self.chars[0]);
 
         let mut i = 1;
-        let  GlueOpts::NlNl((q, v, idx, dq, dv)) = &self.glue[0];
-        
+        let GlueOpts::NlNl((q, v, dq, dv)) = &self.glue[0];
+
         for qi in q {
             assert_eq!(z[i], *qi);
             i += 1;
         }
         assert_eq!(z[i], *v);
-        i += 1;
-        assert_eq!(z[i], *idx);
         i += 1;
         for qi in dq {
             assert_eq!(z[i], *qi);
@@ -891,20 +615,19 @@ where
         }
         assert_eq!(z[i], *dv);
         i += 1;
-          
+
         assert_eq!(z[i], self.accepting[0]);
 
         let mut out = vec![
             self.states[1], // "next state"
         ];
-        let GlueOpts::NlNl((q, v, idx, dq, dv)) = &self.glue[1];
-        
+        let GlueOpts::NlNl((q, v, dq, dv)) = &self.glue[1];
+
         out.extend(q);
         out.push(*v);
-        out.push(*idx);
         out.extend(dq);
         out.push(*dv);
-      
+
         out.push(self.accepting[1]);
         out
     }
@@ -952,7 +675,7 @@ where
         );
 
         let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
-        let GlueOpts::NlNl((q, _v, _idx, dq, _dv)) = &self.glue[0];
+        let GlueOpts::NlNl((q, _v, dq, _dv)) = &self.glue[0];
         let sc_l = q.len();
         let doc_l = dq.len();
         let i_0 = z[sc_l + 2].clone();
@@ -1090,18 +813,12 @@ where
                                 )
                                 .unwrap();
                             if !matched {
-                                matched =
-                                    self.nldoc_parsing(&s, &alloc_v, &mut last_i).unwrap();
+                                matched = self.nldoc_parsing(&s, &alloc_v, &mut last_i).unwrap();
                             }
 
                             if !matched {
-                                self.default_parsing(
-                                    &s,
-                                    &alloc_v,
-                                    &mut last_state,
-                                    &mut accepting,
-                                )
-                                .unwrap();
+                                self.default_parsing(&s, &alloc_v, &mut last_state, &mut accepting)
+                                    .unwrap();
                             }
                         }
                     }
