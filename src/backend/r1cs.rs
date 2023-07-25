@@ -388,20 +388,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
-    pub fn set_commitment(&mut self, rc: ReefCommitment<F>) {
-        match (&rc, self.commit_type) {
-            (ReefCommitment::HashChain(_), JCommit::HashChain) => {
-                self.reef_commit = Some(rc);
-            }
-            (ReefCommitment::Nlookup(_), JCommit::Nlookup) => {
-                self.reef_commit = Some(rc);
-            }
-            _ => {
-                panic!("Commitment does not match selected type");
-            }
-        }
-    }
-
     pub fn prover_calc_hash(
         &self,
         start_hash_or_blind: F,
@@ -749,6 +735,26 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // TODO here stack popping crap
+
+        // keep track of the paths - TODO parsing in nova
+        let path_plus = term(
+            Op::Eq,
+            vec![
+                new_var(format!("next_running_path_count")), // vanishing
+                term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        new_var(format!("prev_running_path_count")),
+                        new_var(format!("path_count_add")),
+                    ],
+                ),
+            ],
+        );
+        self.assertions.push(path_plus);
+        self.pub_inputs
+            .push(new_var(format!("next_running_path_count")));
+        self.pub_inputs
+            .push(new_var(format!("prev_running_path_count")));
     }
 
     // for use at the end of sum check
@@ -1635,7 +1641,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut query: Vec<F> = match id {
             "nl" => vec![],
             "nldoc" => match &self.reef_commit {
-                Some(ReefCommitment::Nlookup(dcs)) => vec![dcs.commit_doc_hash],
+                Some(dcs) => vec![dcs.commit_doc_hash],
                 _ => panic!("commitment not found"),
             },
             _ => panic!("weird tag"),
@@ -1974,7 +1980,7 @@ mod tests {
 
                 let reef_commit =
                     gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
-                r1cs_converter.set_commitment(reef_commit.clone());
+                r1cs_converter.reef_commit = Some(reef_commit.clone());
 
                 assert_eq!(expected_match, r1cs_converter.is_match);
 
@@ -2046,11 +2052,6 @@ mod tests {
                     Some(x) => Some(int_to_ff(x)),
                     None => None,
                 };
-                //dummy hash check (hashes not generated at this level)
-                let dummy_hash = match &reef_commit {
-                    ReefCommitment::HashChain(hcs) => Some(hcs.commit),
-                    _ => None,
-                };
 
                 final_clear_checks(
                     r1cs_converter.batching,
@@ -2060,7 +2061,6 @@ mod tests {
                     r1cs_converter.udoc.len(),
                     rq,
                     rv,
-                    dummy_hash, // final hash not checked
                     drq,
                     drv,
                 );

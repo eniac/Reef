@@ -90,7 +90,7 @@ pub fn run_backend(
         log::tic(Component::Compiler, "R1CS", "Commitment Generations");
         let reef_commit =
             gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
-        r1cs_converter.set_commitment(reef_commit.clone());
+        r1cs_converter.reef_commit = Some(reef_commit.clone());
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "R1CS", "Commitment Generations");
@@ -217,17 +217,7 @@ fn setup<'a>(
         pp.num_variables().1
     );
 
-    // this variable could be two different types of things, which is potentially dicey, but
-    // literally whatever
-    let blind = match r1cs_converter.reef_commit.clone().unwrap() {
-        ReefCommitment::HashChain(hcs) => hcs.blind,
-        ReefCommitment::Nlookup(dcs) => dcs.commit_doc_hash,
-    };
-    // TODO only do this for HC
-    let prev_hash = match r1cs_converter.reef_commit.clone().unwrap() {
-        ReefCommitment::HashChain(_) => unimplemented!(),
-        ReefCommitment::Nlookup(_) => <G1 as Group>::Scalar::from(0),
-    };
+    let blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
 
     let current_state = r1cs_converter.safa.get_init().index();
 
@@ -260,13 +250,7 @@ fn solve<'a>(
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());
 
-    // this variable could be two different types of things, which is potentially dicey, but
-    // literally whatever
-    let blind = match r1cs_converter.reef_commit.clone().unwrap() {
-        ReefCommitment::HashChain(hcs) => hcs.blind,
-        ReefCommitment::Nlookup(dcs) => dcs.commit_doc_hash,
-    };
-    // TODO put this in glue
+    let blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
 
     let mut wits;
     let mut running_q = None;
@@ -542,10 +526,9 @@ fn verify(
         doc_len,
         Some(zn[1..(q_len + 1)].to_vec()),
         Some(zn[q_len + 1]),
-        None,
-        Some(zn[(2 + q_len + 1)..(2 + q_len + 1 + qd_len)].to_vec()),
-        Some(zn[2 + q_len + 1 + qd_len]),
-    );
+        Some(zn[(2 + q_len)..(2 + q_len + qd_len)].to_vec()),
+        Some(zn[2 + q_len + qd_len]),
+    ); // TODO number maybe wrong here
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Final Clear Checks");
 }
