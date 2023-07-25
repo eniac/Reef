@@ -755,6 +755,32 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             .push(new_var(format!("next_running_path_count")));
         self.pub_inputs
             .push(new_var(format!("prev_running_path_count")));
+
+        // if not fake transition, add
+        // TODO fake transistions for solutions > one cycle
+        let num_paths_plus = term(
+            Op::Ite,
+            vec![
+                term(
+                    Op::Eq,
+                    vec![new_var(format!("path_count_add")), new_const(0)],
+                ),
+                term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("next_num_paths")), // vanishing
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Add),
+                            vec![new_var(format!("prev_num_paths")), new_const(1)],
+                        ),
+                    ],
+                ),
+                new_bool_const(true),
+            ],
+        );
+        self.assertions.push(num_paths_plus);
+        self.pub_inputs.push(new_var(format!("next_num_paths")));
+        self.pub_inputs.push(new_var(format!("prev_num_paths")));
     }
 
     // for use at the end of sum check

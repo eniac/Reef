@@ -42,6 +42,12 @@ where
     leaf_term(Op::Const(Value::Field(cfg().field().new_v(i))))
 }
 
+pub(crate) fn new_bool_const(b: bool) -> Term
+// constants
+{
+    leaf_term(Op::Const(Value::Bool(b)))
+}
+
 pub(crate) fn new_var(name: String) -> Term {
     // empty holes
     leaf_term(Op::Var(name, Sort::Field(cfg().field().clone())))
