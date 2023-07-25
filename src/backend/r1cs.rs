@@ -701,13 +701,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         circ_r1cs.finalize(&final_cs)
     }
 
-    pub fn to_circuit(&mut self) -> (ProverData, VerifierData) {
-        match self.batching {
-            JBatching::NaivePolys => unimplemented!(), //self.to_polys(),
-            JBatching::Nlookup => self.to_nlookup(),
-        }
-    }
-
     fn cursor_circuit(&mut self) {
         // TODO add transition cursor
         for j in 0..(self.batch_size - 1) {
@@ -754,6 +747,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
             self.assertions.push(ite_term);
         }
+
+        // TODO here stack popping crap
     }
 
     // for use at the end of sum check
@@ -1021,12 +1016,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
-    pub fn to_nlookup(&mut self) -> (ProverData, VerifierData) {
+    pub fn to_circuit(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs(true);
         assert_eq!(lookups.len(), self.batch_size);
         self.nlookup_gadget(lookups, self.table.len(), "nl"); // len correct? TODO
         self.cursor_circuit();
-
         self.accepting_state_circuit(); // TODO
 
         match self.commit_type {

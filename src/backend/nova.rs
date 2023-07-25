@@ -163,21 +163,6 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         return Ok(false);
     }
 
-    fn input_i_parsing(
-        &self,
-        vars: &mut HashMap<Var, Variable>,
-        s: &String,
-        var: Var,
-        i_0: AllocatedNum<F>,
-    ) -> Result<bool, SynthesisError> {
-        if s.starts_with("i_0") {
-            vars.insert(var, i_0.get_variable());
-
-            return Ok(true);
-        }
-        return Ok(false);
-    }
-
     fn input_variable_qv_parsing(
         &self,
         vars: &mut HashMap<Var, Variable>,
@@ -236,46 +221,6 @@ where {
 
             return Ok(true);
         }
-        return Ok(false);
-    }
-
-    fn hash_parsing(
-        &self,
-        s: &String,
-        alloc_v: &AllocatedNum<F>,
-        alloc_chars: &mut Vec<Option<AllocatedNum<F>>>,
-        //alloc_idxs: &mut Vec<Option<AllocatedNum<F>>>,
-        //last_i: &mut Option<AllocatedNum<F>>,
-    ) -> Result<bool, SynthesisError> {
-        // intermediate (in circ) wits
-        if s.starts_with("char_") {
-            let char_j = Some(alloc_v.clone()); //.get_variable();
-
-            let s_sub: Vec<&str> = s.split("_").collect();
-            let j: usize = s_sub[1].parse().unwrap();
-
-            if j < self.batch_size {
-                alloc_chars[j] = char_j;
-            } // don't add the last one
-
-            return Ok(true);
-            /*} else if s.starts_with(&format!("i_{}", self.batch_size)) {
-                *last_i = Some(alloc_v.clone());
-                alloc_idxs[self.batch_size] = last_i.clone();
-
-                return Ok(true);
-            } else if s.starts_with("i_") {
-                let i_j = Some(alloc_v.clone()); //.get_variable();
-
-                let s_sub: Vec<&str> = s.split("_").collect();
-                let j: usize = s_sub[1].parse().unwrap();
-
-                alloc_idxs[j] = i_j;
-
-                return Ok(true);
-            */
-        }
-
         return Ok(false);
     }
 
@@ -678,7 +623,7 @@ where
         let GlueOpts::NlNl((q, _v, dq, _dv)) = &self.glue[0];
         let sc_l = q.len();
         let doc_l = dq.len();
-        let i_0 = z[sc_l + 2].clone();
+        //let i_0 = z[sc_l + 2].clone();
 
         let mut alloc_rc = vec![None; sc_l + 1];
         let mut alloc_prev_rc = vec![None; sc_l + 1];
@@ -690,8 +635,8 @@ where
 
         let prev_q = z[1..(1 + sc_l)].to_vec(); //.clone();
         let prev_v = z[1 + sc_l].clone();
-        let prev_dq = z[(sc_l + 3)..(sc_l + doc_l + 3)].to_vec(); //.clone();
-        let prev_dv = z[sc_l + doc_l + 3].clone();
+        let prev_dq = z[(sc_l + 2)..(sc_l + doc_l + 2)].to_vec(); //.clone();
+        let prev_dv = z[sc_l + doc_l + 2].clone();
 
         let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
         let mut alloc_qs = vec![None; num_cqs];
@@ -750,11 +695,12 @@ where
                     )
                     .unwrap();
             }
+            /*
             if !matched {
                 matched = self
                     .input_i_parsing(&mut vars, &s, var, i_0.clone())
                     .unwrap();
-            }
+            }*/
             if !matched {
                 let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                 vars.insert(var, alloc_v.get_variable());
