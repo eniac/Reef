@@ -1,0 +1,25 @@
+Opts
+Naive
+To DFA
+N States: 34
+N Delta: 4352
+Make Zok
+gen r1cs
+gen
+Current physical memory usage: 31644659712
+Current virtual memory usage: 31917416448
+tor1cs
+Current physical memory usage: 37368786944
+Current virtual memory usage: 40849297408
+Gen commitment
+Current physical memory usage: 37368918016
+Current virtual memory usage: 40849297408
+To circuit
+Current physical memory usage: 39631372288
+Current virtual memory usage: 43111878656
+start synth
+Current physical memory usage: 50143014912
+Current virtual memory usage: 53623402496
+end synth
+Current physical memory usage: 62285029376
+Current virtual memory usage: 68525993984

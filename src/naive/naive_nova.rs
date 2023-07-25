@@ -37,6 +37,7 @@ use fxhash::{FxHashMap,FxHasher};
 use std::hash::BuildHasherDefault;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use crate::naive::dfa::*; 
+use memory_stats::memory_stats;
 
 #[derive(Clone, Debug)]
 pub struct NaiveCircuit<F: PrimeField> {
@@ -123,6 +124,13 @@ where
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,
     {
+        println!("start synth");
+        if let Some(usage) = memory_stats() {
+    println!("Current physical memory usage: {}", usage.physical_mem);
+    println!("Current virtual memory usage: {}", usage.virtual_mem);
+} else {
+    println!("Couldn't get the current memory usage :(");
+}
         let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
 
          // find chars
@@ -210,6 +218,13 @@ where
         );
 
         let out = vec![hashed];
+        println!("end synth");
+        if let Some(usage) = memory_stats() {
+    println!("Current physical memory usage: {}", usage.physical_mem);
+    println!("Current virtual memory usage: {}", usage.virtual_mem);
+} else {
+    println!("Couldn't get the current memory usage :(");
+}
         Ok(out)
 
     }
