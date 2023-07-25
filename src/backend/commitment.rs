@@ -36,7 +36,6 @@ pub struct ReefCommitment<F> {
 }
 
 pub fn gen_commitment(
-    commit_docype: JCommit,
     doc: Vec<usize>,
     pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
 ) -> ReefCommitment<<G1 as Group>::Scalar>
@@ -112,7 +111,6 @@ pub fn proof_dot_prod(
 }
 
 pub fn final_clear_checks(
-    eval_type: JBatching,
     reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
     accepting_state: <G1 as Group>::Scalar,
     table: &Vec<Integer>,

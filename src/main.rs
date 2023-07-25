@@ -75,8 +75,6 @@ fn main() {
     run_backend(
         safa.clone(),
         doc,
-        opt.eval_type,
-        opt.commit_type,
         opt.batch_size,
     ); // auto select batching/commit
 

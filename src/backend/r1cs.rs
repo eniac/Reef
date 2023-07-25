@@ -30,8 +30,6 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     max_offsets: usize,
-    pub batching: JBatching,
-    pub commit_type: JCommit,
     pub reef_commit: Option<ReefCommitment<F>>,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
@@ -67,14 +65,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         doc: &Vec<char>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U4>,
-        batch_override: Option<JBatching>,
-        commit_override: Option<JCommit>,
     ) -> Self {
         //let nfa_match = nfa.is_match(doc);
         //let is_match = nfa_match.is_some();
-
-        let batching = batch_override.unwrap();
-        let commit = commit_override.unwrap();
 
         //let opt_batch_size;
         let cost: usize;
@@ -127,20 +120,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }*/
         println!("BATCH {:#?}", sel_batch_size);
 
-        println!(
-            "batch type: {:#?}, commit type: {:#?}, batch_size {:#?}",
-            batching,
-            commit,
-            sel_batch_size, //cost
-        );
+        println!("batch_size {:#?}", sel_batch_size);
 
         //let mut batch_doc = doc.clone();
         let mut batch_doc_len = doc.len();
 
-        if matches!(commit, JCommit::Nlookup) {
-            //    batch_doc.push(EPSILON.clone()); // MUST do to make batching work w/commitments
-            batch_doc_len += 2; // ??? TODO????
-        }
+        batch_doc_len += 2; // ??? TODO????
 
         let mut epsilon_to_add = sel_batch_size - (batch_doc_len % sel_batch_size);
 
@@ -365,8 +350,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_ab,
             table, // TODO fix else
             max_offsets,
-            batching, // TODO
-            commit_type: commit,
             reef_commit: None,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
@@ -1055,14 +1038,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.cursor_circuit();
         self.accepting_state_circuit(); // TODO
 
-        match self.commit_type {
-            JCommit::HashChain => {
-                unimplemented!(); //self.hashchain_commit();
-            }
-            JCommit::Nlookup => {
-                self.nlookup_doc_commit();
-            }
-        }
+        self.nlookup_doc_commit();
+
         self.r1cs_conv()
     }
 
@@ -1148,9 +1125,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         isize,
         usize,
     ) {
-        match self.batching {
-            JBatching::NaivePolys => unimplemented!(),
-            JBatching::Nlookup => self.gen_wit_i_nlookup(
+        self.gen_wit_i_nlookup(
                 solution,
                 batch_num,
                 current_state,
@@ -1159,8 +1134,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 prev_doc_running_claim_q,
                 prev_doc_running_claim_v,
                 cursor_0,
-            ),
-        }
+        )
     }
 
     // returns char_num, is_star
@@ -1472,35 +1446,29 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let cursor_n = cursor_i; // TODO?
 
-        match self.commit_type {
-            JCommit::HashChain => {
-                unimplemented!();
-            }
-            JCommit::Nlookup => {
-                assert!(doc_running_q.is_some() || batch_num == 0);
-                assert!(doc_running_v.is_some() || batch_num == 0);
-                let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
-                    wits,
-                    batch_num,
-                    doc_running_q,
-                    doc_running_v,
-                    chars_access,
-                    cursor_access,
-                );
-                wits = w;
+       
+        assert!(doc_running_q.is_some() || batch_num == 0);
+        assert!(doc_running_v.is_some() || batch_num == 0);
+        let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
+            wits,
+            batch_num,
+            doc_running_q,
+            doc_running_v,
+            chars_access,
+            cursor_access,
+        );
+        wits = w;
                 //println!("WITS {:#?}", wits);
-                (
-                    wits,
-                    next_state,
-                    Some(next_running_q),
-                    Some(next_running_v),
-                    Some(next_doc_running_q),
-                    Some(next_doc_running_v),
-                    start_epsilons,
-                    cursor_n,
-                )
-            }
-        }
+        (
+            wits,
+            next_state,
+            Some(next_running_q),
+            Some(next_running_v),
+            Some(next_doc_running_q),
+            Some(next_doc_running_v),
+            start_epsilons,
+            cursor_n,
+        )
     }
 
     // for fake edges
@@ -2000,12 +1968,10 @@ mod tests {
                     &chars,
                     0,
                     sc.clone(),
-                    Some(b.clone()),
-                    Some(c.clone()),
                 );
 
                 let reef_commit =
-                    gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
+                    gen_commitment(r1cs_converter.udoc.clone(), &sc);
                 r1cs_converter.reef_commit = Some(reef_commit.clone());
 
                 assert_eq!(expected_match, r1cs_converter.is_match);
@@ -2080,7 +2046,6 @@ mod tests {
                 };
 
                 final_clear_checks(
-                    r1cs_converter.batching,
                     reef_commit,
                     <G1 as Group>::Scalar::from(1), // dummy, not checked
                     &r1cs_converter.table,

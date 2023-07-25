@@ -10,7 +10,7 @@ type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{
     commitment::*,
-    costs::{logmn, JBatching, JCommit},
+    costs::{logmn},
     nova::*,
     r1cs::*,
 };
@@ -39,8 +39,6 @@ struct ProofInfo {
     commit: ReefCommitment<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
     doc_len: usize,
-    eval_type: JBatching,
-    commit_type: JCommit,
 }
 
 #[cfg(feature = "metrics")]
@@ -50,8 +48,6 @@ use crate::metrics::{log, log::Component};
 pub fn run_backend(
     safa: SAFA<char>,
     doc: Vec<char>,
-    batching_type: Option<JBatching>,
-    commit_doctype: Option<JCommit>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
 ) {
     let (sender, recv): (
@@ -76,8 +72,6 @@ pub fn run_backend(
             &doc,
             temp_batch_size,
             sc.clone(),
-            batching_type,
-            commit_doctype,
         );
         #[cfg(feature = "metrics")]
         log::stop(
@@ -89,7 +83,7 @@ pub fn run_backend(
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Commitment Generations");
         let reef_commit =
-            gen_commitment(r1cs_converter.commit_type, r1cs_converter.udoc.clone(), &sc);
+            gen_commitment(r1cs_converter.udoc.clone(), &sc);
         r1cs_converter.reef_commit = Some(reef_commit.clone());
 
         #[cfg(feature = "metrics")]
@@ -118,8 +112,6 @@ pub fn run_backend(
                 commit: reef_commit,
                 table: r1cs_converter.table.clone(),
                 doc_len: r1cs_converter.udoc.len(),
-                eval_type: r1cs_converter.batching,
-                commit_type: r1cs_converter.commit_type,
             })
             .unwrap();
 
@@ -157,8 +149,8 @@ fn setup<'a>(
 
     let doc_v = <G1 as Group>::Scalar::from(0);
     let empty_glue = vec![
-        GlueOpts::NlNl((q.clone(), v.clone(), doc_q.clone(), doc_v.clone())),
-        GlueOpts::NlNl((q, v, doc_q, doc_v)),
+        NlNl{q:q.clone(), v: v.clone(), doc_q: doc_q.clone(), doc_v: doc_v.clone()},
+        NlNl{q: q, v: v, doc_q: doc_q, doc_v:doc_v},
     ];
 
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
@@ -341,8 +333,8 @@ fn solve<'a>(
             .collect();
         let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
         let glue = vec![
-            GlueOpts::NlNl((q, v, doc_q, doc_v)),
-            GlueOpts::NlNl((next_q, next_v, next_doc_q, next_doc_v)),
+            NlNl{q: q, v: v, doc_q: doc_q, doc_v: doc_v},
+            NlNl{q: next_q, v: next_v, doc_q: next_doc_q, doc_v: next_doc_v},
         ];
 
         let values: Option<Vec<_>> = Some(wits).map(|values| {
@@ -473,8 +465,6 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
         proof_info.commit,
         proof_info.table,
         proof_info.doc_len,
-        proof_info.eval_type,
-        proof_info.commit_type,
     );
 
     #[cfg(feature = "metrics")]
@@ -488,8 +478,6 @@ fn verify(
     reef_commit: ReefCommitment<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
     doc_len: usize,
-    eval_type: JBatching,
-    commit_type: JCommit,
 ) {
     let q_len = logmn(table.len());
     let qd_len = logmn(doc_len);
@@ -519,7 +507,6 @@ fn verify(
     // eval type, reef commitment, accepting state bool, table, doc, final_q, final_v, final_hash,
     // final_doc_q, final_doc_v
     final_clear_checks(
-        eval_type,
         reef_commit,
         zn[2 + q_len + 1 + qd_len + 1],
         &table,
@@ -545,8 +532,6 @@ mod tests {
         ab: String,
         rstr: String,
         doc: Vec<char>,
-        batching_type: Option<JBatching>,
-        commit_docype: Option<JCommit>,
         batch_size: usize,
     ) {
         let r = re::new(&rstr);
@@ -556,8 +541,6 @@ mod tests {
         run_backend(
             safa.clone(),
             doc.clone(),
-            batching_type.clone(),
-            commit_docype.clone(),
             batch_size,
         );
     }
@@ -571,8 +554,6 @@ mod tests {
                 .chars()
                 //.map(|c| c.to_string())
                 .collect(),
-            Some(JBatching::Nlookup),
-            Some(JCommit::Nlookup),
             33,
         );
     }
@@ -586,8 +567,6 @@ mod tests {
                 .chars()
                 //.map(|c| c.to_string())
                 .collect(),
-            Some(JBatching::Nlookup),
-            Some(JCommit::Nlookup),
             2,
         );
     }
@@ -601,8 +580,6 @@ mod tests {
                 .chars()
                 //.map(|c| c.to_string())
                 .collect(),
-            Some(JBatching::Nlookup),
-            Some(JCommit::Nlookup),
             0,
         );
         /*  backend_test(
