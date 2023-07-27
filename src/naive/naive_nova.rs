@@ -154,7 +154,7 @@ where
             let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
             vars.insert(var, alloc_v.get_variable());
             if s.starts_with("document.") { // doc.0_n587
-                let char_j = Some(alloc_v.clone()); //.get_variable();
+                let char_j = Some(alloc_v); //.get_variable();
         
                 let s_sub: Vec<&str> = s.split(['.','_']).collect(); // name = char_i
                 let j: usize = s_sub[1].parse().unwrap();
@@ -302,7 +302,7 @@ pub fn gen_wits<'a>(doc_vec: Vec<u32>, is_match: bool, doc_len: usize, solution:
 pub fn naive_spartan_snark_setup(circuit: NaiveCircuit<Fq>)-> (SpartanProverKey<G1, EE>, SpartanVerifierKey<G1, EE>) {
     // // produce keys
     let (pk, vk) =
-      SpartanSNARK::<G1, EE, NaiveCircuit<<G1 as Group>::Scalar>>::setup(circuit.clone()).unwrap();
+      SpartanSNARK::<G1, EE, NaiveCircuit<<G1 as Group>::Scalar>>::setup(circuit).unwrap();
 
     (pk,vk)
   }

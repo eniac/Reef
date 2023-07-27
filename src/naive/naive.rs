@@ -112,10 +112,10 @@ pub fn gen_r1cs() -> (ProverData, VerifierData){
         mode: Mode::Proof,
     };
     
-    mem_log("pre zsharp gen");
+    mem_log("Memory Usage Pre Zok Parsing");
     let cs = ZSharpFE::gen(inputs);
 
-    mem_log("post zsharp gen");
+    mem_log("Memory Usage Post Zok Parsing");
 
 
     let mut opts = Vec::new();
@@ -139,11 +139,11 @@ pub fn gen_r1cs() -> (ProverData, VerifierData){
 
     let cs = cs.get("main");
 
-    mem_log("pre to_r1cs");
+    mem_log("Memory Usage Post Opt, Pre to_r1cs");
     let mut r1cs = to_r1cs(cs, cfg());
     r1cs = reduce_linearities(r1cs, cfg());
     let final_r1cs = r1cs.finalize(&cs);
-    mem_log("post r1cs finalize");
+    mem_log("Memory Usage Post to_r1cs");
     return final_r1cs;
 }
 
@@ -201,6 +201,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     #[cfg(feature = "metrics")]
     log::r1cs(Component::Compiler, "Circuit Gen", "r1cs",P.r1cs.constraints.len());
+    
+    println!("N constraints: {:#?}",P.r1cs.constraints.len());
 
     let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
@@ -209,9 +211,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("Gen commitment");
 
-    mem_log("pre-commitment");
+    mem_log("Memory Usage Pre-Commitment");
     let commitment = gen_commitment(doc_vec.clone(), &pc);
-    mem_log("post_commitment");
+    mem_log("Memory Usage Post-Commitment");
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "R1CS", "Commitment Generations");
@@ -240,15 +242,20 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver, "Witnesses", "Generation");
     println!("Wit gen");
+    
+    mem_log("pre wit gen");
+    let witnesses = gen_wits(doc_vec, is_match, doc_len, solution, &dfa, alpha.len(), &P);
+    mem_log("post wit gen");
 
-    let witnesses = gen_wits(doc_vec.clone(), is_match, doc_len, solution, &dfa, alpha.len(), &P);
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver, "Witnesses", "Generation");
-
+    
     #[cfg(feature = "metrics")]
     log::tic(Component::Prover, "Proof", "Adding witnesses");
-
-    let prove_circuit = NaiveCircuit::new(P.r1cs.clone(),witnesses, doc_len, pc.clone(), commitment.blind, commitment.commit, is_match_g);
+    
+    mem_log("pre_prove circuit");
+    let prove_circuit = NaiveCircuit::new(P.r1cs,witnesses, doc_len, pc, commitment.blind, commitment.commit, is_match_g);
+    mem_log("post prove circuit");
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Prover, "Proof", "Adding witnesses");

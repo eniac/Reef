@@ -1,0 +1,142 @@
+N States: 34
+N Delta: 4352
+Make Zok
+gen r1cs
+Memory Usage Pre Zok Parsing
+Current physical memory usage: 8007680
+Current virtual memory usage: 282656768
+Memory Usage Post Zok Parsing
+Current physical memory usage: 4838096896
+Current virtual memory usage: 5110747136
+pre ScalarizeVars
+Current physical memory usage: 4838096896
+Current virtual memory usage: 5110747136
+post ScalarizeVars
+Current physical memory usage: 4839305216
+Current virtual memory usage: 5111918592
+pre Flatten
+Current physical memory usage: 4839305216
+Current virtual memory usage: 5111918592
+post Flatten
+Current physical memory usage: 9980637184
+Current virtual memory usage: 10253316096
+pre Sha
+Current physical memory usage: 9980715008
+Current virtual memory usage: 10253565952
+post Sha
+Current physical memory usage: 9980952576
+Current virtual memory usage: 10253553664
+pre ConstantFold([])
+Current physical memory usage: 9980952576
+Current virtual memory usage: 10253553664
+post ConstantFold([])
+Current physical memory usage: 12988907520
+Current virtual memory usage: 13261611008
+pre ParseCondStores
+Current physical memory usage: 12988907520
+Current virtual memory usage: 13261611008
+post ParseCondStores
+Current physical memory usage: 12986941440
+Current virtual memory usage: 13259513856
+pre Tuple
+Current physical memory usage: 12986941440
+Current virtual memory usage: 13259513856
+post Tuple
+Current physical memory usage: 13029146624
+Current virtual memory usage: 13301850112
+pre ConstantFold([])
+Current physical memory usage: 13029146624
+Current virtual memory usage: 13301850112
+post ConstantFold([])
+Current physical memory usage: 13031436288
+Current virtual memory usage: 13304139776
+pre Tuple
+Current physical memory usage: 13031436288
+Current virtual memory usage: 13304139776
+post Tuple
+Current physical memory usage: 13046804480
+Current virtual memory usage: 13319507968
+pre Obliv
+Current physical memory usage: 13046804480
+Current virtual memory usage: 13319507968
+post Obliv
+Current physical memory usage: 17605136384
+Current virtual memory usage: 17877807104
+pre Tuple
+Current physical memory usage: 17605136384
+Current virtual memory usage: 17877807104
+post Tuple
+Current physical memory usage: 20076253184
+Current virtual memory usage: 20348923904
+pre LinearScan
+Current physical memory usage: 20076326912
+Current virtual memory usage: 20349087744
+post LinearScan
+Current physical memory usage: 20122906624
+Current virtual memory usage: 20395610112
+pre Tuple
+Current physical memory usage: 20122906624
+Current virtual memory usage: 20395610112
+post Tuple
+Current physical memory usage: 20122906624
+Current virtual memory usage: 20395610112
+pre Flatten
+Current physical memory usage: 20122906624
+Current virtual memory usage: 20395610112
+post Flatten
+Current physical memory usage: 25327308800
+Current virtual memory usage: 25599881216
+pre ConstantFold([])
+Current physical memory usage: 25327382528
+Current virtual memory usage: 25600028672
+post ConstantFold([])
+Current physical memory usage: 31645495296
+Current virtual memory usage: 31918198784
+Memory Usage Post Opt, Pre to_r1cs
+Current physical memory usage: 31645495296
+Current virtual memory usage: 31918198784
+Memory Usage Post to_r1cs
+Current physical memory usage: 37250555904
+Current virtual memory usage: 40730775552
+N constraints: 8410507
+Gen commitment
+Memory Usage Pre-Commitment
+Current physical memory usage: 37250686976
+Current virtual memory usage: 40730775552
+Memory Usage Post-Commitment
+Current physical memory usage: 37250686976
+Current virtual memory usage: 40730775552
+To circuit
+pre circuit new
+Current physical memory usage: 37250686976
+Current virtual memory usage: 40730775552
+post circuit new
+Current physical memory usage: 39632465920
+Current virtual memory usage: 43112632320
+pre spartan setup
+Current physical memory usage: 39632547840
+Current virtual memory usage: 43112878080
+start of setup
+Current physical memory usage: 39632613376
+Current virtual memory usage: 43112878080
+post let circuit
+Current physical memory usage: 39632613376
+Current virtual memory usage: 43112878080
+pre CS new
+Current physical memory usage: 39632613376
+Current virtual memory usage: 43112878080
+post CS new
+Current physical memory usage: 39632613376
+Current virtual memory usage: 43112878080
+start syntr
+Current physical memory usage: 39632613376
+Current virtual memory usage: 43112878080
+pre synth hash
+Current physical memory usage: 51385966592
+Current virtual memory usage: 57677004800
+post synth hash
+Current physical memory usage: 51772518400
+Current virtual memory usage: 58015178752
+end synth
+Current physical memory usage: 51772600320
+Current virtual memory usage: 58015367168
