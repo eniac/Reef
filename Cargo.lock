@@ -526,6 +526,7 @@ dependencies = [
  "itertools 0.10.5",
  "log",
  "logos",
+ "memory-stats",
  "once_cell",
  "pairing",
  "paste",
