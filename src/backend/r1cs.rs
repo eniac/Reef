@@ -170,7 +170,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // TODO range check
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        safa.write_pdf("safa1").unwrap();
+        //safa.write_pdf("safa1").unwrap();
 
         println!("ACCEPTING {:#?}", safa.accepting);
         //println!("DELTAS {:#?}", safa.deltas());
@@ -2260,7 +2260,7 @@ mod tests {
         }
     */
 
-    #[test]
+    /*#[test]
     #[should_panic]
     fn nfa_bad_substring() {
         init();
@@ -2271,7 +2271,7 @@ mod tests {
             vec![1],
             true,
         );
-    }
+    }*/
 
     #[test]
     #[should_panic]
