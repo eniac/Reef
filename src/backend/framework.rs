@@ -8,12 +8,7 @@ type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
 type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
 use crate::backend::r1cs_helper::trace_preprocessing;
-use crate::backend::{
-    commitment::*,
-    costs::{logmn},
-    nova::*,
-    r1cs::*,
-};
+use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::safa::SAFA;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::ProverData;
@@ -67,12 +62,7 @@ pub fn run_backend(
             "R1CS",
             "Optimization Selection, R1CS precomputations",
         );
-        let mut r1cs_converter = R1CS::new(
-            &safa,
-            &doc,
-            temp_batch_size,
-            sc.clone(),
-        );
+        let mut r1cs_converter = R1CS::new(&safa, &doc, temp_batch_size, sc.clone());
         #[cfg(feature = "metrics")]
         log::stop(
             Component::Compiler,
@@ -82,8 +72,7 @@ pub fn run_backend(
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Commitment Generations");
-        let reef_commit =
-            gen_commitment(r1cs_converter.udoc.clone(), &sc);
+        let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
         r1cs_converter.reef_commit = Some(reef_commit.clone());
 
         #[cfg(feature = "metrics")]
@@ -149,8 +138,18 @@ fn setup<'a>(
 
     let doc_v = <G1 as Group>::Scalar::from(0);
     let empty_glue = vec![
-        NlNl{q:q.clone(), v: v.clone(), doc_q: doc_q.clone(), doc_v: doc_v.clone()},
-        NlNl{q: q, v: v, doc_q: doc_q, doc_v:doc_v},
+        NlNl {
+            q: q.clone(),
+            v: v.clone(),
+            doc_q: doc_q.clone(),
+            doc_v: doc_v.clone(),
+        },
+        NlNl {
+            q: q,
+            v: v,
+            doc_q: doc_q,
+            doc_v: doc_v,
+        },
     ];
 
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
@@ -256,13 +255,15 @@ fn solve<'a>(
 
     let mut prev_cursor_0 = 0;
     let mut next_cursor_0;
+    let mut prev_running_path_count = 0;
+    let mut next_running_path_count;
+    let mut prev_num_paths = 0;
+    let mut next_num_paths;
 
     let mut current_state = r1cs_converter.safa.get_init().index();
     // TODO don't recalc :(
 
     let mut next_state = current_state;
-
-    let mut _start_of_epsilons; // TODO get rid
 
     let trace = r1cs_converter.safa.solve(doc);
     let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
@@ -281,8 +282,9 @@ fn solve<'a>(
             next_running_v,
             next_doc_running_q,
             next_doc_running_v,
-            _start_of_epsilons,
             next_cursor_0,
+            next_running_path_count,
+            next_num_paths,
         ) = r1cs_converter.gen_wit_i(
             &mut sols,
             i,
@@ -292,6 +294,8 @@ fn solve<'a>(
             doc_running_q.clone(),
             doc_running_v.clone(),
             prev_cursor_0.clone(),
+            prev_running_path_count,
+            prev_num_paths,
         );
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, &test, "witness generation");
@@ -333,8 +337,18 @@ fn solve<'a>(
             .collect();
         let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
         let glue = vec![
-            NlNl{q: q, v: v, doc_q: doc_q, doc_v: doc_v},
-            NlNl{q: next_q, v: next_v, doc_q: next_doc_q, doc_v: next_doc_v},
+            NlNl {
+                q: q,
+                v: v,
+                doc_q: doc_q,
+                doc_v: doc_v,
+            },
+            NlNl {
+                q: next_q,
+                v: next_v,
+                doc_q: next_doc_q,
+                doc_v: next_doc_v,
+            },
         ];
 
         let values: Option<Vec<_>> = Some(wits).map(|values| {
@@ -528,21 +542,12 @@ mod tests {
     use crate::regex::{re, Regex};
     use crate::safa::SAFA;
 
-    fn backend_test(
-        ab: String,
-        rstr: String,
-        doc: Vec<char>,
-        batch_size: usize,
-    ) {
+    fn backend_test(ab: String, rstr: String, doc: Vec<char>, batch_size: usize) {
         let r = re::new(&rstr);
         let safa = SAFA::new(&ab[..], &r);
 
         init();
-        run_backend(
-            safa.clone(),
-            doc.clone(),
-            batch_size,
-        );
+        run_backend(safa.clone(), doc.clone(), batch_size);
     }
 
     #[test]

@@ -1128,38 +1128,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             .push(new_var(format!("{}_next_running_claim", id)));
     }
 
-    pub fn gen_wit_i(
-        &mut self,
-        solution: &mut Vec<LinkedList<TraceElem<char>>>,
-        batch_num: usize,
-        current_state: usize,
-        prev_running_claim_q: Option<Vec<Integer>>,
-        prev_running_claim_v: Option<Integer>,
-        prev_doc_running_claim_q: Option<Vec<Integer>>,
-        prev_doc_running_claim_v: Option<Integer>,
-        cursor_0: usize,
-    ) -> (
-        FxHashMap<String, Value>,
-        usize,
-        Option<Vec<Integer>>,
-        Option<Integer>,
-        Option<Vec<Integer>>,
-        Option<Integer>,
-        isize,
-        usize,
-    ) {
-        self.gen_wit_i_nlookup(
-                solution,
-                batch_num,
-                current_state,
-                prev_running_claim_q,
-                prev_running_claim_v,
-                prev_doc_running_claim_q,
-                prev_doc_running_claim_v,
-                cursor_0,
-        )
-    }
-
     // returns char_num, is_star
     fn get_char_num(&self, edge: Either<char, OpenSet<usize>>) -> (usize, bool) {
         match edge {
@@ -1193,7 +1161,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         stack_lvl: usize,         // offset_i
         cursor_i: usize,
         i: usize, // this is for naming
-    ) -> Integer {
+        prev_running_path_count: usize,
+        prev_num_paths: usize,
+    ) -> (Integer, usize, usize) {
         // sanity
         let mut or = false;
         for n in self.safa.accepting.clone().into_iter() {
@@ -1209,6 +1179,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("stack_lvl"), new_wit(stack_lvl));
         wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
         wits.insert(format!("cursor_{}", i), new_wit(cursor_i)); // alreaded "added" here
+
+        wits.insert(
+            format!("prev_running_path_count"),
+            new_wit(prev_running_path_count),
+        );
+        let next_running_path_count = prev_running_path_count + path_count_add;
+        wits.insert(
+            format!("next_running_path_count"),
+            new_wit(next_running_path_count),
+        );
+
+        wits.insert(format!("prev_num_paths"), new_wit(prev_num_paths));
+        let next_num_paths = prev_num_paths + 1;
+        wits.insert(format!("next_num_paths"), new_wit(next_num_paths));
 
         // v_i =
         let num_states = self.safa.g.node_count();
@@ -1241,7 +1225,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
-        v_i
+        (v_i, next_running_path_count, next_num_paths)
     }
 
     fn normal_v(
@@ -1297,7 +1281,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         v_i
     }
 
-    fn gen_wit_i_nlookup(
+    pub fn gen_wit_i(
+        //_nlookup(
         &mut self,
         sols: &mut Vec<LinkedList<TraceElem<char>>>, //move_num: (usize, usize),
         batch_num: usize,
@@ -1307,6 +1292,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         doc_running_q: Option<Vec<Integer>>,
         doc_running_v: Option<Integer>,
         cursor_0: usize,
+        prev_running_path_count: usize,
+        prev_num_paths: usize,
     ) -> (
         FxHashMap<String, Value>,
         usize,
@@ -1314,7 +1301,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         Option<Integer>,
         Option<Vec<Integer>>,
         Option<Integer>,
-        isize,
+        usize,
+        usize,
         usize,
     ) {
         let mut wits = FxHashMap::default();
@@ -1326,11 +1314,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut v = vec![];
         let mut q = vec![];
-        let mut start_epsilons = -1;
         let mut i = 1;
         let mut cursor_i = cursor_0;
         let mut cursor_access = vec![cursor_0];
         let mut chars_access = vec![];
+
+        let mut next_running_path_count = 0;
+        let mut next_num_paths = 0;
 
         wits.insert(format!("cursor_0"), new_wit(cursor_i));
 
@@ -1357,7 +1347,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
                 println!("last 'transition' (fake)");
                 //cursor_i = 0;
-                v.push(self.transition_v(
+                let trans_v;
+                (trans_v, next_running_path_count, next_num_paths) = self.transition_v(
                     &mut wits,
                     &mut q,
                     0,       //self.path_count_lookup[&self.from_state],
@@ -1366,7 +1357,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     0, //self.stack_level,
                     cursor_i,
                     i,
-                ));
+                    prev_running_path_count,
+                    prev_num_paths,
+                );
+                v.push(trans_v);
                 i += 1;
             } else if sols[self.sol_num].is_empty() && i > 0 {
                 // if we are not at a beginning, pad to the end
@@ -1389,7 +1383,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 println!("CURSOR STACK POP {:#?}", self.cursor_stack);
                 cursor_i = self.cursor_stack.pop_front().unwrap();
 
-                v.push(self.transition_v(
+                let trans_v;
+                (trans_v, next_running_path_count, next_num_paths) = self.transition_v(
                     &mut wits,
                     &mut q,
                     self.path_count_lookup[&self.from_state],
@@ -1398,7 +1393,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     self.stack_level,
                     cursor_i,
                     i,
-                ));
+                    prev_running_path_count,
+                    prev_num_paths,
+                );
+                v.push(trans_v);
+
                 i += 1;
                 self.path_count += 1;
                 self.stack_level = 0;
@@ -1411,7 +1410,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 if self.safa.g[te.from_node].is_and() {
                     self.from_state = te.to_node.index();
                     self.cursor_stack.push_front(cursor_i);
+
+                    wits.insert(
+                        format!("stack_saved_{}", self.stack_level),
+                        new_wit(cursor_i),
+                    );
                     self.stack_level += 1;
+
                     println!("CURSOR STACK PUSH {:#?}", self.cursor_stack);
                 }
 
@@ -1469,7 +1474,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let cursor_n = cursor_i; // TODO?
 
-       
         assert!(doc_running_q.is_some() || batch_num == 0);
         assert!(doc_running_v.is_some() || batch_num == 0);
         let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
@@ -1481,7 +1485,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             cursor_access,
         );
         wits = w;
-                //println!("WITS {:#?}", wits);
+        //println!("WITS {:#?}", wits);
+
         (
             wits,
             next_state,
@@ -1489,8 +1494,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             Some(next_running_v),
             Some(next_doc_running_q),
             Some(next_doc_running_v),
-            start_epsilons,
             cursor_n,
+            next_running_path_count,
+            next_num_paths,
         )
     }
 
@@ -1986,15 +1992,9 @@ mod tests {
             for b in vec![JBatching::Nlookup] {
                 let sc =
                     Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-                let mut r1cs_converter = R1CS::new(
-                    &safa,
-                    &chars,
-                    0,
-                    sc.clone(),
-                );
+                let mut r1cs_converter = R1CS::new(&safa, &chars, 0, sc.clone());
 
-                let reef_commit =
-                    gen_commitment(r1cs_converter.udoc.clone(), &sc);
+                let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
                 r1cs_converter.reef_commit = Some(reef_commit.clone());
 
                 assert_eq!(expected_match, r1cs_converter.is_match);
@@ -2004,6 +2004,8 @@ mod tests {
                 let mut doc_running_q = None;
                 let mut doc_running_v = None;
                 let mut doc_idx = 0;
+                let mut running_path_count = 0;
+                let mut num_paths = 0;
 
                 let (pd, _vd) = r1cs_converter.to_circuit();
                 //println!("PD {:#?}", pd);
@@ -2032,8 +2034,9 @@ mod tests {
                         running_v,
                         doc_running_q,
                         doc_running_v,
-                        _start_epsilons,
                         doc_idx,
+                        running_path_count,
+                        num_paths,
                     ) = r1cs_converter.gen_wit_i(
                         &mut sols,
                         i,
@@ -2043,6 +2046,8 @@ mod tests {
                         doc_running_q.clone(),
                         doc_running_v.clone(),
                         doc_idx,
+                        running_path_count,
+                        num_pahts,
                     );
 
                     pd.check_all(&values);
