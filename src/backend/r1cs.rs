@@ -9,6 +9,7 @@ use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, Ve
 use ff::PrimeField;
 use fxhash::FxHashMap;
 use generic_array::typenum;
+use itertools::Itertools;
 use neptune::{
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -50,7 +51,8 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     path_count: usize,
     stack_level: usize,
     from_state: usize,
-    cursor_stack: LinkedList<usize>,
+    cursor_stack: Vec<usize>,
+    cursor_stack_ptr: usize,
     pub path_count_lookup: FxHashMap<usize, usize>,
     max_stack_level: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
@@ -346,6 +348,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         println!("TABLE {:#?}", table);
 
+        let mut cursor_stack = vec![];
+        for i in 0..current_stack_level {
+            cursor_stack.push(0); // TODO think
+        }
+
         Self {
             safa,
             num_ab,
@@ -366,7 +373,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             path_count: 0, //TODO
             stack_level: 0,
             from_state: 0,
-            cursor_stack: LinkedList::new(),
+            cursor_stack,
+            cursor_stack_ptr: 0,
             path_count_lookup,
             max_stack_level: current_stack_level,
             pc: pcs,
@@ -720,12 +728,24 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // cursor_batch = stack[stack_lvl]
-        let mut stack_access_ite = new_const(-1); // TODO: think about?
+        let mut stack_access_ite = term(
+            Op::Ite,
+            vec![
+                term(Op::Eq, vec![new_var(format!("stack_lvl")), new_const(0)]),
+                new_bool_const(true), // TODO this is the empty trans case
+                new_bool_const(false),
+            ],
+        );
+
+        new_bool_const(false);
         for sl in 0..self.max_stack_level {
             stack_access_ite = term(
                 Op::Ite,
                 vec![
-                    term(Op::Eq, vec![]),
+                    term(
+                        Op::Eq,
+                        vec![new_var(format!("stack_lvl")), new_const(sl + 1)],
+                    ),
                     term(
                         Op::Eq,
                         vec![
@@ -1381,7 +1401,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 // end condition
                 let rel_i = 1;
                 println!("CURSOR STACK POP {:#?}", self.cursor_stack);
-                cursor_i = self.cursor_stack.pop_front().unwrap();
+                self.cursor_stack_ptr -= 1;
+                cursor_i = self.cursor_stack[self.cursor_stack_ptr];
 
                 let trans_v;
                 (trans_v, next_running_path_count, next_num_paths) = self.transition_v(
@@ -1409,14 +1430,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 println!("{:#?}", te);
                 if self.safa.g[te.from_node].is_and() {
                     self.from_state = te.to_node.index();
-                    self.cursor_stack.push_front(cursor_i);
 
-                    wits.insert(
-                        format!("stack_saved_{}", self.stack_level),
-                        new_wit(cursor_i),
-                    );
+                    self.cursor_stack[self.cursor_stack_ptr] = cursor_i;
+                    self.cursor_stack_ptr += 1;
+                    //self.cursor_stack.push_front(cursor_i);
+
                     self.stack_level += 1;
-
                     println!("CURSOR STACK PUSH {:#?}", self.cursor_stack);
                 }
 
@@ -1447,6 +1466,17 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 cursor_access.push(cursor_i);
                 state_i = next_state; // not necessary anymore
             }
+        }
+
+        //fill up stack levels maintained across iters
+        let mut idx = 0;
+        for s in &self.cursor_stack {
+            println!("INSERT STACK {:#?}", s.clone());
+            wits.insert(
+                format!("stack_saved_{}", idx),
+                new_wit(s.clone()), // CHANGE?
+            );
+            idx += 1;
         }
 
         println!("DONE LOOP");
@@ -1485,7 +1515,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             cursor_access,
         );
         wits = w;
-        //println!("WITS {:#?}", wits);
+        println!("WITS {:#?}", wits);
 
         (
             wits,
@@ -2008,12 +2038,10 @@ mod tests {
                 let mut num_paths = 0;
 
                 let (pd, _vd) = r1cs_converter.to_circuit();
-                //println!("PD {:#?}", pd);
+                // println!("PD {:#?}", pd);
 
                 let mut values;
                 let mut next_state;
-
-                let mut _start_epsilons;
 
                 let trace = safa.solve(&chars);
                 //println!("TRACE {:#?}", trace);
@@ -2022,7 +2050,16 @@ mod tests {
                 //println!("SOLS {:#?}", sols);
 
                 let num_steps = sols.len();
-                assert_eq!(num_steps, r1cs_converter.path_count_lookup.len());
+                println!("PATH COUNT LOOKUP {:#?}", r1cs_converter.path_count_lookup);
+                assert_eq!(
+                    num_steps,
+                    r1cs_converter
+                        .path_count_lookup
+                        .values()
+                        .cloned()
+                        .unique()
+                        .count()
+                );
                 println!("NUM STEPS {:#?}", num_steps);
                 let mut current_state = 0; // TODOmoves[0].from_node.index();
 
@@ -2047,7 +2084,7 @@ mod tests {
                         doc_running_v.clone(),
                         doc_idx,
                         running_path_count,
-                        num_pahts,
+                        num_paths,
                     );
 
                     pd.check_all(&values);
