@@ -73,8 +73,11 @@ fn get_modulus<F: Field + PrimeField>() -> Integer {
 }
 
 #[derive(Clone, Debug)]
-pub enum GlueOpts<F: PrimeField> {
-    NlNl((Vec<F>, F, Vec<F>, F)), // q, v, doc_q, doc_v
+pub struct NlNl<F: PrimeField> {
+    pub q: Vec<F>,
+    pub v : F, 
+    pub doc_q: Vec<F>,
+    pub doc_v: F
 }
 
 #[derive(Clone, Debug)]
@@ -83,7 +86,7 @@ pub struct NFAStepCircuit<F: PrimeField> {
     values: Option<Vec<Value>>,
     batch_size: usize,
     states: Vec<F>,
-    glue: Vec<GlueOpts<F>>,
+    glue: Vec<NlNl<F>>,
     commit_blind: F,
     accepting: Vec<F>,
     pc: PoseidonConstants<F, typenum::U4>,
@@ -97,7 +100,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         r1cs: R1csFinal,
         values: Option<Vec<Value>>,
         states: Vec<F>,
-        glue: Vec<GlueOpts<F>>,
+        glue: Vec<NlNl<F>>,
         commit_blind: F,
         accepting: Vec<F>,
         batch_size: usize,
@@ -110,12 +113,6 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         assert_eq!(glue.len(), 2);
         assert_eq!(accepting.len(), 2);
 
-        match (&glue[0], &glue[1]) {
-            (GlueOpts::NlNl(_), GlueOpts::NlNl(_)) => {}
-            (_, _) => {
-                panic!("glue I/O does not match");
-            }
-        }
         // todo blind, first checking here
 
         NFAStepCircuit {
@@ -533,8 +530,8 @@ where
         // [state, opt<i>, opt<hash>, opt<v,q for eval claim>, opt<v,q for doc claim>, accepting?]
 
         let mut arity = 2;
-        let GlueOpts::NlNl((q, _v, dq, _dv)) = &self.glue[0];
-        arity += q.len() + 1 + dq.len() + 1;
+        let nlnl_glue = &self.glue[0];
+        arity += nlnl_glue.q.len() + 1 + nlnl_glue.doc_q.len() + 1;
         arity
     }
 
@@ -546,19 +543,19 @@ where
                                           //assert_eq!(z[1], self.chars[0]);
 
         let mut i = 1;
-        let GlueOpts::NlNl((q, v, dq, dv)) = &self.glue[0];
+        let mut nlnl_glue = &self.glue[0];
 
-        for qi in q {
-            assert_eq!(z[i], *qi);
+        for qi in nlnl_glue.q.clone() {
+            assert_eq!(z[i], qi);
             i += 1;
         }
-        assert_eq!(z[i], *v);
+        assert_eq!(z[i], nlnl_glue.v);
         i += 1;
-        for qi in dq {
-            assert_eq!(z[i], *qi);
+        for qi in nlnl_glue.doc_q.clone() {
+            assert_eq!(z[i], qi);
             i += 1;
         }
-        assert_eq!(z[i], *dv);
+        assert_eq!(z[i], nlnl_glue.doc_v);
         i += 1;
 
         assert_eq!(z[i], self.accepting[0]);
@@ -566,14 +563,14 @@ where
         let mut out = vec![
             self.states[1], // "next state"
         ];
-        let GlueOpts::NlNl((q, v, dq, dv)) = &self.glue[1];
+        nlnl_glue = &self.glue[1];
 
-        out.extend(q);
-        out.push(*v);
-        out.extend(dq);
-        out.push(*dv);
+        out.extend(nlnl_glue.q.clone());
+        out.push(nlnl_glue.v);
+        out.extend(nlnl_glue.doc_q.clone());
+        out.push(nlnl_glue.doc_v);
 
-        out.push(self.accepting[1]);
+        out.push(self.accepting[1]);    
         out
     }
 
@@ -620,9 +617,9 @@ where
         );
 
         let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
-        let GlueOpts::NlNl((q, _v, dq, _dv)) = &self.glue[0];
-        let sc_l = q.len();
-        let doc_l = dq.len();
+        let nlnl_glue = &self.glue[0];
+        let sc_l = nlnl_glue.q.len();
+        let doc_l = nlnl_glue.doc_q.len();
         //let i_0 = z[sc_l + 2].clone();
 
         let mut alloc_rc = vec![None; sc_l + 1];
