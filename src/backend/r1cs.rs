@@ -54,6 +54,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     from_state: usize,
     cursor_stack: LinkedList<usize>,
     pub path_count_lookup: FxHashMap<usize, usize>,
+    max_stack_level: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
@@ -384,6 +385,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             from_state: 0,
             cursor_stack: LinkedList::new(),
             path_count_lookup,
+            max_stack_level: current_stack_level,
             pc: pcs,
         }
     }
@@ -734,7 +736,28 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.assertions.push(ite_term);
         }
 
-        // TODO here stack popping crap
+        // cursor_batch = stack[stack_lvl]
+        let mut stack_access_ite = new_const(-1); // TODO: think about?
+        for sl in 0..self.max_stack_level {
+            stack_access_ite = term(
+                Op::Ite,
+                vec![
+                    term(Op::Eq, vec![]),
+                    term(
+                        Op::Eq,
+                        vec![
+                            new_var(format!("cursor_{}", self.batch_size)),
+                            new_var(format!("stack_saved_{}", sl)),
+                        ],
+                    ),
+                    stack_access_ite,
+                ],
+            );
+
+            self.pub_inputs.push(new_var(format!("stack_saved_{}", sl)));
+        }
+
+        self.assertions.push(stack_access_ite);
 
         // keep track of the paths - TODO parsing in nova
         let path_plus = term(
