@@ -372,8 +372,12 @@ impl RegexF {
             }
             RegexF::App(ref a, ref b) => RegexF::app(&a.deriv(c), b),
             RegexF::Alt(ref a, ref b) => RegexF::alt(&a.deriv(c), &b.deriv(c)),
+            RegexF::And(ref a, ref b) => RegexF::and(&a.deriv(c), &b.deriv(c)),
             RegexF::Star(ref a) => RegexF::app(&a.deriv(c), &RegexF::star(a)),
-            _ => panic!("No derivatives for regex {}", self),
+            RegexF::Range(ref a, i, j) if i == j =>
+                a.repeat(*i).deriv(c),
+            RegexF::Range(ref a, i, j) =>
+                RegexF::alt(&a.range(*i+1, *j), &a.repeat(*i)).deriv(c),
         }
     }
 }
@@ -429,6 +433,11 @@ pub mod re {
     /// Alternation
     pub fn alt(a: Regex, b: Regex) -> Regex {
         G.mk(RegexF::alt(&*a, &*b))
+    }
+
+    pub fn alts(a: &Vec<Regex>) -> Regex {
+        let rs: Vec<RegexF> = a.into_iter().map(|r| r.get().clone()).collect();
+        G.mk(RegexF::alts(&rs[..]))
     }
 
     /// Conjunction

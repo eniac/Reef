@@ -919,11 +919,18 @@ mod tests {
 
     #[test]
     fn test_running_problems() {
-        let list_of_failures = ["^a{3}|((?=b).{2})$","ab{1,3}"];
-        for l in list_of_failures {
-            let r = re::simpl(re::new(l));
-            let mut safa = SAFA::new("ab", &r);
-        }
+        let rstr = "^(a{3}|((?=b).{2}))$";
+        let r = re::simpl(re::new(rstr));
+        let safa = SAFA::new("ab", &r);
+        safa.write_pdf("safa").unwrap();
+    }
+
+    #[test]
+    fn test_running_problems2() {
+        let rstr = "ab{1,3}";
+        let r = re::simpl(re::new(rstr));
+        let safa = SAFA::new("ab", &r);
+        safa.write_pdf("safa").unwrap();
     }
 
     #[cfg(feature = "plot")]
