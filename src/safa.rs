@@ -917,13 +917,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_running_problems() {
+        let list_of_failures = ["^a{3}|((?=b).{2})$","ab{1,3}"];
+        for l in list_of_failures {
+            let r = re::simpl(re::new(l));
+            let mut safa = SAFA::new("ab", &r);
+        }
+    }
+
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = re::simpl(re::new("^(?=.*a.*)(?=.*b.*).{4}$"));
+        let r = re::simpl(re::new("^a{3}|((?=b).{2})$"));
         let mut safa = SAFA::new("ab", &r);
         // safa = safa.negate();
-        safa.write_pdf("safa9").unwrap();
+        safa.write_pdf("safa_alt").unwrap();
         // let strdoc = "baababab";
         // let doc = strdoc.chars().collect();
 
