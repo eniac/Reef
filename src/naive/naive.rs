@@ -92,35 +92,43 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "Circuit Gen", "r1cs");
 
-    println!("gen r1cs");
+    // println!("gen r1cs");
 
-    let circuit_filepath = "match.r1cs";
-    let witness_gen_filepath = "match_js/match.wasm";
+    // let circuit_filepath = "match.r1cs";
+    // let witness_gen_filepath = "match_js/match.wasm";
 
-    let root = current_dir().unwrap();
+    // let root = current_dir().unwrap();
 
-    let circuit_file = root.join(circuit_filepath);
-    let witness_generator_file = root.join(witness_gen_filepath);
+    // let circuit_file = root.join(circuit_filepath);
+    // let witness_generator_file = root.join(witness_gen_filepath);
 
-    let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
+    // let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
 
-    let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
+    // let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
+    // let mut private_input = HashMap::new();
+    // private_input.insert("doc".to_string(), json!(doc_vec));
+    // private_input.insert("prover_states".to_string(), json!(solution));
+    // private_inputs.push(private_input);
 
-    // private_inputs.insert("doc".to_string(), json!())
+    // // #[cfg(feature = "metrics")]
+    // // log::stop(Component::Compiler, "Circuit Gen", "r1cs");
 
-
-
-    // let (P,V) = gen_r1cs();
+    // // #[cfg(feature = "metrics")]
+    // // log::r1cs(Component::Compiler, "Circuit Gen", "r1cs",P.r1cs.constraints.len());
     
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Compiler, "Circuit Gen", "r1cs");
+    // // println!("N constraints: {:#?}",P.r1cs.constraints.len());
 
-    // #[cfg(feature = "metrics")]
-    // log::r1cs(Component::Compiler, "Circuit Gen", "r1cs",P.r1cs.constraints.len());
-    
-    // println!("N constraints: {:#?}",P.r1cs.constraints.len());
+    // println!(
+    //     "Number of constraints: {}",
+    //    r1cs.constraints.len()
+    // );
 
-    // let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+    // println!(
+    //     "Number of variables: {}",
+    //    r1cs.num_variables
+    // );
+
+    //let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
     // #[cfg(feature = "metrics")]
     // log::tic(Component::Compiler, "R1CS", "Commitment Generations");
@@ -128,7 +136,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     // println!("Gen commitment");
 
     // mem_log("Memory Usage Pre-Commitment");
-    // let commitment = gen_commitment(doc_vec.clone(), &pc);
+    //let commitment = gen_commitment(doc_vec.clone(), &pc);
     // mem_log("Memory Usage Post-Commitment");
 
     // #[cfg(feature = "metrics")]
@@ -140,7 +148,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     // println!("To circuit");
 
     // mem_log("pre circuit new");
-    // let circuit = NaiveCircuit::new(P.r1cs.clone(), None, doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
+    //let circuit = NaiveCircuit::new(r1cs.clone(),  doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
     // mem_log("post circuit new");
     // #[cfg(feature = "metrics")]
     // log::stop(Component::Compiler, "R1CS", "To Circuit");

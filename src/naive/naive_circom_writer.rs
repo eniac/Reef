@@ -83,6 +83,7 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
     format!("pragma circom 2.0.3;
 
     include \"utils.circom\";
+    include \"./third_party/Nova-Scotia/circomlibs/poseidon.circom\";
     
     template IsValidTrans() {{
         signal input curIndex;
@@ -111,11 +112,21 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
     template Main () {{
         signal input doc[{doc_len}];
         signal input prover_states[{prover_states}];
+        signal input blind;
+
+        signal input commitment;    
     
         signal output match;
     
         component valid_state[{doc_len}];
         component valid_match;
+
+        var blinded_doc[{prover_states}];
+        blinded_doc[0] = blind; 
+        
+        for (var j=0;j<{doc_len};j++) {{
+            blinded_doc[j+1] = doc[j];
+        }}
     
         prover_states[0]===0;
     
@@ -128,11 +139,16 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
         valid_match.in <== prover_states[{doc_len}];
     
         valid_match.out === 0;
+
+        component hash = Poseidon({prover_states});
+        hash.inputs <== blinded_doc;
+    
+        hash.out === commitment;
     
         match <== valid_match.out;
     }}
     
-    component main = Main();")
+    component main {{ public [commitment] }} = Main();")
 }
 
 pub fn make_circom(dfa: &DFA<'_>, doc_len: usize, n_char: usize) -> std::io::Result<()> {

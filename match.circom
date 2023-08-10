@@ -1,6 +1,7 @@
 pragma circom 2.0.3;
 
     include "utils.circom";
+    include "./third_party/Nova-Scotia/circomlibs/poseidon.circom";
     
     template IsValidTrans() {
         signal input curIndex;
@@ -29,11 +30,21 @@ pragma circom 2.0.3;
     template Main () {
         signal input doc[3];
         signal input prover_states[4];
+        signal input blind;
+
+        signal input commitment;    
     
         signal output match;
     
         component valid_state[3];
         component valid_match;
+
+        var blinded_doc[4];
+        blinded_doc[0] = blind; 
+        
+        for (var j=0;j<3;j++) {
+            blinded_doc[j+1] = doc[j];
+        }
     
         prover_states[0]===0;
     
@@ -46,8 +57,13 @@ pragma circom 2.0.3;
         valid_match.in <== prover_states[3];
     
         valid_match.out === 0;
+
+        component hash = Poseidon(4);
+        hash.inputs <== blinded_doc;
+    
+        hash.out === commitment;
     
         match <== valid_match.out;
     }
     
-    component main = Main();
+    component main { public [commitment] } = Main();
