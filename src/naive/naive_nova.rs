@@ -242,7 +242,7 @@ pub fn gen_commitment(doc: Vec<u32>, pc: &PoseidonConstants<Fq, typenum::U4>)->H
         acc,
     );
 
-    let blind = <G1 as Group>::Scalar::random(&mut OsRng);
+    let blind = <G1 as Group>::Scalar::one();
      
     let mut doc_clone: Vec<Fq> = doc.into_iter().map(|x| <G1 as Group>::Scalar::from(x as u64)).collect();
     doc_clone.insert(0, blind);

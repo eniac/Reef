@@ -2410,6 +2410,7 @@ dependencies = [
  "neptune",
  "nova-scotia",
  "nova-snark",
+ "num-bigint 0.4.3",
  "petgraph",
  "prettyprint",
  "printpdf",

@@ -37,6 +37,7 @@ backtrace-on-stack-overflow = "0.3.0"
 memory-stats = "1.1.0"
 nova-scotia = {path="./third_party/Nova-Scotia"}
 execute = "0.2.12"
+num-bigint = "0.4.3"
 
 [target.'cfg(all(not(windows), not(target_env = "musl")))'.dependencies]
 jemallocator = "0.3.0"

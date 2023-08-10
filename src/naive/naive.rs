@@ -97,6 +97,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     private_input.insert("blind".to_string(),json!(commitment.blind));
     private_inputs.push(private_input);
 
+    println!("private inputs:{:#?}",private_inputs);
     println!(
         "Number of constraints: {}",
        r1cs.constraints.len()
