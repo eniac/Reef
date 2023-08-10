@@ -97,7 +97,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     private_input.insert("blind".to_string(),json!(commitment.blind));
     private_inputs.push(private_input);
 
-    println!("private inputs:{:#?}",private_inputs);
+    println!("commitment:{:#?}",commitment);
     println!(
         "Number of constraints: {}",
        r1cs.constraints.len()
@@ -141,18 +141,23 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     assert!(result.is_ok());
 
-    // let output = prove_circuit.output(&z);
+    let output = prove_circuit.output(&z);
 
-    // let snark = result.unwrap();
+    println!("output: {:?}", output);
+
+    let snark = result.unwrap();
 
     // // verify the SNARK
 
-    // let io = z.into_iter()
-    //   .chain(output.clone().into_iter())
-    //   .collect::<Vec<_>>();
-    // let verifier_result = snark.verify(&vk, &io);
+    let io = z.into_iter()
+      .chain(output.clone().into_iter())
+      .collect::<Vec<_>>();
+    println!("{:?}", io);
+    let verifier_result = snark.verify(&vk, &io);
 
-    // assert!(verifier_result.is_ok()); 
+    println!("{:?}", verifier_result);
+
+    assert!(verifier_result.is_ok()); 
 
     // let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
     // let mut wtr = Writer::from_writer(file);
