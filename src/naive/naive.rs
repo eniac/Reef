@@ -4,7 +4,7 @@ type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
-use crate::backend::{r1cs_helper::init};
+// use crate::backend::{r1cs_helper::init};
 use crate::naive::naive_nova::*;
 use crate::naive::naive_circom_writer::*;
 use std::env::current_dir;
@@ -14,11 +14,6 @@ use std::io::prelude::*;
 use crate::naive::dfa::*; 
 use crate::regex::re;
 use crate::naive::naive_parser as naive_re;
-use circ::front::zsharp::{self, ZSharpFE};
-use circ::front::{FrontEnd, Mode};
-use circ::ir::{opt::{opt, Opt}};
-use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
-use circ::cfg::*;
 use neptune::{
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -27,40 +22,29 @@ use neptune::{
     Strength,
 };
 use generic_array::typenum;
+use nova_scotia::circom::circuit::R1CS;
 use nova_snark::{
-    provider,
     PublicParams,
     traits::{circuit::StepCircuit, Group},
     spartan::direct::*,
 };
+use ff::PrimeField;
+use pasta_curves::Fq;
 use serde_json::json;
 use nova_scotia::{
-    circom::reader::load_r1cs, create_public_params, create_recursive_circuit, FileLocation, F, S,
+    circom::reader::load_r1cs, create_public_params, create_recursive_circuit, FileLocation, F,
 };
 use std::fs::OpenOptions;
 use csv::Writer;
 use memory_stats::memory_stats;
 use std::process::{Command, Stdio};
 use execute::{Execute, shell};
+use std::{collections::HashMap};
 
 #[cfg(feature = "metrics")]
 use crate::metrics::{log, log::Component};
 
-// pub fn gen_r1cs() {
-//     let circuit_filepath = "circuit.r1cs";
-//     let witness_gen_filepath = "circuit_js/circuit.wasm";
-
-//     let root = current_dir().unwrap();
-
-//     let circuit_file = root.join(circuit_filepath);
-//     let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
-//     let witness_generator_file = root.join(witness_gen_filepath);
-//     return; 
-// }
-
 pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
-    init();
-
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
     let doc_len = doc_vec.len();
 
@@ -109,6 +93,22 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::tic(Component::Compiler, "Circuit Gen", "r1cs");
 
     println!("gen r1cs");
+
+    let circuit_filepath = "match.r1cs";
+    let witness_gen_filepath = "match_js/match.wasm";
+
+    let root = current_dir().unwrap();
+
+    let circuit_file = root.join(circuit_filepath);
+    let witness_generator_file = root.join(witness_gen_filepath);
+
+    let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
+
+    let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
+
+    // private_inputs.insert("doc".to_string(), json!())
+
+
 
     // let (P,V) = gen_r1cs();
     
