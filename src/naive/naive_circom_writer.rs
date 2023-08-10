@@ -132,6 +132,7 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
             valid_state[j-1] = IsValidTrans();
             valid_state[j-1].curIndex <== prover_states[j-1]*{n_states}*{n_char} + doc[j-1]*{n_states} +
             prover_states[j];
+            valid_state[j-1].out === 0;
         }}
         valid_match = IsValidMatch();
         valid_match.in <== prover_states[{doc_len}];

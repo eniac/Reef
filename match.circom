@@ -50,6 +50,7 @@ pragma circom 2.0.3;
             valid_state[j-1] = IsValidTrans();
             valid_state[j-1].curIndex <== prover_states[j-1]*6*3 + doc[j-1]*6 +
             prover_states[j];
+            valid_state[j-1].out === 0;
         }
         valid_match = IsValidMatch();
         valid_match.in <== prover_states[3];
