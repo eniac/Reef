@@ -31,10 +31,8 @@ pragma circom 2.0.3;
         signal input doc[3];
         signal input prover_states[4];
         signal input blind;
-
-        signal input commitment;    
     
-        signal output match;
+        signal output hashed;
     
         component valid_state[3];
         component valid_match;
@@ -61,9 +59,7 @@ pragma circom 2.0.3;
         component hash = Poseidon(4);
         hash.inputs <== blinded_doc;
     
-        hash.out === commitment;
-    
-        match <== valid_match.out;
+        hashed<==hash.out;
     }
     
-    component main { public [commitment] } = Main();
+    component main = Main();

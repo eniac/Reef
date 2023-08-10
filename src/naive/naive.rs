@@ -5,8 +5,8 @@ type G2 = pasta_curves::vesta::Point;
 type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
 // use crate::backend::{r1cs_helper::init};
-use crate::naive::naive_nova::*;
 use crate::naive::naive_circom_writer::*;
+use crate::naive::naive_nova::gen_commitment;
 use std::env::current_dir;
 use std::path::PathBuf;
 use std::fs::File;
@@ -22,7 +22,7 @@ use neptune::{
     Strength,
 };
 use generic_array::typenum;
-use nova_scotia::circom::circuit::R1CS;
+use nova_scotia::circom::circuit::*;
 use nova_snark::{
     PublicParams,
     traits::{circuit::StepCircuit, Group},
@@ -48,9 +48,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
     let doc_len = doc_vec.len();
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "DFA", "DFA");
-
     let regex = re::simpl(re::new(&(r.clone())));
 
     let dfa = DFA::new(&alpha[..],naive_re::re::translate(&regex, &alpha[..]));
@@ -60,24 +57,14 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!("N States: {:#?}",dfa_nstate);
     println!("N Delta: {:#?}",dfa_ndelta);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "DFA", "DFA");
-
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Solver, "DFA Solving", "Clear Match");
 
     let is_match = dfa.is_match(&doc);
     let solution = dfa.solve(&doc);
    
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Solver, "DFA Solving", "Clear Match");
-
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "Circuit Gen", "Zok");
-
-    println!("Make Circom");
+    let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+    let commitment = gen_commitment(doc_vec.clone(), &pc);
 
     let _ = make_circom(&dfa, doc_len, alpha.len());
 
@@ -85,87 +72,40 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let output  = command.execute_output().unwrap();
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
-    
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "Circuit Gen", "Zok");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "Circuit Gen", "r1cs");
+    let circuit_filepath = "match.r1cs";
+    let witness_gen_filepath = "match_js/match.wasm";
 
-    // println!("gen r1cs");
+    let root = current_dir().unwrap();
 
-    // let circuit_filepath = "match.r1cs";
-    // let witness_gen_filepath = "match_js/match.wasm";
+    let circuit_file = root.join(circuit_filepath);
+    let witness_generator_file = root.join(witness_gen_filepath);
 
-    // let root = current_dir().unwrap();
+    let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
 
-    // let circuit_file = root.join(circuit_filepath);
-    // let witness_generator_file = root.join(witness_gen_filepath);
+    let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
+    let mut private_input = HashMap::new();
+    private_input.insert("doc".to_string(), json!(doc_vec));
+    private_input.insert("prover_states".to_string(), json!(solution));
+    private_input.insert("blind".to_string(),json!(commitment.blind));
+    private_inputs.push(private_input);
 
-    // let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
+    println!(
+        "Number of constraints: {}",
+       r1cs.constraints.len()
+    );
 
-    // let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
-    // let mut private_input = HashMap::new();
-    // private_input.insert("doc".to_string(), json!(doc_vec));
-    // private_input.insert("prover_states".to_string(), json!(solution));
-    // private_inputs.push(private_input);
+    println!(
+        "Number of variables: {}",
+       r1cs.num_variables
+    );
 
-    // // #[cfg(feature = "metrics")]
-    // // log::stop(Component::Compiler, "Circuit Gen", "r1cs");
+    let circuit = CircomCircuit {
+        r1cs,
+        witness: None,
+    };
 
-    // // #[cfg(feature = "metrics")]
-    // // log::r1cs(Component::Compiler, "Circuit Gen", "r1cs",P.r1cs.constraints.len());
-    
-    // // println!("N constraints: {:#?}",P.r1cs.constraints.len());
-
-    // println!(
-    //     "Number of constraints: {}",
-    //    r1cs.constraints.len()
-    // );
-
-    // println!(
-    //     "Number of variables: {}",
-    //    r1cs.num_variables
-    // );
-
-    //let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Compiler, "R1CS", "Commitment Generations");
-
-    // println!("Gen commitment");
-
-    // mem_log("Memory Usage Pre-Commitment");
-    //let commitment = gen_commitment(doc_vec.clone(), &pc);
-    // mem_log("Memory Usage Post-Commitment");
-
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Compiler, "R1CS", "Commitment Generations");
-
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Compiler, "R1CS", "To Circuit");
-
-    // println!("To circuit");
-
-    // mem_log("pre circuit new");
-    //let circuit = NaiveCircuit::new(r1cs.clone(),  doc_len, pc.clone(), commitment.blind,commitment.commit,is_match_g);
-    // mem_log("post circuit new");
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Compiler, "R1CS", "To Circuit");
-
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Compiler, "R1CS", "Proof Setup");
-
-    // mem_log("pre spartan setup");
-    // let (pk, vk) = naive_spartan_snark_setup(circuit);
-    // mem_log("post spartan setup");
-
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Compiler, "R1CS", "Proof Setup");
-
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Solver, "Witnesses", "Generation");
-    // println!("Wit gen");
+    let (pk, vk) = naive_spartan_snark_setup(circuit);
     
     // mem_log("pre wit gen");
     // let witnesses = gen_wits(doc_vec, is_match, doc_len, solution, &dfa, alpha.len(), &P);

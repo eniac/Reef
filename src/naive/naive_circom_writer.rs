@@ -113,10 +113,8 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
         signal input doc[{doc_len}];
         signal input prover_states[{prover_states}];
         signal input blind;
-
-        signal input commitment;    
     
-        signal output match;
+        signal output hashed;
     
         component valid_state[{doc_len}];
         component valid_match;
@@ -143,12 +141,10 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
         component hash = Poseidon({prover_states});
         hash.inputs <== blinded_doc;
     
-        hash.out === commitment;
-    
-        match <== valid_match.out;
+        hashed<==hash.out;
     }}
     
-    component main {{ public [commitment] }} = Main();")
+    component main = Main();")
 }
 
 pub fn make_circom(dfa: &DFA<'_>, doc_len: usize, n_char: usize) -> std::io::Result<()> {
