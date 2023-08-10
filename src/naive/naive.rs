@@ -109,7 +109,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     );
 
     let circuit = CircomCircuit {
-        r1cs,
+        r1cs: r1cs.clone(),
         witness: None,
     };
 
@@ -129,17 +129,17 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         &witness_generator_output,
     );
 
-    
-    // let witnesses = gen_wits(doc_vec, is_match, doc_len, solution, &dfa, alpha.len(), &P);
 
-
-    // let prove_circuit = NaiveCircuit::new(P.r1cs,witnesses, doc_len, pc, commitment.blind, commitment.commit, is_match_g);
+    let prove_circuit = CircomCircuit {
+        r1cs: r1cs.clone(),
+        witness: Some(witnesses),
+    };
 
     let z = vec![commitment.commit];
 
-    // let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
+    let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
 
-    // assert!(result.is_ok());
+    assert!(result.is_ok());
 
     // let output = prove_circuit.output(&z);
 
