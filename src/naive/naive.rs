@@ -14,6 +14,7 @@ use std::io::prelude::*;
 use crate::naive::dfa::*; 
 use crate::regex::re;
 use crate::naive::naive_parser as naive_re;
+use itertools::Itertools;
 use neptune::{
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -23,6 +24,7 @@ use neptune::{
 };
 use generic_array::typenum;
 use nova_scotia::circom::circuit::*;
+use nova_scotia::compute_witness;
 use nova_snark::{
     PublicParams,
     traits::{circuit::StepCircuit, Group},
@@ -60,6 +62,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let is_match = dfa.is_match(&doc);
     let solution = dfa.solve(&doc);
+    let mut prover_states: Vec<u32> = solution.clone().into_iter().map(|(a,b,c)| a).collect_vec();
+    if let Some(last) = solution.last().map(|(a,b,c)| (*c).clone()) {
+        prover_states.push(last);
+    }
    
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
 
@@ -80,13 +86,14 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let circuit_file = root.join(circuit_filepath);
     let witness_generator_file = root.join(witness_gen_filepath);
+    let witness_generator_output = root.join("circom_witness.wtns");
 
     let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
 
     let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
     let mut private_input = HashMap::new();
     private_input.insert("doc".to_string(), json!(doc_vec));
-    private_input.insert("prover_states".to_string(), json!(solution));
+    private_input.insert("prover_states".to_string(), json!(prover_states));
     private_input.insert("blind".to_string(),json!(commitment.blind));
     private_inputs.push(private_input);
 
@@ -106,33 +113,30 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     };
 
     let (pk, vk) = naive_spartan_snark_setup(circuit);
+
+    //witness generation
+    let iteration_count = private_inputs.len();
+    let public_input: [Fq;0] = [];
+    let start_public_input_hex = public_input.iter().map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string()).collect::<Vec<String>>();
+    let mut current_public_input = start_public_input_hex.clone();
+
+
+    let witnesses = compute_witness::<G1, G2>(
+        current_public_input,
+        private_inputs[0].clone(),
+        FileLocation::PathBuf(witness_generator_file),
+        &witness_generator_output,
+    );
+
     
-    // mem_log("pre wit gen");
     // let witnesses = gen_wits(doc_vec, is_match, doc_len, solution, &dfa, alpha.len(), &P);
-    // mem_log("post wit gen");
 
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Solver, "Witnesses", "Generation");
-    
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Prover, "Proof", "Adding witnesses");
-    
-    // mem_log("pre_prove circuit");
+
     // let prove_circuit = NaiveCircuit::new(P.r1cs,witnesses, doc_len, pc, commitment.blind, commitment.commit, is_match_g);
-    // mem_log("post prove circuit");
 
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Prover, "Proof", "Adding witnesses");
-
-    // let z = vec![commitment.commit];
-
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Prover, "Proof", "Prove");
+    let z = vec![commitment.commit];
 
     // let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
-
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Prover, "Proof", "Prove");
 
     // assert!(result.is_ok());
 
@@ -140,25 +144,13 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     // let snark = result.unwrap();
 
-    // #[cfg(feature = "metrics")]
-    // log::space(
-    //     Component::Prover,
-    //     "Proof Size",
-    //     "Spartan SNARK size",
-    //     serde_json::to_string(&snark).unwrap().len(),
-    // );
-
     // // verify the SNARK
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Verifier, "Verify", "Verify");
 
     // let io = z.into_iter()
     //   .chain(output.clone().into_iter())
     //   .collect::<Vec<_>>();
     // let verifier_result = snark.verify(&vk, &io);
 
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Verifier, "Verify", "Verify");
     // assert!(verifier_result.is_ok()); 
 
     // let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
