@@ -135,7 +135,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         witness: Some(witnesses),
     };
 
-    let z = vec![commitment.commit];
+    let z = vec![<G1 as Group>::Scalar::one()];
 
     let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
 
@@ -152,7 +152,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let io = z.into_iter()
       .chain(output.clone().into_iter())
       .collect::<Vec<_>>();
-    println!("{:?}", io);
+    println!("io: {:?}", io);
     let verifier_result = snark.verify(&vk, &io);
 
     println!("{:?}", verifier_result);
