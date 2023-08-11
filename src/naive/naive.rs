@@ -7,7 +7,7 @@ type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 // use crate::backend::{r1cs_helper::init};
 use crate::naive::naive_circom_writer::*;
 use crate::naive::naive_nova::gen_commitment;
-use std::env::current_dir;
+use std::{env::current_dir, path::Component};
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
@@ -50,15 +50,24 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
     let doc_len = doc_vec.len();
 
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "DFA","DFA");
     let regex = re::simpl(re::new(&(r.clone())));
 
+    
     let dfa = DFA::new(&alpha[..],naive_re::re::translate(&regex, &alpha[..]));
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
 
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "DFA","DFA");
+
     println!("N States: {:#?}",dfa_nstate);
     println!("N Delta: {:#?}",dfa_ndelta);
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Solver,"DFA Solving", "Clear Match");
     let is_match = dfa.is_match(&doc);
     let solution = dfa.solve(&doc);
     let mut prover_states: Vec<u32> = solution.clone().into_iter().map(|(a,b,c)| a).collect_vec();
@@ -67,14 +76,28 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     }
    
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Solver, "DFA Solving", "Clear Match");
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS", "Commitment Gen");
 
     let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
     let commitment = gen_commitment(doc_vec.clone(), &pc);
 
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS", "Commitment Gen");
+
     //let _ = make_circom(&dfa, doc_len, alpha.len());
 
     let mut command = shell("circom match.circom --r1cs --sym --wasm --prime vesta");
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS", "Circom");
     let output  = command.execute_output().unwrap();
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS", "Circom");
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
@@ -87,7 +110,12 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let witness_generator_file = root.join(witness_gen_filepath);
     let witness_generator_output = root.join("circom_witness.wtns");
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS", "Loading");
     let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler,"R1CS", "Loading");
 
     let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
     let mut private_input = HashMap::new();
@@ -100,6 +128,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         "Number of constraints: {}",
        r1cs.constraints.len()
     );
+    #[cfg(feature = "metrics")]
+    log::r1cs(Component::Compiler, "R1CS", "Size", r1cs.constraints.len());
 
     println!(
         "Number of variables: {}",
@@ -111,7 +141,13 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         witness: None,
     };
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler,"Snark", "Setup");
     let (pk, vk) = naive_spartan_snark_setup(circuit);
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler,"Snark","Setup");
+
 
     //witness generation
     let iteration_count = private_inputs.len();
@@ -119,6 +155,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let start_public_input_hex = public_input.iter().map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string()).collect::<Vec<String>>();
     let mut current_public_input = start_public_input_hex.clone();
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Solver,"Witness","Gen");
 
     let witnesses = compute_witness::<G1, G2>(
         current_public_input,
@@ -126,6 +164,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         FileLocation::PathBuf(witness_generator_file),
         &witness_generator_output,
     );
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Solver,"Witness","Gen");
 
 
     let prove_circuit = CircomCircuit {
@@ -135,7 +176,13 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let z = vec![<G1 as Group>::Scalar::one()];
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Prover,"Prover","Prove");
+
     let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover,"Prover","Prove");
 
     assert!(result.is_ok());
 
@@ -143,13 +190,27 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let snark = result.unwrap();
 
+    #[cfg(feature = "metrics")]
+    log::space(
+        Component::Prover,
+        "Proof Size",
+        "Spartan SNARK size",
+        serde_json::to_string(&snark).unwrap().len(),
+    );
+
     // // verify the SNARK
 
     let io = z.into_iter()
       .chain(output.clone().into_iter())
       .collect::<Vec<_>>();
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Verifier, "Verify", "Verify");
+
     let verifier_result = snark.verify(&vk, &io);
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Verifier, "Verify", "Verify"); 
 
     assert!(verifier_result.is_ok()); 
 
