@@ -59,7 +59,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!("N States: {:#?}",dfa_nstate);
     println!("N Delta: {:#?}",dfa_ndelta);
 
-
     let is_match = dfa.is_match(&doc);
     let solution = dfa.solve(&doc);
     let mut prover_states: Vec<u32> = solution.clone().into_iter().map(|(a,b,c)| a).collect_vec();
@@ -72,7 +71,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
     let commitment = gen_commitment(doc_vec.clone(), &pc);
 
-    let _ = make_circom(&dfa, doc_len, alpha.len());
+    //let _ = make_circom(&dfa, doc_len, alpha.len());
 
     let mut command = shell("circom match.circom --r1cs --sym --wasm --prime vesta");
     let output  = command.execute_output().unwrap();
@@ -97,7 +96,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     private_input.insert("blind".to_string(),json!(commitment.blind));
     private_inputs.push(private_input);
 
-    println!("commitment:{:#?}",commitment);
     println!(
         "Number of constraints: {}",
        r1cs.constraints.len()
@@ -143,8 +141,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let output = prove_circuit.output(&z);
 
-    println!("output: {:?}", output);
-
     let snark = result.unwrap();
 
     // // verify the SNARK
@@ -152,10 +148,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let io = z.into_iter()
       .chain(output.clone().into_iter())
       .collect::<Vec<_>>();
-    println!("io: {:?}", io);
-    let verifier_result = snark.verify(&vk, &io);
 
-    println!("{:?}", verifier_result);
+    let verifier_result = snark.verify(&vk, &io);
 
     assert!(verifier_result.is_ok()); 
 

@@ -30,10 +30,10 @@ pragma circom 2.0.3;
          out <== comp[N-2].out; 
      }
 function rootsTrans(i) {
-	var roots[18] = [624,658,601,676,594,633,651,588,669,608,665,583,619,681,612,645,687,640];
+	var roots[18] = [658,687,624,640,665,594,676,633,588,681,583,612,601,619,608,651,645,669];
 	return roots[i];
     }
 function rootsMatch(i) {
-	var roots[3] = [4,3,5];
+	var roots[3] = [5,3,4];
 	return roots[i];
     }
