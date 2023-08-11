@@ -1,0 +1,11 @@
+/Users/elizabethmargolin/Desktop/Nova-Scotia/target/debug/deps/wyz-a2bfb7cac899c044.rmeta: /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/lib.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/bidi.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/comu.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/fmt.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/range.rs
+
+/Users/elizabethmargolin/Desktop/Nova-Scotia/target/debug/deps/libwyz-a2bfb7cac899c044.rlib: /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/lib.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/bidi.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/comu.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/fmt.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/range.rs
+
+/Users/elizabethmargolin/Desktop/Nova-Scotia/target/debug/deps/wyz-a2bfb7cac899c044.d: /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/lib.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/bidi.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/comu.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/fmt.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/range.rs
+
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/lib.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/bidi.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/comu.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/fmt.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wyz-0.5.1/src/range.rs:

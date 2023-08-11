@@ -1,0 +1,10 @@
+/Users/elizabethmargolin/Desktop/Nova-Scotia/target/debug/deps/thiserror-eeb8ed6bcb0514c5.rmeta: /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/lib.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/aserror.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/display.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/provide.rs
+
+/Users/elizabethmargolin/Desktop/Nova-Scotia/target/debug/deps/libthiserror-eeb8ed6bcb0514c5.rlib: /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/lib.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/aserror.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/display.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/provide.rs
+
+/Users/elizabethmargolin/Desktop/Nova-Scotia/target/debug/deps/thiserror-eeb8ed6bcb0514c5.d: /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/lib.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/aserror.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/display.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/provide.rs
+
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/lib.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/aserror.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/display.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.44/src/provide.rs:

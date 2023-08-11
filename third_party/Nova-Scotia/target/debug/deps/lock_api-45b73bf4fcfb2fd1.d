@@ -1,0 +1,10 @@
+/Users/elizabethmargolin/Desktop/Nova-Scotia/target/debug/deps/lock_api-45b73bf4fcfb2fd1.rmeta: /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/lib.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/mutex.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/remutex.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/rwlock.rs
+
+/Users/elizabethmargolin/Desktop/Nova-Scotia/target/debug/deps/liblock_api-45b73bf4fcfb2fd1.rlib: /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/lib.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/mutex.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/remutex.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/rwlock.rs
+
+/Users/elizabethmargolin/Desktop/Nova-Scotia/target/debug/deps/lock_api-45b73bf4fcfb2fd1.d: /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/lib.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/mutex.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/remutex.rs /Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/rwlock.rs
+
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/lib.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/mutex.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/remutex.rs:
+/Users/elizabethmargolin/.cargo/registry/src/index.crates.io-6f17d22bba15001f/lock_api-0.4.10/src/rwlock.rs:
