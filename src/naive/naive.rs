@@ -9,7 +9,7 @@ use crate::naive::naive_circom_writer::*;
 use crate::naive::naive_nova::gen_commitment;
 use std::{env::current_dir};
 use std::path::PathBuf;
-use std::fs::File;
+use std::fs::{File,remove_file};
 use std::io::prelude::*;
 use crate::naive::dfa::*; 
 use crate::regex::re;
@@ -152,6 +152,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
 
     //witness generation
+    println!("Wit Gen");
     let iteration_count = private_inputs.len();
     let public_input: [Fq;0] = [];
     let start_public_input_hex = public_input.iter().map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string()).collect::<Vec<String>>();
@@ -178,6 +179,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let z = vec![<G1 as Group>::Scalar::one()];
 
+    println!("Prove");
+
     #[cfg(feature = "metrics")]
     log::tic(Component::Prover,"Prover","Prove");
 
@@ -201,7 +204,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     );
 
     // // verify the SNARK
-
+    println!("Verify");
     let io = z.into_iter()
       .chain(output.clone().into_iter())
       .collect::<Vec<_>>();
@@ -216,20 +219,26 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     assert!(verifier_result.is_ok()); 
 
-    // let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
-    // let mut wtr = Writer::from_writer(file);
-    // let _ = wtr.write_record(&[
-    // format!("{}_{}",&doc[..10],doc.len()),
-    // r,
-    // dfa_ndelta.to_string(), //nedges().to_string(),
-    // dfa_nstate.to_string(), //nstates().to_string(),
-    // ]);
-    // let spacer = "---------";
-    // let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-    // wtr.flush();
+    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
+    let mut wtr = Writer::from_writer(file);
+    let _ = wtr.write_record(&[
+    format!("{}_{}",&doc[..10],doc.len()),
+    r,
+    dfa_ndelta.to_string(), //nedges().to_string(),
+    dfa_nstate.to_string(), //nstates().to_string(),
+    ]);
+    let spacer = "---------";
+    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    wtr.flush();
 
-    // #[cfg(feature = "metrics")]
-    // log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    #[cfg(feature = "metrics")]
+    log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+
+    remove_file("match.circom");
+    remove_file("match.sym");
+    remove_file("match.r1cs");
+    remove_file("circom_witness.wtns");
+
     return   
 }
 
