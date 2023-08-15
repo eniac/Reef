@@ -7,7 +7,7 @@ type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 // use crate::backend::{r1cs_helper::init};
 use crate::naive::naive_circom_writer::*;
 use crate::naive::naive_nova::gen_commitment;
-use std::{env::current_dir, path::Component};
+use std::{env::current_dir};
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
@@ -74,6 +74,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     if let Some(last) = solution.last().map(|(a,b,c)| (*c).clone()) {
         prover_states.push(last);
     }
+    println!("solution length: {}",prover_states.len());
+    println!("doc length: {}",doc_len);
    
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
     #[cfg(feature = "metrics")]
@@ -88,7 +90,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "R1CS", "Commitment Gen");
 
-    //let _ = make_circom(&dfa, doc_len, alpha.len());
+    let _ = make_circom(&dfa, doc_len, alpha.len());
 
     let mut command = shell("circom match.circom --r1cs --sym --wasm --prime vesta");
 
