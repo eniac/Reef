@@ -31,6 +31,9 @@ impl<C: Display + Debug + Step + Default + Ord + Copy + Clone> OpenRange<C> {
             end: Some(end),
         }
     }
+    pub fn single(c: C) -> Self {
+        Self::closed(c, c)
+    }
     pub fn nil() -> Self {
         Self {
             start: Default::default(),
@@ -76,7 +79,7 @@ impl<C: Display + Debug + Step + Default + Ord + Copy + Clone> OpenRange<C> {
             (None, None) => OpenSet::open(self.start.max(o.start)),
             (Some(e), None) if Step::forward(e, 1) < o.start => OpenSet::empty(),
             (None, Some(e)) if Step::forward(e, 1) < self.start => OpenSet::empty(),
-            (Some(_), None) | (None, Some(_)) => OpenSet::open(self.start.max(o.start)),
+            (Some(c), None) | (None, Some(c)) => OpenSet::closed(self.start.max(o.start), c),
             (Some(se), Some(oe)) => {
                 let start = self.start.min(o.start);
                 let end = se.max(oe);
@@ -215,6 +218,14 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
     pub fn new(v: &[(C, Option<C>)]) -> Self {
         Self::from_iter(v.iter().map(|c| c.clone()))
     }
+    /// Deep constructor
+    pub fn build(v: &Vec<C>) -> Self {
+        let mut s = Self::empty();
+        for i in v {
+            s.insert(&OpenRange::single(*i));
+        }
+        s
+    }
 
     pub fn from_iter(v: impl Iterator<Item = (C, Option<C>)>) -> Self {
         Self(v.map(|(start, end)| OpenRange::new(start, end)).collect())
@@ -309,27 +320,17 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
         *self = acc;
     }
 
-    /// Insert an interval in the range set
-    pub fn insert_intersect(&mut self, r: &OpenRange<C>) {
-        let mut v: BTreeSet<_> = self.0.clone();
-        v.insert(r.clone());
-        // Guaranteed to have at least one elem
-        let mut next: OpenRange<_> = v.first().unwrap().clone();
-        let mut acc = next.intersection(&next);
-        for i in v {
-            next = acc.0.pop_last().unwrap().clone();
-            acc.0.append(&mut next.intersection(&i).0);
-        }
-        *self = acc;
-    }
-
     /// The intersection of two open sets
     pub fn intersection(&self, rs: &Self) -> Self {
-        let mut s = self.clone();
+        let mut acc = Self::empty();
+
         for r in rs.0.iter() {
-            s.insert_intersect(r);
+            // Guaranteed to have at least one elem
+            for s in self.0.clone() {
+                acc.append(&s.intersection(r));
+            }
         }
-        s
+        acc
     }
 
     /// Difference of two open sets
@@ -493,6 +494,14 @@ fn test_openrange_intersect_nooverlap() {
 }
 
 #[test]
+fn test_openrange_intersect_char() {
+    assert_eq!(
+        OpenRange::open('b').intersection(&OpenRange::closed('b','c')),
+        OpenSet::closed('b', 'c'))
+}
+
+
+#[test]
 fn test_openset_insert() {
     let mut s = OpenSet::closed(1, 2);
     s.insert(&OpenRange::closed(3, 4));
@@ -503,3 +512,11 @@ fn test_openset_insert() {
 fn test_openset_repeat() {
     assert_eq!(OpenSet::closed(1, 2).repeat(1, 3), OpenSet::closed(1, 6))
 }
+
+#[test]
+fn test_openset_intersect_bug() {
+    assert_eq!(OpenSet::build(&"abc".chars().collect())
+                  .intersection(&OpenSet::single('a').negate()),
+        OpenSet::closed('b', 'c'))
+}
+
