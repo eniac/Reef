@@ -60,11 +60,11 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     
     println!("newR: {:?}",newR);
 
+    return;
+
     let dfa = DFA::new(&alpha[..],newR);
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
-
-    return;
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA","DFA");
