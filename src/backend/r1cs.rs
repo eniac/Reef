@@ -48,13 +48,6 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     is_match: bool,
     // witness crap
     pub sol_num: usize,
-    path_count: usize,
-    stack_level: usize,
-    from_state: usize,
-    cursor_stack: Vec<usize>,
-    cursor_stack_ptr: usize,
-    pub path_count_lookup: FxHashMap<usize, usize>,
-    max_stack_level: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
@@ -74,40 +67,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         //let opt_batch_size;
         let cost: usize;
-        /*  if batch_size > 0 {
-                    (batching, commit, opt_batch_size, cost) = match (batch_override, commit_override) {
-                        (Some(b), Some(c)) => (
-                            b,
-                            c,
-                            batch_size,
-                            full_round_cost_model(nfa, batch_size, b, nfa_match, doc.len(), c),
-                        ),
-                        (Some(b), _) => {
-                            opt_commit_select_with_batch(nfa, batch_size, nfa_match, doc.len(), b)
-                        }
-                        (None, Some(c)) => opt_cost_model_select_with_commit(
-                            &nfa,
-                            batch_size,
-                            nfa.is_match(doc),
-                            doc.len(),
-                            c,
-                        ),
-                        (None, None) => {
-                            opt_cost_model_select_with_batch(&nfa, batch_size, nfa_match, doc.len())
-                        }
-                    };
-                } else {
-                    (batching, commit, opt_batch_size, cost) = opt_cost_model_select(
-                        &nfa,
-                        0,
-                        logmn(doc.len()) - 1,
-                        nfa_match,
-                        doc.len(),
-                        commit_override,
-                        batch_override,
-                    );
-                }
-        */
         //      let sel_batch_size = opt_batch_size;
 
         // TODO timing here
@@ -186,9 +145,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         // stack level, states
-        /*let mut forall_children: Vec<HashSet<usize>> = Vec::new();
-        let mut forall_children_first: Vec<bool> = Vec::new();
-        let mut current_path_state = 0;
+        let mut forall_children: Vec<Vec<usize>> = Vec::new();
+        /*let mut current_path_state = 0;
         let mut current_stack_level = 0;
         let mut current_path_count = 0;
         let mut path_count_lookup: FxHashMap<usize, usize> = FxHashMap::default();
@@ -206,7 +164,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     .filter(|e| e.source() != e.target())
                     .collect();
                 and_edges.sort_by(|a, b| a.target().partial_cmp(&b.target()).unwrap());
-                let mut and_states = HashSet::default();
+                let mut and_states = vec![];
 
                 for i in 0..and_edges.len() {
                     match and_edges[i].weight().clone() {
@@ -217,7 +175,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 let offset = single.unwrap();
                                 if offset == 0 {
                                     // epsilon
-                                    and_states.insert(and_edges[i].target().index());
+                                    and_states.push(and_edges[i].target().index());
 
                                     // add table
                                     let in_state = all_state.index();
@@ -249,7 +207,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
 
                 forall_children.push(and_states);
-                forall_children_first.push(true);
                 current_stack_level += 1;
             }
 
@@ -257,24 +214,21 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let all_state_idx = all_state.index();
 
             for stack_lvl in 0..forall_children.len() {
-                if forall_children[stack_lvl].contains(&all_state_idx) {
-                    if forall_children_first[stack_lvl] == false {
-                        current_path_count += 1;
-                    } else {
-                        forall_children_first[stack_lvl] = false;
+                for k in 0..forall_children[stack_lvl].len() {
+                    if forall_children[stack_lvl][k] == all_state_idx {
+                        current_path_state = all_state_idx;
+                        normal_add_table(
+                            &safa,
+                            &mut num_ab,
+                            &mut current_forall_state_stack,
+                            &mut set_table,
+                            num_states,
+                            num_chars,
+                            max_offsets,
+                            all_state,
+                            (k == forall_children[stack_lvl].len() - 1), // last?
+                        );
                     }
-
-                    current_path_state = all_state_idx;
-                    normal_add_table(
-                        &safa,
-                        &mut num_ab,
-                        &mut current_forall_state_stack,
-                        &mut set_table,
-                        num_states,
-                        num_chars,
-                        max_offsets,
-                        all_state,
-                    );
                 }
             }
         }
@@ -292,6 +246,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 num_chars,
                 max_offsets,
                 NodeIndex::new(0), //all_state, TODO ?
+                true,
             );
         }
 
@@ -757,52 +712,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         self.assertions.push(stack_access_ite);
-
-        // keep track of the paths - TODO parsing in nova
-        let path_plus = term(
-            Op::Eq,
-            vec![
-                new_var(format!("next_running_path_count")), // vanishing
-                term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![
-                        new_var(format!("prev_running_path_count")),
-                        new_var(format!("path_count_add")),
-                    ],
-                ),
-            ],
-        );
-        self.assertions.push(path_plus);
-        self.pub_inputs
-            .push(new_var(format!("next_running_path_count")));
-        self.pub_inputs
-            .push(new_var(format!("prev_running_path_count")));
-
-        // if not fake transition, add
-        // TODO fake transistions for solutions > one cycle
-        let num_paths_plus = term(
-            Op::Ite,
-            vec![
-                term(
-                    Op::Eq,
-                    vec![new_var(format!("path_count_add")), new_const(0)],
-                ),
-                term(
-                    Op::Eq,
-                    vec![
-                        new_var(format!("next_num_paths")), // vanishing
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Add),
-                            vec![new_var(format!("prev_num_paths")), new_const(1)],
-                        ),
-                    ],
-                ),
-                new_bool_const(true),
-            ],
-        );
-        self.assertions.push(num_paths_plus);
-        self.pub_inputs.push(new_var(format!("next_num_paths")));
-        self.pub_inputs.push(new_var(format!("prev_num_paths")));
     }
 
     // for use at the end of sum check

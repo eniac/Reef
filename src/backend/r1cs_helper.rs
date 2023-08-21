@@ -158,6 +158,7 @@ pub fn normal_add_table<'a>(
     num_chars: usize,
     max_offsets: usize,
     all_state: NodeIndex,
+    last_forall_path: bool,
 ) {
     // dupicate safa, run this path
     let mut dfs_small = Dfs::new(&safa.g, all_state);
@@ -261,7 +262,7 @@ pub fn normal_add_table<'a>(
                 // "finished"
                 num_states - 1 //fake_last_state TODO make num_states += 1 in main
             } else {
-                if LAST_FORALL_MEMBER {
+                if last_forall_path {
                     current_forall_state_stack.pop_front();
                 }
                 current_forall_state_stack.front()
