@@ -170,7 +170,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // TODO range check
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        //safa.write_pdf("safa1").unwrap();
+        safa.write_pdf("safa1").unwrap();
 
         println!("ACCEPTING {:#?}", safa.accepting);
         //println!("DELTAS {:#?}", safa.deltas());
