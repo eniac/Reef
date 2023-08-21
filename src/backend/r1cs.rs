@@ -186,16 +186,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         // stack level, states
-        let mut forall_children: Vec<HashSet<usize>> = Vec::new();
+        /*let mut forall_children: Vec<HashSet<usize>> = Vec::new();
         let mut forall_children_first: Vec<bool> = Vec::new();
         let mut current_path_state = 0;
         let mut current_stack_level = 0;
         let mut current_path_count = 0;
         let mut path_count_lookup: FxHashMap<usize, usize> = FxHashMap::default();
+        */
+        let mut current_forall_state_stack: LinkedList<usize> = LinkedList::new();
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
+                current_forall_state_stack.push_front(all_state.index());
+
                 let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
                     .edges(all_state)
@@ -264,14 +268,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     normal_add_table(
                         &safa,
                         &mut num_ab,
-                        &mut path_count_lookup,
+                        &mut current_forall_state_stack,
                         &mut set_table,
                         num_states,
                         num_chars,
                         max_offsets,
-                        current_stack_level,
-                        current_path_count,
-                        current_path_state,
                         all_state,
                     );
                 }
@@ -285,19 +286,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             normal_add_table(
                 &safa,
                 &mut num_ab,
-                &mut path_count_lookup,
+                &mut current_forall_state_stack,
                 &mut set_table,
                 num_states,
                 num_chars,
                 max_offsets,
-                0,                 //current_stack_level,
-                0,                 //current_path_count,
-                0,                 //current_path_state,
                 NodeIndex::new(0), //all_state, TODO ?
             );
         }
-
-        println!("PATH COUNT LOOKUP {:#?}", path_count_lookup.clone());
 
         // last "empty" transition
         // add check entries to table

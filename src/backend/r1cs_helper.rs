@@ -152,14 +152,11 @@ pub(crate) fn trace_preprocessing(
 pub fn normal_add_table<'a>(
     safa: &'a SAFA<char>,
     num_ab: &mut FxHashMap<Option<char>, usize>,
-    path_count_lookup: &mut FxHashMap<usize, usize>,
+    current_forall_state_stack: &mut LinkedList<usize>,
     set_table: &mut HashSet<Integer>,
     num_states: usize,
     num_chars: usize,
     max_offsets: usize,
-    current_stack_level: usize,
-    current_path_count: usize,
-    current_path_state: usize,
     all_state: NodeIndex,
 ) {
     // dupicate safa, run this path
@@ -255,14 +252,24 @@ pub fn normal_add_table<'a>(
             // add check entries to table
             let base: i32 = 2; // an explicit type is required
 
-            let c = base.pow(current_path_count as u32) as usize; // path count
-            let offset = current_stack_level;
+            let c = num_ab[&None]; //EPSILON
+            let offset = 0; // TODO? current_stack_level;
             let rel = 1;
             let in_state = state.index();
-            let out_state = current_path_state; // FROM state
-                                                // TODO we have to make sure the multipliers are big enough
 
-            println!("ADDITIONAL FOR ACCEPTING: path count {:#?}, stack_lvl {:#?}, path_state {:#?}, in_state {:#?}", current_path_count, current_stack_level, current_path_state, in_state);
+            let out_state = if current_forall_state_stack.len() == 0 {
+                // "finished"
+                num_states - 1 //fake_last_state TODO make num_states += 1 in main
+            } else {
+                if LAST_FORALL_MEMBER {
+                    current_forall_state_stack.pop_front();
+                }
+                current_forall_state_stack.front()
+            };
+
+            // TODO we have to make sure the multipliers are big enough
+
+            println!("ADDITIONAL FOR ACCEPTING");
             println!(
                 "V from {:#?},{:#?},{:#?},{:#?},{:#?}",
                 in_state, out_state, c, offset, rel,
@@ -278,26 +285,6 @@ pub fn normal_add_table<'a>(
                 )
                 .rem_floor(cfg().field().modulus())
             );
-
-            set_table.insert(
-                Integer::from(
-                    (in_state * num_states * num_chars * max_offsets * 2)
-                        + (out_state * num_chars * max_offsets * 2)
-                        + (c * max_offsets * 2)
-                        + (offset * 2)
-                        + rel,
-                )
-                .rem_floor(cfg().field().modulus()),
-            );
-
-            path_count_lookup.insert(out_state, c);
-
-            // fake transition
-            let c = 0; // path count
-            let offset = 0;
-            let rel = 1;
-            let in_state = state.index();
-            let out_state = current_path_state;
 
             set_table.insert(
                 Integer::from(
