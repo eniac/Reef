@@ -54,11 +54,17 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA","DFA");
     let regex = re::simpl(re::new(&(r.clone())));
+    println!("{:?}",regex);
 
+    let newR = naive_re::re::translate(&regex, &alpha[..]);
     
-    let dfa = DFA::new(&alpha[..],naive_re::re::translate(&regex, &alpha[..]));
+    println!("newR: {:?}",newR);
+
+    let dfa = DFA::new(&alpha[..],newR);
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
+
+    return;
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "DFA","DFA");
@@ -245,10 +251,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
 #[test]
 fn test_1() {
-    let r  = "abc".to_string();
-    let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+    let r  = "([^a]+)a".to_string();
+    //let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
     let ab: String = "abc".to_string();
-    //abvec.iter().collect();
+    //let ab = abvec.iter().collect();
     let doc = "abc".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
 }

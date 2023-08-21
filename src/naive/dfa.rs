@@ -40,6 +40,7 @@ impl<'a> DFA<'a> {
           // Explore derivatives
           for c in d.ab.chars() {
               let q_c = deriv(c, q);
+              println!("q_c:{}, c: {}",q_c,c);
               d.add_transition(q, c, &q_c);
               if d.contains_state(&q_c) {
                   continue;

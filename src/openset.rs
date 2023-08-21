@@ -31,6 +31,9 @@ impl<C: Display + Debug + Step + Default + Ord + Copy + Clone> OpenRange<C> {
             end: Some(end),
         }
     }
+    pub fn single(c: C) -> Self {
+        Self::closed(c, c)
+    }
     pub fn nil() -> Self {
         Self {
             start: Default::default(),
@@ -71,6 +74,24 @@ impl<C: Display + Debug + Step + Default + Ord + Copy + Clone> OpenRange<C> {
         }
     }
 
+    pub fn intersection(&self, o: &Self) -> OpenSet<C> {
+        match (self.end, o.end) {
+            (None, None) => OpenSet::open(self.start.max(o.start)),
+            (Some(e), None) if Step::forward(e, 1) < o.start => OpenSet::empty(),
+            (None, Some(e)) if Step::forward(e, 1) < self.start => OpenSet::empty(),
+            (Some(c), None) | (None, Some(c)) => OpenSet::closed(self.start.max(o.start), c),
+            (Some(se), Some(oe)) => {
+                let start = self.start.min(o.start);
+                let end = se.max(oe);
+                if start <= Step::forward(end, 1) {
+                    OpenSet::closed(self.start.max(o.start), se.min(oe))
+                } else {
+                    OpenSet::empty()
+                }
+            }
+        }
+    }
+
     pub fn negate(&self) -> OpenSet<C> {
         match self.clone() {
             // ! (0,b) = [(b+1, *)]
@@ -94,6 +115,7 @@ impl<C: Display + Debug + Step + Default + Ord + Copy + Clone> OpenRange<C> {
             }
         }
     }
+
     /// Is [0, *]
     pub fn is_full(&self) -> bool {
         self.start == Default::default() && self.end.is_none()
@@ -196,6 +218,14 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
     pub fn new(v: &[(C, Option<C>)]) -> Self {
         Self::from_iter(v.iter().map(|c| c.clone()))
     }
+    /// Deep constructor
+    pub fn build(v: &Vec<C>) -> Self {
+        let mut s = Self::empty();
+        for i in v {
+            s.insert(&OpenRange::single(*i));
+        }
+        s
+    }
 
     pub fn from_iter(v: impl Iterator<Item = (C, Option<C>)>) -> Self {
         Self(v.map(|(start, end)| OpenRange::new(start, end)).collect())
@@ -290,7 +320,25 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
         *self = acc;
     }
 
-    /// The union of two open sets
+    /// The intersection of two open sets
+    pub fn intersection(&self, rs: &Self) -> Self {
+        let mut acc = Self::empty();
+
+        for r in rs.0.iter() {
+            // Guaranteed to have at least one elem
+            for s in self.0.clone() {
+                acc.append(&s.intersection(r));
+            }
+        }
+        acc
+    }
+
+    /// Difference of two open sets
+    pub fn diff(&self, r: &Self) -> Self {
+        self.intersection(&r.negate())
+    }
+
+    /// The mutable union of an open set to another
     pub fn append(&mut self, other: &Self) {
         for r in other.0.iter() {
             self.insert(&r)
@@ -425,6 +473,35 @@ fn test_openrange_merge() {
 }
 
 #[test]
+fn test_openrange_intersect_closed() {
+    assert_eq!(
+        OpenRange::closed(1, 2).intersection(&OpenRange::closed(2,2)),
+        OpenSet::closed(2,2))
+}
+
+#[test]
+fn test_openrange_intersect_open() {
+    assert_eq!(
+        OpenRange::open(1).intersection(&OpenRange::open(3)),
+        OpenSet::open(3))
+}
+
+#[test]
+fn test_openrange_intersect_nooverlap() {
+    assert_eq!(
+        OpenRange::open(4).intersection(&OpenRange::closed(0,2)),
+        OpenSet::empty())
+}
+
+#[test]
+fn test_openrange_intersect_char() {
+    assert_eq!(
+        OpenRange::open('b').intersection(&OpenRange::closed('b','c')),
+        OpenSet::closed('b', 'c'))
+}
+
+
+#[test]
 fn test_openset_insert() {
     let mut s = OpenSet::closed(1, 2);
     s.insert(&OpenRange::closed(3, 4));
@@ -434,4 +511,11 @@ fn test_openset_insert() {
 #[test]
 fn test_openset_repeat() {
     assert_eq!(OpenSet::closed(1, 2).repeat(1, 3), OpenSet::closed(1, 6))
+}
+
+#[test]
+fn test_openset_intersect_bug() {
+    assert_eq!(OpenSet::build(&"abc".chars().collect())
+                  .intersection(&OpenSet::single('a').negate()),
+        OpenSet::closed('b', 'c'))
 }

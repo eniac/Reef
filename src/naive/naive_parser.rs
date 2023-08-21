@@ -6,10 +6,11 @@ use regex_syntax::hir::Literal::Unicode;
 use regex_syntax::hir::RepetitionKind::{OneOrMore, ZeroOrMore,ZeroOrOne,Range};
 use regex_syntax::hir::RepetitionRange::{Exactly,Bounded, AtLeast};
 use regex_syntax::Parser;
-
+use crate::openset::*;
 
 pub mod re {
     use hashconsing::{consign, HConsed, HashConsign};
+    use crate::openset::{OpenSet, OpenRange};
     use crate::regex::re as ReefRE;
 
     pub type Regex = HConsed<RegexF>;
@@ -129,7 +130,12 @@ pub mod re {
             ReefRE::RegexF::Dot => dot(),
             ReefRE::RegexF::CharClass(c) => {
                 let mut acc = empty();
-                for ch in c.clone().take_while(|c| ab.contains(*c)) {
+                let mut alphaAsOR = OpenSet::empty();
+                for c in ab.chars() { 
+                    alphaAsOR.insert(&OpenRange::closed(c,c));
+                }
+                
+                for ch in alphaAsOR.intersection(c) {
                     acc = alt(acc, character(ch));
                 } 
                acc
