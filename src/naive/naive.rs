@@ -12,8 +12,7 @@ use std::path::PathBuf;
 use std::fs::{File,remove_file};
 use std::io::prelude::*;
 use crate::naive::dfa::*; 
-use crate::regex::re;
-use crate::naive::naive_parser as naive_re;
+use crate::naive::naive_regex::*;
 use itertools::Itertools;
 use neptune::{
     poseidon::PoseidonConstants,
@@ -54,15 +53,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA","DFA");
     let regex = re::simpl(re::new(&(r.clone())));
-    println!("{:?}",regex);
 
-    let newR = naive_re::re::translate(&regex, &alpha[..]);
-    
-    println!("newR: {:?}",newR);
+    let dfa = DFA::new(&alpha[..],regex);
 
-    return;
 
-    let dfa = DFA::new(&alpha[..],newR);
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
 
@@ -70,10 +64,16 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::stop(Component::Compiler, "DFA","DFA");
 
     println!("N States: {:#?}",dfa_nstate);
-    println!("N Delta: {:#?}",dfa_ndelta);
+    println!("Match: {:#?}",dfa.is_match(&"abba".to_string()));
+    println!("No Match: {:#?}",dfa.is_match(&"bbbb".to_string()));
+    
+
+
+    return;
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver,"DFA Solving", "Clear Match");
+
     let is_match = dfa.is_match(&doc);
     let solution = dfa.solve(&doc);
     let mut prover_states: Vec<u32> = solution.clone().into_iter().map(|(a,b,c)| a).collect_vec();
