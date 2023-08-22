@@ -48,7 +48,7 @@ pub struct CircomCircuit<Fr: PrimeField> {
 impl<'a, Fr: PrimeField> CircomCircuit<Fr> {
     pub fn get_public_outputs(&self) -> Vec<Fr> {
         // NOTE: assumes exactly half of the (public inputs + outputs) are outputs
-        let pub_output_count = 1;
+        let pub_output_count = (self.r1cs.num_inputs - 1) / 2;
         let mut z_out: Vec<Fr> = vec![];
         for i in 1..self.r1cs.num_inputs {
             // Public inputs do not exist, so we alloc, and later enforce equality from z values
@@ -89,7 +89,7 @@ impl<'a, Fr: PrimeField> CircomCircuit<Fr> {
 
         let mut vars: Vec<AllocatedNum<Fr>> = vec![];
         let mut z_out: Vec<AllocatedNum<Fr>> = vec![];
-        let pub_output_count = 1;
+        let pub_output_count = (self.r1cs.num_inputs - 1) / 2;
 
         for i in 1..self.r1cs.num_inputs {
             // Public inputs do not exist, so we alloc, and later enforce equality from z values
@@ -150,13 +150,14 @@ impl<'a, Fr: PrimeField> CircomCircuit<Fr> {
                 |lc| lc + vars[i - 1].get_variable(),
             );
         }
+
         Ok(z_out)
     }
 }
 
 impl<'a, Fr: PrimeField> StepCircuit<Fr> for CircomCircuit<Fr> {
     fn arity(&self) -> usize {
-        1
+        (self.r1cs.num_inputs - 1) / 2
     }
 
     fn get_counter_type(&self) -> nova_snark::StepCounterType {
@@ -170,19 +171,11 @@ impl<'a, Fr: PrimeField> StepCircuit<Fr> for CircomCircuit<Fr> {
     ) -> Result<Vec<AllocatedNum<Fr>>, SynthesisError> {
         // synthesize the circuit
         let z_out = self.vanilla_synthesize(cs, z);
-        
+
         z_out
     }
 
     fn output(&self, _z: &[Fr]) -> Vec<Fr> {
         self.get_public_outputs()
     }
-}
-
-pub fn naive_spartan_snark_setup(circuit: CircomCircuit<Fq>)-> (SpartanProverKey<G1, EE>, SpartanVerifierKey<G1, EE>) {
-    // // produce keys
-    let (pk, vk) =
-      SpartanSNARK::<G1, EE, CircomCircuit<<G1 as Group>::Scalar>>::setup(circuit).unwrap();
-
-    (pk,vk)
 }
