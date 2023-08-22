@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Result};
 
-use crate::naive::naive_deriv::{deriv, nullable};
-use crate::naive::naive_parser::re::Regex;
+use crate::naive::naive_regex::{re,Regex};
+// use crate::regex::*;
 
 #[derive(Debug)]
 pub struct DFA<'a> {
@@ -35,11 +35,13 @@ impl<'a> DFA<'a> {
         // Recursive funtion
         fn mk_dfa(d: &mut DFA, q: &Regex) {
           // Add to DFA if not already there
+          println!("initial state:{}",q);
           d.add_state(q);
 
           // Explore derivatives
-          for c in d.ab.chars() {
-              let q_c = deriv(c, q);
+          //d.ab.chars()
+          for c in d.ab.chars()  {
+              let q_c = re::deriv(q, &c);
               println!("q_c:{}, c: {}",q_c,c);
               d.add_transition(q, c, &q_c);
               if d.contains_state(&q_c) {
@@ -96,7 +98,7 @@ impl<'a> DFA<'a> {
         self.states
             .clone()
             .into_iter()
-            .filter_map(|(k, v)| if nullable(&k) { Some(v) } else { None })
+            .filter_map(|(k, v)| if re::nullable(&k) { Some(v) } else { None })
             .collect()
     }
 
@@ -105,7 +107,7 @@ impl<'a> DFA<'a> {
         self.states
             .clone()
             .into_iter()
-            .filter_map(|(k, v)| if nullable(&k) { None } else { Some(v) })
+            .filter_map(|(k, v)| if re::nullable(&k) { None } else { Some(v) })
             .collect()
     }
 
@@ -191,6 +193,7 @@ impl<'a> DFA<'a> {
 
         char_classes
     }
+
 }
 
 // #[cfg(test)]

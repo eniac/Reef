@@ -12,8 +12,7 @@ use std::path::PathBuf;
 use std::fs::{File,remove_file};
 use std::io::prelude::*;
 use crate::naive::dfa::*; 
-use crate::regex::re;
-use crate::naive::naive_parser as naive_re;
+use crate::naive::naive_regex::*;
 use itertools::Itertools;
 use neptune::{
     poseidon::PoseidonConstants,
@@ -56,13 +55,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let regex = re::simpl(re::new(&(r.clone())));
     println!("{:?}",regex);
 
-    let newR = naive_re::re::translate(&regex, &alpha[..]);
-    
-    println!("newR: {:?}",newR);
-
-    return;
-
-    let dfa = DFA::new(&alpha[..],newR);
+    let dfa = DFA::new(&alpha[..],regex);
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
 
