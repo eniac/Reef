@@ -45,6 +45,13 @@ use std::{collections::HashMap};
 #[cfg(feature = "metrics")]
 use crate::metrics::{log, log::Component};
 
+pub fn get_folded_cost(circuit_size: usize, n_foldings: usize) -> usize {
+    let cost_folding = 2 * circuit_size * n_foldings;
+    let cost_snark = (((circuit_size) as f32) * 128.0).log2().ceil() as usize;
+    let total_cost = cost_folding + cost_snark;
+    total_cost
+}
+
 pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
     let doc_len = doc_vec.len();
@@ -149,6 +156,11 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!(
         "Number of constraints per step (secondary circuit): {}",
         pp.num_constraints().1
+    );
+
+    println!(
+        "total n constraints: {}",
+        get_folded_cost(pp.num_constraints().0,doc_len)
     );
 
     #[cfg(feature = "metrics")]
