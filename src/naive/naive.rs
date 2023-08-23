@@ -23,7 +23,7 @@ use neptune::{
 };
 use generic_array::typenum;
 use nova_scotia::circom::circuit::*;
-use nova_scotia::compute_witness;
+// use nova_scotia::compute_witness;
 use nova_snark::{
     PublicParams,
     traits::{circuit::StepCircuit, Group},
@@ -102,6 +102,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
+    return;
+
     let circuit_filepath = "match.r1cs";
     let witness_gen_filepath = "match_js/match.wasm";
 
@@ -142,103 +144,103 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         witness: None,
     };
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler,"Snark", "Setup");
-    let (pk, vk) = naive_spartan_snark_setup(circuit);
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Compiler,"Snark", "Setup");
+    // let (pk, vk) = naive_spartan_snark_setup(circuit);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler,"Snark","Setup");
-
-
-    //witness generation
-    println!("Wit Gen");
-    let iteration_count = private_inputs.len();
-    let public_input: [Fq;0] = [];
-    let start_public_input_hex = public_input.iter().map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string()).collect::<Vec<String>>();
-    let mut current_public_input = start_public_input_hex.clone();
-
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Solver,"Witness","Gen");
-
-    let witnesses = compute_witness::<G1, G2>(
-        current_public_input,
-        private_inputs[0].clone(),
-        FileLocation::PathBuf(witness_generator_file),
-        &witness_generator_output,
-    );
-
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Solver,"Witness","Gen");
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Compiler,"Snark","Setup");
 
 
-    let prove_circuit = CircomCircuit {
-        r1cs: r1cs.clone(),
-        witness: Some(witnesses),
-    };
+    // //witness generation
+    // println!("Wit Gen");
+    // let iteration_count = private_inputs.len();
+    // let public_input: [Fq;0] = [];
+    // let start_public_input_hex = public_input.iter().map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string()).collect::<Vec<String>>();
+    // let mut current_public_input = start_public_input_hex.clone();
 
-    let z = vec![<G1 as Group>::Scalar::one()];
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Solver,"Witness","Gen");
 
-    println!("Prove");
+    // let witnesses = compute_witness::<G1, G2>(
+    //     current_public_input,
+    //     private_inputs[0].clone(),
+    //     FileLocation::PathBuf(witness_generator_file),
+    //     &witness_generator_output,
+    // );
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Prover,"Prover","Prove");
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Solver,"Witness","Gen");
 
-    let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Prover,"Prover","Prove");
+    // let prove_circuit = CircomCircuit {
+    //     r1cs: r1cs.clone(),
+    //     witness: Some(witnesses),
+    // };
 
-    assert!(result.is_ok());
+    // let z = vec![<G1 as Group>::Scalar::one()];
 
-    let output = prove_circuit.output(&z);
+    // println!("Prove");
 
-    let snark = result.unwrap();
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Prover,"Prover","Prove");
 
-    #[cfg(feature = "metrics")]
-    log::space(
-        Component::Prover,
-        "Proof Size",
-        "Spartan SNARK size",
-        serde_json::to_string(&snark).unwrap().len(),
-    );
+    // let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
 
-    // // verify the SNARK
-    println!("Verify");
-    let io = z.into_iter()
-      .chain(output.clone().into_iter())
-      .collect::<Vec<_>>();
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Prover,"Prover","Prove");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Verifier, "Verify", "Verify");
+    // assert!(result.is_ok());
 
-    let verifier_result = snark.verify(&vk, &io);
+    // let output = prove_circuit.output(&z);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Verifier, "Verify", "Verify"); 
+    // let snark = result.unwrap();
 
-    assert!(verifier_result.is_ok()); 
+    // #[cfg(feature = "metrics")]
+    // log::space(
+    //     Component::Prover,
+    //     "Proof Size",
+    //     "Spartan SNARK size",
+    //     serde_json::to_string(&snark).unwrap().len(),
+    // );
 
-    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
-    let mut wtr = Writer::from_writer(file);
-    let _ = wtr.write_record(&[
-    format!("{}_{}",&doc[..10],doc.len()),
-    r,
-    dfa_ndelta.to_string(), //nedges().to_string(),
-    dfa_nstate.to_string(), //nstates().to_string(),
-    ]);
-    let spacer = "---------";
-    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-    wtr.flush();
+    // // // verify the SNARK
+    // println!("Verify");
+    // let io = z.into_iter()
+    //   .chain(output.clone().into_iter())
+    //   .collect::<Vec<_>>();
 
-    #[cfg(feature = "metrics")]
-    log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Verifier, "Verify", "Verify");
 
-    remove_file("match.circom");
-    remove_file("match.sym");
-    remove_file("match.r1cs");
-    remove_file("circom_witness.wtns");
+    // let verifier_result = snark.verify(&vk, &io);
 
-    return   
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Verifier, "Verify", "Verify"); 
+
+    // assert!(verifier_result.is_ok()); 
+
+    // let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
+    // let mut wtr = Writer::from_writer(file);
+    // let _ = wtr.write_record(&[
+    // format!("{}_{}",&doc[..10],doc.len()),
+    // r,
+    // dfa_ndelta.to_string(), //nedges().to_string(),
+    // dfa_nstate.to_string(), //nstates().to_string(),
+    // ]);
+    // let spacer = "---------";
+    // let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    // wtr.flush();
+
+    // #[cfg(feature = "metrics")]
+    // log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+
+    // remove_file("match.circom");
+    // remove_file("match.sym");
+    // remove_file("match.r1cs");
+    // remove_file("circom_witness.wtns");
+
+    // return   
 }
 
 

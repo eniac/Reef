@@ -129,6 +129,15 @@ template PoseidonMulti(N) {
         
     }
 
+}
+
+template IsZero() {
+    signal input in;
+    signal output out;
+    signal inv;
+    inv <-- in!=0 ? 1/in : 0;
+    out <== -in*inv +1;
+    in*out === 0;
 }\n".to_string();
     
     final_string.push_str(&make_vanishing(dfa.deltas().len(),"Trans",make_idx_string(&dfa, n_char as u64))); 
@@ -141,7 +150,7 @@ template PoseidonMulti(N) {
 }
 
 
-pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:usize, n_char: usize, n_states: usize)->String{
+pub fn make_main(doc_len: usize,deltas:usize,n_accepting:usize, n_char: usize, n_states: usize)->String{
     format!("pragma circom 2.0.3;
 
     include \"utils.circom\";
@@ -164,41 +173,51 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
         signal output out;
     
         component runningProduct = MultiplierN({n_accepting});
+        component isZero = IsZero();
+    
     
         for (var i = 0; i < {n_accepting}; i++) {{
             runningProduct.in[i] <== rootsMatch(i) - in;
         }}
-        out <== runningProduct.out;
+        isZero.in <== runningProduct.out;
+        out <== isZero.out;
     }}
     
     template Main () {{
-        signal input doc[{doc_len}];
-        signal input prover_states[{prover_states}];
-        signal input blind;
-    
-        signal output hashed;
-    
-        component valid_state[{doc_len}];
-        component valid_match;
-    
-        prover_states[0]===0;
-    
-        for (var j=1;j<{prover_states};j++) {{
-            valid_state[j-1] = IsValidTrans();
-            valid_state[j-1].curIndex <== prover_states[j-1]*{n_states}*{n_char} + doc[j-1]*{n_states} +
-            prover_states[j];
-            valid_state[j-1].out === 0;
-        }}
-        valid_match = IsValidMatch();
-        valid_match.in <== prover_states[{doc_len}];
-    
-        valid_match.out === 0;
+        signal input doc_len;
+        signal input cur_state;
+        signal input next_state; 
+        signal input char;
 
-        component hash = PoseidonMulti({doc_len});
-        hash.in <== doc;
-        hash.blind <== blind;
+        signal input step_in[3];
+        signal output step_out[3];
+
+        signal running_hash <== step_in[1];
+        signal index <== step_in[0];
+
+        component indexIsZero = IsZero();
+        indexIsZero.in <== index;
     
-        hashed<==hash.out;
+        component valid_state;
+        
+        valid_state = IsValidTrans();
+        valid_state.curIndex <== cur_state*{n_states}*{n_char} + char*{n_states} + next_state;
+        valid_state.out === 0;
+
+        cur_state*indexIsZero.out === 0;
+
+        component valid_match;
+        valid_match = IsValidMatch();
+        valid_match.in <== cur_state;
+
+        component hash = Poseidon(2);
+        hash.inputs[0] <==running_hash;
+
+        hash.inputs[1] <== char;
+
+        step_out[0] <== index + 1;
+        step_out[1] <== hash.out;
+        step_out[2] <== valid_match.out;
     }}
     
     component main = Main();")
@@ -206,7 +225,7 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
 
 pub fn make_circom(dfa: &DFA<'_>, doc_len: usize, n_char: usize) -> std::io::Result<()> {
     make_utils(dfa, doc_len, n_char);
-    let mut final_string = make_main(doc_len, doc_len+1, dfa.deltas().len(), dfa.get_final_states().len(), n_char,dfa.nstates());
+    let mut final_string = make_main(doc_len, dfa.deltas().len(), dfa.get_final_states().len(), n_char,dfa.nstates());
     let mut file = File::create("match.circom")?;
     file.write_all(final_string.as_bytes())?;
     Ok(())
