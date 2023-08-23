@@ -53,7 +53,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA","DFA");
     let regex = re::simpl(re::new(&(r.clone())));
-    println!("{:?}",regex);
 
     let dfa = DFA::new(&alpha[..],regex);
     let dfa_ndelta = dfa.deltas().len();

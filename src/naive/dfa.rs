@@ -35,14 +35,12 @@ impl<'a> DFA<'a> {
         // Recursive funtion
         fn mk_dfa(d: &mut DFA, q: &Regex) {
           // Add to DFA if not already there
-          println!("initial state:{}",q);
           d.add_state(q);
 
           // Explore derivatives
           //d.ab.chars()
           for c in d.ab.chars()  {
               let q_c = re::deriv(q, &c);
-              println!("q_c:{}, c: {}",q_c,c);
               d.add_transition(q, c, &q_c);
               if d.contains_state(&q_c) {
                   continue;
