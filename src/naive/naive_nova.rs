@@ -230,6 +230,32 @@ where
     }
 }
 
+pub fn gen_hash(to_hash: Vec<Fq>, pc: &PoseidonConstants<Fq, typenum::U4>)->pasta_curves::Fq{
+    let mut hash: Vec<Fq>;
+
+    let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
+    let acc = &mut ();
+
+    sponge.start(
+        IOPattern(vec![SpongeOp::Absorb(to_hash.len() as u32 + 1), SpongeOp::Squeeze(1)]),
+        None,
+        acc,
+    );
+     
+    //let mut hash_clone: Vec<Fq> = to_hash.into_iter().map(|x| <G1 as Group>::Scalar::from(x as u64)).collect();
+
+    SpongeAPI::absorb(
+        &mut sponge,
+        to_hash.len() as u32,
+        &to_hash,
+        acc,
+    );
+
+    hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+    sponge.finish(acc).unwrap();
+    hash[0]
+} 
+
 pub fn gen_commitment(doc: Vec<u32>, pc: &PoseidonConstants<Fq, typenum::U4>)->HashCommitmentStruct<pasta_curves::Fq>{
     let mut hash: Vec<Fq>;
 

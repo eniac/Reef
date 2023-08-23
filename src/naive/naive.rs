@@ -6,7 +6,7 @@ type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
 // use crate::backend::{r1cs_helper::init};
 use crate::naive::naive_circom_writer::*;
-use crate::naive::naive_nova::gen_commitment;
+use crate::naive::naive_nova::{gen_commitment, gen_hash};
 use std::{env::current_dir};
 use std::path::PathBuf;
 use std::fs::{File,remove_file};
@@ -101,8 +101,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
-    return;
-
     let circuit_filepath = "match.r1cs";
     let witness_gen_filepath = "match_js/match.wasm";
 
@@ -119,30 +117,64 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler,"R1CS", "Loading");
 
-    let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
-    let mut private_input = HashMap::new();
-    private_input.insert("doc".to_string(), json!(doc_vec));
-    private_input.insert("prover_states".to_string(), json!(prover_states));
-    private_input.insert("blind".to_string(),json!(commitment.blind));
-    private_inputs.push(private_input);
+    let empty_commitment = gen_commitment(vec![], &pc);
 
+    let start_public_input = [
+        F::<G1>::from(0),
+        gen_hash(vec![commitment.blind], &pc),
+        F::<G1>::from(1)
+    ];
+
+    let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
+
+    for i in 0..doc_len {
+        let mut private_input = HashMap::new();
+        private_input.insert("cur_state".to_string(), json!(prover_states[i]));
+        private_input.insert("next_state".to_string(), json!(prover_states[i+1]));
+        private_input.insert("char".to_string(),json!(doc_vec[i]));
+        private_inputs.push(private_input);
+
+    }
+
+    let pp = create_public_params::<G1, G2>(r1cs.clone());
+ 
     println!(
-        "Number of constraints: {}",
-       r1cs.constraints.len()
+        "Number of constraints per step (primary circuit): {}",
+        pp.num_constraints().0
     );
+    println!(
+        "Number of constraints per step (secondary circuit): {}",
+        pp.num_constraints().1
+    );
+
     #[cfg(feature = "metrics")]
     log::r1cs(Component::Compiler, "R1CS", "Size", r1cs.constraints.len());
 
     println!(
-        "Number of variables: {}",
-       r1cs.num_variables
+        "Number of variables per step (primary circuit): {}",
+        pp.num_variables().0
+    );
+    println!(
+        "Number of variables per step (secondary circuit): {}",
+        pp.num_variables().1
     );
 
-    let circuit = CircomCircuit {
-        r1cs: r1cs.clone(),
-        witness: None,
-    };
+    let recursive_snark = create_recursive_circuit(
+        FileLocation::PathBuf(witness_generator_file),
+        r1cs,
+        private_inputs,
+        start_public_input.to_vec(),
+        &pp,
+    ).unwrap();
 
+    let z0_secondary = [<G2 as Group>::Scalar::zero()];
+
+    // verify the recursive SNARK
+    println!("Verifying a RecursiveSNARK...");
+    let res = recursive_snark.verify(&pp, doc_len, start_public_input.to_vec(), z0_secondary.to_vec());
+    assert!(res.is_ok());
+
+    return;
     // #[cfg(feature = "metrics")]
     // log::tic(Component::Compiler,"Snark", "Setup");
     // let (pk, vk) = naive_spartan_snark_setup(circuit);

@@ -31,7 +31,6 @@ pragma circom 2.0.3;
     }
     
     template Main () {
-        signal input doc_len;
         signal input cur_state;
         signal input next_state; 
         signal input char;
@@ -55,7 +54,7 @@ pragma circom 2.0.3;
 
         component valid_match;
         valid_match = IsValidMatch();
-        valid_match.in <== cur_state;
+        valid_match.in <== next_state;
 
         component hash = Poseidon(2);
         hash.inputs[0] <==running_hash;

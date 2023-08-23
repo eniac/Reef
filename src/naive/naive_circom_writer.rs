@@ -184,7 +184,6 @@ pub fn make_main(doc_len: usize,deltas:usize,n_accepting:usize, n_char: usize, n
     }}
     
     template Main () {{
-        signal input doc_len;
         signal input cur_state;
         signal input next_state; 
         signal input char;
@@ -208,7 +207,7 @@ pub fn make_main(doc_len: usize,deltas:usize,n_accepting:usize, n_char: usize, n
 
         component valid_match;
         valid_match = IsValidMatch();
-        valid_match.in <== cur_state;
+        valid_match.in <== next_state;
 
         component hash = Poseidon(2);
         hash.inputs[0] <==running_hash;
