@@ -212,13 +212,14 @@ where
 
         let res = RecursiveSNARK::<G1, G2, C1<G1>, C2<G2>>::prove_step(
             &pp,
-            recursive_snark.clone(),
+            recursive_snark,
             circuit.clone(),
             circuit_secondary.clone(),
             start_public_input.clone(),
             z0_secondary.clone(),
         );
         assert!(res.is_ok());
+        recursive_snark = Some(res.unwrap());
     }
     fs::remove_file(witness_generator_output)?;
 
