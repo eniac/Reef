@@ -237,7 +237,7 @@ pub fn gen_hash(to_hash: Vec<Fq>, pc: &PoseidonConstants<Fq, typenum::U4>)->past
     let acc = &mut ();
 
     sponge.start(
-        IOPattern(vec![SpongeOp::Absorb(to_hash.len() as u32 + 1), SpongeOp::Squeeze(1)]),
+        IOPattern(vec![SpongeOp::Absorb(to_hash.len() as u32), SpongeOp::Squeeze(1)]),
         None,
         acc,
     );

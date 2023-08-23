@@ -66,4 +66,4 @@ pragma circom 2.0.3;
         step_out[2] <== valid_match.out;
     }
     
-    component main = Main();
+    component main { public [step_in] }= Main();

@@ -117,13 +117,15 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler,"R1CS", "Loading");
 
-    let empty_commitment = gen_commitment(vec![], &pc);
+    println!("R1CS loaded" );
 
     let start_public_input = [
         F::<G1>::from(0),
         gen_hash(vec![commitment.blind], &pc),
         F::<G1>::from(1)
     ];
+
+    println!("pub inputs");
 
     let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
 
@@ -137,6 +139,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     }
 
     let pp = create_public_params::<G1, G2>(r1cs.clone());
+
+    println!("post pp");
  
     println!(
         "Number of constraints per step (primary circuit): {}",

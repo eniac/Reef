@@ -76,14 +76,14 @@ impl<'a, Fr: PrimeField> CircomCircuit<Fr> {
         // println!("witness: {:?}", self.witness);
         // // println!("wire_mapping: {:?}", self.wire_mapping);
         // // println!("aux_offset: {:?}", self.aux_offset);
-        // println!("num_inputs: {:?}", self.r1cs.num_inputs);
+        println!("num_inputs: {:?}", self.r1cs.num_inputs);
         // println!("num_aux: {:?}", self.r1cs.num_aux);
         // println!("num_variables: {:?}", self.r1cs.num_variables);
         // println!("constraints: {:?}", self.r1cs.constraints);
-        // println!(
-        //     "z: {:?}",
-        //     z.into_iter().map(|x| x.get_value()).collect::<Vec<_>>()
-        // );
+        println!(
+            "z: {:?}",
+            z.into_iter().map(|x| x.get_value()).collect::<Vec<_>>()
+        );
 
         let witness = &self.witness;
 

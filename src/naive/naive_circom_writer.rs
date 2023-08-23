@@ -219,7 +219,7 @@ pub fn make_main(doc_len: usize,deltas:usize,n_accepting:usize, n_char: usize, n
         step_out[2] <== valid_match.out;
     }}
     
-    component main = Main();")
+    component main {{ public [step_in] }}= Main();")
 }
 
 pub fn make_circom(dfa: &DFA<'_>, doc_len: usize, n_char: usize) -> std::io::Result<()> {
