@@ -2,7 +2,8 @@
 
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 
 // use crate::backend::{r1cs_helper::init};
 use crate::naive::naive_circom_writer::*;
@@ -27,7 +28,8 @@ use nova_scotia::circom::circuit::*;
 use nova_snark::{
     PublicParams,
     traits::{circuit::StepCircuit, Group},
-    spartan::direct::*,
+    spartan::*,
+    CompressedSNARK,
 };
 use ff::PrimeField;
 use pasta_curves::Fq;
@@ -185,9 +187,35 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let z0_secondary = [<G2 as Group>::Scalar::zero()];
 
-    // verify the recursive SNARK
-    println!("Verifying a RecursiveSNARK...");
-    let res = recursive_snark.verify(&pp, doc_len, start_public_input.to_vec(), z0_secondary.to_vec());
+    // // verify the recursive SNARK
+    // println!("Verifying a RecursiveSNARK...");
+    // let res = recursive_snark.verify(&pp, doc_len, start_public_input.to_vec(), z0_secondary.to_vec());
+    // assert!(res.is_ok());
+
+    // produce a compressed SNARK
+    println!("Generating a CompressedSNARK using Spartan with IPA-PC...");
+    type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
+    type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
+    let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
+    println!(
+        "CompressedSNARK::prove: {:?}",
+        res.is_ok(),
+    );
+    assert!(res.is_ok());
+    let compressed_snark = res.unwrap();
+
+    // // verify the compressed SNARK
+    println!("Verifying a CompressedSNARK...");
+    let res = compressed_snark.verify(
+        &pp,
+        doc_len,
+        start_public_input.to_vec().clone(),
+        z0_secondary.to_vec(),
+    );
+    println!(
+        "CompressedSNARK::verify: {:?}",
+        res.is_ok(),
+    );
     assert!(res.is_ok());
 
     return;
