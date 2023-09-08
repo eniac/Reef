@@ -40,7 +40,6 @@ impl RegexParser {
                         re::app(Self::to_regex(e)?, re::dotstar()))),
         }?;
 
-        println!("Before {:?} after {:?}", e, res);
         Ok(res)
     }
 

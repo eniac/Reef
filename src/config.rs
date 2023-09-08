@@ -212,7 +212,6 @@ impl BaseParser<char> for AsciiParser {
         reader
             .read_to_end(&mut buffer)
             .expect("Could not parse document");
-
         buffer.into_iter()
             .map(|i| i as char)
             .filter(|c| *c != '\n' && *c != '\r')

@@ -46,16 +46,15 @@ use std::{collections::HashMap};
 use crate::metrics::{log, log::Component};
 
 pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
+    println!("doc len: {}",doc.len());
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
     let doc_len = doc_vec.len();
-
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA","DFA");
     let regex = re::simpl(re::new(&(r.clone())));
 
     let dfa = DFA::new(&alpha[..],regex);
-
 
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
@@ -64,12 +63,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::stop(Component::Compiler, "DFA","DFA");
 
     println!("N States: {:#?}",dfa_nstate);
-    println!("Match: {:#?}",dfa.is_match(&"abba".to_string()));
-    println!("No Match: {:#?}",dfa.is_match(&"bbbb".to_string()));
-    
-
-
-    return;
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver,"DFA Solving", "Clear Match");
@@ -108,6 +101,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::stop(Component::Compiler, "R1CS", "Circom");
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
+
+    remove_file("match.circom");
 
     let circuit_filepath = "match.r1cs";
     let witness_gen_filepath = "match_js/match.wasm";
@@ -177,6 +172,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver,"Witness","Gen");
 
+    remove_file("match.sym");
+    remove_file("match.r1cs");
+    remove_file("circom_witness.wtns");
 
     let prove_circuit = CircomCircuit {
         r1cs: r1cs.clone(),
@@ -239,11 +237,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     #[cfg(feature = "metrics")]
     log::write_csv(&out_write.as_path().display().to_string()).unwrap();
-
-    remove_file("match.circom");
-    remove_file("match.sym");
-    remove_file("match.r1cs");
-    remove_file("circom_witness.wtns");
 
     return   
 }
