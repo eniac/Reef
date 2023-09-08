@@ -36,6 +36,8 @@ fn main() {
         opt.input.chars().collect()
     };
 
+    println!("re {}",opt.re);
+
     naive::naive_bench(opt.re,ab,doc,opt.output);
 
     // #[cfg(feature = "metrics")]

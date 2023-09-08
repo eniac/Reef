@@ -142,16 +142,16 @@ template PoseidonMulti(N) {
 
 
 pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:usize, n_char: usize, n_states: usize)->String{
-    let valid_match_body;
+    let valid_match_body: String;
     if (n_accepting == 1) {
-        valid_match_body = "out <== rootsMatch(0) - in;"
+        valid_match_body = "out <== rootsMatch(0) - in;".to_string();
     } else {
         valid_match_body = format!("component runningProduct = MultiplierN({n_accepting});
     
         for (var i = 0; i < {n_accepting}; i++) {{
             runningProduct.in[i] <== rootsMatch(i) - in;
         }}
-        out <== runningProduct.out;")
+        out <== runningProduct.out;");
     }
     format!("pragma circom 2.0.3;
 
