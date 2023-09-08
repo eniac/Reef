@@ -47,6 +47,7 @@ use crate::metrics::{log, log::Component};
 
 pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!("doc len: {}",doc.len());
+    println!("{}",r);
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
     let doc_len = doc_vec.len();
 
@@ -244,9 +245,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
 #[test]
 fn test_1() {
-    let r  = "([^a]+)a".to_string();
-    //let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
-    let ab: String = "abc".to_string();
+    let r  = "abc";
+    //"Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text\/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00".to_string();
+    let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
+    // let ab: String = "abc".to_string();
     //let ab = abvec.iter().collect();
     let doc = "abc".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
