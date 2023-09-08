@@ -142,6 +142,17 @@ template PoseidonMulti(N) {
 
 
 pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:usize, n_char: usize, n_states: usize)->String{
+    let valid_match_body;
+    if (n_accepting == 1) {
+        valid_match_body = "out <== rootsMatch(0) - in;"
+    } else {
+        valid_match_body = "component runningProduct = MultiplierN({n_accepting});
+    
+        for (var i = 0; i < {n_accepting}; i++) {{
+            runningProduct.in[i] <== rootsMatch(i) - in;
+        }}
+        out <== runningProduct.out;"
+    }
     format!("pragma circom 2.0.3;
 
     include \"utils.circom\";
@@ -162,13 +173,9 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
     template IsValidMatch() {{
         signal input in;
         signal output out;
-    
-        component runningProduct = MultiplierN({n_accepting});
-    
-        for (var i = 0; i < {n_accepting}; i++) {{
-            runningProduct.in[i] <== rootsMatch(i) - in;
-        }}
-        out <== runningProduct.out;
+
+        {valid_match_body}
+       
     }}
     
     template Main () {{
