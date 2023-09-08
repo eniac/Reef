@@ -146,12 +146,12 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
     if (n_accepting == 1) {
         valid_match_body = "out <== rootsMatch(0) - in;"
     } else {
-        valid_match_body = "component runningProduct = MultiplierN({n_accepting});
+        valid_match_body = format!("component runningProduct = MultiplierN({n_accepting});
     
         for (var i = 0; i < {n_accepting}; i++) {{
             runningProduct.in[i] <== rootsMatch(i) - in;
         }}
-        out <== runningProduct.out;"
+        out <== runningProduct.out;")
     }
     format!("pragma circom 2.0.3;
 
