@@ -158,14 +158,28 @@ pub fn normal_add_table<'a>(
     num_chars: usize,
     max_offsets: usize,
     all_state: NodeIndex,
-    last_forall_path: bool,
+    forall_node: NodeIndex,
+    last_path: bool,
 ) {
+    if last_path {
+        current_forall_state_stack.push_front(num_states); // TODO
+    } else {
+        current_forall_state_stack.push_front(forall_node.index());
+    }
+
     // dupicate safa, run this path
     let mut dfs_small = Dfs::new(&safa.g, all_state);
 
+    // note: duplicate "back branches" being added, but added to set so its all cool
+    // this could probably be more efficient tho
     while let Some(state) = dfs_small.next(&safa.g) {
         let in_state = state.index();
         println!("SMALL DFA STATE {:#?}", state);
+
+        if safa.g[state].is_and() {
+            current_forall_state_stack.push_front(state.index());
+        }
+
         for edge in safa.g.edges(state) {
             let out_state = edge.target().index();
 
@@ -258,14 +272,13 @@ pub fn normal_add_table<'a>(
             let rel = 1;
             let in_state = state.index();
 
+            println!("FORALL STATE STACK {:#?}", current_forall_state_stack);
+
             let out_state = if current_forall_state_stack.len() == 0 {
                 // "finished"
                 num_states - 1 //fake_last_state TODO make num_states += 1 in main
             } else {
-                if last_forall_path {
-                    current_forall_state_stack.pop_front();
-                }
-                current_forall_state_stack.front()
+                *current_forall_state_stack.front().unwrap()
             };
 
             // TODO we have to make sure the multipliers are big enough
@@ -299,6 +312,7 @@ pub fn normal_add_table<'a>(
             );
         }
     }
+    current_forall_state_stack.pop_front();
 }
 
 // a starts with evals on hypercube
