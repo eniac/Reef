@@ -1,0 +1,197 @@
+
+ad.stackov_128,"^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+\.){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-]",12032,94
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,Loading,2605486,μs
+solver,Witness,Gen,183047105,μs
+compiler,Snark,Setup,61493040,μs
+compiler,R1CS,Circom,147183984,μs
+prover,Prover,Prove,33842026,μs
+verifier,Verify,Verify,29836505,μs
+compiler,R1CS,Commitment Gen,23213,μs
+solver,DFA Solving,Clear Match,223358,μs
+compiler,DFA,DFA,28937,μs
+compiler,R1CS,Size,1552754,constraints
+prover,Proof Size,Spartan SNARK size,49541,bytes
+adimage101_128,^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-],4224,33
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+solver,DFA Solving,Clear Match,75329,μs
+compiler,DFA,DFA,28530,μs
+prover,Prover,Prove,16825905,μs
+compiler,Snark,Setup,24044452,μs
+verifier,Verify,Verify,14714027,μs
+compiler,R1CS,Commitment Gen,23201,μs
+solver,Witness,Gen,26729741,μs
+compiler,R1CS,Circom,35943402,μs
+compiler,R1CS,Loading,970690,μs
+compiler,R1CS,Size,553295,constraints
+prover,Proof Size,Spartan SNARK size,47320,bytes
+adimage101_128,^(.+[_.-])?telemetry[_.-],3200,25
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,Commitment Gen,23283,μs
+compiler,Snark,Setup,18342855,μs
+compiler,R1CS,Circom,26016681,μs
+prover,Prover,Prove,8570368,μs
+compiler,DFA,DFA,22557,μs
+verifier,Verify,Verify,7503640,μs
+compiler,R1CS,Loading,753157,μs
+solver,Witness,Gen,17196073,μs
+solver,DFA Solving,Clear Match,57080,μs
+compiler,R1CS,Size,422219,constraints
+prover,Proof Size,Spartan SNARK size,45152,bytes
+adimage101_128,^adim(age|g)s?[0-9]*[_.-],1408,11
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+prover,Prover,Prove,4302385,μs
+compiler,Snark,Setup,9570078,μs
+compiler,DFA,DFA,773,μs
+verifier,Verify,Verify,3772385,μs
+solver,Witness,Gen,5553321,μs
+compiler,R1CS,Circom,11375125,μs
+compiler,R1CS,Loading,375087,μs
+compiler,R1CS,Commitment Gen,23331,μs
+solver,DFA Solving,Clear Match,24975,μs
+compiler,R1CS,Size,192831,constraints
+prover,Proof Size,Spartan SNARK size,43081,bytes
+adtracker1_128,^adtrack(er|ing)?[0-9]*[_.-],1792,14
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+solver,Witness,Gen,6384548,μs
+compiler,DFA,DFA,980,μs
+compiler,R1CS,Circom,14156426,μs
+compiler,R1CS,Loading,453809,μs
+verifier,Verify,Verify,3875988,μs
+compiler,R1CS,Commitment Gen,23226,μs
+prover,Prover,Prove,4508821,μs
+compiler,Snark,Setup,11343106,μs
+solver,DFA Solving,Clear Match,31761,μs
+compiler,R1CS,Size,241983,constraints
+prover,Proof Size,Spartan SNARK size,43014,bytes
+advertisin_128,^advert(s|is(ing|ements?))?[0-9]*[_.-],2432,19
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,Commitment Gen,23233,μs
+prover,Prover,Prove,8466064,μs
+compiler,R1CS,Loading,586350,μs
+solver,DFA Solving,Clear Match,44355,μs
+verifier,Verify,Verify,7383364,μs
+compiler,Snark,Setup,14773686,μs
+compiler,DFA,DFA,1416,μs
+compiler,R1CS,Circom,19167642,μs
+solver,Witness,Gen,9777937,μs
+compiler,R1CS,Size,323903,constraints
+prover,Proof Size,Spartan SNARK size,45313,bytes
+affiliate._128,^aff(iliat(es?|ion))?[_.-],1920,15
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+solver,DFA Solving,Clear Match,34790,μs
+compiler,R1CS,Loading,494019,μs
+solver,Witness,Gen,7143753,μs
+compiler,R1CS,Commitment Gen,23254,μs
+compiler,R1CS,Circom,15322264,μs
+compiler,Snark,Setup,12008901,μs
+compiler,DFA,DFA,1047,μs
+prover,Prover,Prove,4428234,μs
+verifier,Verify,Verify,3785114,μs
+compiler,R1CS,Size,258367,constraints
+prover,Proof Size,Spartan SNARK size,43100,bytes
+analytics._128,^analytics?[_.-],1536,12
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,Loading,411557,μs
+verifier,Verify,Verify,3839640,μs
+compiler,R1CS,Commitment Gen,24087,μs
+compiler,R1CS,Circom,12240131,μs
+solver,Witness,Gen,5641874,μs
+compiler,Snark,Setup,10156160,μs
+compiler,DFA,DFA,788,μs
+solver,DFA Solving,Clear Match,27157,μs
+prover,Prover,Prove,4419412,μs
+compiler,R1CS,Size,209215,constraints
+prover,Proof Size,Spartan SNARK size,43004,bytes
+banners.te_128,^banners?[_.-],1280,10
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+verifier,Verify,Verify,3776252,μs
+compiler,R1CS,Circom,10354685,μs
+prover,Prover,Prove,4327480,μs
+solver,DFA Solving,Clear Match,22930,μs
+compiler,DFA,DFA,639,μs
+solver,Witness,Gen,5406011,μs
+compiler,R1CS,Loading,347414,μs
+compiler,Snark,Setup,8945686,μs
+compiler,R1CS,Commitment Gen,23223,μs
+compiler,R1CS,Size,176447,constraints
+prover,Proof Size,Spartan SNARK size,43019,bytes
+beacons221_128,^beacons?[0-9]*[_.-],1280,10
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,Commitment Gen,23193,μs
+compiler,DFA,DFA,751,μs
+compiler,R1CS,Loading,347271,μs
+verifier,Verify,Verify,3808870,μs
+compiler,R1CS,Circom,10417029,μs
+solver,Witness,Gen,5060301,μs
+prover,Prover,Prove,4368332,μs
+compiler,Snark,Setup,8907341,μs
+solver,DFA Solving,Clear Match,22789,μs
+compiler,R1CS,Size,176447,constraints
+prover,Proof Size,Spartan SNARK size,43060,bytes
+counters22_128,^count(ers?)?[0-9]*[_.-],1408,11
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+prover,Prover,Prove,4313257,μs
+solver,Witness,Gen,5304436,μs
+compiler,Snark,Setup,9554628,μs
+verifier,Verify,Verify,3742339,μs
+compiler,R1CS,Loading,374856,μs
+compiler,R1CS,Commitment Gen,23213,μs
+solver,DFA Solving,Clear Match,25101,μs
+compiler,DFA,DFA,809,μs
+compiler,R1CS,Circom,11169196,μs
+compiler,R1CS,Size,192831,constraints
+prover,Proof Size,Spartan SNARK size,43026,bytes
+mads.testi_128,^mads\.,896,7
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,Snark,Setup,6959670,μs
+solver,DFA Solving,Clear Match,16736,μs
+compiler,R1CS,Circom,7882723,μs
+solver,Witness,Gen,4425105,μs
+compiler,DFA,DFA,352,μs
+prover,Prover,Prove,2334449,μs
+compiler,R1CS,Commitment Gen,23252,μs
+compiler,R1CS,Loading,267340,μs
+verifier,Verify,Verify,1971796,μs
+compiler,R1CS,Size,127295,constraints
+prover,Proof Size,Spartan SNARK size,40893,bytes
+pixel.test_124,^pixels?[-.],1152,9
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,Circom,9316495,μs
+solver,DFA Solving,Clear Match,20130,μs
+solver,Witness,Gen,4771223,μs
+verifier,Verify,Verify,3788551,μs
+compiler,DFA,DFA,576,μs
+prover,Prover,Prove,4329836,μs
+compiler,R1CS,Loading,312292,μs
+compiler,Snark,Setup,8127455,μs
+compiler,R1CS,Commitment Gen,23164,μs
+compiler,R1CS,Size,155141,constraints
+prover,Proof Size,Spartan SNARK size,43020,bytes
+statistics_128,^stat(s|istics)?[0-9]*[_.-],1664,13
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+solver,Witness,Gen,5945763,μs
+prover,Prover,Prove,4412231,μs
+compiler,R1CS,Loading,426798,μs
+compiler,DFA,DFA,866,μs
+verifier,Verify,Verify,3795290,μs
+compiler,R1CS,Commitment Gen,23228,μs
+compiler,Snark,Setup,10693647,μs
+solver,DFA Solving,Clear Match,29388,μs
+compiler,R1CS,Circom,13139667,μs
+compiler,R1CS,Size,225599,constraints
+prover,Proof Size,Spartan SNARK size,42952,bytes

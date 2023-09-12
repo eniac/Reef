@@ -1,0 +1,112 @@
+JmT}yAO8{O_100,([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?),2304,18
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,Circom,15606442,μs
+verifier,Verify,Verify,3442134,μs
+compiler,DFA,DFA,15443,μs
+compiler,R1CS,Loading,427718,μs
+prover,Prover,Prove,4039045,μs
+compiler,Snark,Setup,11206331,μs
+solver,Witness,Gen,6980147,μs
+solver,DFA Solving,Clear Match,30109,μs
+compiler,R1CS,Commitment Gen,19654,μs
+compiler,R1CS,Size,240351,constraints
+prover,Proof Size,Spartan SNARK size,43051,bytes
+To sestyTo_2000,([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?),2304,18
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,Snark,Setup,227977709,μs
+solver,Witness,Gen,61476463,μs
+compiler,R1CS,Circom,250121294,μs
+verifier,Verify,Verify,109348386,μs
+compiler,R1CS,Loading,8524084,μs
+compiler,DFA,DFA,13909,μs
+solver,DFA Solving,Clear Match,612375,μs
+compiler,R1CS,Commitment Gen,36871,μs
+prover,Prover,Prove,123514684,μs
+compiler,R1CS,Size,4804073,constraints
+prover,Proof Size,Spartan SNARK size,53724,bytes
+To strut b_100,"(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))",48640,380
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+prover,Prover,Prove,122121201,μs
+compiler,DFA,DFA,5223012,μs
+compiler,Snark,Setup,192661809,μs
+compiler,R1CS,Loading,7784014,μs
+solver,DFA Solving,Clear Match,659333,μs
+solver,Witness,Gen,1833864320,μs
+compiler,R1CS,Commitment Gen,19911,μs
+verifier,Verify,Verify,107148474,μs
+compiler,R1CS,Circom,1799902930,μs
+compiler,R1CS,Size,4874178,constraints
+prover,Proof Size,Spartan SNARK size,53827,bytes
+~dNOA<=(4+_100,([^ @]+)@([^ @]+),1280,10
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,DFA,DFA,5109,μs
+solver,Witness,Gen,4970847,μs
+prover,Prover,Prove,4042357,μs
+compiler,R1CS,Loading,269249,μs
+compiler,R1CS,Circom,8905727,μs
+compiler,R1CS,Commitment Gen,20131,μs
+solver,DFA Solving,Clear Match,17618,μs
+compiler,Snark,Setup,7098146,μs
+verifier,Verify,Verify,3495513,μs
+compiler,R1CS,Size,137946,constraints
+prover,Proof Size,Spartan SNARK size,42993,bytes
+jWaRPdZYjm_100,([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?,4736,37
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+solver,DFA Solving,Clear Match,63516,μs
+compiler,Snark,Setup,20246614,μs
+compiler,R1CS,Circom,37229428,μs
+prover,Prover,Prove,7950754,μs
+compiler,R1CS,Commitment Gen,20393,μs
+compiler,DFA,DFA,27642,μs
+solver,Witness,Gen,21189827,μs
+verifier,Verify,Verify,6833464,μs
+compiler,R1CS,Loading,819179,μs
+compiler,R1CS,Size,483570,constraints
+prover,Proof Size,Spartan SNARK size,45184,bytes
+azdEv'qQt!_100,([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+),8448,66
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,Snark,Setup,34078843,μs
+compiler,R1CS,Commitment Gen,20255,μs
+compiler,DFA,DFA,61554,μs
+compiler,R1CS,Loading,1398770,μs
+solver,DFA Solving,Clear Match,111632,μs
+solver,Witness,Gen,61081647,μs
+verifier,Verify,Verify,13277027,μs
+compiler,R1CS,Circom,81175926,μs
+prover,Prover,Prove,15536542,μs
+compiler,R1CS,Size,854799,constraints
+prover,Proof Size,Spartan SNARK size,47361,bytes
+*To strut _2000,([^ @]+)@([^ @]+),1280,10
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+verifier,Verify,Verify,53235090,μs
+solver,DFA Solving,Clear Match,331288,μs
+compiler,R1CS,Commitment Gen,36091,μs
+compiler,R1CS,Loading,5293339,μs
+prover,Prover,Prove,60745470,μs
+compiler,DFA,DFA,4064,μs
+compiler,R1CS,Circom,153278759,μs
+compiler,Snark,Setup,143381917,μs
+solver,Witness,Gen,23384838,μs
+compiler,R1CS,Size,2756068,constraints
+prover,Proof Size,Spartan SNARK size,51675,bytes
+To strut b_2000, ([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?,2304,18
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+prover,Prover,Prove,121595883,μs
+verifier,Verify,Verify,106911969,μs
+compiler,Snark,Setup,229880872,μs
+compiler,R1CS,Circom,246593209,μs
+compiler,DFA,DFA,15396,μs
+compiler,R1CS,Loading,8448051,μs
+compiler,R1CS,Commitment Gen,36125,μs
+solver,Witness,Gen,61087367,μs
+solver,DFA Solving,Clear Match,608902,μs
+compiler,R1CS,Size,4804073,constraints
+prover,Proof Size,Spartan SNARK size,53867,bytes

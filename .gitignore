@@ -4,7 +4,6 @@
 out*
 *.dot
 *.pdf
-*.txt
 *.csv
 fast*
 slow*
