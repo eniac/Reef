@@ -28,6 +28,7 @@ use std::collections::LinkedList;
 
 pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub safa: &'a SAFA<C>,
+    forall_states: Vec<(NodeIndex, usize)>, // (forallstate, kids)
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     max_offsets: usize,
@@ -46,6 +47,10 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     star_num: usize,
     pub doc_extend: usize,
     is_match: bool,
+    // circuit crap
+    stack_ptr_circ_count: usize,
+    max_branches: usize,
+    max_stack: usize,
     // witness crap
     pub sol_num: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
@@ -144,10 +149,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
-        // stack level, states
         let mut forall_children: Vec<Vec<usize>> = Vec::new();
         let mut current_forall_node = NodeIndex::new(0);
         let mut current_forall_state_stack: LinkedList<usize> = LinkedList::new();
+        let mut forall_states = Vec::new();
+        let mut max_branches = 0;
+        let mut max_stack = 0;
+        let mut current_max_stack = 0;
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             println!("PROCESS STATE {:#?}", all_state);
@@ -161,6 +169,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     .collect();
                 and_edges.sort_by(|a, b| a.target().partial_cmp(&b.target()).unwrap());
                 let mut and_states = vec![];
+
+                forall_states.push((all_state, and_edges.len()));
+                if and_edges.len() > max_branches {
+                    max_branches = and_edges.len();
+                }
 
                 for i in 0..and_edges.len() {
                     match and_edges[i].weight().clone() {
@@ -226,11 +239,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             max_offsets,
                             all_state,
                             current_forall_node,
-                            (k == forall_children[stack_lvl].len() - 1),
+                            k == forall_children[stack_lvl].len() - 1,
                         );
                     }
                 }
             }
+        }
+
+        for k in forall_children {
+            max_stack += k.len(); // overestimation - make this tighter
         }
 
         if set_table.len() == 0 {
@@ -302,6 +319,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         Self {
             safa,
+            forall_states,
             num_ab,
             table, // TODO fix else
             max_offsets,
@@ -309,13 +327,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: sel_batch_size,
-            //cdoc: batch_doc, //chars
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
             ep_num,
             star_num,
             doc_extend: epsilon_to_add,
             is_match,
+            stack_ptr_circ_count: 0,
+            max_branches,
+            max_stack,
             sol_num: 0,
             pc: pcs,
         }
@@ -544,12 +564,30 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         v
     }
 
+    fn in_foralls_circuit(&mut self, state_var: Term, in_var: Term) {
+        let mut vanish_on = vec![];
+        for (fas, kids) in self.forall_states.into_iter() {
+            vanish_on.push(Integer::from(fas.index() * self.max_branches + kids));
+        }
+
+        let vanishing_poly = poly_eval_circuit(vanish_on, state_var);
+        let match_term = term(
+            Op::Ite,
+            vec![
+                term(Op::Eq, vec![new_const(0), vanishing_poly]),
+                term(Op::Eq, vec![in_var, new_const(1)]),
+                term(Op::Eq, vec![in_var, new_const(0)]),
+            ],
+        );
+
+        self.assertions.push(match_term);
+    }
+
     // TODO - we don't want it to always accept state 0
-    fn accepting_state_circuit(&mut self) {
+    fn accepting_state_circuit(&mut self, state_var: Term, in_var: Term) {
         // final state (non) match check
         let vanishing_poly;
         let final_states = &self.safa.accepting;
-        //    let non_final_states = self.nfa.non_accepting();
         let mut vanish_on = vec![];
 
         if self.is_match {
@@ -559,24 +597,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
         } else {
             unimplemented!();
-            /*for xi in non_final_states.into_iter() {
-                vanish_on.push(Integer::from(xi));
-            }*/
         }
         vanishing_poly =
-            poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size - 1))); // todo?
+        //    poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size - 1))); // todo?
+            poly_eval_circuit(vanish_on, state_var);
 
         let match_term = term(
             Op::Ite,
             vec![
                 term(Op::Eq, vec![new_const(0), vanishing_poly]),
-                term(Op::Eq, vec![new_var(format!("accepting")), new_const(1)]),
-                term(Op::Eq, vec![new_var(format!("accepting")), new_const(0)]),
+                term(Op::Eq, vec![in_var, new_const(1)]),
+                term(Op::Eq, vec![in_var, new_const(0)]),
             ],
         );
 
         self.assertions.push(match_term);
-        self.pub_inputs.push(new_var(format!("accepting")));
+        //self.pub_inputs.push(new_var(format!("accepting")));
     }
 
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
@@ -620,88 +656,234 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         circ_r1cs.finalize(&final_cs)
     }
 
-    fn cursor_circuit(&mut self) {
-        /*// TODO add transition cursor
-            for j in 0..(self.batch_size - 1) {
-                // if star, geq
-                // else normal
-                // i_j+1 = i_j + offset
+    // stack for cursors
+    fn push_stack_circuit(&mut self, forall_state: Term, forall_kids: Vec<Term>) {
+        // todo add vars
 
-                let cursor_plus = term(
-                    Op::Eq,
-                    vec![
-                        new_var(format!("cursor_{}", j + 1)), // vanishing
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Add),
-                            vec![
-                                new_var(format!("cursor_{}", j)),
-                                new_var(format!("offset_{}", j)),
-                            ],
-                        ),
-                    ],
-                );
+        // "padding" included in encoding
+        assert!(forall_kids.len() == self.max_branches);
 
-                // TODO LIMIT bits here
-                let cursor_geq = term(
-                    Op::BvBinPred(BvBinPred::Uge),
-                    vec![
-                        term(Op::PfToBv(254), vec![new_var(format!("cursor_{}", j + 1))]),
-                        term(Op::PfToBv(254), vec![new_var(format!("cursor_{}", j))]),
-                    ],
-                );
-
-                let ite_term = term(
-                    Op::Ite,
-                    vec![
-                        term(
-                            Op::Eq,
-                            vec![
-                                new_const(self.num_ab[&Some('*')]),
-                                new_var(format!("char_{}", j)),
-                            ],
-                        ),
-                        cursor_geq,
-                        cursor_plus,
-                    ],
-                );
-                self.assertions.push(ite_term);
-            }
-
-            // cursor_batch = stack[stack_lvl]
-            let mut stack_access_ite = term(
-                Op::Ite,
+        for b in 0..self.max_branches {
+            //forall_kids.len() {
+            let to_push = term(
+                Op::PfNaryOp(PfNaryOp::Add),
                 vec![
-                    term(Op::Eq, vec![new_var(format!("stack_lvl")), new_const(0)]),
-                    new_bool_const(true), // TODO this is the empty trans case
-                    new_bool_const(false),
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Mul),
+                        vec![forall_state, new_const(self.num_states)],
+                    ),
+                    forall_kids[b],
                 ],
             );
 
-            new_bool_const(false);
-            for sl in 0..self.max_stack_level {
-                stack_access_ite = term(
+            let mut pushed = term(Op::Eq, vec![new_var(format!("stack_{}", 0)), to_push]);
+            for i in 1..self.max_stack {
+                let inside_ite = term(Op::Eq, vec![new_var(format!("stack_{}", i)), to_push]);
+
+                pushed = term(
                     Op::Ite,
                     vec![
                         term(
                             Op::Eq,
-                            vec![new_var(format!("stack_lvl")), new_const(sl + 1)],
-                        ),
-                        term(
-                            Op::Eq,
                             vec![
-                                new_var(format!("cursor_{}", self.batch_size)),
-                                new_var(format!("stack_saved_{}", sl)),
+                                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                                new_const(i),
                             ],
                         ),
-                        stack_access_ite,
+                        inside_ite,
+                        pushed,
+                    ],
+                );
+            }
+
+            let update_stack_ptr = term(
+                Op::Eq,
+                vec![
+                    new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count + 1)),
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Add),
+                        vec![
+                            new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                            new_const(1),
+                        ],
+                    ),
+                ],
+            );
+            self.stack_ptr_circ_count += 1;
+
+            self.assertions.push(pushed);
+            self.assertions.push(update_stack_ptr);
+        }
+    }
+
+    fn pop_stack_circuit(&mut self, popped_var: Term) {
+        for b in 0..self.max_branches {
+            // change anything in here?? TODO think
+            let mut popped = new_bool_const(false); // >??
+            for i in 0..self.max_stack {
+                let padding_eq_check = term(
+                    Op::Ite,
+                    vec![
+                    term(Op::Not vec![term(Op::Eq, new_var(format!("stack_{}",i)), new_const(self.stack_entry_padding))]),
+                    term(Op::Eq, new_var(format!("stack_{}",i)), popped_var),
+                    new_bool_const(true), // else, do nothing
+
                     ],
                 );
 
-                self.pub_inputs.push(new_var(format!("stack_saved_{}", sl)));
+                let update_stack_ptr = term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count + 1)),
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Add),
+                            vec![
+                                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                                new_const(-1),
+                            ],
+                        ),
+                    ],
+                );
+                self.stack_ptr_circ_count += 1;
+
+                let pop_inside = term(
+                    Op::BoolNaryOp(BoolNaryOp::And),
+                    vec![update_stack_ptr, padding_eq_check],
+                );
+
+                popped = term(
+                    Op::Ite,
+                    vec![
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                                new_const(i),
+                            ],
+                        ),
+                        pop_inside,
+                        popped,
+                    ],
+                );
             }
 
-            self.assertions.push(stack_access_ite);
-        */
+            self.assertions.push(popped);
+        }
+    }
+
+    fn cursor_circuit(&mut self) {
+        // TODO add transition cursor
+        for j in 0..(self.batch_size - 1) {
+            // if star, geq
+            // else normal
+            // i_j+1 = i_j + offset
+
+            let cursor_plus = term(
+                Op::Eq,
+                vec![
+                    new_var(format!("cursor_{}", j + 1)), // vanishing
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Add),
+                        vec![
+                            new_var(format!("cursor_{}", j)),
+                            new_var(format!("offset_{}", j)),
+                        ],
+                    ),
+                ],
+            );
+
+            // TODO LIMIT bits here plus the other bullshit
+            let cursor_geq = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(Op::PfToBv(254), vec![new_var(format!("cursor_{}", j + 1))]),
+                    term(Op::PfToBv(254), vec![new_var(format!("cursor_{}", j))]),
+                ],
+            );
+
+            let ite_term = term(
+                Op::Ite,
+                vec![
+                    term(
+                        Op::Eq,
+                        vec![
+                            new_const(self.num_ab[&Some('*')]),
+                            new_var(format!("char_{}", j)),
+                        ],
+                    ),
+                    cursor_geq,
+                    cursor_plus,
+                ],
+            );
+            self.assertions.push(ite_term);
+
+            // if in_state \in forall
+            let in_forall = new_var(format!("is_forall_{}", j));
+
+            let forall_entry = term(
+                Op::PfNaryOp(PfNaryOp::Add),
+                vec![
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Mul),
+                        vec![
+                            new_var(format!("state_{}", j)), // in state?? CHECK TODO
+                            new_const(self.max_branches),
+                        ],
+                    ),
+                    new_var(format!("num_branches_{}", j)),
+                ],
+            );
+
+            self.in_foralls_circuit(forall_entry, in_forall);
+            self.pub_inputs.push(new_var(format!("num_branches_{}", j)));
+
+            // push cursors on stack
+            /*for b in 0..self.max_branches {
+                if
+
+            }*/
+        }
+
+        // if branch transition (if last in batch)
+
+        // assert cursor == EOF
+        // assert in_state \in accepting
+        // cursor = pop stack
+
+        // cursor_batch = stack[stack_lvl]
+        let mut stack_access_ite = term(
+            Op::Ite,
+            vec![
+                term(Op::Eq, vec![new_var(format!("stack_lvl")), new_const(0)]),
+                new_bool_const(true), // TODO this is the empty trans case
+                new_bool_const(false),
+            ],
+        );
+
+        new_bool_const(false);
+        for sl in 0..self.max_stack_level {
+            stack_access_ite = term(
+                Op::Ite,
+                vec![
+                    term(
+                        Op::Eq,
+                        vec![new_var(format!("stack_lvl")), new_const(sl + 1)],
+                    ),
+                    term(
+                        Op::Eq,
+                        vec![
+                            new_var(format!("cursor_{}", self.batch_size)),
+                            new_var(format!("stack_saved_{}", sl)),
+                        ],
+                    ),
+                    stack_access_ite,
+                ],
+            );
+
+            self.pub_inputs.push(new_var(format!("stack_saved_{}", sl)));
+        }
+
+        self.assertions.push(stack_access_ite);
     }
 
     // for use at the end of sum check
