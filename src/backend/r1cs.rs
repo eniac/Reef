@@ -434,7 +434,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let num_states = self.safa.g.node_count();
 
         let mut v = vec![];
-        for i in 1..self.batch_size {
+        for i in 1..(self.batch_size + 1) {
             let v_i = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
@@ -500,74 +500,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
         }
         self.pub_inputs
-            .push(new_var(format!("state_{}", self.batch_size - 1)));
+            .push(new_var(format!("state_{}", self.batch_size)));
 
-        let v_b = term(
-            Op::PfNaryOp(PfNaryOp::Add),
-            vec![
-                term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Add),
-                            vec![
-                                term(
-                                    Op::PfNaryOp(PfNaryOp::Add),
-                                    vec![
-                                        term(
-                                            Op::PfNaryOp(PfNaryOp::Mul),
-                                            vec![
-                                                new_var(format!("state_{}", self.batch_size - 1)),
-                                                new_const(
-                                                    num_states * num_chars * self.max_offsets * 2,
-                                                ),
-                                            ],
-                                        ),
-                                        term(
-                                            Op::PfNaryOp(PfNaryOp::Mul),
-                                            vec![
-                                                new_var(format!("from_state")),
-                                                new_const(num_chars * self.max_offsets * 2),
-                                            ],
-                                        ),
-                                    ],
-                                ),
-                                term(
-                                    Op::PfNaryOp(PfNaryOp::Mul),
-                                    vec![
-                                        new_var(format!("path_count_add")),
-                                        new_const(self.max_offsets * 2),
-                                    ],
-                                ),
-                            ],
-                        ),
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Mul),
-                            vec![new_var(format!("stack_lvl")), new_const(2)],
-                        ),
-                    ],
-                ),
-                new_var(format!("rel_{}", self.batch_size - 1)),
-            ],
-        );
-        v.push(v_b.clone());
-
-        if include_vs {
-            let match_v = term(
-                Op::Eq,
-                vec![new_var(format!("v_{}", self.batch_size - 1)), v_b],
-            );
-
-            self.assertions.push(match_v);
-            self.pub_inputs
-                .push(new_var(format!("v_{}", self.batch_size - 1)));
-        }
-
-        self.pub_inputs.push(new_var(format!("path_count_add")));
-        self.pub_inputs.push(new_var(format!("from_state")));
-        self.pub_inputs.push(new_var(format!("stack_lvl")));
-        self.pub_inputs
-            .push(new_var(format!("rel_{}", self.batch_size - 1)));
         v
     }
 
@@ -1294,6 +1228,25 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             .push(new_var(format!("{}_next_running_claim", id)));
     }
 
+    fn pop_wit(&self, wits: &mut FxHashMap<String, Value>) -> usize {
+        let mut popped_elt = self.stack[self.stack_ptr];
+        self.stack_ptr -= 1;
+        while popped_elt != self.stack_entry_padding {
+            popped_elt = self.stack[self.stack_ptr];
+            self.stack_ptr -= 1;
+        }
+
+        wits.insert(format!("cursor_{}", self.batch_size), new_wit(popped_elt));
+
+        // after pop
+        wits.insert(format!("stack_ptr_popped", X), new_wit(self.stack_ptr));
+
+        // return cursor
+        popped_elt
+    }
+
+    fn push_wit() {}
+
     // returns char_num, is_star
     fn get_char_num(&self, edge: Either<char, OpenSet<usize>>) -> (usize, bool) {
         match edge {
@@ -1317,7 +1270,52 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
-    fn normal_v(
+    fn padding_v(
+        &self,
+        wits: &mut FxHashMap<String, Value>,
+        q: &mut Vec<usize>,
+        state_i: usize,
+        next_state: usize,
+        cursor_i: usize,
+        i: usize, // this is for naming
+    ) -> Integer {
+        let char_num = self.ab_num[&None];
+        let offset_i = 0;
+        let rel_i = 0;
+
+        wits.insert(format!("char_{}", i), new_wit(char_num));
+        wits.insert(format!("state_{}", i), new_wit(state_i));
+        wits.insert(format!("offset_{}", i), new_wit(offset_i));
+        wits.insert(format!("rel_{}", i), new_wit(rel_i));
+        wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i)); // alreaded "added" here
+
+        // v_i =
+        let num_states = self.safa.g.node_count();
+        let num_chars = self.safa.ab.len();
+
+        // TODO check overflow
+        let v_i = Integer::from(
+            (state_i * num_states * num_chars * self.max_offsets * 2)
+                + (next_state * num_chars * self.max_offsets * 2)
+                + (char_num * self.max_offsets * 2)
+                + (offset_i * 2)
+                + (rel_i),
+        )
+        .rem_floor(cfg().field().modulus());
+
+        wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
+
+        println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        );
+
+        q.push(self.table.iter().position(|val| val == &v_i).unwrap());
+
+        v_i
+    }
+
+    fn edge_v(
         &self,
         wits: &mut FxHashMap<String, Value>,
         q: &mut Vec<usize>,
@@ -1329,11 +1327,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         rel_i: usize,
         i: usize, // this is for naming
     ) -> Integer {
-        wits.insert(format!("char_{}", i - 1), new_wit(char_num));
-        wits.insert(format!("state_{}", i - 1), new_wit(state_i));
-        wits.insert(format!("offset_{}", i - 1), new_wit(offset_i));
-        wits.insert(format!("rel_{}", i - 1), new_wit(rel_i));
-        wits.insert(format!("cursor_{}", i), new_wit(cursor_i)); // alreaded "added" here
+        wits.insert(format!("char_{}", i), new_wit(char_num));
+        wits.insert(format!("state_{}", i), new_wit(state_i));
+        wits.insert(format!("offset_{}", i), new_wit(offset_i));
+        wits.insert(format!("rel_{}", i), new_wit(rel_i));
+        wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i)); // alreaded "added" here
 
         // v_i =
         let num_states = self.safa.g.node_count();
@@ -1350,254 +1348,181 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         //v.push(v_i.clone());
-        wits.insert(format!("v_{}", i - 1), new_wit(v_i.clone()));
+        wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
         println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-            i - 1,
-            v_i,
-            state_i,
-            next_state,
-            char_num,
-            offset_i,
-            rel_i,
-            cursor_i,
+            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
         );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
     }
-    /*
-        pub fn gen_wit_i(
-            //_nlookup(
-            &mut self,
-            sols: &mut Vec<LinkedList<TraceElem<char>>>, //move_num: (usize, usize),
-            batch_num: usize,
-            current_state: usize, // TODO DEL, and TODO DEL start_epsilons
-            running_q: Option<Vec<Integer>>,
-            running_v: Option<Integer>,
-            doc_running_q: Option<Vec<Integer>>,
-            doc_running_v: Option<Integer>,
-            cursor_0: usize,
-            prev_running_path_count: usize,
-            prev_num_paths: usize,
-        ) -> (
-            FxHashMap<String, Value>,
-            usize,
-            Option<Vec<Integer>>,
-            Option<Integer>,
-            Option<Vec<Integer>>,
-            Option<Integer>,
-            usize,
-            usize,
-            usize,
-        ) {
-            let mut wits = FxHashMap::default();
 
-            // generate claim v's (well, v isn't a real named var, generate the states/chars)
-            let mut state_i = 0;
-            let mut next_state = 0;
-            let mut last_state = 0;
+    pub fn gen_wit_i(
+        //_nlookup(
+        &mut self,
+        sols: &mut Vec<LinkedList<TraceElem<char>>>, //move_num: (usize, usize),
+        batch_num: usize,
+        current_state: usize, // TODO DEL, and TODO DEL start_epsilons
+        running_q: Option<Vec<Integer>>,
+        running_v: Option<Integer>,
+        doc_running_q: Option<Vec<Integer>>,
+        doc_running_v: Option<Integer>,
+        cursor_0: usize,
+    ) -> (
+        FxHashMap<String, Value>,
+        usize,
+        Option<Vec<Integer>>,
+        Option<Integer>,
+        Option<Vec<Integer>>,
+        Option<Integer>,
+        usize,
+    ) {
+        let mut wits = FxHashMap::default();
 
-            let mut v = vec![];
-            let mut q = vec![];
-            let mut i = 1;
-            let mut cursor_i = cursor_0;
-            let mut cursor_access = vec![cursor_0];
-            let mut chars_access = vec![];
+        // generate claim v's (well, v isn't a real named var, generate the states/chars)
+        let mut state_i = 0;
+        let mut next_state = 0;
+        let mut char_num = self.num_ab[&None];
+        let mut offset_i = 0;
 
-            let mut next_running_path_count = 0;
-            let mut next_num_paths = 0;
+        let mut v = vec![];
+        let mut q = vec![];
+        let mut i = 0;
+        let mut cursor_i = cursor_0;
+        let mut cursor_access = vec![cursor_0];
 
-            wits.insert(format!("cursor_0"), new_wit(cursor_i));
+        wits.insert(format!("cursor_0"), new_wit(cursor_i));
 
-            while i - 1 < self.batch_size {
-                let mut char_num = self.num_ab[&None];
-                next_state = state_i;
-                let mut offset_i = 0;
-                let mut rel_i = 0;
-                let mut is_star = false;
-
-                if self.sol_num >= sols.len()
-                    || (self.sol_num == sols.len() - 1 && sols[self.sol_num].is_empty())
-                {
-                    println!("A {:#?}", self.sol_num);
-
-                    while i - 1 < self.batch_size - 1 {
-                        // pad epsilons (above vals) bc we're done
-                        v.push(self.normal_v(
-                            &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
-                        ));
-                        i += 1;
-                        chars_access.push(char_num);
-                        cursor_access.push(cursor_i);
-                    }
-                    println!("last 'transition' (fake)");
-                    //cursor_i = 0;
-                    let trans_v;
-                    (trans_v, next_running_path_count, next_num_paths) = self.transition_v(
-                        &mut wits,
-                        &mut q,
-                        0,       //self.path_count_lookup[&self.from_state],
-                        state_i, // accepting
-                        self.from_state,
-                        0, //self.stack_level,
-                        cursor_i,
-                        i,
-                        prev_running_path_count,
-                        prev_num_paths,
-                    );
-                    v.push(trans_v);
+        while i < self.batch_size {
+            if sols[self.sol_num].is_empty() {
+                // need to transition
+                while i < self.batch_size - 1 {
+                    v.push(self.padding_v(&mut wits, &mut q, state_i, next_state, cursor_i, i));
                     i += 1;
-                } else if sols[self.sol_num].is_empty() && i > 0 {
-                    // if we are not at a beginning, pad to the end
-                    self.sol_num += 1;
+                }
 
-                    while i - 1 < self.batch_size - 1 {
-                        println!("REACHED END OF ONE SOL, PADDING");
-
-                        // pad epsilons (above vals)
-                        v.push(self.normal_v(
-                            &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
-                        ));
-                        i += 1;
-                        chars_access.push(char_num);
-                        cursor_access.push(cursor_i);
-                    }
-
-                    // end condition
-                    let rel_i = 1;
-                    println!("CURSOR STACK POP {:#?}", self.cursor_stack);
-                    self.cursor_stack_ptr -= 1;
-                    cursor_i = self.cursor_stack[self.cursor_stack_ptr];
-
-                    let trans_v;
-                    (trans_v, next_running_path_count, next_num_paths) = self.transition_v(
-                        &mut wits,
-                        &mut q,
-                        self.path_count_lookup[&self.from_state],
-                        state_i, // accepting
-                        self.from_state,
-                        self.stack_level,
-                        cursor_i,
-                        i,
-                        prev_running_path_count,
-                        prev_num_paths,
-                    );
-                    v.push(trans_v);
-
-                    i += 1;
-                    self.path_count += 1;
-                    self.stack_level = 0;
-                } else if sols[self.sol_num].is_empty() {
-                    println!("ADD 1");
-                    self.sol_num += 1;
+                char_num = self.num_ab[&None];
+                offset_i = 0;
+                if self.sol_num == sols.len() {
+                    // very last
+                    next_state = self.num_states; // TODO
                 } else {
-                    let te = sols[self.sol_num].pop_front().unwrap();
-                    println!("{:#?}", te);
-                    if self.safa.g[te.from_node].is_and() {
-                        self.from_state = te.to_node.index();
+                    next_state = sols[self.sol_num + 1].front().unwrap().from_node.index();
+                }
 
-                        self.cursor_stack[self.cursor_stack_ptr] = cursor_i;
-                        self.cursor_stack_ptr += 1;
-                        //self.cursor_stack.push_front(cursor_i);
+                // TODO
+                cursor_i = self.pop_wit(&mut wits);
 
-                        self.stack_level += 1;
-                        println!("CURSOR STACK PUSH {:#?}", self.cursor_stack);
+                // transition
+                v.push(self.edge_v(
+                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, 1, i,
+                ));
+                i += 1;
+
+                self.sol_num += 1;
+            } else {
+                // from solution
+                let te = sols[self.sol_num].pop_front().unwrap();
+                println!("{:#?}", te);
+
+                // handle stack pushes during forall
+                if self.safa.g[te.from_node].is_and() {
+                    // forall
+                    if i == 0 { // correct place
+                         // TODO PUSH STACK
+                    } else {
+                        // pad out the rest of this loop
+                        while i < self.batch_size {
+                            v.push(
+                                self.padding_v(&mut wits, &mut q, state_i, next_state, cursor_i, i),
+                            );
+                            i += 1;
+                        }
                     }
+                } else {
+                    // not forall
+                    if i == 0 { // must pad out the stack
 
-                    //normal
-                    (char_num, is_star) = self.get_char_num(te.edge);
-                    state_i = te.from_node.index();
-                    next_state = te.to_node.index();
-                    println!("NEXT STATE IS {:#?}", next_state);
-                    offset_i = te.to_cur - te.from_cur;
-                    rel_i = 0;
-
-                    cursor_i += offset_i;
-
-                    // potentially, the edge is a *, but we are provided a concrete offset
-                    if is_star {
-                        offset_i = 0;
+                        // TODO PAD PUSH STACK
                     }
+                }
 
-                    println!("is star {:#?}", is_star);
+                // normal transition
+                (char_num, is_star) = self.get_char_num(te.edge);
+                state_i = te.from_node.index();
+                next_state = te.to_node.index();
+                println!("NEXT STATE IS {:#?}", next_state);
+                offset_i = te.to_cur - te.from_cur;
+                rel_i = 0;
 
-                    // back to normal
-                    v.push(self.normal_v(
-                        &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, i,
-                    ));
-                    last_state = next_state;
-                    i += 1;
-                    chars_access.push(char_num);
+                cursor_i += offset_i;
+
+                // this is some fucking shit to be fixed
+                if is_star {
+                    offset_i = 0;
+                }
+
+                v.push(self.edge_v(
+                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, 0, i,
+                ));
+                i += 1;
+
+                if char_num == self.num_ab[&None] {
+                    cursor_access.push(self.ep_num);
+                } else if char_num == self.num_ab[Some('*')] {
+                    cursor_access.push(self.star_num);
+                } else {
                     cursor_access.push(cursor_i);
-                    state_i = next_state; // not necessary anymore
                 }
             }
-
-            //fill up stack levels maintained across iters
-            let mut idx = 0;
-            for s in &self.cursor_stack {
-                println!("INSERT STACK {:#?}", s.clone());
-                wits.insert(
-                    format!("stack_saved_{}", idx),
-                    new_wit(s.clone()), // CHANGE?
-                );
-                idx += 1;
-            }
-
-            println!("DONE LOOP");
-
-            // last state
-            wits.insert(
-                format!("state_{}", self.batch_size - 1),
-                new_wit(next_state),
-            );
-
-            assert!(running_q.is_some() || batch_num == 0);
-            assert!(running_v.is_some() || batch_num == 0);
-
-            println!("Q,V = {:#?}, {:#?}", q, v);
-            println!("TABLE = {:#?}", self.table.clone());
-            assert_eq!(v.len(), self.batch_size);
-            let (w, next_running_q, next_running_v) =
-                self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
-            wits = w;
-
-            wits.insert(
-                format!("accepting"),
-                new_wit(self.prover_accepting_state(last_state)),
-            );
-
-            let cursor_n = cursor_i; // TODO?
-
-            assert!(doc_running_q.is_some() || batch_num == 0);
-            assert!(doc_running_v.is_some() || batch_num == 0);
-            let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
-                wits,
-                batch_num,
-                doc_running_q,
-                doc_running_v,
-                chars_access,
-                cursor_access,
-            );
-            wits = w;
-            println!("WITS {:#?}", wits);
-
-            (
-                wits,
-                next_state,
-                Some(next_running_q),
-                Some(next_running_v),
-                Some(next_doc_running_q),
-                Some(next_doc_running_v),
-                cursor_n,
-                next_running_path_count,
-                next_num_paths,
-            )
         }
-    */
+
+        println!("DONE LOOP");
+
+        // last state
+        wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
+
+        assert!(running_q.is_some() || batch_num == 0);
+        assert!(running_v.is_some() || batch_num == 0);
+
+        println!("Q,V = {:#?}, {:#?}", q, v);
+        println!("TABLE = {:#?}", self.table.clone());
+        assert_eq!(v.len(), self.batch_size);
+        let (w, next_running_q, next_running_v) =
+            self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
+        wits = w;
+
+        // TODO
+        wits.insert(
+            format!("accepting"),
+            new_wit(self.prover_accepting_state(last_state)),
+        );
+
+        assert!(doc_running_q.is_some() || batch_num == 0);
+        assert!(doc_running_v.is_some() || batch_num == 0);
+        let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
+            wits,
+            batch_num,
+            doc_running_q,
+            doc_running_v,
+            cursor_access,
+        );
+        wits = w;
+        println!("WITS {:#?}", wits);
+
+        (
+            wits,
+            next_state,
+            Some(next_running_q),
+            Some(next_running_v),
+            Some(next_doc_running_q),
+            Some(next_doc_running_v),
+            cursor_i,
+        )
+    }
 
     fn wit_nlookup_doc_commit(
         &self,
@@ -1605,7 +1530,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         batch_num: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
-        chars: Vec<usize>,
         cursor_access: Vec<usize>,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let mut v = vec![];
@@ -1615,18 +1539,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         println!("EP NUM {:#?}, STAR NUM {:#?}", self.ep_num, self.star_num);
 
         for i in 0..(self.batch_size - 1) {
-            if chars[i] == self.num_ab[&None] {
-                q.push(self.ep_num.clone());
-                v.push(Integer::from(self.num_ab[&None]));
-            } else if chars[i] == self.num_ab[&Some('*')] {
-                println!("STAR");
-                q.push(self.star_num.clone());
-                v.push(Integer::from(self.num_ab[&Some('*')]));
-            } else {
-                let access_at = cursor_access[i];
-                q.push(access_at);
-                v.push(self.idoc[access_at].clone());
-            }
+            // TODO - make sure epsilon and * are added to the end of doc [ DOC, EOF, epsilon, star
+            // ]
+            let access_at = cursor_access[i];
+            q.push(access_at);
+            v.push(self.idoc[access_at].clone());
         }
 
         println!("DOC NLOOKUP Q V {:#?}, {:#?}", q, v);
@@ -2098,8 +2015,6 @@ mod tests {
                 let mut doc_running_q: Option<Vec<Integer>> = None;
                 let mut doc_running_v: Option<Integer> = None;
                 let mut doc_idx = 0;
-                let mut running_path_count = 0;
-                let mut num_paths = 0;
 
                 let (pd, _vd) = r1cs_converter.to_circuit();
                 // println!("PD {:#?}", pd);
@@ -2125,95 +2040,88 @@ mod tests {
                 );
                 */
                 println!("NUM STEPS {:#?}", num_steps);
-                panic!();
                 let mut current_state = 0; // TODOmoves[0].from_node.index();
-                                           /*
-                                           for i in 0..num_steps {
-                                               /*(
-                                                   values,
-                                                   next_state,
-                                                   running_q,
-                                                   running_v,
-                                                   doc_running_q,
-                                                   doc_running_v,
-                                                   doc_idx,
-                                                   running_path_count,
-                                                   num_paths,
-                                               ) = r1cs_converter.gen_wit_i(
-                                                   &mut sols,
-                                                   i,
-                                                   current_state,
-                                                   running_q.clone(),
-                                                   running_v.clone(),
-                                                   doc_running_q.clone(),
-                                                   doc_running_v.clone(),
-                                                   doc_idx,
-                                                   running_path_count,
-                                                   num_paths,
-                                               );*/
-                                               // TODO
 
-                                               pd.check_all(&values);
+                for i in 0..num_steps {
+                    (
+                        values,
+                        next_state,
+                        running_q,
+                        running_v,
+                        doc_running_q,
+                        doc_running_v,
+                        doc_idx,
+                    ) = r1cs_converter.gen_wit_i(
+                        &mut sols,
+                        i,
+                        current_state,
+                        running_q.clone(),
+                        running_v.clone(),
+                        doc_running_q.clone(),
+                        doc_running_v.clone(),
+                        doc_idx,
+                    );
 
-                                               // for next i+1 round
-                                               current_state = next_state;
-                                           }
+                    pd.check_all(&values);
 
-                                           let rq = match running_q {
-                                               Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
-                                               None => None,
-                                           };
-                                           let rv = match running_v {
-                                               Some(x) => Some(int_to_ff(x)),
-                                               None => None,
-                                           };
-                                           let drq = match doc_running_q {
-                                               Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
-                                               None => None,
-                                           };
-                                           let drv = match doc_running_v {
-                                               Some(x) => Some(int_to_ff(x)),
-                                               None => None,
-                                           };
+                    // for next i+1 round
+                    current_state = next_state;
+                }
 
-                                           final_clear_checks(
-                                               reef_commit,
-                                               <G1 as Group>::Scalar::from(1), // dummy, not checked
-                                               &r1cs_converter.table,
-                                               r1cs_converter.udoc.len(),
-                                               rq,
-                                               rv,
-                                               drq,
-                                               drv,
-                                           );
+                let rq = match running_q {
+                    Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+                    None => None,
+                };
+                let rv = match running_v {
+                    Some(x) => Some(int_to_ff(x)),
+                    None => None,
+                };
+                let drq = match doc_running_q {
+                    Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+                    None => None,
+                };
+                let drv = match doc_running_v {
+                    Some(x) => Some(int_to_ff(x)),
+                    None => None,
+                };
 
-                                           /*
-                                           println!(
-                                               "cost model: {:#?}",
-                                               costs::full_round_cost_model_nohash(
-                                                   &safa,
-                                                   r1cs_converter.batch_size,
-                                                   b.clone(),
-                                                   nfa.is_match(&chars),
-                                                   doc.len(),
-                                                   c,
-                                               )
-                                           );*/
-                                           println!("actual cost: {:#?}", pd.r1cs.constraints.len());
-                                           println!("\n\n\n");
+                final_clear_checks(
+                    reef_commit,
+                    <G1 as Group>::Scalar::from(1), // dummy, not checked
+                    &r1cs_converter.table,
+                    r1cs_converter.udoc.len(),
+                    rq,
+                    rv,
+                    drq,
+                    drv,
+                );
 
-                                           /*assert!(
-                                               pd.r1cs.constraints.len() as usize
-                                                   == costs::full_round_cost_model_nohash(
-                                                       &nfa,
-                                                       r1cs_converter.batch_size,
-                                                       b.clone(),
-                                                       nfa.is_match(&chars),
-                                                       doc.len(),
-                                                       c
-                                                   )
-                                           );*/
-                                           */
+                /*
+                println!(
+                    "cost model: {:#?}",
+                    costs::full_round_cost_model_nohash(
+                        &safa,
+                        r1cs_converter.batch_size,
+                        b.clone(),
+                        nfa.is_match(&chars),
+                        doc.len(),
+                        c,
+                    )
+                );*/
+                println!("actual cost: {:#?}", pd.r1cs.constraints.len());
+                println!("\n\n\n");
+
+                /*assert!(
+                    pd.r1cs.constraints.len() as usize
+                        == costs::full_round_cost_model_nohash(
+                            &nfa,
+                            r1cs_converter.batch_size,
+                            b.clone(),
+                            nfa.is_match(&chars),
+                            doc.len(),
+                            c
+                        )
+                );*/
             }
         }
     }
