@@ -214,7 +214,8 @@ pub fn make_main(doc_len: usize,prover_states: usize,deltas:usize,n_accepting:us
 pub fn make_circom(dfa: &DFA<'_>, doc_len: usize, n_char: usize) -> std::io::Result<()> {
     make_utils(dfa, doc_len, n_char);
     let mut final_string = make_main(doc_len, doc_len+1, dfa.deltas().len(), dfa.get_final_states().len(), n_char,dfa.nstates());
-    let mut file = File::create("match.circom")?;
-    file.write_all(final_string.as_bytes())?;
+    let file = File::create("match.circom");
+    assert!(file.is_ok());
+    file.unwrap().write_all(final_string.as_bytes())?;
     Ok(())
 }
