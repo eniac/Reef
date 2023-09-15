@@ -52,9 +52,11 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     max_branches: usize,
     max_stack: usize,
     num_states: usize,
-    stack_entry_padding: Integer,
+    kid_padding: usize,
     // witness crap
     pub sol_num: usize,
+    stack: Vec<(usize, usize)>,
+    stack_ptr: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
@@ -155,10 +157,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut forall_children: Vec<Vec<usize>> = Vec::new();
         let mut foralls_w_kids: Vec<(usize, Vec<usize>)> = Vec::new();
         let mut current_forall_node = NodeIndex::new(0);
-        let mut current_forall_state_stack: LinkedList<usize> = LinkedList::new();
         let mut max_branches = 0;
         let mut max_stack = 0;
         let mut current_max_stack = 0;
+        let mut current_forall_state_stack: LinkedList<usize> = LinkedList::new();
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             println!("PROCESS STATE {:#?}", all_state);
@@ -172,6 +174,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     .collect();
                 and_edges.sort_by(|a, b| a.target().partial_cmp(&b.target()).unwrap());
                 let mut and_states = vec![];
+                for i in 0..and_edges.len() {
+                    and_states.push(and_edges[i].target().index());
+                }
 
                 if and_edges.len() > max_branches {
                     max_branches = and_edges.len();
@@ -186,13 +191,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 let offset = single.unwrap();
                                 if offset == 0 {
                                     // epsilon
-                                    and_states.push(and_edges[i].target().index());
+                                    //and_states.push(and_edges[i].target().index());
 
                                     // add table
                                     let in_state = all_state.index();
                                     let out_state = and_edges[i].target().index();
                                     let c = num_ab[&None]; //EPSILON
-                                    let rel = 0;
+                                    let rel = calc_rel(
+                                        all_state, out_state, and_states, &safa, num_states, false,
+                                    );
 
                                     set_table.insert(
                                         Integer::from(
@@ -241,7 +248,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             num_chars,
                             max_offsets,
                             all_state,
-                            current_forall_node,
+                            vec![],
                             k == forall_children[stack_lvl].len() - 1,
                         );
                     }
@@ -266,8 +273,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 num_chars,
                 max_offsets,
                 NodeIndex::new(0), //all_state, TODO ?
-                NodeIndex::new(0),
-                true, // ??
+                vec![],
+                true,
             );
         }
 
@@ -320,7 +327,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         println!("TABLE {:#?}", table);
 
-        let stack_entry_padding = Integer::from(0); // TODO!!
+        let kid_padding = 0; // TODO !!
+
+        let stack = vec![];
+        for i in 0..max_stack {
+            stack.push((0, 0)); // TODO CHANGE THIS TO THE PADDING
+        }
 
         Self {
             safa,
@@ -342,8 +354,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             max_branches,
             max_stack,
             num_states,
-            stack_entry_padding,
+            kid_padding,
             sol_num: 0,
+            stack,
+            stack_ptr: 0,
             pc: pcs,
         }
     }
@@ -505,45 +519,41 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         v
     }
 
-    fn in_foralls_circuit(&mut self, state_var: Term, in_var: Term) {
-        let mut vanish_on = vec![];
-        for (fas, kids) in self.foralls_w_kids.clone().into_iter() {
-            let mut vo = Integer::from(fas * self.num_states);
-            for k in 0..self.max_branches {
-                if k < kids.len() {
-                    vo += kids[k] * self.num_states;
-                } else {
-                    vo += self.stack_entry_padding.clone() * Integer::from(self.num_states);
-                }
-            }
-            vanish_on.push(vo);
-        }
-
-        let mut hashed_state_var = term(
-            Op::PfNaryOp(PfNaryOp::Mul),
-            vec![state_var, new_const(self.num_states)],
+    fn in_foralls_circuit(&mut self, state_num: usize, in_var: Term) {
+        //not reg, trans, accept
+        let not_reg = term(
+            Op::Not,
+            vec![term(
+                Op::Eq,
+                vec![new_const(0), new_var(format!("rel_{}", state_num))],
+            )],
         );
-        for k in 0..self.max_branches {
-            hashed_state_var = term(
-                Op::PfNaryOp(PfNaryOp::Add),
-                vec![
-                    term(
-                        Op::PfNaryOp(PfNaryOp::Mul),
-                        vec![
-                            new_var(format!("forall_kid_{}", k)),
-                            new_const(self.num_states),
-                        ],
-                    ),
-                    hashed_state_var,
-                ],
-            );
-        }
+        let not_trans = term(
+            Op::Not,
+            vec![term(
+                Op::Eq,
+                vec![new_const(0), new_var(format!("rel_{}", state_num))],
+            )],
+        );
+        let not_acc = term(
+            Op::Not,
+            vec![term(
+                Op::Eq,
+                vec![new_const(0), new_var(format!("rel_{}", state_num))],
+            )],
+        );
+        let rel_val = term(
+            Op::BoolNaryOp(BoolNaryOp::And),
+            vec![
+                term(Op::BoolNaryOp(BoolNaryOp::And), vec![not_reg, not_trans]),
+                not_acc,
+            ],
+        );
 
-        let vanishing_poly = poly_eval_circuit(vanish_on, hashed_state_var);
         let match_term = term(
             Op::Ite,
             vec![
-                term(Op::Eq, vec![new_const(0), vanishing_poly]),
+                rel_val,
                 term(Op::Eq, vec![in_var.clone(), new_const(1)]),
                 term(Op::Eq, vec![in_var.clone(), new_const(0)]),
             ],
@@ -552,29 +562,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.assertions.push(match_term);
     }
 
-    // TODO - we don't want it to always accept state 0
-    fn in_accepting_state_circuit(&mut self, state_var: Term, in_var: Term) {
-        // final state (non) match check
-        let vanishing_poly;
-        let final_states = &self.safa.accepting;
-        let mut vanish_on = vec![];
-
-        if self.is_match {
-            // proof of membership
-            for xi in final_states.into_iter() {
-                vanish_on.push(Integer::from(xi.index()));
-            }
-        } else {
-            unimplemented!();
-        }
-        vanishing_poly =
-        //    poly_eval_circuit(vanish_on, new_var(format!("state_{}", self.batch_size - 1))); // todo?
-            poly_eval_circuit(vanish_on, state_var);
-
+    fn last_state_accepting_circuit(&mut self, in_var: Term) {
         let match_term = term(
             Op::Ite,
             vec![
-                term(Op::Eq, vec![new_const(0), vanishing_poly]),
+                term(
+                    Op::Eq,
+                    vec![new_const(0), new_var(format!("rel_{}", self.batch_size))],
+                ),
                 term(Op::Eq, vec![in_var.clone(), new_const(1)]),
                 term(Op::Eq, vec![in_var.clone(), new_const(0)]),
             ],
@@ -625,9 +620,106 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         circ_r1cs.finalize(&final_cs)
     }
 
+    fn push_ite(&self, i: usize, to_push: Term, b: usize) -> Term {
+        let pushed = term(
+            Op::Eq,
+            vec![new_var(format!("stack_{}_out", i)), to_push.clone()],
+        );
+
+        let not_pushed = term(
+            Op::Eq,
+            vec![
+                new_var(format!("stack_{}_out", i)),
+                new_var(format!("stack_{}_in", i)),
+            ],
+        );
+
+        let stack_ptr_add = term(
+            Op::Eq,
+            vec![
+                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count + 1)),
+                term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        new_const(1),
+                        new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                    ],
+                ),
+            ],
+        );
+
+        let stack_ptr_same = term(
+            Op::Eq,
+            vec![
+                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count + 1)),
+                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+            ],
+        );
+
+        term(
+            Op::Ite,
+            vec![
+                term(
+                    Op::BoolNaryOp(BoolNaryOp::And),
+                    vec![
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                                new_const(i),
+                            ],
+                        ),
+                        term(
+                            Op::Not,
+                            vec![term(
+                                Op::Eq,
+                                vec![
+                                    new_var(format!("forall_0_kid_{}", b)),
+                                    new_const(self.kid_padding),
+                                ],
+                            )],
+                        ),
+                    ],
+                ),
+                term(Op::BoolNaryOp(BoolNaryOp::And), vec![pushed, stack_ptr_add]),
+                term(
+                    Op::BoolNaryOp(BoolNaryOp::And),
+                    vec![not_pushed, stack_ptr_same],
+                ),
+            ],
+        )
+    }
+
     // stack for cursors
-    fn push_stack_circuit(&mut self, forall_state: Term, forall_kids: Vec<Term>) -> Term {
+    fn push_stack_circuit(&mut self, forall_state_num: usize, forall_kids: Vec<Term>) -> Term {
         // todo add vars
+
+        // get kids from rel_i hash
+        let mut hashed_state_var = new_const(3);
+        for k in 0..self.max_branches {
+            hashed_state_var = term(
+                Op::PfNaryOp(PfNaryOp::Add),
+                vec![
+                    term(
+                        Op::PfNaryOp(PfNaryOp::Mul),
+                        vec![
+                            new_var(format!("forall_0_kid_{}", k)),
+                            new_const(self.num_states),
+                        ],
+                    ),
+                    hashed_state_var,
+                ],
+            );
+        }
+
+        let hashed_kids_eq = term(
+            Op::Eq,
+            vec![
+                hashed_state_var,
+                new_var(format!("rel_{}", forall_state_num)),
+            ],
+        );
+        self.assertions.push(hashed_kids_eq);
 
         // "padding" included in encoding
         assert!(forall_kids.len() == self.max_branches);
@@ -641,23 +733,19 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 vec![
                     term(
                         Op::PfNaryOp(PfNaryOp::Mul),
-                        vec![forall_state.clone(), new_const(self.num_states)],
+                        vec![
+                            new_var(format!("cursor_{}", forall_state_num + 1)),
+                            new_const(self.num_states),
+                        ],
                     ),
                     forall_kids[b].clone(),
                 ],
             );
 
-            let mut pushed = term(
-                Op::Eq,
-                vec![new_var(format!("stack_{}", 0)), to_push.clone()],
-            );
-            for i in 1..self.max_stack {
-                let inside_ite = term(
-                    Op::Eq,
-                    vec![new_var(format!("stack_{}", i)), to_push.clone()],
-                );
+            let mut inside_ite = self.push_ite(0, to_push, b);
 
-                pushed = term(
+            for i in 1..self.max_stack {
+                inside_ite = term(
                     Op::Ite,
                     vec![
                         term(
@@ -667,87 +755,90 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 new_const(i),
                             ],
                         ),
+                        self.push_ite(i, to_push, b),
                         inside_ite,
-                        pushed,
                     ],
                 );
             }
 
-            let update_stack_ptr = term(
-                Op::Eq,
-                vec![
-                    new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count + 1)),
-                    term(
-                        Op::PfNaryOp(PfNaryOp::Add),
-                        vec![
-                            new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
-                            new_const(1),
-                        ],
-                    ),
-                ],
-            );
             self.stack_ptr_circ_count += 1;
 
-            push_stmt = term(
-                Op::BoolNaryOp(BoolNaryOp::And),
-                vec![
-                    term(
-                        Op::BoolNaryOp(BoolNaryOp::And),
-                        vec![update_stack_ptr, pushed],
-                    ),
-                    push_stmt,
-                ],
-            );
+            push_stmt = term(Op::BoolNaryOp(BoolNaryOp::And), vec![inside_ite, push_stmt]);
         }
         push_stmt
     }
 
-    fn pop_stack_circuit(&mut self, popped_var: Term) -> Term {
-        let mut popped = new_bool_const(false); // >??
-        for i in 0..self.max_stack {
-            let asgn = term(
-                Op::Eq,
-                vec![new_var(format!("stack_{}", i)), popped_var.clone()],
-            );
-            let update_stack_ptr = term(
-                Op::Eq,
-                vec![
-                    new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count + 1)),
-                    term(
-                        Op::PfNaryOp(PfNaryOp::Add),
-                        vec![
-                            new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
-                            new_const(-1 * i as isize), // TOOD think
-                        ],
-                    ),
-                ],
-            );
+    fn pop_ite(&self, i: usize, pop_elt: Term) -> Term {
+        let popped = term(
+            Op::Eq,
+            vec![new_var(format!("stack_{}_out", i)), pop_elt.clone()],
+        );
 
-            self.stack_ptr_circ_count += 1;
+        let not_popped = term(
+            Op::Eq,
+            vec![
+                new_var(format!("stack_{}_out", i)),
+                new_var(format!("stack_{}_in", i)),
+            ],
+        );
 
-            let padding_eq_check = term(
-                Op::Ite,
-                vec![
-                    term(
-                        Op::Not,
-                        vec![term(
-                            Op::Eq,
-                            vec![
-                                new_var(format!("stack_{}", i)),
-                                new_const(self.stack_entry_padding.clone()), // maybe make usize
-                                                                             // TODO?
-                            ],
-                        )],
-                    ),
-                    term(
-                        Op::BoolNaryOp(BoolNaryOp::And),
-                        vec![asgn, update_stack_ptr],
-                    ),
-                    new_bool_const(true), // else, do nothing
-                ],
-            );
+        let stack_ptr_sub = term(
+            Op::Eq,
+            vec![
+                new_var(format!("stack_ptr_popped")),
+                term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![
+                        new_const(-1),
+                        new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                    ],
+                ),
+            ],
+        );
 
-            popped = term(
+        let stack_ptr_same = term(
+            Op::Eq,
+            vec![
+                new_var(format!("stack_ptr_popped")),
+                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+            ],
+        );
+
+        term(
+            Op::Ite,
+            vec![
+                term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                        new_const(i),
+                    ],
+                ),
+                term(Op::BoolNaryOp(BoolNaryOp::And), vec![popped, stack_ptr_sub]),
+                term(
+                    Op::BoolNaryOp(BoolNaryOp::And),
+                    vec![not_popped, stack_ptr_same],
+                ),
+            ],
+        )
+    }
+
+    fn pop_stack_circuit(&mut self, cursor_var: Term) -> Term {
+        let to_pop = term(
+            Op::PfNaryOp(PfNaryOp::Add),
+            vec![
+                term(
+                    Op::PfNaryOp(PfNaryOp::Mul),
+                    vec![cursor_var, new_const(self.num_states)],
+                ),
+                new_var(format!("state_{}", self.batch_size)),
+            ],
+        );
+
+        let mut inside_ite = self.pop_ite(0, to_pop);
+
+        for i in 1..self.max_stack {
+            inside_ite = term(
                 Op::Ite,
                 vec![
                     term(
@@ -757,13 +848,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             new_const(i),
                         ],
                     ),
-                    padding_eq_check,
-                    popped,
+                    self.pop_ite(i, to_pop),
+                    inside_ite,
                 ],
             );
         }
-
-        popped
+        inside_ite
     }
 
     fn cursor_circuit(&mut self) {
@@ -814,21 +904,21 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 // if in_state \in forall - only first
                 let in_forall = new_var(format!("is_forall_{}", j));
 
-                self.in_foralls_circuit(new_var(format!("state_0")), in_forall.clone());
+                self.in_foralls_circuit(0, in_forall.clone());
 
                 let mut forall_kids = vec![];
                 for k in 0..self.max_branches {
                     forall_kids.push(new_var(format!("forall_0_kid_{}", k)));
                 }
 
-                let push_stmt = self.push_stack_circuit(new_var(format!("state_0")), forall_kids);
+                let push_stmt = self.push_stack_circuit(0, forall_kids);
 
                 let do_pushes = term(Op::Ite, vec![in_forall, push_stmt, new_bool_const(true)]);
                 self.assertions.push(do_pushes);
             } else {
                 // assert not forall
                 let in_forall = new_var(format!("is_forall_{}", j));
-                self.in_foralls_circuit(new_var(format!("state_{}", j)), in_forall.clone());
+                self.in_foralls_circuit(j, in_forall.clone());
 
                 let not_in_forall = term(Op::Not, vec![in_forall]);
                 self.assertions.push(not_in_forall);
@@ -857,24 +947,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     ],
                 );
 
-                // assert in_state \in accepting
-                let in_accepting = new_var(format!("branch_accepting"));
-                self.in_accepting_state_circuit(
-                    new_var(format!("state_{}", j)),
-                    in_accepting.clone(),
-                );
-
                 // cursor = pop stack
                 let pop_stmt = self.pop_stack_circuit(new_var(format!("cursor_{}", j + 1)));
 
-                let branch_transition = term(
-                    Op::BoolNaryOp(BoolNaryOp::And),
-                    vec![
-                        pop_stmt,
-                        term(Op::BoolNaryOp(BoolNaryOp::And), vec![in_accepting, eof]),
-                    ],
-                );
+                let branch_transition = term(Op::BoolNaryOp(BoolNaryOp::And), vec![pop_stmt, eof]);
 
+                // branch transition rel val -> in is accepting
                 let branch_or_not = term(
                     Op::Ite,
                     vec![
@@ -1159,7 +1237,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         assert_eq!(lookups.len(), self.batch_size);
         self.nlookup_gadget(lookups, self.table.len(), "nl"); // len correct? TODO
         self.cursor_circuit();
-        //self.accepting_state_circuit(); // TODO
+        self.last_state_accepting_circuit(new_var(format!("accepting")));
 
         self.nlookup_doc_commit();
 
@@ -1231,21 +1309,84 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     fn pop_wit(&self, wits: &mut FxHashMap<String, Value>) -> usize {
         let mut popped_elt = self.stack[self.stack_ptr];
         self.stack_ptr -= 1;
-        while popped_elt != self.stack_entry_padding {
-            popped_elt = self.stack[self.stack_ptr];
-            self.stack_ptr -= 1;
-        }
 
-        wits.insert(format!("cursor_{}", self.batch_size), new_wit(popped_elt));
+        wits.insert(format!("cursor_{}", self.batch_size), new_wit(popped_elt.0));
+        wits.insert(format!("state_{}", self.batch_size), new_wit(popped_elt.1));
 
         // after pop
-        wits.insert(format!("stack_ptr_popped", X), new_wit(self.stack_ptr));
+        wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
 
         // return cursor
-        popped_elt
+        popped_elt.0
     }
 
-    fn push_wit() {}
+    fn push_wit(
+        &self,
+        wits: &mut FxHashMap<String, Value>,
+        forall: Option<NodeIndex>,
+        cur_cursor: usize,
+    ) {
+        // assert in foralls sanity check ?
+
+        let forall_kids = match forall {
+            Some(state) => self.foralls_w_kids[state.index()].1,
+            None => vec![],
+        };
+
+        while forall_kids.len() < self.max_branches {
+            forall_kids.push(self.kid_padding);
+        }
+
+        let mut k = 0;
+        for i in 0..self.stack_ptr {
+            wits.insert(
+                format!("stack_{}_in", i),
+                new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
+            );
+            wits.insert(
+                format!("stack_{}_out", i),
+                new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
+            );
+
+            wits.insert(format!("stack_ptr_{}", i), new_wit(self.stack_ptr));
+        }
+
+        for kid in forall_kids {
+            wits.insert(
+                format!("stack_{}_in", self.stack_ptr),
+                new_wit(
+                    self.stack[self.stack_ptr].0 * self.num_states + self.stack[self.stack_ptr].1,
+                ),
+            );
+
+            self.stack[self.stack_ptr] = (cur_cursor, kid);
+            wits.insert(
+                format!("stack_{}_out", self.stack_ptr),
+                new_wit(kid * self.num_states + cur_cursor),
+            );
+            wits.insert(format!("forall_kid_{}", k), new_wit(kid));
+            k += 1;
+
+            self.stack_ptr += 1;
+            wits.insert(
+                format!("stack_ptr_{}", self.stack_ptr),
+                new_wit(self.stack_ptr),
+            );
+        }
+
+        for i in (self.stack_ptr + 1)..self.max_stack {
+            wits.insert(
+                format!("stack_{}_in", i),
+                new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
+            );
+            wits.insert(
+                format!("stack_{}_out", i),
+                new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
+            );
+
+            wits.insert(format!("stack_ptr_{}", i), new_wit(self.stack_ptr));
+        }
+    }
 
     // returns char_num, is_star
     fn get_char_num(&self, edge: Either<char, OpenSet<usize>>) -> (usize, bool) {
@@ -1279,7 +1420,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         cursor_i: usize,
         i: usize, // this is for naming
     ) -> Integer {
-        let char_num = self.ab_num[&None];
+        let char_num = self.num_ab[&None];
         let offset_i = 0;
         let rel_i = 0;
 
@@ -1413,7 +1554,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     next_state = sols[self.sol_num + 1].front().unwrap().from_node.index();
                 }
 
-                // TODO
                 cursor_i = self.pop_wit(&mut wits);
 
                 // transition
@@ -1431,8 +1571,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 // handle stack pushes during forall
                 if self.safa.g[te.from_node].is_and() {
                     // forall
-                    if i == 0 { // correct place
-                         // TODO PUSH STACK
+                    if i == 0 {
+                        // correct place
+                        self.push_wit(&mut wits, Some(te.from_node), cursor_i);
                     } else {
                         // pad out the rest of this loop
                         while i < self.batch_size {
@@ -1444,19 +1585,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     }
                 } else {
                     // not forall
-                    if i == 0 { // must pad out the stack
-
-                        // TODO PAD PUSH STACK
+                    if i == 0 {
+                        // must pad out the stack
+                        // fill stack vars with padding
+                        self.push_wit(&mut wits, None, cursor_i);
                     }
                 }
 
                 // normal transition
+                let is_star;
                 (char_num, is_star) = self.get_char_num(te.edge);
                 state_i = te.from_node.index();
                 next_state = te.to_node.index();
                 println!("NEXT STATE IS {:#?}", next_state);
                 offset_i = te.to_cur - te.from_cur;
-                rel_i = 0;
 
                 cursor_i += offset_i;
 
@@ -1472,7 +1614,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 if char_num == self.num_ab[&None] {
                     cursor_access.push(self.ep_num);
-                } else if char_num == self.num_ab[Some('*')] {
+                } else if char_num == self.num_ab[&Some('*')] {
                     cursor_access.push(self.star_num);
                 } else {
                     cursor_access.push(cursor_i);
@@ -1495,11 +1637,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
         wits = w;
 
-        // TODO
-        wits.insert(
-            format!("accepting"),
-            new_wit(self.prover_accepting_state(last_state)),
-        );
+        // accepting
+        wits.insert(format!("accepting"), new_wit(1));
 
         assert!(doc_running_q.is_some() || batch_num == 0);
         assert!(doc_running_v.is_some() || batch_num == 0);
@@ -1534,9 +1673,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let mut v = vec![];
         let mut q = vec![];
-
-        println!("CHARS {:#?}", chars.clone());
-        println!("EP NUM {:#?}, STAR NUM {:#?}", self.ep_num, self.star_num);
 
         for i in 0..(self.batch_size - 1) {
             // TODO - make sure epsilon and * are added to the end of doc [ DOC, EOF, epsilon, star
@@ -2019,8 +2155,8 @@ mod tests {
                 let (pd, _vd) = r1cs_converter.to_circuit();
                 // println!("PD {:#?}", pd);
 
-                //let mut values;
-                //let mut next_state;
+                let mut values;
+                let mut next_state;
 
                 let trace = safa.solve(&chars);
                 //println!("TRACE {:#?}", trace);

@@ -158,13 +158,13 @@ pub fn normal_add_table<'a>(
     num_chars: usize,
     max_offsets: usize,
     all_state: NodeIndex,
-    forall_node: NodeIndex,
+    and_states: Vec<usize>,
     last_path: bool,
 ) {
     if last_path {
         current_forall_state_stack.push_front(num_states); // TODO
     } else {
-        current_forall_state_stack.push_front(forall_node.index());
+        current_forall_state_stack.push_front(all_state.index());
     }
 
     // dupicate safa, run this path
@@ -191,9 +191,8 @@ pub fn normal_add_table<'a>(
                         let offset = single.unwrap();
                         // if offset == 0 { -> doesn't matter, always use epsilon for actual
                         // epsilon and for jumps
-
+                        let rel = calc_rel(state, out_state, and_states, safa, num_states, false);
                         let c = num_ab[&None]; //EPSILON
-                        let rel = 0;
 
                         set_table.insert(
                             Integer::from(
@@ -209,7 +208,7 @@ pub fn normal_add_table<'a>(
                         // [0,*]
                         let c = num_ab[&Some('*')];
                         let offset = 0; // TODO?
-                        let rel = 0;
+                        let rel = calc_rel(state, out_state, and_states, safa, num_states, false);
                         println!("STAR EDGE {:#?} -{:#?}-> {:#?}", in_state, c, out_state);
                         set_table.insert(
                             Integer::from(
@@ -228,8 +227,8 @@ pub fn normal_add_table<'a>(
                             let mut offset = r.start;
                             while offset <= r.end.unwrap() {
                                 let c = num_ab[&None]; //EPSILON
-                                let rel = 0;
-
+                                let rel =
+                                    calc_rel(state, out_state, and_states, safa, num_states, false);
                                 set_table.insert(
                                     Integer::from(
                                         (in_state * num_states * num_chars * max_offsets * 2)
@@ -248,7 +247,7 @@ pub fn normal_add_table<'a>(
                 Either(Ok(ch)) => {
                     let c = num_ab[&Some(ch)];
                     let offset = 1;
-                    let rel = 0;
+                    let rel = calc_rel(state, out_state, and_states, safa, num_states, false);
                     set_table.insert(
                         Integer::from(
                             (in_state * num_states * num_chars * max_offsets * 2)
@@ -269,17 +268,19 @@ pub fn normal_add_table<'a>(
 
             let c = num_ab[&None]; //EPSILON
             let offset = 0; // TODO? current_stack_level;
-            let rel = 1;
-            let in_state = state.index();
-
-            println!("FORALL STATE STACK {:#?}", current_forall_state_stack);
 
             let out_state = if current_forall_state_stack.len() == 0 {
                 // "finished"
-                num_states - 1 //fake_last_state TODO make num_states += 1 in main
+                num_states //fake_last_state TODO make num_states += 1 in main
             } else {
+                if last_path {
+                    current_forall_state_stack.pop_front();
+                }
                 *current_forall_state_stack.front().unwrap()
             };
+
+            let rel = calc_rel(state, out_state, and_states, safa, num_states, true);
+            let in_state = state.index();
 
             // TODO we have to make sure the multipliers are big enough
 
@@ -313,6 +314,34 @@ pub fn normal_add_table<'a>(
         }
     }
     current_forall_state_stack.pop_front();
+}
+
+pub(crate) fn calc_rel<'a>(
+    in_state: NodeIndex,
+    out_state: usize, //NodeIndex,
+    children: Vec<usize>,
+    safa: &'a SAFA<char>,
+    num_states: usize,
+    trans: bool,
+) -> usize {
+    let mut rel = 0;
+
+    if trans {
+        assert!(safa.g[NodeIndex::new(out_state)].is_and());
+        assert!(safa.accepting.contains(&in_state));
+        rel = 1;
+    } else if safa.accepting.contains(&NodeIndex::new(out_state)) {
+        rel = 2;
+    } else if safa.g[in_state].is_and() {
+        assert!(children.len() > 0);
+
+        rel = 3;
+        for k in children {
+            rel += k * num_states; //TODO
+        }
+    }
+
+    rel
 }
 
 // a starts with evals on hypercube

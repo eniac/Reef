@@ -75,9 +75,9 @@ fn get_modulus<F: Field + PrimeField>() -> Integer {
 #[derive(Clone, Debug)]
 pub struct NlNl<F: PrimeField> {
     pub q: Vec<F>,
-    pub v : F, 
+    pub v: F,
     pub doc_q: Vec<F>,
-    pub doc_v: F
+    pub doc_v: F,
 }
 
 #[derive(Clone, Debug)]
@@ -570,7 +570,7 @@ where
         out.extend(nlnl_glue.doc_q.clone());
         out.push(nlnl_glue.doc_v);
 
-        out.push(self.accepting[1]);    
+        out.push(self.accepting[1]);
         out
     }
 
