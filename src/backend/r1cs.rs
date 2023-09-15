@@ -198,7 +198,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                     let out_state = and_edges[i].target().index();
                                     let c = num_ab[&None]; //EPSILON
                                     let rel = calc_rel(
-                                        all_state, out_state, and_states, &safa, num_states, false,
+                                        all_state,
+                                        out_state,
+                                        &and_states,
+                                        &safa,
+                                        num_states,
+                                        false,
                                     );
 
                                     set_table.insert(
@@ -329,7 +334,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let kid_padding = 0; // TODO !!
 
-        let stack = vec![];
+        let mut stack = vec![];
         for i in 0..max_stack {
             stack.push((0, 0)); // TODO CHANGE THIS TO THE PADDING
         }
@@ -742,7 +747,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
 
-            let mut inside_ite = self.push_ite(0, to_push, b);
+            let mut inside_ite = self.push_ite(0, to_push.clone(), b);
 
             for i in 1..self.max_stack {
                 inside_ite = term(
@@ -755,7 +760,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 new_const(i),
                             ],
                         ),
-                        self.push_ite(i, to_push, b),
+                        self.push_ite(i, to_push.clone(), b),
                         inside_ite,
                     ],
                 );
@@ -835,7 +840,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             ],
         );
 
-        let mut inside_ite = self.pop_ite(0, to_pop);
+        let mut inside_ite = self.pop_ite(0, to_pop.clone());
 
         for i in 1..self.max_stack {
             inside_ite = term(
@@ -848,7 +853,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             new_const(i),
                         ],
                     ),
-                    self.pop_ite(i, to_pop),
+                    self.pop_ite(i, to_pop.clone()),
                     inside_ite,
                 ],
             );
@@ -1306,7 +1311,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             .push(new_var(format!("{}_next_running_claim", id)));
     }
 
-    fn pop_wit(&self, wits: &mut FxHashMap<String, Value>) -> usize {
+    fn pop_wit(&mut self, wits: &mut FxHashMap<String, Value>) -> usize {
         let mut popped_elt = self.stack[self.stack_ptr];
         self.stack_ptr -= 1;
 
@@ -1321,15 +1326,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn push_wit(
-        &self,
+        &mut self,
         wits: &mut FxHashMap<String, Value>,
         forall: Option<NodeIndex>,
         cur_cursor: usize,
     ) {
         // assert in foralls sanity check ?
 
-        let forall_kids = match forall {
-            Some(state) => self.foralls_w_kids[state.index()].1,
+        let mut forall_kids = match forall {
+            Some(state) => self.foralls_w_kids[state.index()].1.clone(),
             None => vec![],
         };
 

@@ -238,165 +238,155 @@ fn solve<'a>(
     num_steps: usize,
     doc: &Vec<char>,
 ) {
-    /*
-        let q_len = logmn(r1cs_converter.table.len());
-        let qd_len = logmn(r1cs_converter.udoc.len());
+    let q_len = logmn(r1cs_converter.table.len());
+    let qd_len = logmn(r1cs_converter.udoc.len());
 
-        let blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
+    let blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
 
-        let mut wits;
-        let mut running_q: Option<Vec<Integer>> = None;
-        let mut running_v: Option<Integer> = None;
-        let mut next_running_q: Option<Vec<Integer>>;
-        let mut next_running_v: Option<Integer>;
-        let mut doc_running_q: Option<Vec<Integer>> = None;
-        let mut doc_running_v: Option<Integer> = None;
-        let mut next_doc_running_q: Option<Vec<Integer>>;
-        let mut next_doc_running_v: Option<Integer>;
+    let mut wits;
+    let mut running_q: Option<Vec<Integer>> = None;
+    let mut running_v: Option<Integer> = None;
+    let mut next_running_q: Option<Vec<Integer>>;
+    let mut next_running_v: Option<Integer>;
+    let mut doc_running_q: Option<Vec<Integer>> = None;
+    let mut doc_running_v: Option<Integer> = None;
+    let mut next_doc_running_q: Option<Vec<Integer>>;
+    let mut next_doc_running_v: Option<Integer>;
 
-        let mut prev_cursor_0 = 0;
-        let mut next_cursor_0;
-        let mut prev_running_path_count = 0;
-        let mut next_running_path_count: usize;
-        let mut prev_num_paths = 0;
-        let mut next_num_paths: usize;
+    let mut prev_cursor_0 = 0;
+    let mut next_cursor_0;
 
-        let mut current_state = r1cs_converter.safa.get_init().index();
-        // TODO don't recalc :(
+    let mut current_state = r1cs_converter.safa.get_init().index();
+    // TODO don't recalc :(
 
-        let mut next_state = current_state;
+    let mut next_state = current_state;
 
-        let trace = r1cs_converter.safa.solve(doc);
-        let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
+    let trace = r1cs_converter.safa.solve(doc);
+    let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
 
-        for i in 0..num_steps {
-            #[cfg(feature = "metrics")]
-            let test = format!("step {}", i);
+    for i in 0..num_steps {
+        #[cfg(feature = "metrics")]
+        let test = format!("step {}", i);
 
-            #[cfg(feature = "metrics")]
-            log::tic(Component::Solver, &test, "witness generation");
-            // allocate real witnesses for round i
-            /*(
-                wits,
-                next_state,
-                next_running_q,
-                next_running_v,
-                next_doc_running_q,
-                next_doc_running_v,
-                next_cursor_0,
-                next_running_path_count,
-                next_num_paths,
-            ) = r1cs_converter.gen_wit_i(
-                &mut sols,
-                i,
-                next_state,
-                running_q.clone(),
-                running_v.clone(),
-                doc_running_q.clone(),
-                doc_running_v.clone(),
-                prev_cursor_0.clone(),
-                prev_running_path_count,
-                prev_num_paths,
-            );*/
-            #[cfg(feature = "metrics")]
-            log::stop(Component::Solver, &test, "witness generation");
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Solver, &test, "witness generation");
+        // allocate real witnesses for round i
+        (
+            wits,
+            next_state,
+            next_running_q,
+            next_running_v,
+            next_doc_running_q,
+            next_doc_running_v,
+            next_cursor_0,
+        ) = r1cs_converter.gen_wit_i(
+            &mut sols,
+            i,
+            next_state,
+            running_q.clone(),
+            running_v.clone(),
+            doc_running_q.clone(),
+            doc_running_v.clone(),
+            prev_cursor_0.clone(),
+        );
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Solver, &test, "witness generation");
 
-            circ_data.check_all(&wits);
+        circ_data.check_all(&wits);
 
-            let q = match running_q {
-                Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                None => vec![<G1 as Group>::Scalar::from(0); q_len],
-            };
+        let q = match running_q {
+            Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+            None => vec![<G1 as Group>::Scalar::from(0); q_len],
+        };
 
-            let v = match running_v {
-                Some(rv) => int_to_ff(rv),
-                None => int_to_ff(r1cs_converter.table[0].clone()),
-            };
+        let v = match running_v {
+            Some(rv) => int_to_ff(rv),
+            None => int_to_ff(r1cs_converter.table[0].clone()),
+        };
 
-            let next_q = next_running_q
-                .clone()
-                .unwrap()
-                .into_iter()
-                .map(|x| int_to_ff(x))
-                .collect();
-            let next_v = int_to_ff(next_running_v.clone().unwrap());
+        let next_q = next_running_q
+            .clone()
+            .unwrap()
+            .into_iter()
+            .map(|x| int_to_ff(x))
+            .collect();
+        let next_v = int_to_ff(next_running_v.clone().unwrap());
 
-            let doc_q = match doc_running_q {
-                Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                None => vec![<G1 as Group>::Scalar::from(0); qd_len],
-            };
+        let doc_q = match doc_running_q {
+            Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+            None => vec![<G1 as Group>::Scalar::from(0); qd_len],
+        };
 
-            let doc_v = match doc_running_v {
-                Some(rv) => int_to_ff(rv),
-                None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
-            };
-            let next_doc_q = next_doc_running_q
-                .clone()
-                .unwrap()
-                .into_iter()
-                .map(|x| int_to_ff(x))
-                .collect();
-            let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
-            let glue = vec![
-                NlNl {
-                    q: q,
-                    v: v,
-                    doc_q: doc_q,
-                    doc_v: doc_v,
-                },
-                NlNl {
-                    q: next_q,
-                    v: next_v,
-                    doc_q: next_doc_q,
-                    doc_v: next_doc_v,
-                },
-            ];
+        let doc_v = match doc_running_v {
+            Some(rv) => int_to_ff(rv),
+            None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
+        };
+        let next_doc_q = next_doc_running_q
+            .clone()
+            .unwrap()
+            .into_iter()
+            .map(|x| int_to_ff(x))
+            .collect();
+        let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
+        let glue = vec![
+            NlNl {
+                q: q,
+                v: v,
+                doc_q: doc_q,
+                doc_v: doc_v,
+            },
+            NlNl {
+                q: next_q,
+                v: next_v,
+                doc_q: next_doc_q,
+                doc_v: next_doc_v,
+            },
+        ];
 
-            let values: Option<Vec<_>> = Some(wits).map(|values| {
-                let mut evaluator = StagedWitCompEvaluator::new(&circ_data.precompute);
-                let mut ffs = Vec::new();
-                ffs.extend(evaluator.eval_stage(values.clone()).into_iter().cloned());
-                ffs.extend(
-                    evaluator
-                        .eval_stage(Default::default())
-                        .into_iter()
-                        .cloned(),
-                );
-                ffs
-            });
-
-            let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
-                circ_data.r1cs.clone(),
-                values,
-                vec![
-                    <G1 as Group>::Scalar::from(current_state as u64),
-                    <G1 as Group>::Scalar::from(next_state as u64),
-                ],
-                glue,
-                blind,
-                vec![
-                    <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(current_state)),
-                    <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(next_state)),
-                ],
-                r1cs_converter.batch_size,
-                r1cs_converter.pc.clone(),
-                <G1 as Group>::Scalar::from(0 as u64), // PLACEHOLDER!!
+        let values: Option<Vec<_>> = Some(wits).map(|values| {
+            let mut evaluator = StagedWitCompEvaluator::new(&circ_data.precompute);
+            let mut ffs = Vec::new();
+            ffs.extend(evaluator.eval_stage(values.clone()).into_iter().cloned());
+            ffs.extend(
+                evaluator
+                    .eval_stage(Default::default())
+                    .into_iter()
+                    .cloned(),
             );
+            ffs
+        });
 
-            #[cfg(feature = "metrics")]
-            log::stop(Component::Solver, &test, "witness generation");
+        let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
+            circ_data.r1cs.clone(),
+            values,
+            vec![
+                <G1 as Group>::Scalar::from(current_state as u64),
+                <G1 as Group>::Scalar::from(next_state as u64),
+            ],
+            glue,
+            blind,
+            vec![
+                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(current_state)),
+                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(next_state)),
+            ],
+            r1cs_converter.batch_size,
+            r1cs_converter.pc.clone(),
+            <G1 as Group>::Scalar::from(0 as u64), // PLACEHOLDER!!
+        );
 
-            sender.send(circuit_primary).unwrap(); //witness_i).unwrap();
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Solver, &test, "witness generation");
 
-            // for next i+1 round
-            current_state = next_state;
-            running_q = next_running_q;
-            running_v = next_running_v;
-            doc_running_q = next_doc_running_q;
-            doc_running_v = next_doc_running_v;
-            prev_cursor_0 = next_cursor_0;
-        }
-    */
+        sender.send(circuit_primary).unwrap(); //witness_i).unwrap();
+
+        // for next i+1 round
+        current_state = next_state;
+        running_q = next_running_q;
+        running_v = next_running_v;
+        doc_running_q = next_doc_running_q;
+        doc_running_v = next_doc_running_v;
+        prev_cursor_0 = next_cursor_0;
+    }
 }
 
 fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof_info: ProofInfo) {

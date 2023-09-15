@@ -191,7 +191,7 @@ pub fn normal_add_table<'a>(
                         let offset = single.unwrap();
                         // if offset == 0 { -> doesn't matter, always use epsilon for actual
                         // epsilon and for jumps
-                        let rel = calc_rel(state, out_state, and_states, safa, num_states, false);
+                        let rel = calc_rel(state, out_state, &and_states, safa, num_states, false);
                         let c = num_ab[&None]; //EPSILON
 
                         set_table.insert(
@@ -208,7 +208,7 @@ pub fn normal_add_table<'a>(
                         // [0,*]
                         let c = num_ab[&Some('*')];
                         let offset = 0; // TODO?
-                        let rel = calc_rel(state, out_state, and_states, safa, num_states, false);
+                        let rel = calc_rel(state, out_state, &and_states, safa, num_states, false);
                         println!("STAR EDGE {:#?} -{:#?}-> {:#?}", in_state, c, out_state);
                         set_table.insert(
                             Integer::from(
@@ -227,8 +227,14 @@ pub fn normal_add_table<'a>(
                             let mut offset = r.start;
                             while offset <= r.end.unwrap() {
                                 let c = num_ab[&None]; //EPSILON
-                                let rel =
-                                    calc_rel(state, out_state, and_states, safa, num_states, false);
+                                let rel = calc_rel(
+                                    state,
+                                    out_state,
+                                    &and_states,
+                                    safa,
+                                    num_states,
+                                    false,
+                                );
                                 set_table.insert(
                                     Integer::from(
                                         (in_state * num_states * num_chars * max_offsets * 2)
@@ -247,7 +253,7 @@ pub fn normal_add_table<'a>(
                 Either(Ok(ch)) => {
                     let c = num_ab[&Some(ch)];
                     let offset = 1;
-                    let rel = calc_rel(state, out_state, and_states, safa, num_states, false);
+                    let rel = calc_rel(state, out_state, &and_states, safa, num_states, false);
                     set_table.insert(
                         Integer::from(
                             (in_state * num_states * num_chars * max_offsets * 2)
@@ -279,7 +285,7 @@ pub fn normal_add_table<'a>(
                 *current_forall_state_stack.front().unwrap()
             };
 
-            let rel = calc_rel(state, out_state, and_states, safa, num_states, true);
+            let rel = calc_rel(state, out_state, &and_states, safa, num_states, true);
             let in_state = state.index();
 
             // TODO we have to make sure the multipliers are big enough
@@ -319,7 +325,7 @@ pub fn normal_add_table<'a>(
 pub(crate) fn calc_rel<'a>(
     in_state: NodeIndex,
     out_state: usize, //NodeIndex,
-    children: Vec<usize>,
+    children: &Vec<usize>,
     safa: &'a SAFA<char>,
     num_states: usize,
     trans: bool,
