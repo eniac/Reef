@@ -73,11 +73,13 @@ fn get_modulus<F: Field + PrimeField>() -> Integer {
 }
 
 #[derive(Clone, Debug)]
-pub struct NlNl<F: PrimeField> {
+pub struct Glue<F: PrimeField> {
     pub q: Vec<F>,
     pub v: F,
     pub doc_q: Vec<F>,
     pub doc_v: F,
+    pub stack: Vec<F>,
+    pub stack_ptr: F,
 }
 
 #[derive(Clone, Debug)]
@@ -86,7 +88,7 @@ pub struct NFAStepCircuit<F: PrimeField> {
     values: Option<Vec<Value>>,
     batch_size: usize,
     states: Vec<F>,
-    glue: Vec<NlNl<F>>,
+    glue: Vec<Glue<F>>,
     commit_blind: F,
     accepting: Vec<F>,
     pc: PoseidonConstants<F, typenum::U4>,
@@ -94,29 +96,26 @@ pub struct NFAStepCircuit<F: PrimeField> {
 }
 
 // note that this will generate a single round, and no witnesses, unlike nova example code
-// witness and loops will happen at higher level as to put as little as possible deep in circ
+// witness and loops will happen at higher level bc its my code and i can do what i want
 impl<F: PrimeField> NFAStepCircuit<F> {
     pub fn new(
         r1cs: R1csFinal,
         values: Option<Vec<Value>>,
         states: Vec<F>,
-        glue: Vec<NlNl<F>>,
+        glue: Vec<Glue<F>>,
         commit_blind: F,
         accepting: Vec<F>,
         batch_size: usize,
         pcs: PoseidonConstants<F, typenum::U4>,
         claim_blind: F,
     ) -> Self {
-        // todo check wits line up with the non det advice
-
         assert_eq!(states.len(), 2);
         assert_eq!(glue.len(), 2);
-        assert_eq!(accepting.len(), 2);
 
         // todo blind, first checking here
 
         NFAStepCircuit {
-            r1cs: r1cs, //&prover_data.r1cs, // def get rid of this crap
+            r1cs: r1cs,
             values: values,
             batch_size: batch_size,
             states: states,
@@ -189,6 +188,27 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         }
 
         return Ok(false);
+    }
+
+    fn stack_parsing(
+        &self,
+        s: &String,
+        alloc_v: &AllocatedNum<F>,
+        alloc_stack_ptr_popped: &mut Option<AllocatedNum<F>>,
+        alloc_stack_out: &mut Vec<Option<AllocatedNum<F>>>,
+    ) -> Result<bool, SynthesisError>
+where {
+        if s.starts_with(&format!("stack_ptr_popped")) {
+            *alloc_stack_ptr_popped = Some(alloc_v.clone()); //.get_variable();
+            return Ok(true);
+        } else if s.starts_with(&format!("stack_out_")) {
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[2].parse().unwrap();
+            alloc_stack_out[j] = Some(alloc_v.clone());
+
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     fn default_parsing(
@@ -527,11 +547,14 @@ where
     F: PrimeField,
 {
     fn arity(&self) -> usize {
-        // [state, opt<i>, opt<hash>, opt<v,q for eval claim>, opt<v,q for doc claim>, accepting?]
+        // @ELI, here's what z looks like, arity is += 1 when you add hash
+        // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, accepting?, stack_ptr,
+        // <stack>]
 
         let mut arity = 2;
-        let nlnl_glue = &self.glue[0];
-        arity += nlnl_glue.q.len() + 1 + nlnl_glue.doc_q.len() + 1;
+        let glue = &self.glue[0];
+        arity += glue.q.len() + 1 + glue.doc_q.len() + 1;
+        arity += glue.stack.len() + 1;
         arity
     }
 
@@ -543,34 +566,43 @@ where
                                           //assert_eq!(z[1], self.chars[0]);
 
         let mut i = 1;
-        let mut nlnl_glue = &self.glue[0];
+        let mut glue = &self.glue[0];
 
-        for qi in nlnl_glue.q.clone() {
+        for qi in glue.q.clone() {
             assert_eq!(z[i], qi);
             i += 1;
         }
-        assert_eq!(z[i], nlnl_glue.v);
+        assert_eq!(z[i], glue.v);
         i += 1;
-        for qi in nlnl_glue.doc_q.clone() {
+        for qi in glue.doc_q.clone() {
             assert_eq!(z[i], qi);
             i += 1;
         }
-        assert_eq!(z[i], nlnl_glue.doc_v);
+        assert_eq!(z[i], glue.doc_v);
         i += 1;
 
         assert_eq!(z[i], self.accepting[0]);
+        i += 1;
+        assert_eq!(z[i], glue.stack_ptr);
+        i += 1;
+        for si in glue.stack.clone() {
+            assert_eq!(z[i], si);
+            i += 1;
+        }
 
         let mut out = vec![
             self.states[1], // "next state"
         ];
-        nlnl_glue = &self.glue[1];
+        glue = &self.glue[1];
 
-        out.extend(nlnl_glue.q.clone());
-        out.push(nlnl_glue.v);
-        out.extend(nlnl_glue.doc_q.clone());
-        out.push(nlnl_glue.doc_v);
+        out.extend(glue.q.clone());
+        out.push(glue.v);
+        out.extend(glue.doc_q.clone());
+        out.push(glue.doc_v);
 
         out.push(self.accepting[1]);
+        out.push(glue.stack_ptr);
+        out.extend(glue.stack.clone());
         out
     }
 
@@ -617,10 +649,10 @@ where
         );
 
         let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
-        let nlnl_glue = &self.glue[0];
-        let sc_l = nlnl_glue.q.len();
-        let doc_l = nlnl_glue.doc_q.len();
-        //let i_0 = z[sc_l + 2].clone();
+        let glue = &self.glue[0];
+        let sc_l = glue.q.len();
+        let doc_l = glue.doc_q.len();
+        let stack_len = glue.stack.len();
 
         let mut alloc_rc = vec![None; sc_l + 1];
         let mut alloc_prev_rc = vec![None; sc_l + 1];
@@ -630,10 +662,16 @@ where
         let mut alloc_doc_prev_rc = vec![None; doc_l + 1];
         let mut alloc_doc_gs = vec![vec![None; 3]; doc_l];
 
+        let mut alloc_stack_ptr_popped = None;
+        let mut alloc_stack_out = vec![None; stack_len];
+
         let prev_q = z[1..(1 + sc_l)].to_vec(); //.clone();
         let prev_v = z[1 + sc_l].clone();
         let prev_dq = z[(sc_l + 2)..(sc_l + doc_l + 2)].to_vec(); //.clone();
         let prev_dv = z[sc_l + doc_l + 2].clone();
+
+        let stack_ptr_0 = z[sc_l + doc_l + 4].clone();
+        let stack_in = z[(sc_l + doc_l + 5)..(sc_l + doc_l + 5 + stack_len)].to_vec();
 
         let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
         let mut alloc_qs = vec![None; num_cqs];
@@ -692,6 +730,7 @@ where
                     )
                     .unwrap();
             }
+
             /*
             if !matched {
                 matched = self
@@ -701,22 +740,32 @@ where
             if !matched {
                 let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
                 vars.insert(var, alloc_v.get_variable());
+
                 matched = self
-                    .intm_fs_parsing(
-                        &alloc_v,
-                        //   &mut vars,
+                    .stack_parsing(
                         &s,
-                        //   var,
-                        false,
-                        &mut alloc_qs,
-                        &mut alloc_vs,
-                        &mut alloc_claim_r,
-                        &mut alloc_gs,
-                        //   &prev_q,
-                        //   &prev_v,
+                        &alloc_v,
+                        &mut alloc_stack_ptr_popped,
+                        &mut alloc_stack_out,
                     )
                     .unwrap();
-
+                if !matched {
+                    matched = self
+                        .intm_fs_parsing(
+                            &alloc_v,
+                            //   &mut vars,
+                            &s,
+                            //   var,
+                            false,
+                            &mut alloc_qs,
+                            &mut alloc_vs,
+                            &mut alloc_claim_r,
+                            &mut alloc_gs,
+                            //   &prev_q,
+                            //   &prev_v,
+                        )
+                        .unwrap();
+                }
                 if !matched {
                     matched = self
                         .intm_fs_parsing(
@@ -807,6 +856,10 @@ where
             out.push(qv.unwrap()); // better way to do this?
         }
         out.push(accepting.unwrap());
+        out.push(alloc_stack_ptr_popped.unwrap());
+        for si in alloc_stack_out {
+            out.push(si.unwrap());
+        }
 
         for (i, (a, b, c)) in self.r1cs.constraints.iter().enumerate() {
             cs.enforce(

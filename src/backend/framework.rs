@@ -129,26 +129,32 @@ fn setup<'a>(
 ) {
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());
+    let stack_len = r1cs_converter.max_stack;
 
     // use "empty" (witness-less) circuit to generate nova F
     let q = vec![<G1 as Group>::Scalar::from(0); q_len];
-
     let v = <G1 as Group>::Scalar::from(0);
     let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
-
     let doc_v = <G1 as Group>::Scalar::from(0);
+    let stack_ptr = <G1 as Group>::Scalar::from(0);
+    let stack = vec![<G1 as Group>::Scalar::from(0); stack_len];
+
     let empty_glue = vec![
-        NlNl {
+        Glue {
             q: q.clone(),
             v: v.clone(),
             doc_q: doc_q.clone(),
             doc_v: doc_v.clone(),
+            stack_ptr: stack_ptr.clone(),
+            stack: stack.clone(),
         },
-        NlNl {
+        Glue {
             q: q,
             v: v,
             doc_q: doc_q,
             doc_v: doc_v,
+            stack_ptr: stack_ptr,
+            stack: stack,
         },
     ];
 
@@ -255,6 +261,10 @@ fn solve<'a>(
 
     let mut prev_cursor_0 = 0;
     let mut next_cursor_0;
+    let mut stack_ptr_0 = 0;
+    let mut stack_ptr_popped;
+    let mut stack_in = vec![0; r1cs_converter.max_stack];
+    let mut stack_out;
 
     let mut current_state = r1cs_converter.safa.get_init().index();
     // TODO don't recalc :(
@@ -289,6 +299,12 @@ fn solve<'a>(
             doc_running_v.clone(),
             prev_cursor_0.clone(),
         );
+        stack_ptr_popped = r1cs_converter.stack_ptr;
+        stack_out = vec![];
+        for (cur, kid) in &r1cs_converter.stack {
+            stack_out.push(cur * r1cs_converter.num_states + kid);
+        }
+
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, &test, "witness generation");
 
@@ -328,18 +344,36 @@ fn solve<'a>(
             .map(|x| int_to_ff(x))
             .collect();
         let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
+
+        let sp_0 = <G1 as Group>::Scalar::from(stack_ptr_0 as u64);
+        let spp = <G1 as Group>::Scalar::from(stack_ptr_popped as u64);
+        let stk_in = stack_in
+            .clone()
+            .into_iter()
+            .map(|x| <G1 as Group>::Scalar::from(x as u64))
+            .collect();
+        let stk_out = stack_out
+            .clone()
+            .into_iter()
+            .map(|x| <G1 as Group>::Scalar::from(x as u64))
+            .collect();
+
         let glue = vec![
-            NlNl {
+            Glue {
                 q: q,
                 v: v,
                 doc_q: doc_q,
                 doc_v: doc_v,
+                stack_ptr: sp_0,
+                stack: stk_in,
             },
-            NlNl {
+            Glue {
                 q: next_q,
                 v: next_v,
                 doc_q: next_doc_q,
                 doc_v: next_doc_v,
+                stack_ptr: spp,
+                stack: stk_out,
             },
         ];
 
@@ -386,6 +420,8 @@ fn solve<'a>(
         doc_running_q = next_doc_running_q;
         doc_running_v = next_doc_running_v;
         prev_cursor_0 = next_cursor_0;
+        stack_ptr_0 = stack_ptr_popped;
+        stack_in = stack_out;
     }
 }
 

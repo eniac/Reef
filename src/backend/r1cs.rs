@@ -50,13 +50,13 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     // circuit crap
     stack_ptr_circ_count: usize,
     max_branches: usize,
-    max_stack: usize,
-    num_states: usize,
+    pub max_stack: usize,
+    pub num_states: usize,
     kid_padding: usize,
     // witness crap
     pub sol_num: usize,
-    stack: Vec<(usize, usize)>,
-    stack_ptr: usize,
+    pub stack: Vec<(usize, usize)>,
+    pub stack_ptr: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
 }
 
@@ -628,14 +628,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     fn push_ite(&self, i: usize, to_push: Term, b: usize) -> Term {
         let pushed = term(
             Op::Eq,
-            vec![new_var(format!("stack_{}_out", i)), to_push.clone()],
+            vec![new_var(format!("stack_out_{}", i)), to_push.clone()],
         );
 
         let not_pushed = term(
             Op::Eq,
             vec![
-                new_var(format!("stack_{}_out", i)),
-                new_var(format!("stack_{}_in", i)),
+                new_var(format!("stack_out_{}", i)),
+                new_var(format!("stack_in_{}", i)),
             ],
         );
 
@@ -776,14 +776,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     fn pop_ite(&self, i: usize, pop_elt: Term) -> Term {
         let popped = term(
             Op::Eq,
-            vec![new_var(format!("stack_{}_out", i)), pop_elt.clone()],
+            vec![new_var(format!("stack_out_{}", i)), pop_elt.clone()],
         );
 
         let not_popped = term(
             Op::Eq,
             vec![
-                new_var(format!("stack_{}_out", i)),
-                new_var(format!("stack_{}_in", i)),
+                new_var(format!("stack_out_{}", i)),
+                new_var(format!("stack_in_{}", i)),
             ],
         );
 
@@ -1345,11 +1345,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut k = 0;
         for i in 0..self.stack_ptr {
             wits.insert(
-                format!("stack_{}_in", i),
+                format!("stack_in_{}", i),
                 new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
             );
             wits.insert(
-                format!("stack_{}_out", i),
+                format!("stack_out_{}", i),
                 new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
             );
 
@@ -1358,7 +1358,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         for kid in forall_kids {
             wits.insert(
-                format!("stack_{}_in", self.stack_ptr),
+                format!("stack_in_{}", self.stack_ptr),
                 new_wit(
                     self.stack[self.stack_ptr].0 * self.num_states + self.stack[self.stack_ptr].1,
                 ),
@@ -1366,7 +1366,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             self.stack[self.stack_ptr] = (cur_cursor, kid);
             wits.insert(
-                format!("stack_{}_out", self.stack_ptr),
+                format!("stack_out_{}", self.stack_ptr),
                 new_wit(kid * self.num_states + cur_cursor),
             );
             wits.insert(format!("forall_kid_{}", k), new_wit(kid));
@@ -1381,11 +1381,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         for i in (self.stack_ptr + 1)..self.max_stack {
             wits.insert(
-                format!("stack_{}_in", i),
+                format!("stack_in_{}", i),
                 new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
             );
             wits.insert(
-                format!("stack_{}_out", i),
+                format!("stack_out_{}", i),
                 new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
             );
 
