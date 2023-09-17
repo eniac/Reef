@@ -239,6 +239,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             // normal processing for state
             let all_state_idx = all_state.index();
 
+            // this is a fucked way of doing this
             for stack_lvl in 0..forall_children.len() {
                 for k in 0..forall_children[stack_lvl].len() {
                     if forall_children[stack_lvl][k] == all_state_idx {
@@ -252,8 +253,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             num_states,
                             num_chars,
                             max_offsets,
-                            all_state,
-                            vec![],
+                            current_forall_node,
+                            forall_children[stack_lvl].clone(),
                             k == forall_children[stack_lvl].len() - 1,
                         );
                     }
@@ -524,7 +525,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         v
     }
 
-    fn in_foralls_circuit(&mut self, state_num: usize, in_var: Term) {
+    fn in_foralls_circuit(&mut self, state_num: usize) -> Term {
         //not reg, trans, accept
         let not_reg = term(
             Op::Not,
@@ -555,16 +556,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             ],
         );
 
-        let match_term = term(
-            Op::Ite,
-            vec![
-                rel_val,
-                term(Op::Eq, vec![in_var.clone(), new_const(1)]),
-                term(Op::Eq, vec![in_var.clone(), new_const(0)]),
-            ],
-        );
-
-        self.assertions.push(match_term);
+        rel_val
     }
 
     fn last_state_accepting_circuit(&mut self, in_var: Term) {
@@ -907,9 +899,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             if j == 0 {
                 // if in_state \in forall - only first
-                let in_forall = new_var(format!("is_forall_{}", j));
-
-                self.in_foralls_circuit(0, in_forall.clone());
+                let in_forall = self.in_foralls_circuit(0);
 
                 let mut forall_kids = vec![];
                 for k in 0..self.max_branches {
@@ -922,8 +912,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 self.assertions.push(do_pushes);
             } else {
                 // assert not forall
-                let in_forall = new_var(format!("is_forall_{}", j));
-                self.in_foralls_circuit(j, in_forall.clone());
+                let in_forall = self.in_foralls_circuit(j);
 
                 let not_in_forall = term(Op::Not, vec![in_forall]);
                 self.assertions.push(not_in_forall);

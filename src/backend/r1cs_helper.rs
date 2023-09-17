@@ -167,6 +167,11 @@ pub fn normal_add_table<'a>(
         current_forall_state_stack.push_front(all_state.index());
     }
 
+    println!(
+        "CURRENT FORALL STATE STACK {:#?}",
+        current_forall_state_stack
+    );
+
     // dupicate safa, run this path
     let mut dfs_small = Dfs::new(&safa.g, all_state);
 
@@ -179,6 +184,10 @@ pub fn normal_add_table<'a>(
         if safa.g[state].is_and() {
             current_forall_state_stack.push_front(state.index());
         }
+        println!(
+            "CURRENT FORALL STATE STACK {:#?}",
+            current_forall_state_stack
+        );
 
         for edge in safa.g.edges(state) {
             let out_state = edge.target().index();
@@ -320,6 +329,10 @@ pub fn normal_add_table<'a>(
         }
     }
     current_forall_state_stack.pop_front();
+    println!(
+        "CURRENT FORALL STATE STACK {:#?}",
+        current_forall_state_stack
+    );
 }
 
 pub(crate) fn calc_rel<'a>(
@@ -333,12 +346,15 @@ pub(crate) fn calc_rel<'a>(
     let mut rel = 0;
 
     if trans {
-        assert!(safa.g[NodeIndex::new(out_state)].is_and());
+        //print!("in {:#?}, OUT {:#?}", in_state.index(), out_state);
+        assert!(out_state == num_states || safa.g[NodeIndex::new(out_state)].is_and());
         assert!(safa.accepting.contains(&in_state));
         rel = 1;
     } else if safa.accepting.contains(&NodeIndex::new(out_state)) {
         rel = 2;
     } else if safa.g[in_state].is_and() {
+        println!("in {:#?}, OUT {:#?}", in_state.index(), out_state);
+        println!("CHILDREN {:#?}", children);
         assert!(children.len() > 0);
 
         rel = 3;
