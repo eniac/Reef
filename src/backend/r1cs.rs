@@ -28,7 +28,7 @@ use std::collections::LinkedList;
 
 pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub safa: &'a SAFA<C>,
-    foralls_w_kids: Vec<(usize, Vec<usize>)>,
+    foralls_w_kids: FxHashMap<usize, Vec<usize>>,
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     max_offsets: usize,
@@ -155,7 +155,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         let mut forall_children: Vec<Vec<usize>> = Vec::new();
-        let mut foralls_w_kids: Vec<(usize, Vec<usize>)> = Vec::new();
+        let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
         let mut current_forall_node = NodeIndex::new(0);
         let mut max_branches = 0;
         let mut max_stack = 0;
@@ -198,7 +198,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                     let out_state = and_edges[i].target().index();
                                     let c = num_ab[&None]; //EPSILON
                                     let rel = calc_rel(
-                                        all_state,
+                                        all_state.index(),
                                         out_state,
                                         &and_states,
                                         &safa,
@@ -229,7 +229,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     }
                 }
 
-                foralls_w_kids.push((all_state.index(), and_states.clone()));
+                foralls_w_kids.insert(all_state.index(), and_states.clone());
                 forall_children.push(and_states);
                 //current_stack_level += 1;
             }
@@ -1323,7 +1323,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // assert in foralls sanity check ?
 
         let mut forall_kids = match forall {
-            Some(state) => self.foralls_w_kids[state.index()].1.clone(),
+            Some(state) => self.foralls_w_kids[&state.index()].clone(),
             None => vec![],
         };
 
@@ -1416,7 +1416,26 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     ) -> Integer {
         let char_num = self.num_ab[&None];
         let offset_i = 0;
-        let rel_i = 0;
+
+        let rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
+            calc_rel(
+                state_i,
+                next_state,
+                &self.foralls_w_kids[&state_i],
+                &self.safa,
+                self.num_states,
+                false,
+            )
+        } else {
+            calc_rel(
+                state_i,
+                next_state,
+                &vec![],
+                &self.safa,
+                self.num_states,
+                false,
+            )
+        };
 
         wits.insert(format!("char_{}", i), new_wit(char_num));
         wits.insert(format!("state_{}", i), new_wit(state_i));
@@ -1535,6 +1554,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             if sols[self.sol_num].is_empty() {
                 // need to transition
                 while i < self.batch_size - 1 {
+                    state_i = next_state;
                     v.push(self.padding_v(&mut wits, &mut q, state_i, next_state, cursor_i, i));
                     i += 1;
                 }
@@ -1551,8 +1571,28 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 cursor_i = self.pop_wit(&mut wits);
 
                 // transition
+                let rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
+                    calc_rel(
+                        state_i,
+                        next_state,
+                        &self.foralls_w_kids[&state_i],
+                        &self.safa,
+                        self.num_states,
+                        true,
+                    )
+                } else {
+                    calc_rel(
+                        state_i,
+                        next_state,
+                        &vec![],
+                        &self.safa,
+                        self.num_states,
+                        true,
+                    )
+                };
+
                 v.push(self.edge_v(
-                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, 1, i,
+                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, rel_i, i,
                 ));
                 i += 1;
 
@@ -1601,8 +1641,27 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     offset_i = 0;
                 }
 
+                let rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
+                    calc_rel(
+                        state_i,
+                        next_state,
+                        &self.foralls_w_kids[&state_i],
+                        &self.safa,
+                        self.num_states,
+                        false,
+                    )
+                } else {
+                    calc_rel(
+                        state_i,
+                        next_state,
+                        &vec![],
+                        &self.safa,
+                        self.num_states,
+                        false,
+                    )
+                };
                 v.push(self.edge_v(
-                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, 0, i,
+                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, rel_i, i,
                 ));
                 i += 1;
 

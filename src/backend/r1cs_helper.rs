@@ -200,7 +200,14 @@ pub fn normal_add_table<'a>(
                         let offset = single.unwrap();
                         // if offset == 0 { -> doesn't matter, always use epsilon for actual
                         // epsilon and for jumps
-                        let rel = calc_rel(state, out_state, &and_states, safa, num_states, false);
+                        let rel = calc_rel(
+                            state.index(),
+                            out_state,
+                            &and_states,
+                            safa,
+                            num_states,
+                            false,
+                        );
                         let c = num_ab[&None]; //EPSILON
 
                         set_table.insert(
@@ -217,7 +224,14 @@ pub fn normal_add_table<'a>(
                         // [0,*]
                         let c = num_ab[&Some('*')];
                         let offset = 0; // TODO?
-                        let rel = calc_rel(state, out_state, &and_states, safa, num_states, false);
+                        let rel = calc_rel(
+                            state.index(),
+                            out_state,
+                            &and_states,
+                            safa,
+                            num_states,
+                            false,
+                        );
                         println!("STAR EDGE {:#?} -{:#?}-> {:#?}", in_state, c, out_state);
                         set_table.insert(
                             Integer::from(
@@ -237,7 +251,7 @@ pub fn normal_add_table<'a>(
                             while offset <= r.end.unwrap() {
                                 let c = num_ab[&None]; //EPSILON
                                 let rel = calc_rel(
-                                    state,
+                                    state.index(),
                                     out_state,
                                     &and_states,
                                     safa,
@@ -262,7 +276,14 @@ pub fn normal_add_table<'a>(
                 Either(Ok(ch)) => {
                     let c = num_ab[&Some(ch)];
                     let offset = 1;
-                    let rel = calc_rel(state, out_state, &and_states, safa, num_states, false);
+                    let rel = calc_rel(
+                        state.index(),
+                        out_state,
+                        &and_states,
+                        safa,
+                        num_states,
+                        false,
+                    );
                     set_table.insert(
                         Integer::from(
                             (in_state * num_states * num_chars * max_offsets * 2)
@@ -294,7 +315,14 @@ pub fn normal_add_table<'a>(
                 *current_forall_state_stack.front().unwrap()
             };
 
-            let rel = calc_rel(state, out_state, &and_states, safa, num_states, true);
+            let rel = calc_rel(
+                state.index(),
+                out_state,
+                &and_states,
+                safa,
+                num_states,
+                true,
+            );
             let in_state = state.index();
 
             // TODO we have to make sure the multipliers are big enough
@@ -336,7 +364,7 @@ pub fn normal_add_table<'a>(
 }
 
 pub(crate) fn calc_rel<'a>(
-    in_state: NodeIndex,
+    in_state: usize,  //NodeIndex,
     out_state: usize, //NodeIndex,
     children: &Vec<usize>,
     safa: &'a SAFA<char>,
@@ -348,12 +376,12 @@ pub(crate) fn calc_rel<'a>(
     if trans {
         //print!("in {:#?}, OUT {:#?}", in_state.index(), out_state);
         assert!(out_state == num_states || safa.g[NodeIndex::new(out_state)].is_and());
-        assert!(safa.accepting.contains(&in_state));
+        assert!(safa.accepting.contains(&NodeIndex::new(in_state)));
         rel = 1;
     } else if safa.accepting.contains(&NodeIndex::new(out_state)) {
         rel = 2;
-    } else if safa.g[in_state].is_and() {
-        println!("in {:#?}, OUT {:#?}", in_state.index(), out_state);
+    } else if safa.g[NodeIndex::new(in_state)].is_and() {
+        println!("in {:#?}, OUT {:#?}", in_state, out_state);
         println!("CHILDREN {:#?}", children);
         assert!(children.len() > 0);
 
