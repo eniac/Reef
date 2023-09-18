@@ -20,11 +20,13 @@ use neptune::{
     Strength,
 };
 use nova_snark::provider::ipa_pc::{InnerProductInstance, InnerProductArgument};
+use nova_snark::spartan::direct::SpartanVerifierKey;
 use nova_snark::traits::commitment::CommitmentTrait;
 use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
-    spartan::direct::SpartanSNARK
+    spartan::direct::SpartanSNARK,
+    provider::pedersen::{CommitmentGens, CompressedCommitment,Commitment}
 };
 use rug::Integer;
 use std::sync::mpsc;
@@ -524,11 +526,11 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, recv_
     let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(pc, cap_d, int_to_ff(v.clone()), claim_blind);
     
     // produce CAP keys
-    let (pk, vk) = SpartanSNARK::<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>::setup(cap_circuit.clone()).unwrap();
+    let (cap_pk, cap_vk) = SpartanSNARK::<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>::setup(cap_circuit.clone()).unwrap();
     
     let cap_z = vec![cap_d];
     
-    let cap_res = SpartanSNARK::cap_prove(&pk, cap_circuit.clone(), &cap_z, &v_commit.compress(), &int_to_ff(v), &v_decommit);
+    let cap_res = SpartanSNARK::cap_prove(&cap_pk, cap_circuit.clone(), &cap_z, &v_commit.compress(), &int_to_ff(v), &v_decommit);
     assert!(cap_res.is_ok());
     
     let cap_snark = cap_res.unwrap();  
@@ -553,7 +555,11 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, recv_
         proof_info.doc_len,
         ipi, 
         ipa,
-        cap_d
+        cap_d, 
+        cap_circuit, 
+        cap_snark,
+        cap_vk,
+        v_commit,
     );
 
     #[cfg(feature = "metrics")]
@@ -570,6 +576,10 @@ fn verify(
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
     cap_d: <G1 as Group>::Scalar,
+    cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
+    cap_snark: SpartanSNARK<G1, EE1,ConsistencyCircuit<<G1 as Group>::Scalar>>,
+    cap_vk: SpartanVerifierKey<G1,EE1>,
+    v_commit: Commitment<G1>,
 ) {
     let q_len = logmn(table.len());
     let qd_len = logmn(doc_len);
@@ -592,6 +602,10 @@ fn verify(
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Verifier, "Verification", "Final Clear Checks");
+
+    //CAP verify 
+    let cap_res = cap_verifier(cap_d, cap_snark, cap_circuit, cap_vk,v_commit);
+    assert!(cap_res.is_ok());
 
     // state, char, opt<hash>, opt<v,q for eval>, opt<v,q for doc>, accepting
     let zn = res.unwrap().0;

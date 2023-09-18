@@ -16,6 +16,7 @@ use neptune::{
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
     sponge::circuit::SpongeCircuit,
 };
+use nova_snark::spartan::direct::SpartanSNARK;
 use nova_snark::{
     errors::NovaError,
     provider::{
@@ -25,12 +26,14 @@ use nova_snark::{
     },
     traits::{commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait,circuit::StepCircuit},
     StepCounterType,
+    spartan::direct::SpartanVerifierKey,
 };
 use rand::rngs::OsRng;
 use rug::{integer::Order, ops::RemRounding, Integer};
 
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
+type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
 #[derive(Debug, Clone)]
 pub struct ReefCommitment<F> {
@@ -199,6 +202,14 @@ pub fn proof_dot_prod_verify(
 
     ipa.verify(&dc.gens, &dc.gens_single, num_vars, &ipi, &mut v_transcript.clone())?;
     Ok(())
+}
+
+pub fn cap_verifier(cap_d: <G1 as Group>::Scalar,cap_snark: SpartanSNARK<G1, EE1,ConsistencyCircuit<<G1 as Group>::Scalar>>,  cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar>, vk: SpartanVerifierKey<G1,EE1>,com_v: Commitment<G1>)-> Result<(), NovaError>{
+    let z_0 = vec![cap_d];
+    let z_out = cap_circuit.output(&z_0);
+    let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
+    let res = cap_snark.cap_verify(&vk, &io, &com_v.compress());
+    res
 }
 
 
