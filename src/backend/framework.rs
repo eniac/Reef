@@ -281,6 +281,7 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::tic(Component::Solver, &test, "witness generation");
         // allocate real witnesses for round i
+
         (
             wits,
             next_state,

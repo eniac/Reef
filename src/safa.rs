@@ -325,11 +325,24 @@ impl SAFA<char> {
         }
         if self.g[n].is_and() {
             // All of the next entries must have solutions
-            let subsolutions: Vec<_> = self
+            let mut subsolutions: Vec<_> = self
                 .edges(n)
                 .into_iter()
                 .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
                 .collect();
+
+            subsolutions.sort_by(|a, b| {
+                a.clone()
+                    .unwrap()
+                    .0
+                    .front()
+                    .unwrap()
+                    .to_node
+                    .index()
+                    .partial_cmp(&b.clone().unwrap().0.front().unwrap().to_node.index())
+                    .unwrap()
+            });
+
             // All of them need to be set
             if subsolutions.iter().all(Option::is_some) {
                 Some(Trace(

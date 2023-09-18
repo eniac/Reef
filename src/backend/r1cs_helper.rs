@@ -87,8 +87,6 @@ pub(crate) fn trace_preprocessing(
 
     sols.insert(sol);
 
-    println!("SOLS {:#?}", sols);
-
     // sort
     let mut sorted_sols = vec![];
 
@@ -109,6 +107,8 @@ pub(crate) fn trace_preprocessing(
                 .filter(|e| e.source() != e.target())
                 .collect();
             and_edges.sort_by(|a, b| a.target().partial_cmp(&b.target()).unwrap());
+
+            println!("AND {:#?}, EDGES: {:#?}", state.index(), and_edges);
 
             for i in 0..and_edges.len() {
                 match and_edges[i].weight().clone() {
@@ -146,6 +146,7 @@ pub(crate) fn trace_preprocessing(
     }
 
     assert_eq!(sorted_sols.len(), sols.len());
+
     sorted_sols
 }
 
@@ -371,6 +372,12 @@ pub(crate) fn calc_rel<'a>(
     num_states: usize,
     trans: bool,
 ) -> usize {
+    // 0 = normal
+    // 1 = transition (in_state is accepting, out is forall or FINAL)
+    // 2 = out_state is accepting
+    // >3 = in_state is forall, out_state is the "first branch"
+    // 3 = in_state is forall, out_state is a "pop branch"
+
     let mut rel = 0;
 
     if trans {
@@ -381,13 +388,19 @@ pub(crate) fn calc_rel<'a>(
     } else if safa.accepting.contains(&NodeIndex::new(out_state)) {
         rel = 2;
     } else if safa.g[NodeIndex::new(in_state)].is_and() {
-        println!("in {:#?}, OUT {:#?}", in_state, out_state);
-        println!("CHILDREN {:#?}", children);
-        assert!(children.len() > 0);
+        if children[0] == out_state {
+            // push only for the "first branch"
 
-        rel = 3;
-        for k in children {
-            rel += k * num_states; //TODO
+            println!("SPECIAL AND IN {:#?}, OUT {:#?}", in_state, out_state);
+            //println!("CHILDREN {:#?}", children);
+
+            rel = 4;
+            for k in children {
+                rel += k * num_states; //TODO
+            }
+        } else {
+            // others are pops
+            rel = 3;
         }
     }
 
