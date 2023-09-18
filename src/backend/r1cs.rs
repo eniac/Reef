@@ -565,7 +565,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             vec![
                 term(
                     Op::Eq,
-                    vec![new_const(0), new_var(format!("rel_{}", self.batch_size))],
+                    vec![
+                        new_const(2),
+                        new_var(format!("rel_{}", self.batch_size - 1)),
+                    ],
                 ),
                 term(Op::Eq, vec![in_var.clone(), new_const(1)]),
                 term(Op::Eq, vec![in_var.clone(), new_const(0)]),
@@ -1300,12 +1303,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             .push(new_var(format!("{}_next_running_claim", id)));
     }
 
-    fn pop_wit(&mut self, wits: &mut FxHashMap<String, Value>) -> usize {
+    fn pop_wit(&mut self, wits: &mut FxHashMap<String, Value>, active_trans: bool) -> usize {
+        assert!(active_trans); // TODO
+
         let mut popped_elt = self.stack[self.stack_ptr];
         self.stack_ptr -= 1;
 
         wits.insert(format!("cursor_{}", self.batch_size), new_wit(popped_elt.0));
-        wits.insert(format!("state_{}", self.batch_size), new_wit(popped_elt.1));
+        //wits.insert(format!("state_{}", self.batch_size), new_wit(popped_elt.1));
 
         // after pop
         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
@@ -1320,6 +1325,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         forall: Option<NodeIndex>,
         cur_cursor: usize,
     ) {
+        println!("PUSH WITS STACK: {:#?}, forall: {:#?}", self.stack, forall);
+
         // assert in foralls sanity check ?
 
         let mut forall_kids = match forall {
@@ -1327,11 +1334,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             None => vec![],
         };
 
+        println!("FORALL KIDS: {:#?}", forall_kids);
+
         while forall_kids.len() < self.max_branches {
             forall_kids.push(self.kid_padding);
         }
 
-        let mut k = 0;
         for i in 0..self.stack_ptr {
             wits.insert(
                 format!("stack_in_{}", i),
@@ -1345,6 +1353,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             wits.insert(format!("stack_ptr_{}", i), new_wit(self.stack_ptr));
         }
 
+        let mut k = 0;
         for kid in forall_kids {
             wits.insert(
                 format!("stack_in_{}", self.stack_ptr),
@@ -1358,17 +1367,17 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 format!("stack_out_{}", self.stack_ptr),
                 new_wit(kid * self.num_states + cur_cursor),
             );
-            wits.insert(format!("forall_kid_{}", k), new_wit(kid));
+            wits.insert(format!("forall_0_kid_{}", k), new_wit(kid));
             k += 1;
 
-            self.stack_ptr += 1;
             wits.insert(
                 format!("stack_ptr_{}", self.stack_ptr),
                 new_wit(self.stack_ptr),
             );
+            self.stack_ptr += 1;
         }
 
-        for i in (self.stack_ptr + 1)..self.max_stack {
+        for i in (self.stack_ptr)..self.max_stack {
             wits.insert(
                 format!("stack_in_{}", i),
                 new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
@@ -1380,6 +1389,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             wits.insert(format!("stack_ptr_{}", i), new_wit(self.stack_ptr));
         }
+
+        //println!("AFTER STACK {:#?}, WITS {:#?}", self.stack, wits);
     }
 
     // returns char_num, is_star
@@ -1409,6 +1420,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         &self,
         wits: &mut FxHashMap<String, Value>,
         q: &mut Vec<usize>,
+        cursor_access: &mut Vec<usize>,
         state_i: usize,
         next_state: usize,
         cursor_i: usize,
@@ -1464,6 +1476,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
         );
 
+        cursor_access.push(self.ep_num);
+
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -1473,6 +1487,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         &self,
         wits: &mut FxHashMap<String, Value>,
         q: &mut Vec<usize>,
+        cursor_access: &mut Vec<usize>,
         char_num: usize,
         state_i: usize,
         next_state: usize,
@@ -1508,6 +1523,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
         );
+
+        if char_num == self.num_ab[&None] {
+            cursor_access.push(self.ep_num);
+        } else if char_num == self.num_ab[&Some('*')] {
+            cursor_access.push(self.star_num);
+        } else {
+            cursor_access.push(cursor_i);
+        }
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1555,7 +1578,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 // need to transition
                 while i < self.batch_size - 1 {
                     state_i = next_state;
-                    v.push(self.padding_v(&mut wits, &mut q, state_i, next_state, cursor_i, i));
+                    v.push(self.padding_v(
+                        &mut wits,
+                        &mut q,
+                        &mut cursor_access,
+                        state_i,
+                        next_state,
+                        cursor_i,
+                        i,
+                    ));
                     i += 1;
                 }
 
@@ -1568,7 +1599,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     next_state = sols[self.sol_num + 1].front().unwrap().from_node.index();
                 }
 
-                cursor_i = self.pop_wit(&mut wits);
+                cursor_i = self.pop_wit(&mut wits, true);
 
                 // transition
                 let rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
@@ -1592,7 +1623,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 };
 
                 v.push(self.edge_v(
-                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, rel_i, i,
+                    &mut wits,
+                    &mut q,
+                    &mut cursor_access,
+                    char_num,
+                    state_i,
+                    next_state,
+                    offset_i,
+                    cursor_i,
+                    rel_i,
+                    i,
                 ));
                 i += 1;
 
@@ -1611,9 +1651,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     } else {
                         // pad out the rest of this loop
                         while i < self.batch_size {
-                            v.push(
-                                self.padding_v(&mut wits, &mut q, state_i, next_state, cursor_i, i),
-                            );
+                            v.push(self.padding_v(
+                                &mut wits,
+                                &mut q,
+                                &mut cursor_access,
+                                state_i,
+                                next_state,
+                                cursor_i,
+                                i,
+                            ));
                             i += 1;
                         }
                     }
@@ -1661,17 +1707,18 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     )
                 };
                 v.push(self.edge_v(
-                    &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i, rel_i, i,
+                    &mut wits,
+                    &mut q,
+                    &mut cursor_access,
+                    char_num,
+                    state_i,
+                    next_state,
+                    offset_i,
+                    cursor_i,
+                    rel_i,
+                    i,
                 ));
                 i += 1;
-
-                if char_num == self.num_ab[&None] {
-                    cursor_access.push(self.ep_num);
-                } else if char_num == self.num_ab[&Some('*')] {
-                    cursor_access.push(self.star_num);
-                } else {
-                    cursor_access.push(cursor_i);
-                }
             }
         }
 
