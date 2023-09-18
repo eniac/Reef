@@ -91,8 +91,8 @@ pub struct NFAStepCircuit<F: PrimeField> {
     glue: Vec<Glue<F>>,
     commit_blind: F,
     accepting: Vec<F>,
-    pc: PoseidonConstants<F, typenum::U4>,
-    claim_blind: F,
+    pub pc: PoseidonConstants<F, typenum::U4>,
+    pub claim_blind: F,
 }
 
 // note that this will generate a single round, and no witnesses, unlike nova example code

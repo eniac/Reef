@@ -11,12 +11,15 @@ use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::safa::SAFA;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
-use circ::target::r1cs::ProverData;
+use circ::target::r1cs::{ProverData, self};
 use generic_array::typenum;
+use neptune::circuit;
 use neptune::{
-    sponge::vanilla::{Sponge, SpongeTrait},
+    sponge::vanilla::{Sponge, SpongeTrait,Mode},
+    sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     Strength,
 };
+use nova_snark::provider::ipa_pc::{InnerProductInstance, InnerProductArgument};
 use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
@@ -51,6 +54,11 @@ pub fn run_backend(
     ) = mpsc::channel();
 
     let (send_setup, recv_setup): (Sender<ProofInfo>, Receiver<ProofInfo>) = mpsc::channel();
+
+    let (sender_qv, recv_qv): (
+        Sender<(Vec<Integer>,Integer)>,
+        Receiver<(Vec<Integer>,Integer)>,
+    ) = mpsc::channel();
 
     let solver_thread = thread::spawn(move || {
         // we do setup here to avoid unsafe passing
@@ -107,13 +115,13 @@ pub fn run_backend(
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "Compiler", "Full");
 
-        solve(sender, &mut r1cs_converter, &prover_data, num_steps, &doc);
+        solve(sender,sender_qv, &mut r1cs_converter, &prover_data, num_steps, &doc);
     });
 
     //get args
     let proof_info = recv_setup.recv().unwrap();
 
-    prove_and_verify(recv, proof_info);
+    prove_and_verify(recv, recv_qv,proof_info);
 
     // rejoin child
     solver_thread.join().expect("setup/solver thread panicked");
@@ -238,7 +246,8 @@ fn setup<'a>(
 }
 
 fn solve<'a>(
-    sender: Sender<NFAStepCircuit<<G1 as Group>::Scalar>>, //itness<<G1 as Group>::Scalar>>,
+    sender: Sender<NFAStepCircuit<<G1 as Group>::Scalar>>, 
+    sender_qv: Sender<(Vec<Integer>,Integer)>,//itness<<G1 as Group>::Scalar>>,
     r1cs_converter: &mut R1CS<<G1 as Group>::Scalar, char>,
     circ_data: &'a ProverData,
     num_steps: usize,
@@ -423,9 +432,11 @@ fn solve<'a>(
         stack_ptr_0 = stack_ptr_popped;
         stack_in = stack_out;
     }
+
+    sender_qv.send((doc_running_q.unwrap(),doc_running_v.unwrap())).unwrap();
 }
 
-fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof_info: ProofInfo) {
+fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, recv_qv: Receiver<(Vec<Integer>,Integer)>,proof_info: ProofInfo) {
     println!("Proving thread starting...");
 
     // recursive SNARK
@@ -434,13 +445,14 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
     let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
+    let mut circuit_primary: Option<NFAStepCircuit<<G1 as Group>::Scalar>> = None;
     // println!("num foldings: {:#?}", proof_info.num_steps);
     for i in 0..proof_info.num_steps {
         #[cfg(feature = "metrics")]
         let test = format!("step {}", i);
 
         // blocks until we receive first witness
-        let circuit_primary = recv.recv().unwrap();
+        circuit_primary = Some(recv.recv().unwrap());
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, &test, "prove step");
@@ -448,7 +460,7 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
         let result = RecursiveSNARK::prove_step(
             &proof_info.pp.lock().unwrap(),
             recursive_snark,
-            circuit_primary.clone(),
+            circuit_primary.clone().unwrap(),
             circuit_secondary.clone(),
             proof_info.z0_primary.clone(),
             z0_secondary.clone(),
@@ -489,6 +501,28 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
 
+    let (q,v) = recv_qv.recv().unwrap();
+
+    let pc = circuit_primary.clone().unwrap().pc;
+
+    let mut sponge = Sponge::new_with_constants(&pc, Mode::Simplex);
+    let acc = &mut ();
+
+    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+    sponge.start(parameter, None, acc);
+
+    SpongeAPI::absorb(&mut sponge, 2, &[int_to_ff(v.clone()), circuit_primary.clone().unwrap().claim_blind], acc);
+    let d_out_vec = SpongeAPI::squeeze(&mut sponge, 1, acc);
+    sponge.finish(acc).unwrap();
+
+    let cap_d = d_out_vec[0];
+
+    let (ipi, ipa) = proof_dot_prod_prover(
+        &proof_info.commit,
+        q.into_iter().map(|x| int_to_ff(x)).collect(),
+        int_to_ff(v.clone()),
+        proof_info.doc_len,
+    );
     #[cfg(feature = "metrics")]
     log::space(
         Component::Prover,
@@ -507,6 +541,9 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
         proof_info.commit,
         proof_info.table,
         proof_info.doc_len,
+        ipi, 
+        ipa,
+        cap_d
     );
 
     #[cfg(feature = "metrics")]
@@ -520,6 +557,9 @@ fn verify(
     reef_commit: ReefCommitment<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
     doc_len: usize,
+    ipi: InnerProductInstance<G1>,
+    ipa: InnerProductArgument<G1>,
+    cap_d: <G1 as Group>::Scalar,
 ) {
     let q_len = logmn(table.len());
     let qd_len = logmn(doc_len);
@@ -557,6 +597,9 @@ fn verify(
         Some(zn[q_len + 1]),
         Some(zn[(2 + q_len)..(2 + q_len + qd_len)].to_vec()),
         Some(zn[2 + q_len + qd_len]),
+        cap_d,
+        ipi, 
+        ipa
     ); // TODO number maybe wrong here
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Final Clear Checks");

@@ -79,14 +79,32 @@ where
 }
 
 // this crap will need to be seperated out
-pub fn proof_dot_prod(
+pub fn proof_dot_prod_verify(
     dc: ReefCommitment<<G1 as Group>::Scalar>,
     running_q: Vec<<G1 as Group>::Scalar>,
     running_v: <G1 as Group>::Scalar,
+    ipi: InnerProductInstance<G1>,
+    ipa: InnerProductArgument<G1>,
 ) -> Result<(), NovaError> {
-    let mut p_transcript = Transcript::new(b"dot_prod_proof");
     let mut v_transcript = Transcript::new(b"dot_prod_proof");
+    let num_vars = running_q.len();
 
+    ipa.verify(&dc.gens, &dc.gens_single, num_vars, &ipi, &mut v_transcript.clone())?;
+    Ok(())
+}
+
+pub fn proof_dot_prod_prover(  
+    dc: &ReefCommitment<<G1 as Group>::Scalar>,
+    q: Vec<<G1 as Group>::Scalar>,
+    running_v: <G1 as Group>::Scalar,
+    doc_len: usize
+)-> (InnerProductInstance<G1>,InnerProductArgument<G1>) {
+    let doc_ext_len = doc_len.next_power_of_two();
+
+    let mut p_transcript = Transcript::new(b"dot_prod_proof");
+    
+    let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
+    let running_q = q_to_mle_q(&q_rev, doc_ext_len);
     // set up
     let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
     let commit_running_v =
@@ -101,13 +119,9 @@ pub fn proof_dot_prod(
     let ipw =
         InnerProductWitness::new(&dc.vec_t, &dc.decommit_doc, &running_v, &decommit_running_v);
     let ipa =
-        InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut p_transcript)?;
-
-    // verify
-    let num_vars = running_q.len();
-    ipa.verify(&dc.gens, &dc.gens_single, num_vars, &ipi, &mut v_transcript)?;
-
-    Ok(())
+        InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut p_transcript).unwrap();
+    
+    (ipi, ipa)
 }
 
 pub fn final_clear_checks(
@@ -119,9 +133,15 @@ pub fn final_clear_checks(
     final_v: Option<<G1 as Group>::Scalar>,
     final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_doc_v: Option<<G1 as Group>::Scalar>,
+    cap_d: <G1 as Group>::Scalar,
+    ipi: InnerProductInstance<G1>,
+    ipa: InnerProductArgument<G1>,
 ) {
     // state matches?
     assert_eq!(accepting_state, <G1 as Group>::Scalar::from(1));
+
+    //Asserting that d in z_n == d passed into spartan direct
+    assert_eq!(cap_d,final_doc_v.unwrap());
 
     // nlookup eval T check
     match (final_q, final_v) {
@@ -156,7 +176,7 @@ pub fn final_clear_checks(
             let q_ext = q_to_mle_q(&q_rev, doc_ext_len);
 
             // Doc is commited to in this case
-            assert!(proof_dot_prod(reef_commitment, q_ext, v).is_ok());
+            assert!(proof_dot_prod_verify(reef_commitment, q_ext, v, ipi, ipa).is_ok());
         }
         (Some(_), None) => {
             panic!("only half of running claim recieved");
