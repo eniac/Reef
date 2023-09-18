@@ -89,7 +89,7 @@ pub struct NFAStepCircuit<F: PrimeField> {
     batch_size: usize,
     states: Vec<F>,
     glue: Vec<Glue<F>>,
-    commit_blind: F,
+    pub commit_blind: F,
     accepting: Vec<F>,
     pub pc: PoseidonConstants<F, typenum::U4>,
     pub claim_blind: F,

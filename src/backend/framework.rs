@@ -20,9 +20,11 @@ use neptune::{
     Strength,
 };
 use nova_snark::provider::ipa_pc::{InnerProductInstance, InnerProductArgument};
+use nova_snark::traits::commitment::CommitmentTrait;
 use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+    spartan::direct::SpartanSNARK
 };
 use rug::Integer;
 use std::sync::mpsc;
@@ -503,26 +505,34 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, recv_
 
     let (q,v) = recv_qv.recv().unwrap();
 
-    let pc = circuit_primary.clone().unwrap().pc;
+    let cp_clone = circuit_primary.clone().unwrap();
+    let pc = cp_clone.pc;
+    let claim_blind =  cp_clone.claim_blind;
 
-    let mut sponge = Sponge::new_with_constants(&pc, Mode::Simplex);
-    let acc = &mut ();
-
-    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-    sponge.start(parameter, None, acc);
-
-    SpongeAPI::absorb(&mut sponge, 2, &[int_to_ff(v.clone()), circuit_primary.clone().unwrap().claim_blind], acc);
-    let d_out_vec = SpongeAPI::squeeze(&mut sponge, 1, acc);
-    sponge.finish(acc).unwrap();
-
-    let cap_d = d_out_vec[0];
-
-    let (ipi, ipa) = proof_dot_prod_prover(
+    //Doc dot prod 
+    let (ipi, ipa,v_commit,v_decommit) = proof_dot_prod_prover(
         &proof_info.commit,
         q.into_iter().map(|x| int_to_ff(x)).collect(),
         int_to_ff(v.clone()),
         proof_info.doc_len,
     );
+
+    //CAP 
+    let cap_d = calc_d_clear(pc.clone(), claim_blind, v.clone());
+
+    // CAP circuit
+    let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(pc, cap_d, int_to_ff(v.clone()), claim_blind);
+    
+    // produce CAP keys
+    let (pk, vk) = SpartanSNARK::<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>::setup(cap_circuit.clone()).unwrap();
+    
+    let cap_z = vec![cap_d];
+    
+    let cap_res = SpartanSNARK::cap_prove(&pk, cap_circuit.clone(), &cap_z, &v_commit.compress(), &int_to_ff(v), &v_decommit);
+    assert!(cap_res.is_ok());
+    
+    let cap_snark = cap_res.unwrap();  
+
     #[cfg(feature = "metrics")]
     log::space(
         Component::Prover,

@@ -1,23 +1,30 @@
 use crate::backend::costs::{JBatching, JCommit};
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::verifier_mle_eval;
+use ::bellperson::{
+    gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
+    Variable,
+};
 use circ::cfg::cfg;
 use ff::{Field, PrimeField};
 use generic_array::typenum;
 use merlin::Transcript;
 use neptune::{
+    circuit2::Elt,
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
+    sponge::circuit::SpongeCircuit,
 };
 use nova_snark::{
     errors::NovaError,
     provider::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pedersen::{CommitmentGens, CompressedCommitment},
+        pedersen::{CommitmentGens, CompressedCommitment,Commitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
-    traits::{commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait},
+    traits::{commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait,circuit::StepCircuit},
+    StepCounterType,
 };
 use rand::rngs::OsRng;
 use rug::{integer::Order, ops::RemRounding, Integer};
@@ -78,6 +85,107 @@ where
     };
 }
 
+#[derive(Clone)]
+pub struct ConsistencyCircuit<F: PrimeField> {
+    pc: PoseidonConstants<F, typenum::U4>, // arity of PC can be changed as desired
+    d: F,
+    v: F,
+    s: F,
+}
+
+impl<F: PrimeField> ConsistencyCircuit<F> {
+    pub fn new(pc: PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
+      ConsistencyCircuit { pc, d, v, s }
+    }
+}
+
+impl<F> StepCircuit<F> for ConsistencyCircuit<F>
+    where
+    F: PrimeField,
+{
+        fn arity(&self) -> usize {
+            1
+        }
+
+        fn output(&self, z: &[F]) -> Vec<F> {
+        assert_eq!(z[0], self.d);
+        z.to_vec()
+        }
+
+        #[allow(clippy::let_and_return)]
+        fn synthesize<CS>(
+        &self,
+        cs: &mut CS,
+        z: &[AllocatedNum<F>],
+        ) -> Result<Vec<AllocatedNum<F>>, SynthesisError>
+        where
+        CS: ConstraintSystem<F>,
+        {
+        let d_in = z[0].clone();
+
+        //v at index 0 (but technically 1 since io is allocated first)
+        let alloc_v = AllocatedNum::alloc(cs.namespace(|| "v"), || Ok(self.v))?;
+
+        let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s"), || Ok(self.s))?;
+
+        //poseidon(v,s) == d
+        let d_calc = {
+            let acc = &mut cs.namespace(|| "d hash circuit");
+            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+
+            sponge.start(
+            IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
+            None,
+            acc,
+            );
+
+            SpongeAPI::absorb(
+            &mut sponge,
+            2,
+            &[Elt::Allocated(alloc_v), Elt::Allocated(alloc_s)],
+            acc,
+            );
+
+            let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
+            sponge.finish(acc).unwrap();
+            let out =
+            Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
+            out
+        };
+
+        // sanity
+        if d_calc.get_value().is_some() {
+            assert_eq!(d_in.get_value().unwrap(), d_calc.get_value().unwrap());
+        }
+
+        cs.enforce(
+            || "d == d",
+            |z| z + d_in.get_variable(),
+            |z| z + CS::one(),
+            |z| z + d_calc.get_variable(),
+        );
+
+        Ok(vec![d_calc]) // doesn't hugely matter
+        }
+
+        fn get_counter_type(&self) -> StepCounterType {
+        StepCounterType::Incremental
+        }
+}
+
+pub fn calc_d_clear(pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,claim_blind: <G1 as Group>::Scalar, v: Integer)-><G1 as Group>::Scalar {
+    let mut sponge = Sponge::new_with_constants(&pc, Mode::Simplex);
+    let acc = &mut ();
+
+    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+    sponge.start(parameter, None, acc);
+
+    SpongeAPI::absorb(&mut sponge, 2, &[int_to_ff(v.clone()), claim_blind], acc);
+    let d_out_vec = SpongeAPI::squeeze(&mut sponge, 1, acc);
+    sponge.finish(acc).unwrap();
+
+    d_out_vec[0]
+}
 // this crap will need to be seperated out
 pub fn proof_dot_prod_verify(
     dc: ReefCommitment<<G1 as Group>::Scalar>,
@@ -93,12 +201,13 @@ pub fn proof_dot_prod_verify(
     Ok(())
 }
 
+
 pub fn proof_dot_prod_prover(  
     dc: &ReefCommitment<<G1 as Group>::Scalar>,
     q: Vec<<G1 as Group>::Scalar>,
     running_v: <G1 as Group>::Scalar,
     doc_len: usize
-)-> (InnerProductInstance<G1>,InnerProductArgument<G1>) {
+)-> (InnerProductInstance<G1>,InnerProductArgument<G1>, Commitment<G1>, <G1 as Group>::Scalar) {
     let doc_ext_len = doc_len.next_power_of_two();
 
     let mut p_transcript = Transcript::new(b"dot_prod_proof");
@@ -121,7 +230,7 @@ pub fn proof_dot_prod_prover(
     let ipa =
         InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut p_transcript).unwrap();
     
-    (ipi, ipa)
+    (ipi, ipa, commit_running_v, decommit_running_v)
 }
 
 pub fn final_clear_checks(
