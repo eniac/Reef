@@ -157,6 +157,8 @@ pub fn normal_add_table<'a>(
     set_table: &mut HashSet<Integer>,
     num_states: usize,
     num_chars: usize,
+    kid_padding: usize,
+    max_branches: usize,
     max_offsets: usize,
     all_state: NodeIndex,
     and_states: Vec<usize>,
@@ -205,6 +207,8 @@ pub fn normal_add_table<'a>(
                             state.index(),
                             out_state,
                             &and_states,
+                            kid_padding,
+                            max_branches,
                             safa,
                             num_states,
                             false,
@@ -229,6 +233,8 @@ pub fn normal_add_table<'a>(
                             state.index(),
                             out_state,
                             &and_states,
+                            kid_padding,
+                            max_branches,
                             safa,
                             num_states,
                             false,
@@ -255,6 +261,8 @@ pub fn normal_add_table<'a>(
                                     state.index(),
                                     out_state,
                                     &and_states,
+                                    kid_padding,
+                                    max_branches,
                                     safa,
                                     num_states,
                                     false,
@@ -281,6 +289,8 @@ pub fn normal_add_table<'a>(
                         state.index(),
                         out_state,
                         &and_states,
+                        kid_padding,
+                        max_branches,
                         safa,
                         num_states,
                         false,
@@ -320,6 +330,8 @@ pub fn normal_add_table<'a>(
                 state.index(),
                 out_state,
                 &and_states,
+                kid_padding,
+                max_branches,
                 safa,
                 num_states,
                 true,
@@ -368,6 +380,8 @@ pub(crate) fn calc_rel<'a>(
     in_state: usize,  //NodeIndex,
     out_state: usize, //NodeIndex,
     children: &Vec<usize>,
+    kid_padding: usize,
+    max_branches: usize,
     safa: &'a SAFA<char>,
     num_states: usize,
     trans: bool,
@@ -392,12 +406,21 @@ pub(crate) fn calc_rel<'a>(
             // push only for the "first branch"
 
             println!("SPECIAL AND IN {:#?}, OUT {:#?}", in_state, out_state);
-            //println!("CHILDREN {:#?}", children);
+            println!("CHILDREN {:#?}", children);
 
             rel = 4;
-            for k in children {
-                rel += k * num_states; //TODO
+            for k in 1..children.len() {
+                println!("IN HASH {:#?}", children[k]);
+                rel += children[k] * num_states; //TODO
             }
+            for k in 0..(max_branches - children.len() + 1) {
+                rel += kid_padding * num_states;
+            }
+
+            println!(
+                "HASH for {:#?} -> {:#?} is rel={:#?}",
+                in_state, out_state, rel
+            );
         } else {
             // others are pops
             rel = 3;

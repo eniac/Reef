@@ -119,7 +119,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let num_states = safa.g.node_count();
         let num_chars = safa.ab.len();
         let mut max_offsets = 1;
-        for (_, edge, _) in safa.deltas() {
+        let mut max_branches = 0;
+        for (in_state, edge, _) in safa.deltas() {
             match edge {
                 Either(Err(openset)) => {
                     if openset.is_single().is_none() && !openset.is_full() {
@@ -133,6 +134,18 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     }
                 }
                 _ => {}
+            }
+
+            if in_state.is_and() {
+                let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
+                    .g
+                    .edges(in_state.inner)
+                    .filter(|e| e.source() != e.target())
+                    .collect();
+
+                if and_edges.len() > max_branches {
+                    max_branches = and_edges.len();
+                }
             }
         }
 
@@ -157,7 +170,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut forall_children: Vec<Vec<usize>> = Vec::new();
         let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
         let mut current_forall_node = NodeIndex::new(0);
-        let mut max_branches = 0;
+        let kid_padding = 0; // TODO !!
         let mut max_stack = 0;
         let mut current_max_stack = 0;
         let mut current_forall_state_stack: LinkedList<usize> = LinkedList::new();
@@ -176,10 +189,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let mut and_states = vec![];
                 for i in 0..and_edges.len() {
                     and_states.push(and_edges[i].target().index());
-                }
-
-                if and_edges.len() > max_branches {
-                    max_branches = and_edges.len();
                 }
 
                 for i in 0..and_edges.len() {
@@ -201,6 +210,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                         all_state.index(),
                                         out_state,
                                         &and_states,
+                                        kid_padding,
+                                        max_branches,
                                         &safa,
                                         num_states,
                                         false,
@@ -252,6 +263,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             &mut set_table,
                             num_states,
                             num_chars,
+                            kid_padding,
+                            max_branches,
                             max_offsets,
                             current_forall_node,
                             forall_children[stack_lvl].clone(),
@@ -277,6 +290,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 &mut set_table,
                 num_states,
                 num_chars,
+                kid_padding,
+                max_branches,
                 max_offsets,
                 NodeIndex::new(0), //all_state, TODO ?
                 vec![],
@@ -284,15 +299,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
         }
 
-        // last "empty" transition
-        // add check entries to table
-        let base: i32 = 2; // an explicit type is required
-
-        let c = 0; //path count is usually at least 2^0 = 1
-        let offset = 0;
-        let rel = 1;
-        let in_state = 0;
-        let out_state = 0;
         // TODO we have to make sure the multipliers are big enough
 
         let mut table: Vec<Integer> = set_table.into_iter().collect();
@@ -332,8 +338,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         int_doc.push(Integer::from(u));
 
         println!("TABLE {:#?}", table);
-
-        let kid_padding = 0; // TODO !!
 
         let mut stack = vec![];
         for i in 0..max_stack {
@@ -470,7 +474,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         v
     }
 
-    fn last_state_accepting_circuit(&mut self, in_var: Term) {
+    fn last_state_accepting_circuit(&mut self) {
         let match_term = term(
             Op::Ite,
             vec![
@@ -481,13 +485,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         new_var(format!("rel_{}", self.batch_size - 1)),
                     ],
                 ),
-                term(Op::Eq, vec![in_var.clone(), new_const(1)]),
-                term(Op::Eq, vec![in_var.clone(), new_const(0)]),
+                term(Op::Eq, vec![new_var(format!("accepting")), new_const(1)]),
+                term(Op::Eq, vec![new_var(format!("accepting")), new_const(0)]),
             ],
         );
 
         self.assertions.push(match_term);
-        //self.pub_inputs.push(new_var(format!("accepting")));
+        self.pub_inputs.push(new_var(format!("accepting")));
     }
 
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
@@ -531,7 +535,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         circ_r1cs.finalize(&final_cs)
     }
 
-    fn push_ite(&self, i: usize, to_push: Term, b: usize) -> Term {
+    fn push_ite(&mut self, i: usize, to_push: Term, b: usize) -> Term {
         let lmtd_push_cond = term(
             Op::Not,
             vec![term(
@@ -539,6 +543,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 vec![new_const(3), new_var(format!("rel_{}", 0))],
             )],
         );
+
+        self.pub_inputs.push(new_var(format!("stack_out_{}", i)));
+        self.pub_inputs.push(new_var(format!("stack_in_{}", i)));
 
         let pushed = term(
             Op::Eq,
@@ -616,8 +623,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     // stack for cursors
-    fn push_stack_circuit(&mut self, forall_state_num: usize, forall_kids: Vec<Term>) -> Term {
-        // todo add vars
+    fn push_stack_circuit(&mut self) -> Term {
+        let mut forall_kids = vec![];
+        for k in 0..self.max_branches {
+            forall_kids.push(new_var(format!("forall_0_kid_{}", k)));
+        }
 
         // get kids from rel_i hash
         let mut hashed_state_var = new_const(4);
@@ -635,38 +645,44 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     hashed_state_var,
                 ],
             );
+
+            self.pub_inputs.push(new_var(format!("forall_0_kid_{}", k)));
         }
 
-        let hashed_kids_eq = term(
-            Op::Eq,
-            vec![
-                hashed_state_var,
-                new_var(format!("rel_{}", forall_state_num)),
-            ],
+        let hashed_kids_eq = term(Op::Eq, vec![hashed_state_var, new_var(format!("rel_0"))]);
+        let lmtd_push_cond = term(
+            Op::Not,
+            vec![term(
+                Op::Eq,
+                vec![new_const(3), new_var(format!("rel_{}", 0))],
+            )],
         );
-        self.assertions.push(hashed_kids_eq);
+        let hashed_not_pop = term(
+            Op::Ite,
+            vec![lmtd_push_cond, hashed_kids_eq, new_bool_const(true)],
+        );
+        self.assertions.push(hashed_not_pop);
 
         // "padding" included in encoding
         assert!(forall_kids.len() == self.max_branches);
 
         let mut push_stmt = new_bool_const(true);
 
-        for b in 0..self.max_branches {
-            //forall_kids.len() {
+        for b in 0..1 {
+            //self.max_branches {
             let to_push = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
                     term(
                         Op::PfNaryOp(PfNaryOp::Mul),
-                        vec![
-                            new_var(format!("cursor_{}", forall_state_num + 1)),
-                            new_const(self.num_states),
-                        ],
+                        vec![new_var(format!("cursor_{}", 0)), new_const(self.num_states)],
                     ),
                     forall_kids[b].clone(),
                 ],
             );
 
+            self.pub_inputs
+                .push(new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)));
             let mut inside_ite = self.push_ite(0, to_push.clone(), b);
 
             for i in 1..self.max_stack {
@@ -690,6 +706,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             push_stmt = term(Op::BoolNaryOp(BoolNaryOp::And), vec![inside_ite, push_stmt]);
         }
+
         push_stmt
     }
 
@@ -756,7 +773,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         )
     }
 
-    fn pop_stack_circuit(&mut self, cursor_var: Term) -> Term {
+    fn pop_stack_circuit(&mut self) -> Term {
+        let cursor_var = new_var(format!("cursor_0"));
+        // TODO let cursor_0_reset = term(Op::Eq, vec![cursor_var, new_var(format!("cursor_0"))]);
+
         let to_pop = term(
             Op::PfNaryOp(PfNaryOp::Add),
             vec![
@@ -802,7 +822,18 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             ],
         );
 
-        others
+        // not cycle
+        let cycle = term(
+            Op::Eq,
+            vec![
+                new_var(format!("state_{}", j)),
+                new_var(format!("state_{}", j + 1)),
+            ],
+        );
+
+        let special = term(Op::BoolNaryOp(BoolNaryOp::Or), vec![others, cycle]);
+
+        special
     }
 
     fn cursor_circuit(&mut self) {
@@ -826,14 +857,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
 
             // TODO LIMIT bits here plus the other bullshit
-            let cursor_geq = new_bool_const(true); //TODO
-                                                   /*term(
-                                                       Op::BvBinPred(BvBinPred::Uge),
-                                                       vec![
-                                                           term(Op::PfToBv(254), vec![new_var(format!("cursor_{}", j + 1))]),
-                                                           term(Op::PfToBv(254), vec![new_var(format!("cursor_{}", j))]),
-                                                       ],
-                                                   );*/
 
             let ite_term = term(
                 Op::Ite,
@@ -845,27 +868,25 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             new_var(format!("char_{}", j)),
                         ],
                     ),
-                    cursor_geq,
+                    new_bool_const(true), //cursor_geq,
                     cursor_plus,
                 ],
             );
 
-            self.assertions.push(ite_term);
+            // TODO!!
+            if j != 0 {
+                self.assertions.push(ite_term);
+            }
 
             if j == 0 {
                 // PUSH
                 // if in_state \in forall - only first
 
-                let mut forall_kids = vec![];
-                for k in 0..self.max_branches {
-                    forall_kids.push(new_var(format!("forall_0_kid_{}", k)));
-                }
-
-                let push_stmt = self.push_stack_circuit(0, forall_kids);
+                let push_stmt = self.push_stack_circuit();
 
                 // POP
                 // cursor = pop stack
-                let pop_stmt = self.pop_stack_circuit(new_var(format!("cursor_{}", j + 1)));
+                let pop_stmt = new_bool_const(true); //self.pop_stack_circuit();
 
                 // ite
                 let do_what = term(
@@ -883,27 +904,28 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 self.assertions.push(self.not_forall_circ(j));
             }
 
-            // transition?
-            // assert cursor == EOF
-            let eof = term(
-                Op::Eq,
-                vec![
-                    new_var(format!("char_{}", j)),
-                    new_const(self.num_ab[&Some('!')]),
-                ],
-            );
+            /* // transition?
+                // assert cursor == EOF
+                let eof = term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("char_{}", j)),
+                        new_const(self.num_ab[&Some('!')]),
+                    ],
+                );
 
-            // branch transition rel val -> in is accepting
-            let branch_or_not = term(
-                Op::Ite,
-                vec![
-                    term(Op::Eq, vec![new_var(format!("rel_{}", j)), new_const(1)]),
-                    eof,
-                    new_bool_const(true),
-                ],
-            );
+                // branch transition rel val -> in is accepting
+                let branch_or_not = term(
+                    Op::Ite,
+                    vec![
+                        term(Op::Eq, vec![new_var(format!("rel_{}", j)), new_const(1)]),
+                        eof,
+                        new_bool_const(true),
+                    ],
+                );
 
-            self.assertions.push(branch_or_not);
+                self.assertions.push(branch_or_not);
+            */
         }
     }
 
@@ -1176,11 +1198,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let lookups = self.lookup_idxs(true);
         assert_eq!(lookups.len(), self.batch_size);
         self.nlookup_gadget(lookups, self.table.len(), "nl"); // len correct? TODO
-
-        // HERE
-        // //self.cursor_circuit();
-        //self.last_state_accepting_circuit(new_var(format!("accepting")));
-
+        self.cursor_circuit();
+        self.last_state_accepting_circuit();
         self.nlookup_doc_commit();
 
         self.r1cs_conv()
@@ -1311,9 +1330,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.stack[self.stack_ptr] = (cur_cursor, kid);
             wits.insert(
                 format!("stack_out_{}", self.stack_ptr),
-                new_wit(kid * self.num_states + cur_cursor),
+                new_wit(cur_cursor * self.num_states + kid),
             );
             wits.insert(format!("forall_0_kid_{}", k), new_wit(kid));
+            println!("IN HASH WIT {:#?}", kid);
+
             k += 1;
 
             wits.insert(
@@ -1321,6 +1342,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 new_wit(self.stack_ptr),
             );
             self.stack_ptr += 1;
+
+            // rel hash handling
+            wits.insert(format!("forall_0_kid_{}", k), new_wit(kid));
         }
 
         let mut pad_kids = vec![];
@@ -1392,6 +1416,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 state_i,
                 next_state,
                 &self.foralls_w_kids[&state_i],
+                self.kid_padding,
+                self.max_branches,
                 &self.safa,
                 self.num_states,
                 false,
@@ -1401,6 +1427,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 state_i,
                 next_state,
                 &vec![],
+                self.kid_padding,
+                self.max_branches,
                 &self.safa,
                 self.num_states,
                 false,
@@ -1471,7 +1499,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         )
         .rem_floor(cfg().field().modulus());
 
-        //v.push(v_i.clone());
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
         println!(
@@ -1511,6 +1538,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut next_state = 0;
         let mut char_num = self.num_ab[&None];
         let mut offset_i = 0;
+        let mut rel_i = 0;
 
         let mut v = vec![];
         let mut q = vec![];
@@ -1523,6 +1551,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         while i < self.batch_size {
             let mut add_normal = true;
             if sols[self.sol_num].is_empty() {
+                println!("TRANSITOIN");
+
                 // need to transition
                 char_num = self.num_ab[&None];
                 cursor_access.push(self.ep_num);
@@ -1536,11 +1566,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
 
                 // transition
-                let rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
+                rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
                     calc_rel(
                         state_i,
                         next_state,
                         &self.foralls_w_kids[&state_i],
+                        self.kid_padding,
+                        self.max_branches,
                         &self.safa,
                         self.num_states,
                         true,
@@ -1550,6 +1582,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         state_i,
                         next_state,
                         &vec![],
+                        self.kid_padding,
+                        self.max_branches,
                         &self.safa,
                         self.num_states,
                         true,
@@ -1645,11 +1679,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         offset_i = 0;
                     }
 
-                    let rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
+                    rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
                         calc_rel(
                             state_i,
                             next_state,
                             &self.foralls_w_kids[&state_i],
+                            self.kid_padding,
+                            self.max_branches,
                             &self.safa,
                             self.num_states,
                             false,
@@ -1659,6 +1695,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             state_i,
                             next_state,
                             &vec![],
+                            self.kid_padding,
+                            self.max_branches,
                             &self.safa,
                             self.num_states,
                             false,
@@ -1672,12 +1710,17 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     i += 1;
                 }
             }
+
+            state_i = next_state;
         }
 
         println!("DONE LOOP");
 
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
+
+        let accept = if rel_i == 2 { 1 } else { 0 }; //todo
+        wits.insert(format!("accepting"), new_wit(accept));
 
         assert!(running_q.is_some() || batch_num == 0);
         assert!(running_v.is_some() || batch_num == 0);
@@ -1688,9 +1731,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
         wits = w;
-
-        // accepting
-        wits.insert(format!("accepting"), new_wit(1));
 
         assert!(doc_running_q.is_some() || batch_num == 0);
         assert!(doc_running_v.is_some() || batch_num == 0);
@@ -2272,7 +2312,6 @@ mod tests {
             drv,
         );
 
-        panic!();
         /*
         println!(
             "cost model: {:#?}",
