@@ -1530,7 +1530,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 cursor_access.push(self.ep_num);
 
                 offset_i = 0;
-                if self.sol_num == sols.len() {
+                if self.sol_num + 1 == sols.len() {
                     // very last
                     next_state = self.num_states; // TODO
                 } else {
@@ -2225,12 +2225,10 @@ mod tests {
 
         println!("SOLS {:#?}", sols);
 
-        let num_steps = sols.len();
-
-        println!("NUM STEPS {:#?}", num_steps);
         let mut current_state = 0; // TODOmoves[0].from_node.index();
 
-        for i in 0..num_steps {
+        let mut i = 0;
+        while sols.len() > 0 {
             println!("STEP {:#?}", i);
             (
                 values,
@@ -2255,6 +2253,7 @@ mod tests {
 
             // for next i+1 round
             current_state = next_state;
+            i += 1;
         }
 
         let rq = match running_q {

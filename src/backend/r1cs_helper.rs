@@ -170,10 +170,10 @@ pub fn normal_add_table<'a>(
         current_forall_state_stack.push_front(all_state.index());
     }
 
-    println!(
+    /*println!(
         "CURRENT FORALL STATE STACK {:#?}",
         current_forall_state_stack
-    );
+    );*/
 
     // dupicate safa, run this path
     let mut dfs_small = Dfs::new(&safa.g, all_state);
