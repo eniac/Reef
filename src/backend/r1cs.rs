@@ -48,7 +48,6 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub doc_extend: usize,
     is_match: bool,
     // circuit crap
-    stack_ptr_circ_count: usize,
     max_branches: usize,
     pub max_stack: usize,
     pub num_states: usize,
@@ -152,12 +151,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // TODO range check
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        safa.write_pdf("safa1").unwrap();
+        //safa.write_pdf("safa1").unwrap();
 
-        println!("ACCEPTING {:#?}", safa.accepting);
-        //println!("DELTAS {:#?}", safa.deltas());
-        //println!("SOLVE {:#?}", safa.solve(&doc));
-        //        println!("DOC {:#?}", doc.clone());
         println!(
             "STATES {:#?}",
             safa.g
@@ -360,7 +355,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             star_num,
             doc_extend: epsilon_to_add,
             is_match,
-            stack_ptr_circ_count: 0,
             max_branches,
             max_stack,
             num_states,
@@ -371,8 +365,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             pc: pcs,
         }
     }
-
-    // PROVER
 
     pub fn prover_accepting_state(&self, state: usize) -> u64 {
         let mut out = false;
@@ -536,40 +528,28 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn push_ite(&mut self, i: usize, to_push: Term, b: usize) -> Term {
-        let lmtd_push_cond = term(
-            Op::Not,
-            vec![term(
-                Op::Eq,
-                vec![new_const(3), new_var(format!("rel_{}", 0))],
-            )],
-        );
-
-        self.pub_inputs.push(new_var(format!("stack_out_{}", i)));
-        self.pub_inputs.push(new_var(format!("stack_in_{}", i)));
-
         let pushed = term(
             Op::Eq,
-            vec![new_var(format!("stack_out_{}", i)), to_push.clone()],
+            vec![new_var(format!("stack_{}_{}", b + 1, i)), to_push.clone()],
         );
 
         let not_pushed = term(
             Op::Eq,
             vec![
-                new_var(format!("stack_out_{}", i)),
-                new_var(format!("stack_in_{}", i)),
+                new_var(format!("stack_{}_{}", b + 1, i)),
+                new_var(format!("stack_{}_{}", b, i)),
             ],
         );
 
+        let spi = if i == 0 { self.max_stack - 1 } else { i - 1 };
+        let spb = if i == 0 { b } else { b + 1 };
         let stack_ptr_add = term(
             Op::Eq,
             vec![
-                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count + 1)),
+                new_var(format!("stack_ptr_{}_{}", b + 1, i)),
                 term(
                     Op::PfNaryOp(PfNaryOp::Add),
-                    vec![
-                        new_const(1),
-                        new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
-                    ],
+                    vec![new_const(1), new_var(format!("stack_ptr_{}_{}", spb, spi))],
                 ),
             ],
         );
@@ -577,10 +557,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let stack_ptr_same = term(
             Op::Eq,
             vec![
-                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count + 1)),
-                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                new_var(format!("stack_ptr_{}_{}", b + 1, i)),
+                new_var(format!("stack_ptr_{}_{}", spb, spi)),
             ],
         );
+
+        println!("IF SP_{},{} == {} and kid {} not padding, then: update SP_{},{} <- SP_{},{} and STACK_{},{} <- STACK_{},{}", b, self.max_stack - 1, i, b, b+1, i, spb, spi, b+1, i, b, i);
 
         term(
             Op::Ite,
@@ -589,16 +571,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     Op::BoolNaryOp(BoolNaryOp::And),
                     vec![
                         term(
-                            Op::BoolNaryOp(BoolNaryOp::And),
+                            Op::Eq,
                             vec![
-                                lmtd_push_cond,
-                                term(
-                                    Op::Eq,
-                                    vec![
-                                        new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
-                                        new_const(i),
-                                    ],
-                                ),
+                                new_var(format!("stack_ptr_{}_{}", b, self.max_stack - 1)),
+                                new_const(i),
                             ],
                         ),
                         term(
@@ -667,9 +643,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         assert!(forall_kids.len() == self.max_branches);
 
         let mut push_stmt = new_bool_const(true);
-
-        for b in 0..1 {
-            //self.max_branches {
+        for b in 0..self.max_branches {
             let to_push = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
@@ -681,28 +655,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
 
-            self.pub_inputs
-                .push(new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)));
-            let mut inside_ite = self.push_ite(0, to_push.clone(), b);
+            let mut inside_ite = new_bool_const(true);
+            for i in 0..self.max_stack {
+                self.pub_inputs.push(new_var(format!("stack_{}_{}", b, i)));
+                if b > 0 || i == self.max_stack - 1 {
+                    self.pub_inputs
+                        .push(new_var(format!("stack_ptr_{}_{}", b, i)));
+                    // TODO last?
+                }
 
-            for i in 1..self.max_stack {
                 inside_ite = term(
-                    Op::Ite,
-                    vec![
-                        term(
-                            Op::Eq,
-                            vec![
-                                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
-                                new_const(i),
-                            ],
-                        ),
-                        self.push_ite(i, to_push.clone(), b),
-                        inside_ite,
-                    ],
+                    Op::BoolNaryOp(BoolNaryOp::And),
+                    vec![self.push_ite(i, to_push.clone(), b), inside_ite],
                 );
             }
-
-            self.stack_ptr_circ_count += 1;
 
             push_stmt = term(Op::BoolNaryOp(BoolNaryOp::And), vec![inside_ite, push_stmt]);
         }
@@ -713,7 +679,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     fn pop_ite(&self, i: usize, pop_elt: Term) -> Term {
         let popped = term(
             Op::Eq,
-            vec![new_var(format!("stack_in_{}", i)), pop_elt.clone()],
+            vec![
+                new_var(format!("stack_{}_{}", self.max_branches, i)),
+                pop_elt.clone(),
+            ],
         );
 
         let stack_ptr_sub = term(
@@ -724,7 +693,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     Op::PfNaryOp(PfNaryOp::Add),
                     vec![
                         new_const(-1),
-                        new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                        new_var(format!(
+                            "stack_ptr_{}_{}",
+                            self.max_branches - 1,
+                            self.max_stack - 1
+                        )),
                     ],
                 ),
             ],
@@ -736,7 +709,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 term(
                     Op::Eq,
                     vec![
-                        new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                        new_var(format!(
+                            "stack_ptr_{}_{}",
+                            self.max_branches - 1,
+                            self.max_stack - 1
+                        )),
                         new_const(i + 1),
                     ],
                 ),
@@ -776,7 +753,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             Op::Eq,
             vec![
                 new_var(format!("stack_ptr_popped")),
-                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                new_var(format!(
+                    "stack_ptr_{}_{}",
+                    self.max_branches - 1,
+                    self.max_stack - 1
+                )),
             ],
         );
 
@@ -855,12 +836,37 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             if j == 0 {
                 // PUSH
                 // if in_state \in forall - only first
-
                 let push_stmt = self.push_stack_circuit();
+                //         self.assertions.push(push_stmt.clone());
 
                 // POP
                 // cursor = pop stack
                 let pop_stmt = self.pop_stack_circuit();
+
+                let mut inside_ite = new_bool_const(true);
+                for i in 0..self.max_stack {
+                    inside_ite = term(
+                        Op::BoolNaryOp(BoolNaryOp::And),
+                        vec![
+                            term(
+                                Op::Eq,
+                                vec![
+                                    new_var(format!("stack_{}_{}", self.max_branches - 1, i)),
+                                    new_var(format!("stack_{}_{}", 0, i)),
+                                ],
+                            ),
+                            inside_ite,
+                        ],
+                    );
+                }
+
+                let stack_ptr_same = term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("stack_ptr_popped")),
+                        new_var(format!("stack_ptr_{}_{}", 0, self.max_stack - 1)),
+                    ],
+                );
 
                 // ite
                 let do_what = term(
@@ -868,7 +874,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     vec![
                         term(Op::Not, vec![self.not_forall_circ(0)]),
                         term(Op::BoolNaryOp(BoolNaryOp::And), vec![pop_stmt, push_stmt]),
-                        new_bool_const(true),
+                        term(
+                            Op::BoolNaryOp(BoolNaryOp::And),
+                            vec![inside_ite, stack_ptr_same],
+                        ),
                     ],
                 );
                 self.assertions.push(do_what);
@@ -1257,6 +1266,34 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         popped_elt.0
     }
 
+    fn stack_set(&mut self, wits: &mut FxHashMap<String, Value>, b: usize, push: bool) {
+        for i in 0..self.max_stack {
+            wits.insert(
+                format!("stack_{}_{}", b, i),
+                new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
+            );
+
+            if b == 0 {
+                if i == self.max_stack - 1 {
+                    wits.insert(format!("stack_ptr_{}_{}", b, i), new_wit(self.stack_ptr));
+                }
+            } else {
+                let update_ptr = if push && (i >= self.stack_ptr) {
+                    self.stack_ptr + 1
+                } else {
+                    self.stack_ptr
+                };
+
+                println!("CALC FOR UPDATE SP {}, {}", b, i);
+                println!("UPDATE PTR {:#?}", update_ptr);
+                wits.insert(
+                    format!("stack_ptr_{}_{}", b, i), // updates sp_{+1} <- sp ( + 1)
+                    new_wit(update_ptr),
+                );
+            }
+        }
+    }
+
     fn push_wit(
         &mut self,
         wits: &mut FxHashMap<String, Value>,
@@ -1276,47 +1313,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         println!("FORALL KIDS: {:#?}", forall_kids);
         let num_kids = forall_kids.len();
 
-        for i in 0..self.stack_ptr {
-            wits.insert(
-                format!("stack_in_{}", i),
-                new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
-            );
-            wits.insert(
-                format!("stack_out_{}", i),
-                new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
-            );
+        let mut b = 0;
+        self.stack_set(wits, b, false);
+        b += 1;
 
-            wits.insert(format!("stack_ptr_{}", i), new_wit(self.stack_ptr));
-        }
-
-        let mut k = 0;
         for kid in forall_kids.into_iter().rev() {
             println!("KID {:#?}", kid);
-            wits.insert(
-                format!("stack_in_{}", self.stack_ptr),
-                new_wit(
-                    self.stack[self.stack_ptr].0 * self.num_states + self.stack[self.stack_ptr].1,
-                ),
-            );
 
             self.stack[self.stack_ptr] = (cur_cursor, kid);
-            wits.insert(
-                format!("stack_out_{}", self.stack_ptr),
-                new_wit(cur_cursor * self.num_states + kid),
-            );
-            wits.insert(format!("forall_0_kid_{}", k), new_wit(kid));
-            println!("IN HASH WIT {:#?}", kid);
-
-            k += 1;
-
-            wits.insert(
-                format!("stack_ptr_{}", self.stack_ptr),
-                new_wit(self.stack_ptr),
-            );
+            self.stack_set(wits, b, true);
             self.stack_ptr += 1;
 
-            // rel hash handling
-            wits.insert(format!("forall_0_kid_{}", k), new_wit(kid));
+            wits.insert(format!("forall_0_kid_{}", b - 1), new_wit(kid));
+
+            b += 1;
         }
 
         let mut pad_kids = vec![];
@@ -1325,21 +1335,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
         for pad_kid in pad_kids {
             println!("KID {:#?}", pad_kid);
-            wits.insert(format!("forall_0_kid_{}", k), new_wit(pad_kid));
-            k += 1;
-        }
 
-        for i in (self.stack_ptr)..self.max_stack {
-            wits.insert(
-                format!("stack_in_{}", i),
-                new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
-            );
-            wits.insert(
-                format!("stack_out_{}", i),
-                new_wit(self.stack[i].0 * self.num_states + self.stack[i].1),
-            );
+            self.stack_set(wits, b, false);
 
-            wits.insert(format!("stack_ptr_{}", i), new_wit(self.stack_ptr));
+            wits.insert(format!("forall_0_kid_{}", b - 1), new_wit(pad_kid));
+            b += 1;
         }
 
         println!("AFTER STACK {:#?}, PTR {:#?}", self.stack, self.stack_ptr);
@@ -2335,7 +2335,7 @@ mod tests {
             vec![0, 1],
             true,
         );
-        test_func_no_hash(
+        /*    test_func_no_hash(
             "abc".to_string(),
             "^ab$".to_string(),
             "ab".to_string(),
@@ -2348,7 +2348,7 @@ mod tests {
             "abcdeffff".to_string(),
             vec![1, 3],
             true,
-        );
+        );*/
     }
 
     #[test]

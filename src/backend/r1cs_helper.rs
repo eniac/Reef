@@ -316,13 +316,13 @@ pub fn normal_add_table<'a>(
             let c = num_ab[&None]; //EPSILON
             let offset = 0; // TODO? current_stack_level;
 
+            if last_path {
+                current_forall_state_stack.pop_front();
+            }
             let out_state = if current_forall_state_stack.len() == 0 {
                 // "finished"
                 num_states //fake_last_state TODO make num_states += 1 in main
             } else {
-                if last_path {
-                    current_forall_state_stack.pop_front();
-                }
                 *current_forall_state_stack.front().unwrap()
             };
 
