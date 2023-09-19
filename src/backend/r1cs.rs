@@ -711,19 +711,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn pop_ite(&self, i: usize, pop_elt: Term) -> Term {
-        let pop_condition = term(Op::Eq, vec![new_const(3), new_var(format!("rel_{}", 0))]); // pop
-
         let popped = term(
             Op::Eq,
-            vec![new_var(format!("stack_out_{}", i)), pop_elt.clone()],
-        );
-
-        let not_popped = term(
-            Op::Eq,
-            vec![
-                new_var(format!("stack_out_{}", i)),
-                new_var(format!("stack_in_{}", i)),
-            ],
+            vec![new_var(format!("stack_in_{}", i)), pop_elt.clone()],
         );
 
         let stack_ptr_sub = term(
@@ -740,6 +730,48 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             ],
         );
 
+        term(
+            Op::Ite,
+            vec![
+                term(
+                    Op::Eq,
+                    vec![
+                        new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
+                        new_const(i + 1),
+                    ],
+                ),
+                term(Op::BoolNaryOp(BoolNaryOp::And), vec![popped, stack_ptr_sub]),
+                new_bool_const(true),
+            ],
+        )
+    }
+
+    fn pop_stack_circuit(&mut self) -> Term {
+        let cursor_var = new_var(format!("cursor_0"));
+
+        // pop
+        let to_pop = term(
+            Op::PfNaryOp(PfNaryOp::Add),
+            vec![
+                term(
+                    Op::PfNaryOp(PfNaryOp::Mul),
+                    vec![cursor_var, new_const(self.num_states)],
+                ),
+                new_var(format!("state_{}", 1)),
+            ],
+        );
+
+        let mut inside_ite = self.pop_ite(0, to_pop.clone());
+
+        for i in 1..self.max_stack {
+            inside_ite = term(
+                Op::BoolNaryOp(BoolNaryOp::And),
+                vec![self.pop_ite(i, to_pop.clone()), inside_ite],
+            );
+        }
+
+        let pop_condition = term(Op::Eq, vec![new_const(3), new_var(format!("rel_{}", 0))]);
+
         let stack_ptr_same = term(
             Op::Eq,
             vec![
@@ -748,65 +780,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             ],
         );
 
-        term(
-            Op::Ite,
-            vec![
-                term(
-                    Op::BoolNaryOp(BoolNaryOp::And),
-                    vec![
-                        pop_condition,
-                        term(
-                            Op::Eq,
-                            vec![
-                                new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
-                                new_const(i),
-                            ],
-                        ),
-                    ],
-                ),
-                term(Op::BoolNaryOp(BoolNaryOp::And), vec![popped, stack_ptr_sub]),
-                term(
-                    Op::BoolNaryOp(BoolNaryOp::And),
-                    vec![not_popped, stack_ptr_same],
-                ),
-            ],
-        )
-    }
-
-    fn pop_stack_circuit(&mut self) -> Term {
-        let cursor_var = new_var(format!("cursor_0"));
-        // TODO let cursor_0_reset = term(Op::Eq, vec![cursor_var, new_var(format!("cursor_0"))]);
-
-        let to_pop = term(
-            Op::PfNaryOp(PfNaryOp::Add),
-            vec![
-                term(
-                    Op::PfNaryOp(PfNaryOp::Mul),
-                    vec![cursor_var, new_const(self.num_states)],
-                ),
-                new_var(format!("state_{}", self.batch_size)),
-            ],
-        );
-
-        let mut inside_ite = self.pop_ite(0, to_pop.clone());
-
-        for i in 1..self.max_stack {
-            inside_ite = term(
-                Op::Ite,
-                vec![
-                    term(
-                        Op::Eq,
-                        vec![
-                            new_var(format!("stack_ptr_{}", self.stack_ptr_circ_count)),
-                            new_const(i),
-                        ],
-                    ),
-                    self.pop_ite(i, to_pop.clone()),
-                    inside_ite,
-                ],
-            );
-        }
-        inside_ite
+        term(Op::Ite, vec![pop_condition, inside_ite, stack_ptr_same])
     }
 
     fn not_forall_circ(&self, j: usize) -> Term {
@@ -886,7 +860,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 // POP
                 // cursor = pop stack
-                let pop_stmt = new_bool_const(true); //self.pop_stack_circuit();
+                let pop_stmt = self.pop_stack_circuit();
 
                 // ite
                 let do_what = term(
@@ -1273,7 +1247,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         println!("POPPED PTR = {:#?}", self.stack_ptr);
 
-        wits.insert(format!("cursor_{}", self.batch_size), new_wit(popped_elt.0));
+        wits.insert(format!("cursor_{}", 0), new_wit(popped_elt.0));
         //wits.insert(format!("state_{}", self.batch_size), new_wit(popped_elt.1));
 
         // after pop
@@ -1293,8 +1267,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             "PUSH WITS STACK: {:#?}, PTR: {:#?}, forall: {:#?}",
             self.stack, self.stack_ptr, forall
         );
-
-        // assert in foralls sanity check ?
 
         let mut forall_kids = match forall {
             Some(state) => self.foralls_w_kids[&state.index()][1..].to_vec(),
@@ -1619,10 +1591,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             wits.insert(format!("cursor_{}", self.batch_size), new_wit(cursor_i));
                             wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                         } else {
-                            // popped
-                            cursor_i = self.pop_wit(&mut wits);
                             // pad push
                             self.push_wit(&mut wits, None, cursor_i);
+                            // popped
+                            cursor_i = self.pop_wit(&mut wits);
                         }
                     } else {
                         // pad out the rest of this loop
@@ -1742,6 +1714,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             cursor_access,
         );
         wits = w;
+        println!("SELF STACK PTR {:#?}", self.stack_ptr);
         println!("WITS {:#?}", wits);
 
         (
