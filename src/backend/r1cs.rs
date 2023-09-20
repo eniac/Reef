@@ -151,7 +151,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // TODO range check
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        //safa.write_pdf("safa1").unwrap();
+        safa.write_pdf("safa1").unwrap();
 
         println!(
             "STATES {:#?}",
@@ -162,13 +162,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
-        let mut forall_children: Vec<Vec<usize>> = Vec::new();
         let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
         let mut current_forall_node = NodeIndex::new(0);
         let kid_padding = 0; // TODO !!
         let mut max_stack = 0;
         let mut current_max_stack = 0;
-        let mut current_forall_state_stack: LinkedList<usize> = LinkedList::new();
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             println!("PROCESS STATE {:#?}", all_state);
@@ -185,7 +183,35 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 for i in 0..and_edges.len() {
                     and_states.push(and_edges[i].target().index());
                 }
+                // add epsilon loop
+                let in_state = all_state.index();
+                let out_state = all_state.index();
+                let offset = 0;
+                let c = num_ab[&None]; //EPSILON
 
+                let rel = calc_rel(
+                    all_state.index(),
+                    out_state,
+                    &and_states,
+                    kid_padding,
+                    max_branches,
+                    &safa,
+                    num_states,
+                    false,
+                );
+
+                set_table.insert(
+                    Integer::from(
+                        (in_state * num_states * num_chars * max_offsets * 2)
+                            + (out_state * num_chars * max_offsets * 2)
+                            + (c * max_offsets * 2)
+                            + (offset * 2)
+                            + rel,
+                    )
+                    .rem_floor(cfg().field().modulus()),
+                );
+
+                // children
                 for i in 0..and_edges.len() {
                     match and_edges[i].weight().clone() {
                         Either(Err(openset)) => {
@@ -195,12 +221,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 let offset = single.unwrap();
                                 if offset == 0 {
                                     // epsilon
-                                    //and_states.push(and_edges[i].target().index());
 
                                     // add table
                                     let in_state = all_state.index();
                                     let out_state = and_edges[i].target().index();
+                                    println!("AND OUT STATE {:#?}", out_state);
+
                                     let c = num_ab[&None]; //EPSILON
+
                                     let rel = calc_rel(
                                         all_state.index(),
                                         out_state,
@@ -236,42 +264,34 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
 
                 foralls_w_kids.insert(all_state.index(), and_states.clone());
-                forall_children.push(and_states);
-                //current_stack_level += 1;
-            }
-
-            println!("forall children {:#?}", forall_children);
-
-            // normal processing for state
-            let all_state_idx = all_state.index();
-
-            // this is a fucked way of doing this
-            for stack_lvl in 0..forall_children.len() {
-                for k in 0..forall_children[stack_lvl].len() {
-                    if forall_children[stack_lvl][k] == all_state_idx {
-                        //current_path_state = all_state_idx;
-
-                        normal_add_table(
-                            &safa,
-                            &mut num_ab,
-                            &mut current_forall_state_stack,
-                            &mut set_table,
-                            num_states,
-                            num_chars,
-                            kid_padding,
-                            max_branches,
-                            max_offsets,
-                            current_forall_node,
-                            forall_children[stack_lvl].clone(),
-                            k == forall_children[stack_lvl].len() - 1,
-                        );
-                    }
-                }
             }
         }
 
-        for k in forall_children {
-            max_stack += k.len(); // overestimation - make this tighter
+        let mut fa = 0;
+        for (forall, kids) in &foralls_w_kids {
+            for k in 0..kids.len() {
+                let backtrace_state = if k == kids.len() - 1 && fa == foralls_w_kids.len() - 1 {
+                    num_states
+                } else {
+                    *forall
+                };
+
+                normal_add_table(
+                    &safa,
+                    &mut num_ab,
+                    &mut set_table,
+                    num_states,
+                    num_chars,
+                    kid_padding,
+                    max_branches,
+                    max_offsets,
+                    NodeIndex::new(kids[k]),
+                    backtrace_state,
+                    kids.clone(),
+                );
+            }
+            fa += 1;
+            max_stack += kids.len(); // overestimation - make this tighter
         }
 
         if set_table.len() == 0 {
@@ -281,7 +301,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             normal_add_table(
                 &safa,
                 &mut num_ab,
-                &mut current_forall_state_stack,
+                //&mut current_forall_state_stack,
                 &mut set_table,
                 num_states,
                 num_chars,
@@ -289,10 +309,28 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 max_branches,
                 max_offsets,
                 NodeIndex::new(0), //all_state, TODO ?
+                num_states,        // backtrace state
                 vec![],
-                true,
             );
         }
+
+        // add "last" loop
+        let in_state = num_states;
+        let out_state = num_states;
+        let offset = 0;
+        let c = num_ab[&None]; //EPSILON
+        let rel = 0;
+
+        set_table.insert(
+            Integer::from(
+                (in_state * num_states * num_chars * max_offsets * 2)
+                    + (out_state * num_chars * max_offsets * 2)
+                    + (c * max_offsets * 2)
+                    + (offset * 2)
+                    + rel,
+            )
+            .rem_floor(cfg().field().modulus()),
+        );
 
         // TODO we have to make sure the multipliers are big enough
 
@@ -1383,7 +1421,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let offset_i = 0;
 
-        let rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
+        let rel_i = if state_i == self.num_states {
+            0
+        } else if self.safa.g[NodeIndex::new(state_i)].is_and() {
             calc_rel(
                 state_i,
                 next_state,
@@ -1522,7 +1562,24 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         while i < self.batch_size {
             let mut add_normal = true;
-            if sols[self.sol_num].is_empty() {
+            if self.sol_num >= sols.len() {
+                // all done, pad to end
+                add_normal = false;
+                while i < self.batch_size {
+                    state_i = next_state;
+                    v.push(self.padding_v(
+                        &mut wits,
+                        &mut q,
+                        &mut cursor_access,
+                        state_i,
+                        next_state,
+                        cursor_i,
+                        i,
+                    ));
+
+                    i += 1;
+                }
+            } else if sols[self.sol_num].is_empty() {
                 println!("TRANSITOIN");
 
                 // need to transition

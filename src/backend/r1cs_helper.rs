@@ -153,44 +153,25 @@ pub(crate) fn trace_preprocessing(
 pub fn normal_add_table<'a>(
     safa: &'a SAFA<char>,
     num_ab: &mut FxHashMap<Option<char>, usize>,
-    current_forall_state_stack: &mut LinkedList<usize>,
+    //current_forall_state_stack: &mut LinkedList<usize>,
     set_table: &mut HashSet<Integer>,
     num_states: usize,
     num_chars: usize,
     kid_padding: usize,
     max_branches: usize,
     max_offsets: usize,
-    all_state: NodeIndex,
+    actual_state: NodeIndex,
+    backtrace_state: usize,
     and_states: Vec<usize>,
-    last_path: bool,
 ) {
-    if last_path {
-        current_forall_state_stack.push_front(num_states); // TODO
-    } else {
-        current_forall_state_stack.push_front(all_state.index());
-    }
-
-    /*println!(
-        "CURRENT FORALL STATE STACK {:#?}",
-        current_forall_state_stack
-    );*/
-
     // dupicate safa, run this path
-    let mut dfs_small = Dfs::new(&safa.g, all_state);
+    let mut dfs_small = Dfs::new(&safa.g, actual_state);
 
     // note: duplicate "back branches" being added, but added to set so its all cool
     // this could probably be more efficient tho
     while let Some(state) = dfs_small.next(&safa.g) {
         let in_state = state.index();
         println!("SMALL DFA STATE {:#?}", state);
-
-        if safa.g[state].is_and() {
-            current_forall_state_stack.push_front(state.index());
-        }
-        println!(
-            "CURRENT FORALL STATE STACK {:#?}",
-            current_forall_state_stack
-        );
 
         for edge in safa.g.edges(state) {
             let out_state = edge.target().index();
@@ -214,6 +195,7 @@ pub fn normal_add_table<'a>(
                             false,
                         );
                         let c = num_ab[&None]; //EPSILON
+                        println!("EPSILON FROM NORMAL");
 
                         set_table.insert(
                             Integer::from(
@@ -316,15 +298,7 @@ pub fn normal_add_table<'a>(
             let c = num_ab[&None]; //EPSILON
             let offset = 0; // TODO? current_stack_level;
 
-            if last_path {
-                current_forall_state_stack.pop_front();
-            }
-            let out_state = if current_forall_state_stack.len() == 0 {
-                // "finished"
-                num_states //fake_last_state TODO make num_states += 1 in main
-            } else {
-                *current_forall_state_stack.front().unwrap()
-            };
+            let out_state = backtrace_state;
 
             let rel = calc_rel(
                 state.index(),
@@ -369,11 +343,6 @@ pub fn normal_add_table<'a>(
             );
         }
     }
-    current_forall_state_stack.pop_front();
-    println!(
-        "CURRENT FORALL STATE STACK {:#?}",
-        current_forall_state_stack
-    );
 }
 
 pub(crate) fn calc_rel<'a>(
