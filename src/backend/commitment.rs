@@ -13,20 +13,22 @@ use neptune::{
     circuit2::Elt,
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
-    sponge::vanilla::{Mode, Sponge, SpongeTrait},
     sponge::circuit::SpongeCircuit,
+    sponge::vanilla::{Mode, Sponge, SpongeTrait},
 };
 use nova_snark::spartan::direct::SpartanSNARK;
 use nova_snark::{
     errors::NovaError,
     provider::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pedersen::{CommitmentGens, CompressedCommitment,Commitment},
+        pedersen::{Commitment, CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
-    traits::{commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait,circuit::StepCircuit},
-    StepCounterType,
     spartan::direct::SpartanVerifierKey,
+    traits::{
+        circuit::StepCircuit, commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait,
+    },
+    StepCounterType,
 };
 use rand::rngs::OsRng;
 use rug::{integer::Order, ops::RemRounding, Integer};
@@ -98,32 +100,32 @@ pub struct ConsistencyCircuit<F: PrimeField> {
 
 impl<F: PrimeField> ConsistencyCircuit<F> {
     pub fn new(pc: PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
-      ConsistencyCircuit { pc, d, v, s }
+        ConsistencyCircuit { pc, d, v, s }
     }
 }
 
 impl<F> StepCircuit<F> for ConsistencyCircuit<F>
-    where
+where
     F: PrimeField,
 {
-        fn arity(&self) -> usize {
-            1
-        }
+    fn arity(&self) -> usize {
+        1
+    }
 
-        fn output(&self, z: &[F]) -> Vec<F> {
+    fn output(&self, z: &[F]) -> Vec<F> {
         assert_eq!(z[0], self.d);
         z.to_vec()
-        }
+    }
 
-        #[allow(clippy::let_and_return)]
-        fn synthesize<CS>(
+    #[allow(clippy::let_and_return)]
+    fn synthesize<CS>(
         &self,
         cs: &mut CS,
         z: &[AllocatedNum<F>],
-        ) -> Result<Vec<AllocatedNum<F>>, SynthesisError>
-        where
+    ) -> Result<Vec<AllocatedNum<F>>, SynthesisError>
+    where
         CS: ConstraintSystem<F>,
-        {
+    {
         let d_in = z[0].clone();
 
         //v at index 0 (but technically 1 since io is allocated first)
@@ -137,22 +139,22 @@ impl<F> StepCircuit<F> for ConsistencyCircuit<F>
             let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
 
             sponge.start(
-            IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
-            None,
-            acc,
+                IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
+                None,
+                acc,
             );
 
             SpongeAPI::absorb(
-            &mut sponge,
-            2,
-            &[Elt::Allocated(alloc_v), Elt::Allocated(alloc_s)],
-            acc,
+                &mut sponge,
+                2,
+                &[Elt::Allocated(alloc_v), Elt::Allocated(alloc_s)],
+                acc,
             );
 
             let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
             sponge.finish(acc).unwrap();
             let out =
-            Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
+                Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
             out
         };
 
@@ -169,14 +171,18 @@ impl<F> StepCircuit<F> for ConsistencyCircuit<F>
         );
 
         Ok(vec![d_calc]) // doesn't hugely matter
-        }
+    }
 
-        fn get_counter_type(&self) -> StepCounterType {
+    fn get_counter_type(&self) -> StepCounterType {
         StepCounterType::Incremental
-        }
+    }
 }
 
-pub fn calc_d_clear(pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,claim_blind: <G1 as Group>::Scalar, v: Integer)-><G1 as Group>::Scalar {
+pub fn calc_d_clear(
+    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    claim_blind: <G1 as Group>::Scalar,
+    v: Integer,
+) -> <G1 as Group>::Scalar {
     let mut sponge = Sponge::new_with_constants(&pc, Mode::Simplex);
     let acc = &mut ();
 
@@ -200,11 +206,23 @@ pub fn proof_dot_prod_verify(
     let mut v_transcript = Transcript::new(b"dot_prod_proof");
     let num_vars = running_q.len();
 
-    ipa.verify(&dc.gens, &dc.gens_single, num_vars, &ipi, &mut v_transcript.clone())?;
+    ipa.verify(
+        &dc.gens,
+        &dc.gens_single,
+        num_vars,
+        &ipi,
+        &mut v_transcript.clone(),
+    )?;
     Ok(())
 }
 
-pub fn cap_verifier(cap_d: <G1 as Group>::Scalar,cap_snark: SpartanSNARK<G1, EE1,ConsistencyCircuit<<G1 as Group>::Scalar>>,  cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar>, vk: SpartanVerifierKey<G1,EE1>,com_v: Commitment<G1>)-> Result<(), NovaError>{
+pub fn cap_verifier(
+    cap_d: <G1 as Group>::Scalar,
+    cap_snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
+    cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
+    vk: SpartanVerifierKey<G1, EE1>,
+    com_v: Commitment<G1>,
+) -> Result<(), NovaError> {
     let z_0 = vec![cap_d];
     let z_out = cap_circuit.output(&z_0);
     let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
@@ -212,17 +230,21 @@ pub fn cap_verifier(cap_d: <G1 as Group>::Scalar,cap_snark: SpartanSNARK<G1, EE1
     res
 }
 
-
-pub fn proof_dot_prod_prover(  
+pub fn proof_dot_prod_prover(
     dc: &ReefCommitment<<G1 as Group>::Scalar>,
     q: Vec<<G1 as Group>::Scalar>,
     running_v: <G1 as Group>::Scalar,
-    doc_len: usize
-)-> (InnerProductInstance<G1>,InnerProductArgument<G1>, Commitment<G1>, <G1 as Group>::Scalar) {
+    doc_len: usize,
+) -> (
+    InnerProductInstance<G1>,
+    InnerProductArgument<G1>,
+    Commitment<G1>,
+    <G1 as Group>::Scalar,
+) {
     let doc_ext_len = doc_len.next_power_of_two();
 
     let mut p_transcript = Transcript::new(b"dot_prod_proof");
-    
+
     let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
     let running_q = q_to_mle_q(&q_rev, doc_ext_len);
     // set up
@@ -238,9 +260,9 @@ pub fn proof_dot_prod_prover(
     );
     let ipw =
         InnerProductWitness::new(&dc.vec_t, &dc.decommit_doc, &running_v, &decommit_running_v);
-    let ipa =
-        InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut p_transcript).unwrap();
-    
+    let ipa = InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut p_transcript)
+        .unwrap();
+
     (ipi, ipa, commit_running_v, decommit_running_v)
 }
 
@@ -254,14 +276,14 @@ pub fn final_clear_checks(
     final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_doc_v: Option<<G1 as Group>::Scalar>,
     cap_d: <G1 as Group>::Scalar,
-    ipi: InnerProductInstance<G1>,
-    ipa: InnerProductArgument<G1>,
+    ipi: Option<InnerProductInstance<G1>>,
+    ipa: Option<InnerProductArgument<G1>>,
 ) {
     // state matches?
     assert_eq!(accepting_state, <G1 as Group>::Scalar::from(1));
 
     //Asserting that d in z_n == d passed into spartan direct
-    assert_eq!(cap_d,final_doc_v.unwrap());
+    assert_eq!(cap_d, final_doc_v.unwrap());
 
     // nlookup eval T check
     match (final_q, final_v) {
@@ -296,7 +318,14 @@ pub fn final_clear_checks(
             let q_ext = q_to_mle_q(&q_rev, doc_ext_len);
 
             // Doc is commited to in this case
-            assert!(proof_dot_prod_verify(reef_commitment, q_ext, v, ipi, ipa).is_ok());
+            match (ipi, ipa) {
+                (Some(i), Some(a)) => {
+                    assert!(proof_dot_prod_verify(reef_commitment, q_ext, v, i, a).is_ok());
+                }
+                (_, _) => {
+                    println!("no ipa or ipa checked (for testing)");
+                }
+            }
         }
         (Some(_), None) => {
             panic!("only half of running claim recieved");

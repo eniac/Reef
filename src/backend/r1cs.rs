@@ -2486,6 +2486,9 @@ mod tests {
             rv,
             drq,
             drv,
+            <G1 as Group>::Scalar::from(1), // dummy
+            None,
+            None,
         );
 
         /*

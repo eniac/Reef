@@ -639,8 +639,8 @@ fn verify(
         Some(zn[(2 + q_len)..(2 + q_len + qd_len)].to_vec()),
         Some(zn[2 + q_len + qd_len]),
         cap_d,
-        ipi,
-        ipa,
+        Some(ipi),
+        Some(ipa),
     ); // TODO number maybe wrong here
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Final Clear Checks");
