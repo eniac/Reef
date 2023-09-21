@@ -30,7 +30,6 @@ use std::thread;
 struct ProofInfo {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
-    num_steps: usize,
     commit: ReefCommitment<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
     doc_len: usize,
@@ -46,8 +45,8 @@ pub fn run_backend(
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
 ) {
     let (sender, recv): (
-        Sender<NFAStepCircuit<<G1 as Group>::Scalar>>,
-        Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>,
+        Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
+        Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     ) = mpsc::channel();
 
     let (send_setup, recv_setup): (Sender<ProofInfo>, Receiver<ProofInfo>) = mpsc::channel();
@@ -88,7 +87,7 @@ pub fn run_backend(
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Proof Setup");
-        let (num_steps, z0_primary, pp) = setup(&r1cs_converter, &prover_data);
+        let (z0_primary, pp) = setup(&r1cs_converter, &prover_data);
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "R1CS", "Proof Setup");
@@ -97,7 +96,6 @@ pub fn run_backend(
             .send(ProofInfo {
                 pp: Arc::new(Mutex::new(pp)),
                 z0_primary,
-                num_steps,
                 commit: reef_commit,
                 table: r1cs_converter.table.clone(),
                 doc_len: r1cs_converter.udoc.len(),
@@ -107,7 +105,7 @@ pub fn run_backend(
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "Compiler", "Full");
 
-        solve(sender, &mut r1cs_converter, &prover_data, num_steps, &doc);
+        solve(sender, &mut r1cs_converter, &prover_data, &doc);
     });
 
     //get args
@@ -122,11 +120,7 @@ pub fn run_backend(
 fn setup<'a>(
     r1cs_converter: &R1CS<<G1 as Group>::Scalar, char>,
     circ_data: &'a ProverData,
-) -> (
-    usize,
-    Vec<<G1 as Group>::Scalar>,
-    PublicParams<G1, G2, C1, C2>,
-) {
+) -> (Vec<<G1 as Group>::Scalar>, PublicParams<G1, G2, C1, C2>) {
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());
     let stack_len = r1cs_converter.max_stack;
@@ -231,17 +225,13 @@ fn setup<'a>(
     ));
     let z0_primary = z;
 
-    let num_steps = 1; // TODO r1cs_converter.path_count_lookup.len(); // TODO r1cs_converter.moves.clone().unwrap().0.len();
-    assert!(num_steps > 0, "trying to prove something about 0 foldings");
-
-    (num_steps, z0_primary, pp)
+    (z0_primary, pp)
 }
 
 fn solve<'a>(
-    sender: Sender<NFAStepCircuit<<G1 as Group>::Scalar>>, //itness<<G1 as Group>::Scalar>>,
+    sender: Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     r1cs_converter: &mut R1CS<<G1 as Group>::Scalar, char>,
     circ_data: &'a ProverData,
-    num_steps: usize,
     doc: &Vec<char>,
 ) {
     let q_len = logmn(r1cs_converter.table.len());
@@ -274,7 +264,8 @@ fn solve<'a>(
     let trace = r1cs_converter.safa.solve(doc);
     let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
 
-    for i in 0..num_steps {
+    let mut i = 0;
+    while r1cs_converter.sol_num < sols.len() {
         #[cfg(feature = "metrics")]
         let test = format!("step {}", i);
 
@@ -412,7 +403,7 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, &test, "witness generation");
 
-        sender.send(circuit_primary).unwrap(); //witness_i).unwrap();
+        sender.send(Some(circuit_primary)).unwrap(); //witness_i).unwrap();
 
         // for next i+1 round
         current_state = next_state;
@@ -423,10 +414,15 @@ fn solve<'a>(
         prev_cursor_0 = next_cursor_0;
         stack_ptr_0 = stack_ptr_popped;
         stack_in = stack_out;
+        i += 1
     }
+    sender.send(None).unwrap();
 }
 
-fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof_info: ProofInfo) {
+fn prove_and_verify(
+    recv: Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
+    proof_info: ProofInfo,
+) {
     println!("Proving thread starting...");
 
     // recursive SNARK
@@ -435,13 +431,14 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
     let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
-    // println!("num foldings: {:#?}", proof_info.num_steps);
-    for i in 0..proof_info.num_steps {
+    let mut i = 0;
+    let mut circuit_primary_wrapper = recv.recv().unwrap();
+    while circuit_primary_wrapper.is_some() {
         #[cfg(feature = "metrics")]
         let test = format!("step {}", i);
 
         // blocks until we receive first witness
-        let circuit_primary = recv.recv().unwrap();
+        let circuit_primary = circuit_primary_wrapper.clone().unwrap();
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, &test, "prove step");
@@ -472,6 +469,9 @@ fn prove_and_verify(recv: Receiver<NFAStepCircuit<<G1 as Group>::Scalar>>, proof
         assert!(res.is_ok()); // TODO delete
 
         recursive_snark = Some(result.unwrap());
+
+        i += 1;
+        let circuit_primary_wrapper = recv.recv().unwrap();
     }
 
     assert!(recursive_snark.is_some());

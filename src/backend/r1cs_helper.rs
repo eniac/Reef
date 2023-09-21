@@ -163,7 +163,8 @@ pub fn normal_add_table<'a>(
     actual_state: NodeIndex,
     backtrace_state: usize,
     and_states: Vec<usize>,
-) {
+) -> usize {
+    let mut sub_max_rel = 0;
     // dupicate safa, run this path
     let mut dfs_small = Dfs::new(&safa.g, actual_state);
 
@@ -181,7 +182,9 @@ pub fn normal_add_table<'a>(
                     let single = openset.is_single(); // single offset/epsilon
                     if single.is_some() {
                         // is single
-                        let offset = single.unwrap();
+                        let lower_offset = single.unwrap();
+                        let upper_offset = single.unwrap();
+
                         // if offset == 0 { -> doesn't matter, always use epsilon for actual
                         // epsilon and for jumps
                         let rel = calc_rel(
@@ -194,23 +197,37 @@ pub fn normal_add_table<'a>(
                             num_states,
                             false,
                         );
+                        if rel > sub_max_rel {
+                            sub_max_rel = rel;
+                        }
+
                         let c = num_ab[&None]; //EPSILON
-                        println!("EPSILON FROM NORMAL");
 
                         set_table.insert(
                             Integer::from(
-                                (in_state * num_states * num_chars * max_offsets * 2)
-                                    + (out_state * num_chars * max_offsets * 2)
-                                    + (c * max_offsets * 2)
-                                    + (offset * 2)
-                                    + rel,
+                                (rel * num_states
+                                    * num_states
+                                    * num_chars
+                                    * max_offsets
+                                    * max_offsets)
+                                    + (in_state
+                                        * num_states
+                                        * num_chars
+                                        * max_offsets
+                                        * max_offsets)
+                                    + (out_state * num_chars * max_offsets * max_offsets)
+                                    + (c * max_offsets * max_offsets)
+                                    + (lower_offset * max_offsets)
+                                    + upper_offset,
                             )
                             .rem_floor(cfg().field().modulus()),
                         );
                     } else if openset.is_full() {
                         // [0,*]
                         let c = num_ab[&Some('*')];
-                        let offset = 0; // TODO?
+                        let lower_offset = 0;
+                        let upper_offset = max_offsets; // TODO!!!
+
                         let rel = calc_rel(
                             state.index(),
                             out_state,
@@ -221,52 +238,78 @@ pub fn normal_add_table<'a>(
                             num_states,
                             false,
                         );
+                        if rel > sub_max_rel {
+                            sub_max_rel = rel;
+                        }
                         println!("STAR EDGE {:#?} -{:#?}-> {:#?}", in_state, c, out_state);
                         set_table.insert(
                             Integer::from(
-                                (in_state * num_states * num_chars * max_offsets * 2)
-                                    + (out_state * num_chars * max_offsets * 2)
-                                    + (c * max_offsets * 2)
-                                    + (offset * 2)
-                                    + rel,
+                                (rel * num_states
+                                    * num_states
+                                    * num_chars
+                                    * max_offsets
+                                    * max_offsets)
+                                    + (in_state
+                                        * num_states
+                                        * num_chars
+                                        * max_offsets
+                                        * max_offsets)
+                                    + (out_state * num_chars * max_offsets * max_offsets)
+                                    + (c * max_offsets * max_offsets)
+                                    + (lower_offset * max_offsets)
+                                    + upper_offset,
                             )
                             .rem_floor(cfg().field().modulus()),
                         );
                     } else {
                         // ranges
+                        assert!(openset.len() == 1); // TODO :(
                         let mut iter = openset.0.iter();
                         if let Some(r) = iter.next() {
-                            let mut offset = r.start;
-                            while offset <= r.end.unwrap() {
-                                let c = num_ab[&None]; //EPSILON
-                                let rel = calc_rel(
-                                    state.index(),
-                                    out_state,
-                                    &and_states,
-                                    kid_padding,
-                                    max_branches,
-                                    safa,
-                                    num_states,
-                                    false,
-                                );
-                                set_table.insert(
-                                    Integer::from(
-                                        (in_state * num_states * num_chars * max_offsets * 2)
-                                            + (out_state * num_chars * max_offsets * 2)
-                                            + (c * max_offsets * 2)
-                                            + (offset * 2)
-                                            + rel,
-                                    )
-                                    .rem_floor(cfg().field().modulus()),
-                                );
-                                offset += 1;
+                            let lower_offset = r.start;
+                            let upper_offset = r.end.unwrap();
+
+                            let c = num_ab[&None]; //EPSILON
+                            let rel = calc_rel(
+                                state.index(),
+                                out_state,
+                                &and_states,
+                                kid_padding,
+                                max_branches,
+                                safa,
+                                num_states,
+                                false,
+                            );
+                            if rel > sub_max_rel {
+                                sub_max_rel = rel;
                             }
+
+                            set_table.insert(
+                                Integer::from(
+                                    (rel * num_states
+                                        * num_states
+                                        * num_chars
+                                        * max_offsets
+                                        * max_offsets)
+                                        + (in_state
+                                            * num_states
+                                            * num_chars
+                                            * max_offsets
+                                            * max_offsets)
+                                        + (out_state * num_chars * max_offsets * max_offsets)
+                                        + (c * max_offsets * max_offsets)
+                                        + (lower_offset * max_offsets)
+                                        + upper_offset,
+                                )
+                                .rem_floor(cfg().field().modulus()),
+                            );
                         }
                     }
                 }
                 Either(Ok(ch)) => {
                     let c = num_ab[&Some(ch)];
-                    let offset = 1;
+                    let lower_offset = 1;
+                    let upper_offset = 1;
                     let rel = calc_rel(
                         state.index(),
                         out_state,
@@ -277,13 +320,18 @@ pub fn normal_add_table<'a>(
                         num_states,
                         false,
                     );
+                    if rel > sub_max_rel {
+                        sub_max_rel = rel;
+                    }
+
                     set_table.insert(
                         Integer::from(
-                            (in_state * num_states * num_chars * max_offsets * 2)
-                                + (out_state * num_chars * max_offsets * 2)
-                                + (c * max_offsets * 2)
-                                + (offset * 2)
-                                + rel,
+                            (rel * num_states * num_states * num_chars * max_offsets * max_offsets)
+                                + (in_state * num_states * num_chars * max_offsets * max_offsets)
+                                + (out_state * num_chars * max_offsets * max_offsets)
+                                + (c * max_offsets * max_offsets)
+                                + (lower_offset * max_offsets)
+                                + upper_offset,
                         )
                         .rem_floor(cfg().field().modulus()),
                     );
@@ -296,7 +344,8 @@ pub fn normal_add_table<'a>(
             let base: i32 = 2; // an explicit type is required
 
             let c = num_ab[&None]; //EPSILON
-            let offset = 0; // TODO? current_stack_level;
+            let lower_offset = 0;
+            let upper_offset = 0;
 
             let out_state = backtrace_state;
 
@@ -310,39 +359,33 @@ pub fn normal_add_table<'a>(
                 num_states,
                 true,
             );
+            if rel > sub_max_rel {
+                sub_max_rel = rel;
+            }
             let in_state = state.index();
 
             // TODO we have to make sure the multipliers are big enough
 
             println!("ADDITIONAL FOR ACCEPTING");
             println!(
-                "V from {:#?},{:#?},{:#?},{:#?},{:#?}",
-                in_state, out_state, c, offset, rel,
-            );
-            println!(
-                "V is {:#?}",
-                Integer::from(
-                    (in_state * num_states * num_chars * max_offsets * 2)
-                        + (out_state * num_chars * max_offsets * 2)
-                        + (c * max_offsets * 2)
-                        + (offset * 2)
-                        + rel,
-                )
-                .rem_floor(cfg().field().modulus())
+                "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
+                in_state, out_state, c, lower_offset, upper_offset, rel,
             );
 
             set_table.insert(
                 Integer::from(
-                    (in_state * num_states * num_chars * max_offsets * 2)
-                        + (out_state * num_chars * max_offsets * 2)
-                        + (c * max_offsets * 2)
-                        + (offset * 2)
-                        + rel,
+                    (rel * num_states * num_states * num_chars * max_offsets * max_offsets)
+                        + (in_state * num_states * num_chars * max_offsets * max_offsets)
+                        + (out_state * num_chars * max_offsets * max_offsets)
+                        + (c * max_offsets * max_offsets)
+                        + (lower_offset * max_offsets)
+                        + upper_offset,
                 )
                 .rem_floor(cfg().field().modulus()),
             );
         }
     }
+    sub_max_rel
 }
 
 pub(crate) fn calc_rel<'a>(
