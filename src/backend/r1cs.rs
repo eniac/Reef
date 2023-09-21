@@ -48,7 +48,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub doc_extend: usize,
     is_match: bool,
     // circuit crap
-    max_branches: usize,
+    pub max_branches: usize,
     pub max_stack: usize,
     pub num_states: usize,
     kid_padding: usize,
@@ -1679,7 +1679,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         &mut self,
         sols: &mut Vec<LinkedList<TraceElem<char>>>, //move_num: (usize, usize),
         batch_num: usize,
-        current_state: usize, // TODO DEL, and TODO DEL start_epsilons
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
         doc_running_q: Option<Vec<Integer>>,
@@ -1699,8 +1698,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
         let mut state_i = 0;
         let mut next_state = 0;
-        let mut char_num = self.num_ab[&None];
-        let mut offset_i = 0;
+        let mut char_num;
+        let mut offset_i;
         let mut rel_i = 0;
 
         let mut v = vec![];
@@ -2099,12 +2098,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         //let query_f: Vec<G1::Scalar> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
         SpongeAPI::absorb(&mut sponge, query.len() as u32, &query, acc);
-
+        println!("CLAIM INPUTS QUERY {:#?}", query);
         // TODO - what needs to be public?
 
         // generate claim r
         let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
         let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+        println!("CLAIM R {:#?}", claim_r.clone());
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
         let mut rs = vec![claim_r.clone()];
@@ -2429,8 +2429,6 @@ mod tests {
 
         println!("SOLS {:#?}", sols);
 
-        let mut current_state = 0; // TODOmoves[0].from_node.index();
-
         let mut i = 0;
         while r1cs_converter.sol_num < sols.len() {
             println!("STEP {:#?}", i);
@@ -2445,7 +2443,6 @@ mod tests {
             ) = r1cs_converter.gen_wit_i(
                 &mut sols,
                 i,
-                current_state,
                 running_q.clone(),
                 running_v.clone(),
                 doc_running_q.clone(),
@@ -2456,7 +2453,6 @@ mod tests {
             pd.check_all(&values);
 
             // for next i+1 round
-            current_state = next_state;
             i += 1;
         }
 
@@ -2486,7 +2482,7 @@ mod tests {
             rv,
             drq,
             drv,
-            <G1 as Group>::Scalar::from(1), // dummy
+            None,
             None,
             None,
         );

@@ -1,4 +1,3 @@
-#![feature(is_terminal)]
 #![allow(missing_docs, non_snake_case)]
 use clap::Parser;
 use csv::Writer;

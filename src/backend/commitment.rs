@@ -45,6 +45,7 @@ pub struct ReefCommitment<F> {
     vec_t: Vec<F>, //<G1 as Group>::Scalar>,
     decommit_doc: F,
     pub commit_doc_hash: F,
+    pub s: F, // salt for hash
 }
 
 pub fn gen_commitment(
@@ -76,6 +77,8 @@ where
     commit_doc.absorb_in_ro(&mut ro);
     let commit_doc_hash = ro.squeeze(256); // todo
 
+    let salt = <G1 as Group>::Scalar::random(&mut OsRng);
+
     return ReefCommitment {
         gens: gens_t.clone(),
         gens_single: CommitmentGens::<G1>::new_with_blinding_gen(
@@ -87,6 +90,7 @@ where
         vec_t: scalars,
         decommit_doc: blind,
         commit_doc_hash: commit_doc_hash,
+        s: salt,
     };
 }
 
@@ -275,7 +279,7 @@ pub fn final_clear_checks(
     final_v: Option<<G1 as Group>::Scalar>,
     final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_doc_v: Option<<G1 as Group>::Scalar>,
-    cap_d: <G1 as Group>::Scalar,
+    cap_d: Option<<G1 as Group>::Scalar>,
     ipi: Option<InnerProductInstance<G1>>,
     ipa: Option<InnerProductArgument<G1>>,
 ) {
@@ -283,7 +287,12 @@ pub fn final_clear_checks(
     assert_eq!(accepting_state, <G1 as Group>::Scalar::from(1));
 
     //Asserting that d in z_n == d passed into spartan direct
-    assert_eq!(cap_d, final_doc_v.unwrap());
+    match cap_d {
+        Some(d) => {
+            assert_eq!(d, final_doc_v.unwrap());
+        }
+        None => {}
+    }
 
     // nlookup eval T check
     match (final_q, final_v) {

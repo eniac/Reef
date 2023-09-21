@@ -12,6 +12,7 @@ use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::safa::SAFA;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::{self, ProverData};
+use ff::Field;
 use generic_array::typenum;
 use neptune::circuit;
 use neptune::{
@@ -28,6 +29,7 @@ use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
+use rand::rngs::OsRng;
 use rug::Integer;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -170,10 +172,10 @@ fn setup<'a>(
         vec![<G1 as Group>::Scalar::from(0); 2],
         empty_glue,
         <G1 as Group>::Scalar::from(0),
-        vec![<G1 as Group>::Scalar::from(0); 2],
         r1cs_converter.batch_size,
+        r1cs_converter.max_branches,
         r1cs_converter.pc.clone(),
-        <G1 as Group>::Scalar::from(0), //idk if this is correct
+        <G1 as Group>::Scalar::from(0),
     );
 
     // trivial circuit
@@ -220,7 +222,9 @@ fn setup<'a>(
         pp.num_variables().1
     );
 
-    let blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
+    let commit_blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
+    let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
+    println!("SALT {:#?}", claim_blind);
 
     let current_state = r1cs_converter.safa.get_init().index();
 
@@ -229,12 +233,17 @@ fn setup<'a>(
     z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
     z.push(int_to_ff(r1cs_converter.table[0].clone()));
 
-    z.push(<G1 as Group>::Scalar::from(0 as u64)); //wrong
     z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
-    z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
-    z.push(<G1 as Group>::Scalar::from(
-        r1cs_converter.prover_accepting_state(current_state),
-    ));
+    let d = calc_d_clear(
+        r1cs_converter.pc.clone(),
+        claim_blind,
+        Integer::from(r1cs_converter.udoc[0] as u64),
+    );
+    //z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
+    z.push(d);
+
+    z.push(<G1 as Group>::Scalar::from(0 as u64));
+    z.append(&mut vec![<G1 as Group>::Scalar::from(0); stack_len]);
     let z0_primary = z;
 
     (z0_primary, pp)
@@ -250,7 +259,9 @@ fn solve<'a>(
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.udoc.len());
 
-    let blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
+    let commit_blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
+    let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
+    println!("SALT {:#?}", claim_blind);
 
     let mut wits;
     let mut running_q: Option<Vec<Integer>> = None;
@@ -272,7 +283,7 @@ fn solve<'a>(
     let mut current_state = r1cs_converter.safa.get_init().index();
     // TODO don't recalc :(
 
-    let mut next_state = current_state;
+    let mut next_state;
 
     let trace = r1cs_converter.safa.solve(doc);
     let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
@@ -297,7 +308,6 @@ fn solve<'a>(
         ) = r1cs_converter.gen_wit_i(
             &mut sols,
             i,
-            next_state,
             running_q.clone(),
             running_v.clone(),
             doc_running_q.clone(),
@@ -338,17 +348,25 @@ fn solve<'a>(
             None => vec![<G1 as Group>::Scalar::from(0); qd_len],
         };
 
-        let doc_v = match doc_running_v {
+        /*let doc_v = match doc_running_v {
             Some(rv) => int_to_ff(rv),
             None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
+        };*/
+        let doc_v = match doc_running_v {
+            Some(rv) => rv,
+            None => Integer::from(r1cs_converter.udoc[0] as u64),
         };
+        let doc_v_hash = calc_d_clear(r1cs_converter.pc.clone(), claim_blind, doc_v.clone());
+
         let next_doc_q = next_doc_running_q
             .clone()
             .unwrap()
             .into_iter()
             .map(|x| int_to_ff(x))
             .collect();
-        let next_doc_v = int_to_ff(next_doc_running_v.clone().unwrap());
+        let next_doc_v = next_doc_running_v.clone().unwrap();
+        let next_doc_v_hash =
+            calc_d_clear(r1cs_converter.pc.clone(), claim_blind, next_doc_v.clone());
 
         let sp_0 = <G1 as Group>::Scalar::from(stack_ptr_0 as u64);
         let spp = <G1 as Group>::Scalar::from(stack_ptr_popped as u64);
@@ -368,7 +386,7 @@ fn solve<'a>(
                 q: q,
                 v: v,
                 doc_q: doc_q,
-                doc_v: doc_v,
+                doc_v: doc_v_hash,
                 stack_ptr: sp_0,
                 stack: stk_in,
             },
@@ -376,7 +394,7 @@ fn solve<'a>(
                 q: next_q,
                 v: next_v,
                 doc_q: next_doc_q,
-                doc_v: next_doc_v,
+                doc_v: next_doc_v_hash,
                 stack_ptr: spp,
                 stack: stk_out,
             },
@@ -403,14 +421,11 @@ fn solve<'a>(
                 <G1 as Group>::Scalar::from(next_state as u64),
             ],
             glue,
-            blind,
-            vec![
-                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(current_state)),
-                <G1 as Group>::Scalar::from(r1cs_converter.prover_accepting_state(next_state)),
-            ],
+            commit_blind,
             r1cs_converter.batch_size,
+            r1cs_converter.max_branches,
             r1cs_converter.pc.clone(),
-            <G1 as Group>::Scalar::from(0 as u64), // PLACEHOLDER!!
+            claim_blind,
         );
 
         #[cfg(feature = "metrics")]
@@ -450,19 +465,23 @@ fn prove_and_verify(
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
     let mut i = 0;
-    let mut circuit_primary_wrapper = recv.recv().unwrap();
-    let mut circuit_primary = None;
 
-    while circuit_primary_wrapper.is_some() {
+    // blocks until we receive first witness
+    let mut circuit_primary = recv.recv().unwrap();
+
+    let cp_clone = circuit_primary.clone().unwrap();
+    let pc = cp_clone.pc;
+    let claim_blind = cp_clone.claim_blind;
+    println!("SALT {:#?}", claim_blind);
+
+    while circuit_primary.is_some() {
         #[cfg(feature = "metrics")]
         let test = format!("step {}", i);
-
-        // blocks until we receive first witness
-        circuit_primary = Some(circuit_primary_wrapper.clone().unwrap());
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, &test, "prove step");
 
+        println!("PROVE STEP {:#?}", i);
         let result = RecursiveSNARK::prove_step(
             &proof_info.pp.lock().unwrap(),
             recursive_snark,
@@ -491,7 +510,7 @@ fn prove_and_verify(
         recursive_snark = Some(result.unwrap());
 
         i += 1;
-        let circuit_primary_wrapper = recv.recv().unwrap();
+        circuit_primary = recv.recv().unwrap()
     }
 
     assert!(recursive_snark.is_some());
@@ -511,10 +530,6 @@ fn prove_and_verify(
     let compressed_snark = res.unwrap();
 
     let (q, v) = recv_qv.recv().unwrap();
-
-    let cp_clone = circuit_primary.clone().unwrap();
-    let pc = cp_clone.pc;
-    let claim_blind = cp_clone.claim_blind;
 
     //Doc dot prod
     let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
@@ -638,7 +653,7 @@ fn verify(
         Some(zn[q_len + 1]),
         Some(zn[(2 + q_len)..(2 + q_len + qd_len)].to_vec()),
         Some(zn[2 + q_len + qd_len]),
-        cap_d,
+        Some(cap_d),
         Some(ipi),
         Some(ipa),
     ); // TODO number maybe wrong here
