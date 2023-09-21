@@ -89,10 +89,10 @@ pub struct NFAStepCircuit<F: PrimeField> {
     batch_size: usize,
     states: Vec<F>,
     glue: Vec<Glue<F>>,
-    commit_blind: F,
+    pub commit_blind: F,
     accepting: Vec<F>,
-    pc: PoseidonConstants<F, typenum::U4>,
-    claim_blind: F,
+    pub pc: PoseidonConstants<F, typenum::U4>,
+    pub claim_blind: F,
 }
 
 // note that this will generate a single round, and no witnesses, unlike nova example code
@@ -490,16 +490,12 @@ where {
     fn hiding_running_claim<CS>(
         &self,
         cs: &mut CS,
-        z: &[AllocatedNum<F>],
         v: &AllocatedNum<F>,
     ) -> Result<AllocatedNum<F>, SynthesisError>
     where
         CS: ConstraintSystem<F>,
     {
-        //This might need to be some other index
-        let d_in = z[0].clone();
-
-        let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s"), || Ok(self.claim_blind))?;
+        let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s_rc"), || Ok(self.claim_blind))?;
 
         //poseidon(v,s) == d
         let d_calc = {
@@ -525,18 +521,6 @@ where {
                 Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
             out
         };
-
-        // sanity
-        if d_calc.get_value().is_some() {
-            assert_eq!(d_in.get_value().unwrap(), d_calc.get_value().unwrap());
-        }
-
-        cs.enforce(
-            || "d == d",
-            |z| z + d_in.get_variable(),
-            |z| z + CS::one(),
-            |z| z + d_calc.get_variable(),
-        );
 
         Ok(d_calc)
     }
@@ -817,9 +801,9 @@ where
                 }
             }
         }
-        //Z needs to be replaced
-        let hidden_rc = self.hiding_running_claim(cs, z, &alloc_rc[sc_l].clone().unwrap());
-        alloc_rc[sc_l] = Some(hidden_rc?);
+        
+        let hidden_rc = self.hiding_running_claim(cs, &alloc_rc[sc_l].clone().unwrap());
+        alloc_doc_rc[doc_l] = Some(hidden_rc?);
 
         self.nl_eval_fiatshamir(
             cs,

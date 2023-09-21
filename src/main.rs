@@ -1,3 +1,4 @@
+#![feature(is_terminal)]
 #![allow(missing_docs, non_snake_case)]
 use clap::Parser;
 use csv::Writer;
@@ -52,7 +53,8 @@ fn main() {
     log::stop(Component::Compiler, "DFA", "DFA");
 
     #[cfg(feature = "plot")]
-    safa.as_str_safa().write_pdf("main")
+    safa.as_str_safa()
+        .write_pdf("main")
         .expect("Failed to plot NFA to a pdf file");
 
     #[cfg(feature = "metrics")]
@@ -72,11 +74,7 @@ fn main() {
 
     init();
 
-    run_backend(
-        safa.clone(),
-        doc,
-        opt.batch_size,
-    ); // auto select batching/commit
+    run_backend(safa.clone(), doc, opt.batch_size); // auto select batching/commit
 
     let file = OpenOptions::new()
         .write(true)

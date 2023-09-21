@@ -57,6 +57,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone> {
     pub stack: Vec<(usize, usize)>,
     pub stack_ptr: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
+    pub doc_rc_v: Option<Integer>,
 }
 
 fn type_of<T>(_: &T) {
@@ -435,6 +436,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             stack,
             stack_ptr: 0,
             pc: pcs,
+            doc_rc_v: Some(Integer::from(1)), // Convert back to none later
         }
     }
 

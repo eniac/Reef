@@ -11,13 +11,20 @@ use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::safa::SAFA;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
-use circ::target::r1cs::ProverData;
+use circ::target::r1cs::{self, ProverData};
 use generic_array::typenum;
+use neptune::circuit;
 use neptune::{
-    sponge::vanilla::{Sponge, SpongeTrait},
+    sponge::api::{IOPattern, SpongeAPI, SpongeOp},
+    sponge::vanilla::{Mode, Sponge, SpongeTrait},
     Strength,
 };
+use nova_snark::provider::ipa_pc::{InnerProductArgument, InnerProductInstance};
+use nova_snark::spartan::direct::SpartanVerifierKey;
+use nova_snark::traits::commitment::CommitmentTrait;
 use nova_snark::{
+    provider::pedersen::{Commitment, CommitmentGens, CompressedCommitment},
+    spartan::direct::SpartanSNARK,
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
@@ -50,6 +57,11 @@ pub fn run_backend(
     ) = mpsc::channel();
 
     let (send_setup, recv_setup): (Sender<ProofInfo>, Receiver<ProofInfo>) = mpsc::channel();
+
+    let (sender_qv, recv_qv): (
+        Sender<(Vec<Integer>, Integer)>,
+        Receiver<(Vec<Integer>, Integer)>,
+    ) = mpsc::channel();
 
     let solver_thread = thread::spawn(move || {
         // we do setup here to avoid unsafe passing
@@ -105,13 +117,13 @@ pub fn run_backend(
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "Compiler", "Full");
 
-        solve(sender, &mut r1cs_converter, &prover_data, &doc);
+        solve(sender, sender_qv, &mut r1cs_converter, &prover_data, &doc);
     });
 
     //get args
     let proof_info = recv_setup.recv().unwrap();
 
-    prove_and_verify(recv, proof_info);
+    prove_and_verify(recv, recv_qv, proof_info);
 
     // rejoin child
     solver_thread.join().expect("setup/solver thread panicked");
@@ -230,6 +242,7 @@ fn setup<'a>(
 
 fn solve<'a>(
     sender: Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
+    sender_qv: Sender<(Vec<Integer>, Integer)>, //itness<<G1 as Group>::Scalar>>,
     r1cs_converter: &mut R1CS<<G1 as Group>::Scalar, char>,
     circ_data: &'a ProverData,
     doc: &Vec<char>,
@@ -416,11 +429,16 @@ fn solve<'a>(
         stack_in = stack_out;
         i += 1
     }
+
     sender.send(None).unwrap();
+    sender_qv
+        .send((doc_running_q.unwrap(), doc_running_v.unwrap()))
+        .unwrap();
 }
 
 fn prove_and_verify(
     recv: Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
+    recv_qv: Receiver<(Vec<Integer>, Integer)>,
     proof_info: ProofInfo,
 ) {
     println!("Proving thread starting...");
@@ -433,12 +451,14 @@ fn prove_and_verify(
 
     let mut i = 0;
     let mut circuit_primary_wrapper = recv.recv().unwrap();
+    let mut circuit_primary = None;
+
     while circuit_primary_wrapper.is_some() {
         #[cfg(feature = "metrics")]
         let test = format!("step {}", i);
 
         // blocks until we receive first witness
-        let circuit_primary = circuit_primary_wrapper.clone().unwrap();
+        circuit_primary = Some(circuit_primary_wrapper.clone().unwrap());
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, &test, "prove step");
@@ -446,7 +466,7 @@ fn prove_and_verify(
         let result = RecursiveSNARK::prove_step(
             &proof_info.pp.lock().unwrap(),
             recursive_snark,
-            circuit_primary.clone(),
+            circuit_primary.clone().unwrap(),
             circuit_secondary.clone(),
             proof_info.z0_primary.clone(),
             z0_secondary.clone(),
@@ -490,6 +510,48 @@ fn prove_and_verify(
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
 
+    let (q, v) = recv_qv.recv().unwrap();
+
+    let cp_clone = circuit_primary.clone().unwrap();
+    let pc = cp_clone.pc;
+    let claim_blind = cp_clone.claim_blind;
+
+    //Doc dot prod
+    let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
+        &proof_info.commit,
+        q.into_iter().map(|x| int_to_ff(x)).collect(),
+        int_to_ff(v.clone()),
+        proof_info.doc_len,
+    );
+
+    //CAP
+    let cap_d = calc_d_clear(pc.clone(), claim_blind, v.clone());
+
+    // CAP circuit
+    let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
+        ConsistencyCircuit::new(pc, cap_d, int_to_ff(v.clone()), claim_blind);
+
+    // produce CAP keys
+    let (cap_pk, cap_vk) =
+        SpartanSNARK::<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>::setup(
+            cap_circuit.clone(),
+        )
+        .unwrap();
+
+    let cap_z = vec![cap_d];
+
+    let cap_res = SpartanSNARK::cap_prove(
+        &cap_pk,
+        cap_circuit.clone(),
+        &cap_z,
+        &v_commit.compress(),
+        &int_to_ff(v),
+        &v_decommit,
+    );
+    assert!(cap_res.is_ok());
+
+    let cap_snark = cap_res.unwrap();
+
     #[cfg(feature = "metrics")]
     log::space(
         Component::Prover,
@@ -508,6 +570,13 @@ fn prove_and_verify(
         proof_info.commit,
         proof_info.table,
         proof_info.doc_len,
+        ipi,
+        ipa,
+        cap_d,
+        cap_circuit,
+        cap_snark,
+        cap_vk,
+        v_commit,
     );
 
     #[cfg(feature = "metrics")]
@@ -521,6 +590,13 @@ fn verify(
     reef_commit: ReefCommitment<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
     doc_len: usize,
+    ipi: InnerProductInstance<G1>,
+    ipa: InnerProductArgument<G1>,
+    cap_d: <G1 as Group>::Scalar,
+    cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
+    cap_snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
+    cap_vk: SpartanVerifierKey<G1, EE1>,
+    v_commit: Commitment<G1>,
 ) {
     let q_len = logmn(table.len());
     let qd_len = logmn(doc_len);
@@ -544,6 +620,10 @@ fn verify(
     #[cfg(feature = "metrics")]
     log::tic(Component::Verifier, "Verification", "Final Clear Checks");
 
+    //CAP verify
+    let cap_res = cap_verifier(cap_d, cap_snark, cap_circuit, cap_vk, v_commit);
+    assert!(cap_res.is_ok());
+
     // state, char, opt<hash>, opt<v,q for eval>, opt<v,q for doc>, accepting
     let zn = res.unwrap().0;
 
@@ -558,6 +638,9 @@ fn verify(
         Some(zn[q_len + 1]),
         Some(zn[(2 + q_len)..(2 + q_len + qd_len)].to_vec()),
         Some(zn[2 + q_len + qd_len]),
+        cap_d,
+        ipi,
+        ipa,
     ); // TODO number maybe wrong here
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Final Clear Checks");
