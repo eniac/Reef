@@ -199,11 +199,10 @@ pub fn calc_d_clear(
 
     d_out_vec[0]
 }
-// this crap will need to be seperated out
+
 pub fn proof_dot_prod_verify(
     dc: ReefCommitment<<G1 as Group>::Scalar>,
     running_q: Vec<<G1 as Group>::Scalar>,
-    running_v: <G1 as Group>::Scalar,
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
 ) -> Result<(), NovaError> {
@@ -272,7 +271,6 @@ pub fn proof_dot_prod_prover(
 
 pub fn final_clear_checks(
     reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
-    accepting_state: <G1 as Group>::Scalar,
     table: &Vec<Integer>,
     doc_len: usize,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
@@ -283,9 +281,6 @@ pub fn final_clear_checks(
     ipi: Option<InnerProductInstance<G1>>,
     ipa: Option<InnerProductArgument<G1>>,
 ) {
-    // state matches?
-    assert_eq!(accepting_state, <G1 as Group>::Scalar::from(1));
-
     //Asserting that d in z_n == d passed into spartan direct
     match cap_d {
         Some(d) => {
@@ -329,7 +324,7 @@ pub fn final_clear_checks(
             // Doc is commited to in this case
             match (ipi, ipa) {
                 (Some(i), Some(a)) => {
-                    assert!(proof_dot_prod_verify(reef_commitment, q_ext, v, i, a).is_ok());
+                    assert!(proof_dot_prod_verify(reef_commitment, q_ext, i, a).is_ok());
                 }
                 (_, _) => {
                     println!("no ipa or ipa checked (for testing)");

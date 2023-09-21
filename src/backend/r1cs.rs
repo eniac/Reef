@@ -2420,7 +2420,7 @@ mod tests {
         // println!("PD {:#?}", pd);
 
         let mut values;
-        let mut next_state;
+        let mut next_state = 0;
 
         let trace = safa.solve(&chars);
         //println!("TRACE {:#?}", trace);
@@ -2472,10 +2472,10 @@ mod tests {
             Some(x) => Some(int_to_ff(x)),
             None => None,
         };
+        assert_eq!(next_state, r1cs_converter.num_states);
 
         final_clear_checks(
             reef_commit,
-            <G1 as Group>::Scalar::from(1), // dummy, not checked
             &r1cs_converter.table,
             r1cs_converter.udoc.len(),
             rq,

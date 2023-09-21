@@ -646,7 +646,6 @@ fn verify(
     // final_doc_q, final_doc_v
     final_clear_checks(
         reef_commit,
-        zn[2 + q_len + 1 + qd_len + 1],
         &table,
         doc_len,
         Some(zn[1..(q_len + 1)].to_vec()),
@@ -656,7 +655,10 @@ fn verify(
         Some(cap_d),
         Some(ipi),
         Some(ipa),
-    ); // TODO number maybe wrong here
+    );
+
+    // TODO FINAL STATE CHECK!!! JESS
+
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Final Clear Checks");
 }
