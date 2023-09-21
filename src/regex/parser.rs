@@ -16,30 +16,32 @@ impl RegexParser {
     /// ^r  -> ^r.*
     /// r   -> .*r.*
     fn to_regex_top(e: &Expr) -> Result<Regex, String> {
-        match e {
+
+        let res = match e {
             Expr::Concat(l) => {
                 let mut inner = Self::to_regex(e.clone())?;
                 if let Some(e) = l.get(0) {
                     match e {
                         Expr::StartLine | Expr::StartText => (),
-                        _ => inner = G.mk(RegexF::App(re::dotstar(), inner)),
+                        _ => inner = re::app(re::dotstar(), inner),
                     }
                 }
 
                 if let Some(e) = l.get(l.len() - 1) {
                     match e {
                         Expr::EndLine | Expr::EndText => (),
-                        _ => inner = G.mk(RegexF::App(inner, re::dotstar())),
+                        _ => inner = re::app(inner, re::dotstar()),
                     }
                 }
                 Ok(inner)
-            }
+            },
             Expr::Group(g) => Self::to_regex_top(&g),
-            _ => Ok(G.mk(RegexF::App(
-                G.mk(RegexF::App(re::dotstar(), Self::to_regex(e)?)),
-                G.mk(RegexF::dotstar()),
-            ))),
-        }
+            _ => Ok(re::app(re::dotstar(),
+                        re::app(Self::to_regex(e)?, re::dotstar()))),
+        }?;
+
+        println!("Before {:?} after {:?}", e, res);
+        Ok(res)
     }
 
     fn shallow_app(a: &Expr, b: RegexF) -> Result<RegexF, String> {

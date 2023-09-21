@@ -42,9 +42,6 @@ impl<A: Clone> Quant<A> {
     pub fn is_or(&self) -> bool {
         !self.is_and
     }
-    pub fn is_neg(&self) -> bool {
-        self.is_neg
-    }
     pub fn negate(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -69,11 +66,7 @@ impl<A: Clone> Quant<A> {
 
 impl Display for Quant<String> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.is_and && self.is_neg {
-            write!(f, "∀ ¬ {}", self.get())
-        } else if !self.is_and && self.is_neg {
-            write!(f, "∃ ¬ {}", self.get())
-        } else if self.is_and {
+        if self.is_and {
             write!(f, "∀ {}", self.get())
         } else {
             write!(f, "∃ {}", self.get())

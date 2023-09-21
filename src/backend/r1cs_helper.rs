@@ -339,7 +339,7 @@ pub fn normal_add_table<'a>(
             }
         }
 
-        if safa.accepting.contains(&state) {
+        if safa.accepting().contains(&state) {
             // add check entries to table
             let base: i32 = 2; // an explicit type is required
 
@@ -409,9 +409,9 @@ pub(crate) fn calc_rel<'a>(
     if trans {
         //print!("in {:#?}, OUT {:#?}", in_state.index(), out_state);
         assert!(out_state == num_states || safa.g[NodeIndex::new(out_state)].is_and());
-        assert!(safa.accepting.contains(&NodeIndex::new(in_state)));
+        assert!(safa.accepting().contains(&NodeIndex::new(in_state)));
         rel = 1;
-    } else if safa.accepting.contains(&NodeIndex::new(out_state)) {
+    } else if safa.accepting().contains(&NodeIndex::new(out_state)) {
         rel = 2;
     } else if safa.g[NodeIndex::new(in_state)].is_and() {
         if children[0] == out_state {

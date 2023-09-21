@@ -26,7 +26,7 @@ use std::cmp::max;
 use std::collections::HashSet;
 use std::collections::LinkedList;
 
-pub struct R1CS<'a, F: PrimeField, C: Clone> {
+pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub safa: &'a SAFA<C>,
     foralls_w_kids: FxHashMap<usize, Vec<usize>>,
     pub num_ab: FxHashMap<Option<C>, usize>,
@@ -445,7 +445,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         if self.is_match {
             // proof of membership
-            for a in self.safa.accepting.iter() {
+            for a in self.safa.accepting().iter() {
                 out = out || a.index() == state;
             }
         } else {

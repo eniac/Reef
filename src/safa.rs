@@ -58,7 +58,6 @@ impl<A: Display, B: Display> Display for Either<A, B> {
         }
     }
 }
-static mut COUNTER: usize = 0;
 
 /// A skip is a set of ranges
 pub type Skip = OpenSet<usize>;
@@ -71,9 +70,17 @@ pub struct SAFA<C: Clone> {
     /// A graph
     pub g: Graph<Quant<Regex>, Either<C, Skip>>,
 
-    /// Set of accepting states
-    pub accepting: BTreeSet<NodeIndex<u32>>,
+    /// Is a positive or negative SAFA (inverse match)
+    pub positive: bool,
 }
+
+impl PartialEq for SAFA<char> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ab == other.ab && self.positive == other.positive && self.deltas() == other.deltas()
+    }
+}
+
+impl Eq for SAFA<char> {}
 
 impl SAFA<char> {
     /// Deep Constructor
@@ -81,74 +88,78 @@ impl SAFA<char> {
         let ab = alphabet.chars().sorted().collect();
         // Add root
         let mut g: Graph<Quant<Regex>, Either<char, Skip>> = Graph::new();
-        let n_init = g.add_node(Quant::and(re.clone()));
+        let n_init = g.add_node(Quant::or(re.clone()));
         g.add_edge(n_init, n_init, SAFA::epsilon());
         let mut s = Self {
             ab,
             g,
-            accepting: BTreeSet::new(),
+            positive: true,
         };
         // Recursively build graph
-        s.add(n_init, re);
-        // Accepting states
-        for n in s.g.node_indices() {
-            if s.g[n].get().nullable() {
-                s.accepting.insert(n);
-            }
-        }
+        s.add(n_init);
         s
     }
 
     /// Add a regex to position [from]
     fn add_skip(&mut self, n: NodeIndex<u32>, skip: Skip, q_c: &Regex) {
-        if let Some(n_c) = self.find(q_c) {
-            self.g.add_edge(n, n_c, Either::right(skip));
-        } else {
-            // Add to graph if not already there
-            let n_c = self.g.add_node(Quant::or(q_c.clone()));
-            // Reflexive step
-            self.g.add_edge(n_c, n_c, SAFA::epsilon());
-            self.g.add_edge(n, n_c, Either::right(skip));
-            // Recurse on child [q_c]
-            self.add(n_c, &q_c);
+        let recurse = !self.exists(q_c, false);
+        let n_c = self.find_or_add(q_c, false);
+        self.g.add_edge(n, n_c, Either::right(skip.clone()));
+        // Also add the complement skip since we know it always fails
+        if !skip.is_full() && !skip.is_nil() {
+            let n_empty = self.find_or_add(&re::empty(), false);
+            self.g.add_edge(
+                n,
+                n_empty,
+                Either::right(skip.negate().diff(&OpenSet::nil())),
+            );
+        }
+        if recurse {
+            self.add(n_c);
         }
     }
 
-    /// Find an [or] node
+    /// Find if a regex exists in the nodes of the graph
+    pub fn exists(&self, r: &Regex, is_and: bool) -> bool {
+        self.g
+            .node_indices()
+            .any(|i| &self.g[i].get() == r && self.g[i].is_and() == is_and)
+    }
+
+    /// Find a node from a regex
     pub fn find(&self, r: &Regex) -> Option<NodeIndex<u32>> {
         self.g.node_indices().find(|i| &self.g[*i].get() == r)
     }
 
-    /// Add derivative of a node in the graph
-    fn add_derivatives(&mut self, from: NodeIndex<u32>, q: &Regex) {
-        let n_q = self.find(q).unwrap_or_else(|| {
-            let n_q = self.g.add_node(Quant::or(q.clone()));
-            // Reflexive step
-            self.g.add_edge(n_q, n_q, SAFA::epsilon());
-            self.g.add_edge(from, n_q, SAFA::epsilon());
-            n_q
-        });
-        // Make [or] node
-        self.g[n_q] = Quant::or(self.g[n_q].get());
+    /// Find a node from a regex, or add it and return a new node id
+    pub fn find_or_add(&mut self, r: &Regex, is_and: bool) -> NodeIndex<u32> {
+        self.g
+            .node_indices()
+            .find(|i| self.g[*i] == Quant::new(r.clone(), is_and))
+            .unwrap_or_else(|| {
+                let n_q = self.g.add_node(Quant::new(r.clone(), is_and));
+                // Reflexive step
+                self.g.add_edge(n_q, n_q, SAFA::epsilon());
+                n_q
+            })
+    }
 
+    /// Add derivative of a node in the graph
+    fn add_derivatives(&mut self, from: NodeIndex<u32>) {
         // Take all the single character steps
         for c in self.ab.clone().iter() {
-            let q_c = re::deriv(q, &c);
-            if let Some(n_c) = self.find(&q_c) {
-                self.g.add_edge(n_q, n_c, Either::left(*c));
-            } else {
-                // Add to graph if not already there
-                let n_c = self.g.add_node(Quant::or(q_c.clone()));
-                // Reflexive step
-                self.g.add_edge(n_c, n_c, SAFA::epsilon());
-                self.g.add_edge(n_q, n_c, Either::left(*c));
-                self.add(n_c, &q_c);
+            let q_c = re::deriv(&self.g[from].get(), &c);
+            let recurse = !self.exists(&q_c, false);
+            let n_c = self.find_or_add(&q_c, false);
+            self.g.add_edge(from, n_c, Either::left(*c));
+            if recurse {
+                self.add(n_c);
             }
         }
     }
 
     /// Insert an [and] or [alt] fork in the safa
-    fn add_fork(&mut self, is_and: bool, from: NodeIndex<u32>, q: &Regex) -> Option<()> {
+    fn add_fork(&mut self, is_and: bool, from: NodeIndex<u32>) -> Option<()> {
         fn to_set(r: &Regex, is_and: bool) -> BTreeSet<Regex> {
             match **r {
                 // (r | r' | ...) => [r, r', ...]
@@ -164,11 +175,14 @@ impl SAFA<char> {
                     l.append(&mut r);
                     l
                 }
+                RegexF::Star(ref a) if !is_and => {
+                    BTreeSet::from([re::nil(), re::app(a.clone(), re::star(a.clone()))])
+                }
                 _ => BTreeSet::from([r.clone()]),
             }
         }
 
-        let children = to_set(q, is_and);
+        let children = to_set(&self.g[from].get(), is_and);
         if children.len() > 1 {
             self.g[from] = Quant::new(self.g[from].get(), is_and);
             children
@@ -181,41 +195,48 @@ impl SAFA<char> {
     }
 
     /// Add a new regex starting at [from]
-    fn add(&mut self, from: NodeIndex<u32>, q: &Regex) {
-        re::extract_skip(q, &self.ab)
+    fn add(&mut self, from: NodeIndex<u32>) {
+        re::extract_skip(&self.g[from].get())
             .map(|(skip, rem)| self.add_skip(from, skip, &rem))
-            .or_else(|| self.add_fork(true, from, q)) // Add [and] fork
-            .or_else(|| self.add_fork(false, from, q)) // Add [or] fork
-            .or_else(|| Some(self.add_derivatives(from, q))); // Catch-all
+            .or_else(|| self.add_fork(true, from)) // Add [and] fork
+            .or_else(|| self.add_fork(false, from)) // Add [or] fork
+            .or_else(|| Some(self.add_derivatives(from))); // Catch-all
+    }
+
+    /// Is this node a fork ([alt, and] with epsilon children)
+    pub fn is_fork(&self, from: NodeIndex<u32>) -> bool {
+        self.edges(from)
+            .iter()
+            .all(|e| e.weight() == &SAFA::epsilon())
+    }
+
+    /// Number of states
+    pub fn nstates(&self) -> usize {
+        self.g.node_indices().len()
     }
 
     /// Negation of SAFAs
-    pub fn negate(&mut self) -> Self {
-        let mut s = Self {
-            ab: self.ab.clone(),
-            g: self.g.clone(),
-            accepting: BTreeSet::new(),
-        };
+    pub fn negate(&self) -> Self {
+        // Clone graph (immutable negate)
+        let mut safa = self.clone();
 
-        // Copy the graph
-        let mut dfs = Dfs::new(&s.g, s.get_init());
-        while let Some(nx) = dfs.next(&s.g) {
-            // Negate the node
-            s.g[nx].negate();
-            for e in self.g.edges(nx) {
-                if let Err(ref skip) = e.weight().0 {
-                    s.add_skip(nx, skip.negate(), &re::empty());
-                    s.accepting.insert(s.find(&re::empty()).unwrap());
+        // Negate sign (for accepting)
+        safa.positive = !safa.positive;
+
+        safa.g = safa.g.map(
+            |i, b| {
+                if safa.is_fork(i) {
+                    b.negate()
+                } else {
+                    b.clone()
                 }
-            }
-        }
-
-        // Switch accepting and non-accepting states
-        s.accepting.append(&mut self.non_accepting());
-        s
+            },
+            |_, e| e.clone(),
+        );
+        safa
     }
 
-    /// To regular expression (root node)
+    /// To regular expression (root = s.g[nx] iode)
     pub fn to_regex(&self) -> Regex {
         self.g[self.get_init()].get()
     }
@@ -228,11 +249,6 @@ impl SAFA<char> {
     /// Get initial state
     pub fn get_init(&self) -> NodeIndex<u32> {
         NodeIndex::new(0)
-    }
-
-    /// Find regular expression in graph [i]
-    pub fn find_regex(&self, re: &Regex) -> Option<NodeIndex<u32>> {
-        self.g.node_indices().find(|x| &self.g[*x].get() == re)
     }
 
     /// All edges (quantified) in the graph
@@ -258,21 +274,35 @@ impl SAFA<char> {
     pub fn is_sink(&self, n: NodeIndex<u32>) -> bool {
         self.g
             .edges(n)
-            .all(|e| e.target() == n && !self.accepting.contains(&e.target()))
+            .all(|e| e.target() == n && self.non_accepting().contains(&n))
     }
 
     /// Accepting criterion for a node, document and cursor
     pub fn is_accept(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<char>) -> bool {
-        self.accepting.contains(&n) && i == doc.len()
+        self.accepting().contains(&n) && i == doc.len()
     }
 
     /// Non accepting states
     pub fn non_accepting(&self) -> BTreeSet<NodeIndex<u32>> {
-        let mut s: BTreeSet<_> = self.g.node_indices().collect();
-        for x in self.accepting.clone() {
-            s.remove(&x);
+        self.g
+            .node_indices()
+            .filter(|i| !self.accepting().contains(i))
+            .collect()
+    }
+
+    /// Accepting states
+    pub fn accepting(&self) -> BTreeSet<NodeIndex<u32>> {
+        if self.positive {
+            self.g
+                .node_indices()
+                .filter(|i| self.g[*i].get().nullable())
+                .collect()
+        } else {
+            self.g
+                .node_indices()
+                .filter(|i| !self.g[*i].get().nullable())
+                .collect()
         }
-        s
     }
 
     /// Recursively solve an edge and all the children coming off of it
@@ -370,12 +400,26 @@ impl SAFA<char> {
     /// Produce a graph of the SAFA in a PDF file with [filename]
     pub fn write_pdf(&self, filename: &str) -> std::io::Result<()> {
         // Graph [g]
-        let g = self.g.map(
-            |_, b| b.clone(),
+        let strg = self.g.map(
+            |_, b| {
+                if self.positive {
+                    if b.get().nullable() {
+                        format!("{} ✓", b)
+                    } else {
+                        b.to_string()
+                    }
+                } else {
+                    if b.get().nullable() {
+                        format!("{} ✗", b)
+                    } else {
+                        format!("{} ¬", b)
+                    }
+                }
+            },
             |_, e| Either(e.clone().0.map(|c| c.to_string())),
         );
 
-        let s: String = Dot::new(&g).to_string();
+        let s: String = Dot::new(&strg).to_string();
         let fdot = format!("{}.dot", filename.to_string());
         std::fs::write(fdot.clone(), s)?;
 
@@ -407,7 +451,7 @@ mod tests {
     use std::fmt::Display;
 
     /// Helper function to output states
-    fn print_states<C: Display + Clone>(safa: &SAFA<C>) {
+    fn print_states<C: Display + Clone + Eq>(safa: &SAFA<C>) {
         safa.g
             .node_indices()
             .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
@@ -582,7 +626,6 @@ mod tests {
         // unsafe { backtrace_on_stack_overflow::enable() };
         let r = re::simpl(re::new("^(.{1,3}){1,2}b$"));
         let safa = SAFA::new("ab", &r);
-        safa.write_pdf("safa").unwrap();
         let doc: Vec<_> = "aaaab".chars().collect();
         equiv_upto_epsilon(
             &safa.solve(&doc),
@@ -633,6 +676,129 @@ mod tests {
         println!("{:#?}", r);
     }
 
+    #[test]
+    fn test_safa_basic_lookahead() {
+        for s in vec![r"(?=a.*).*ed$"] {
+            let r = re::simpl(re::new(s));
+            let safa = SAFA::new("abcde", &r);
+            println! {"Regex: {:#?}",r};
+
+            print_states(&safa);
+            println!("DELTAS");
+            for d in safa.deltas() {
+                println!("{}, {}, {}", d.0, d.1, d.2.index());
+            }
+
+            let strdoc = "aed";
+            let doc = strdoc.chars().collect();
+
+            let sol = safa.solve(&doc);
+
+            println!("SOLUTION for: {}", strdoc);
+            println!("{:?}", sol);
+            assert_ne!(sol, None);
+        }
+    }
+
+    #[test]
+    fn test_safa_lookahead_loop() {
+        let s = r"^((?=a.*).*a)*$";
+        let r = re::simpl(re::new(s));
+        let safa = SAFA::new("ab", &r);
+        assert_eq!(safa.nstates(), 8);
+    }
+
+    #[test]
+    fn test_safa_double_negate() {
+        let r = re::simpl(re::new("(a|b).{1,3}a"));
+        let safa = SAFA::new("ab", &r);
+        assert_eq!(safa, safa.negate().negate());
+    }
+
+    #[test]
+    fn test_safa_double_negate_alt() {
+        let r = re::simpl(re::new("(a.*|.*b)a"));
+        let safa = SAFA::new("ab", &r);
+        // safa.write_pdf("pos").unwrap();
+        // safa.negate().write_pdf("neg").unwrap();
+        // safa.negate().negate().write_pdf("dneg").unwrap();
+        assert_eq!(safa, safa.negate().negate());
+    }
+
+    #[test]
+    fn test_safa_double_negate_and() {
+        let r = re::simpl(re::new("^(?=ab)ba$"));
+        let safa = SAFA::new("ab", &r);
+        // safa.write_pdf("pos").unwrap();
+        // safa.negate().write_pdf("neg").unwrap();
+        // safa.negate().negate().write_pdf("dneg").unwrap();
+        assert_eq!(safa, safa.negate().negate());
+    }
+
+    #[test]
+    fn test_safa_negate_range_interval() {
+        let r = re::simpl(re::new("^.{1,3}b$"));
+        let safa = SAFA::new("ab", &r).negate();
+        let doc: Vec<_> = "aaaa".chars().collect();
+        equiv_upto_epsilon(
+            &safa.solve(&doc),
+            &Trace::new(&[TraceElem::new(0, &Either(Err(Skip::open(4))), 2, 0, 4)]),
+        )
+    }
+
+    #[test]
+    fn test_safa_negative() {
+        for s in vec![
+            r"^(A|BCD).{3}hello$", //r"abcd",r"a.*bd"
+        ] {
+            let r = re::simpl(re::new(s));
+            let safa = SAFA::new("ACBDhello", &r);
+            println! {"Regex: {:#?}",s};
+            print_states(&safa);
+            println!("DELTAS");
+            for d in safa.deltas() {
+                println!("{}, {}, {}", d.0, d.1, d.2.index());
+            }
+            let strdoc = "abbb";
+            let doc = strdoc.chars().collect();
+
+            let sol = safa.solve(&doc);
+
+            println!("SOLUTION for: {}", strdoc);
+            println!("{:?}", sol);
+            assert_ne!(sol, None);
+        }
+    }
+
+    #[test]
+    fn test_safa_negative_password() {
+        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+        let ab: String = abvec.iter().collect();
+        for s in vec![
+            r"(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$",
+        ] {
+            let r = re::simpl(re::new(s));
+            let safa = (SAFA::new(&ab, &r)).negate();
+            println! {"Regex: {:#?}",s};
+            // let mut states = HashSet::new();
+            // let mut ntrans: usize = 0;
+            // for d in safa.deltas() {
+            //     states.insert(d.0);
+            //     ntrans = ntrans + 1;
+            // }
+            // println! {"N States: {:#?}",states.len()};
+            // println! {"N Trans: {:#?}",ntrans};
+
+            let strdoc = "password123";
+            let doc = strdoc.chars().collect();
+
+            let sol = safa.solve(&doc);
+
+            println!("SOLUTION for: {}", strdoc);
+            println!("{:?}", sol);
+            assert_ne!(sol, None);
+        }
+    }
     #[test]
     fn test_safa_validate_password() {
         let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
@@ -772,12 +938,29 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_running_problems() {
+        let rstr = "^(a{3}|((?=b).{2}))$";
+        let r = re::simpl(re::new(rstr));
+        let safa = SAFA::new("ab", &r);
+        safa.write_pdf("safa").unwrap();
+    }
+
+    #[test]
+    fn test_running_problems2() {
+        let rstr = "ab{1,3}";
+        let r = re::simpl(re::new(rstr));
+        let safa = SAFA::new("ab", &r);
+        safa.write_pdf("safa").unwrap();
+    }
+
     #[cfg(feature = "plot")]
     #[test]
     fn test_safa_pdf() {
-        let r = re::new("(?=a.*b.*)acb$");
-        let safa = SAFA::new("abc", &r);
-        safa.write_pdf("safa3").unwrap();
+        let r = re::simpl(re::new("^a{3}|((?=b).{2})$"));
+        let mut safa = SAFA::new("ab", &r);
+        // safa = safa.negate();
+        safa.write_pdf("safa_alt").unwrap();
         // let strdoc = "baababab";
         // let doc = strdoc.chars().collect();
 
