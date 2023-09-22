@@ -3,6 +3,7 @@
 /min/target
 out*
 *.dot
+*.lock
 *.pdf
 *.txt
 *.csv
