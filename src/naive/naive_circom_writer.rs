@@ -151,6 +151,18 @@ template IsZero() {
 
 
 pub fn make_main(doc_len: usize,deltas:usize,n_accepting:usize, n_char: usize, n_states: usize)->String{
+    let valid_match_body: String;
+    if (n_accepting == 1) {
+        valid_match_body = "isZero.in <== rootsMatch(0) - in;".to_string();
+    } else {
+        valid_match_body = format!("component runningProduct = MultiplierN({n_accepting});
+    
+        for (var i = 0; i < {n_accepting}; i++) {{
+            runningProduct.in[i] <== rootsMatch(i) - in;
+        }}
+        isZero.in <== runningProduct.out;");
+    }
+
     format!("pragma circom 2.0.3;
 
     include \"utils.circom\";
@@ -171,15 +183,10 @@ pub fn make_main(doc_len: usize,deltas:usize,n_accepting:usize, n_char: usize, n
     template IsValidMatch() {{
         signal input in;
         signal output out;
-    
-        component runningProduct = MultiplierN({n_accepting});
+        
         component isZero = IsZero();
-    
-    
-        for (var i = 0; i < {n_accepting}; i++) {{
-            runningProduct.in[i] <== rootsMatch(i) - in;
-        }}
-        isZero.in <== runningProduct.out;
+
+        {valid_match_body}
         out <== isZero.out;
     }}
     
