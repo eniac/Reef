@@ -110,3 +110,17 @@ prover,Prover,Prove,39937022,μs
 solver,DFA Solving,Clear Match,309876,μs
 compiler,R1CS,Size,854799,constraints
 prover,Proof Size,Spartan SNARK size,47439,bytes
+sTo strut _2000,([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+),8448,66
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,Loading,23892437,μs
+solver,Witness,Gen,1208448960,μs
+compiler,DFA,DFA,92493,μs
+prover,Prover,Prove,1180488854,μs
+compiler,Snark,Setup,1061934554,μs
+verifier,Verify,Verify,1074690079,μs
+compiler,R1CS,Commitment Gen,66913,μs
+compiler,R1CS,Circom,1210334644,μs
+solver,DFA Solving,Clear Match,3349646,μs
+compiler,R1CS,Size,17092121,constraints
+prover,Proof Size,Spartan SNARK size,58220,bytes
