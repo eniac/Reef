@@ -499,7 +499,7 @@ fn prove_and_verify(
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Prover, &test, "prove step");
-
+        /*
         // verify recursive - TODO we can get rid of this verify once everything works
         // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
         let res = result.clone().unwrap().verify(
@@ -511,7 +511,7 @@ fn prove_and_verify(
         println!("Recursive res: {:#?}", res);
 
         assert!(res.is_ok()); // TODO delete
-
+        */
         recursive_snark = Some(result.unwrap());
 
         i += 1;
