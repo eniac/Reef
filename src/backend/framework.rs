@@ -21,12 +21,15 @@ use neptune::{
     Strength,
 };
 use nova_snark::provider::ipa_pc::{InnerProductArgument, InnerProductInstance};
-use nova_snark::spartan::direct::SpartanVerifierKey;
-use nova_snark::traits::commitment::CommitmentTrait;
+use nova_snark::spartan::direct::*;
 use nova_snark::{
     provider::pedersen::{Commitment, CommitmentGens, CompressedCommitment},
-    spartan::direct::SpartanSNARK,
-    traits::{circuit::TrivialTestCircuit, Group},
+    traits::{
+        circuit::TrivialTestCircuit,
+        commitment::{CommitmentEngineTrait, CommitmentTrait},
+        evaluation::GetGeneratorsTrait,
+        Group,
+    },
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 use rand::rngs::OsRng;
@@ -532,6 +535,7 @@ fn prove_and_verify(
     let (q, v) = recv_qv.recv().unwrap();
 
     //Doc dot prod
+
     let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
         &proof_info.commit,
         q.into_iter().map(|x| int_to_ff(x)).collect(),
@@ -539,7 +543,7 @@ fn prove_and_verify(
         proof_info.doc_len,
     );
 
-    //CAP
+    //CAP Proving
     let cap_d = calc_d_clear(pc.clone(), claim_blind, v.clone());
 
     // CAP circuit
@@ -553,15 +557,22 @@ fn prove_and_verify(
         )
         .unwrap();
 
+    let cap_blind_v = <G1 as Group>::Scalar::random(&mut OsRng);
+    let cap_com_v = <G1 as Group>::CE::commit(
+        cap_pk.pk.gens.get_scalar_gen(),
+        &[int_to_ff(v.clone())],
+        &cap_blind_v,
+    );
+
     let cap_z = vec![cap_d];
 
     let cap_res = SpartanSNARK::cap_prove(
         &cap_pk,
         cap_circuit.clone(),
         &cap_z,
-        &v_commit.compress(),
+        &cap_com_v.compress(),
         &int_to_ff(v),
-        &v_decommit,
+        &cap_blind_v,
     );
     assert!(cap_res.is_ok());
 
@@ -591,7 +602,7 @@ fn prove_and_verify(
         cap_circuit,
         cap_snark,
         cap_vk,
-        v_commit,
+        cap_com_v,
     );
 
     #[cfg(feature = "metrics")]
@@ -611,7 +622,7 @@ fn verify(
     cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
     cap_snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
     cap_vk: SpartanVerifierKey<G1, EE1>,
-    v_commit: Commitment<G1>,
+    cap_v_commit: Commitment<G1>,
 ) {
     let q_len = logmn(table.len());
     let qd_len = logmn(doc_len);
@@ -636,7 +647,7 @@ fn verify(
     log::tic(Component::Verifier, "Verification", "Final Clear Checks");
 
     //CAP verify
-    let cap_res = cap_verifier(cap_d, cap_snark, cap_circuit, cap_vk, v_commit);
+    let cap_res = cap_verifier(cap_d, cap_snark, cap_circuit, cap_vk, cap_v_commit);
     assert!(cap_res.is_ok());
 
     // state, char, opt<hash>, opt<v,q for eval>, opt<v,q for doc>, accepting
@@ -644,6 +655,7 @@ fn verify(
 
     // eval type, reef commitment, accepting state bool, table, doc, final_q, final_v, final_hash,
     // final_doc_q, final_doc_v
+
     final_clear_checks(
         reef_commit,
         &table,

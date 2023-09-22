@@ -216,6 +216,7 @@ pub fn proof_dot_prod_verify(
         &ipi,
         &mut v_transcript.clone(),
     )?;
+    println!("VERIFIED");
     Ok(())
 }
 
@@ -250,6 +251,7 @@ pub fn proof_dot_prod_prover(
 
     let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
     let running_q = q_to_mle_q(&q_rev, doc_ext_len);
+
     // set up
     let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
     let commit_running_v =
@@ -316,10 +318,12 @@ pub fn final_clear_checks(
     match (final_doc_q, final_doc_v) {
         (Some(q), Some(v)) => {
             let doc_ext_len = doc_len.next_power_of_two();
+            println!("DOC EXT LEN {:#?}", doc_ext_len);
 
             // right form for inner product
             let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
             let q_ext = q_to_mle_q(&q_rev, doc_ext_len);
+            println!("Q EXT {:#?}", q_ext);
 
             // Doc is commited to in this case
             match (ipi, ipa) {

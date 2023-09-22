@@ -2474,6 +2474,13 @@ mod tests {
         };
         assert_eq!(next_state, r1cs_converter.num_states);
 
+        let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
+            &r1cs_converter.reef_commit.unwrap(),
+            drq.clone().unwrap(),
+            drv.clone().unwrap(),
+            r1cs_converter.udoc.len(),
+        );
+
         final_clear_checks(
             reef_commit,
             &r1cs_converter.table,
@@ -2483,8 +2490,8 @@ mod tests {
             drq,
             drv,
             None,
-            None,
-            None,
+            Some(ipi),
+            Some(ipa),
         );
 
         /*
@@ -2559,7 +2566,7 @@ mod tests {
         test_func_no_hash(
             "ab".to_string(),
             "^a*b*$".to_string(),
-            "ab".to_string(),
+            "aaab".to_string(),
             vec![1],
             true,
         );
