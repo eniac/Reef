@@ -16,7 +16,6 @@ impl RegexParser {
     /// ^r  -> ^r.*
     /// r   -> .*r.*
     fn to_regex_top(e: &Expr) -> Result<Regex, String> {
-
         let res = match e {
             Expr::Concat(l) => {
                 let mut inner = Self::to_regex(e.clone())?;
@@ -40,7 +39,6 @@ impl RegexParser {
                         re::app(Self::to_regex(e)?, re::dotstar()))),
         }?;
 
-        println!("Before {:?} after {:?}", e, res);
         Ok(res)
     }
 
@@ -88,7 +86,7 @@ impl RegexParser {
             }
             Expr::Repeat { child, lo, hi, .. } if *hi == usize::MAX => {
                 let inner = &Self::to_regex(child)?;
-                Ok(G.mk(RegexF::App(G.mk(RegexF::repeat(inner, *lo)), G.mk(RegexF::Star(inner.clone())))))
+                Ok(G.mk(RegexF::App(re::repeat(inner.clone(), *lo), G.mk(RegexF::Star(inner.clone())))))
             }
             Expr::Repeat { child, lo, hi, .. } => Ok(G.mk(RegexF::Range(Self::to_regex(child)?, *lo, *hi))),
             Expr::Group(g) => Self::to_regex(&g),

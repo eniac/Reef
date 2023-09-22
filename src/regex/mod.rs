@@ -1,21 +1,21 @@
 #![allow(dead_code)]
 #![allow(missing_docs)]
 use hashconsing::{consign, HConsed, HashConsign};
-use std::collections::BTreeSet;
+use itertools::Itertools;
 
-use crate::openset::{OpenRange, OpenSet};
+use crate::openset::OpenSet;
 use crate::safa::Skip;
 use core::fmt;
 use core::fmt::Formatter;
 
-use self::re::projection;
-
 #[cfg(fuzz)]
 pub mod arbitrary;
 
+pub mod dnf;
 pub mod ord;
 pub mod parser;
 
+use crate::regex::dnf::OrSet;
 /// the type of character classes
 pub type CharClass = OpenSet<char>;
 
@@ -352,31 +352,70 @@ impl RegexF {
     }
 
     /// Make [self] given [n] into [rrrr....r] n-times.
-    pub fn repeat(&self, n: usize) -> RegexF {
-        match n {
-            0 => RegexF::nil(),
-            1 => self.clone(),
-            n => RegexF::app(&self.repeat(n - 1), &self),
+    pub fn range_pred(&self, i: &usize, j: &usize) -> RegexF {
+        if *i == 0 && *j == 0 {
+            RegexF::nil()
+        } else if *i == 0 {
+            RegexF::range(self, 0, j-1)
+        } else {
+            RegexF::range(self, i-1, j-1)
         }
     }
 
-    /// Derivative
+    /// Generalized Antimirov derivative
+    pub fn aderiv(&self, c: &char) -> OrSet<Self> {
+        match self {
+            RegexF::Nil => OrSet::empty(),
+            RegexF::CharClass(cs) if cs.contains(c) => OrSet::single(&RegexF::nil()),
+            RegexF::CharClass(_) => OrSet::empty(),
+            RegexF::Dot => OrSet::single(&RegexF::nil()),
+            RegexF::App(ref a, ref b) if a.nullable() =>
+                a.aderiv(c).map(|r| RegexF::app(&r, b)).or(&b.aderiv(c)),
+            RegexF::App(ref a, ref b) =>
+                a.aderiv(c).map(|r| RegexF::app(&r, b)),
+            RegexF::Alt(ref a, ref b) =>
+                a.aderiv(c).or(&b.aderiv(c)),
+            RegexF::And(ref a, ref b) =>
+                a.aderiv(c).and(&b.aderiv(c)),
+            RegexF::Star(ref a) =>
+                a.aderiv(c).map(|r| RegexF::app(&r, &RegexF::star(a))),
+            // The [nil] rule again
+            RegexF::Range(_, i, j) if *i == 0 && *j == 0 => OrSet::empty(),
+            // The app rule: a{i, j} = aa{i-1, j-1} but if a is nullable, repeat the app rule
+            RegexF::Range(ref a, i, j) if a.nullable() => {
+                let b = RegexF::range_pred(a, i, j);
+                a.aderiv(c).map(|r| RegexF::app(&r, &b)).or(&b.aderiv(c))
+            }
+            // The app rule: a{i, j} = aa{i-1, j-1}
+            RegexF::Range(ref a, i, j) =>
+                a.aderiv(c).map(|r| RegexF::app(&r, &RegexF::range_pred(a, i, j)))
+        }
+    }
+
+    /// Brzozowski Derivative
     pub fn deriv(&self, c: &char) -> Self {
         match self {
             RegexF::Nil => RegexF::empty(),
-            RegexF::CharClass(cs) if cs.is_empty() => RegexF::empty(),
             RegexF::CharClass(cs) if cs.contains(c) => RegexF::nil(),
-            RegexF::Dot => RegexF::nil(),
             RegexF::CharClass(_) => RegexF::empty(),
-            RegexF::App(ref a, ref b) if a.nullable() => {
-                RegexF::alt(&RegexF::app(&a.deriv(c), b), &b.deriv(c))
-            }
+            RegexF::Dot => RegexF::nil(),
+            RegexF::App(ref a, ref b) if a.nullable() =>
+                RegexF::alt(&RegexF::app(&a.deriv(c), b), &b.deriv(c)),
             RegexF::App(ref a, ref b) => RegexF::app(&a.deriv(c), b),
             RegexF::Alt(ref a, ref b) => RegexF::alt(&a.deriv(c), &b.deriv(c)),
             RegexF::And(ref a, ref b) => RegexF::and(&a.deriv(c), &b.deriv(c)),
             RegexF::Star(ref a) => RegexF::app(&a.deriv(c), &RegexF::star(a)),
-            RegexF::Range(ref a, i, j) if i == j => a.repeat(*i).deriv(c),
-            RegexF::Range(ref a, i, j) => RegexF::alt(&a.range(*i + 1, *j), &a.repeat(*i)).deriv(c),
+            // The [nil] rule again
+            RegexF::Range(ref a, i, j) if *i == 0 && *j == 0 =>
+                RegexF::empty(),
+            // The app rule: a{i, j} = aa{i-1, j-1} but if a is nullable, repeat the app rule
+            RegexF::Range(ref a, i, j) if a.nullable() =>
+                RegexF::alt(
+                    &RegexF::app(&a.deriv(c), &RegexF::range_pred(a, i, j)),
+                    &RegexF::range_pred(a, i, j).deriv(c)),
+            // The app rule: a{i, j} = aa{i-1, j-1}
+            RegexF::Range(ref a, i, j) =>
+                RegexF::app(&a.deriv(c), &RegexF::range_pred(a, i, j))
         }
     }
 }
@@ -727,6 +766,12 @@ fn test_regex_ord() {
 }
 
 #[test]
+fn test_regex_aderiv() {
+    let r = re::and(re::alt(re::character('a'), re::character('c')), re::character('a'));
+    println!("r = {}, dr/da = {}", r, r.aderiv(&'a'));
+}
+
+#[test]
 fn test_regex_zero_length() {
     assert_eq!(
         re::app(
@@ -860,7 +905,7 @@ fn test_regex_negative_char_class_range() {
 fn test_for_proj() {
     let r = re::simpl(re::new(r"^.a(b|c)d{2}.{5}e{3}$"));
     // println!("{:#?}",r);
-    println!("Intervals {:#?}", projection(r.get()));
+    println!("Intervals {:#?}", re::projection(r.get()));
     // println!("{:#?}",re::get_proj_size(r.get(), 0, false));
     // println!("{:#?}",re::get_proj_size(r.get(), 0, true));
     // println!("{:#?}",re::projection_pow2(r.get()));
@@ -872,13 +917,13 @@ fn test_for_proj() {
 fn test_proj_cons() {
     let r = re::simpl(re::new(r"^.{3}.{4}$"));
     // LEF: Should be (7,8) no?
-    assert_eq!(projection(r.get()), vec![(7, 8)]);
+    assert_eq!(re::projection(r.get()), vec![(7,8)]);
 }
 
 #[test]
 fn test_proj_alt() {
     let r = re::simpl(re::new(r"^(.{3})|(.{2})$"));
-    println!("Intervals {:#?}", projection(r.get()));
+    println!("Intervals {:#?}", re::projection(r.get()));
     // LEF: Unsure what the answer should be, either [(2,3)] or [(3,4)] probably the union interval (2,4)?
-    assert_eq!(projection(r.get()), vec![(2, 4)]);
+    assert_eq!(re::projection(r.get()), vec![(2,4)]);
 }
