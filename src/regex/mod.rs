@@ -43,11 +43,9 @@ impl fmt::Display for RegexF {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         fn is_long(s: &RegexF) -> bool {
             match s {
-              RegexF::Nil | RegexF::Dot | RegexF::CharClass(_) =>
-                  false,
-              RegexF::Range(a, _, _) =>
-                  is_long(a),
-              _ => true
+                RegexF::Nil | RegexF::Dot | RegexF::CharClass(_) => false,
+                RegexF::Range(a, _, _) => is_long(a),
+                _ => true,
             }
         }
 
@@ -203,15 +201,18 @@ impl RegexF {
             // Range & star index math
             (RegexF::Range(a, i, j), x) | (x, RegexF::Range(a, i, j))
                 if RegexF::partial_eq(&a, x) =>
-                RegexF::range(a, i + 1, j + 1),
-            (RegexF::Range(a, i1, j1), RegexF::Range(b, i2, j2))
-                if RegexF::partial_eq(a, b) =>
-                RegexF::range(a, i1 + i2, j1 + j2),
+            {
+                RegexF::range(a, i + 1, j + 1)
+            }
+            (RegexF::Range(a, i1, j1), RegexF::Range(b, i2, j2)) if RegexF::partial_eq(a, b) => {
+                RegexF::range(a, i1 + i2, j1 + j2)
+            }
             (RegexF::Star(x), RegexF::Star(y)) if RegexF::partial_le(x, y) => b.clone(),
             (RegexF::Star(x), RegexF::Star(y)) if RegexF::partial_le(y, x) => a.clone(),
             // And distributivity (not explosive): (a & b)c == (a.*) & bc
-            (RegexF::And(a, b), c) =>
-                RegexF::and(&RegexF::app(a, &RegexF::dotstar()), &RegexF::app(b, c)),
+            (RegexF::And(a, b), c) => {
+                RegexF::and(&RegexF::app(a, &RegexF::dotstar()), &RegexF::app(b, c))
+            }
             // Alt distributivity (explosive!): (a | b)c == ac | bc
             // (RegexF::Alt(a, b), c) =>
             //    RegexF::and(&RegexF::app(a, c), &RegexF::app(b, c)),
@@ -225,7 +226,7 @@ impl RegexF {
                 } else {
                     RegexF::app(x, l)
                 }
-            },
+            }
             (_, _) => RegexF::App(G.mk(a.clone()), G.mk(b.clone())),
         }
     }
@@ -374,10 +375,8 @@ impl RegexF {
             RegexF::Alt(ref a, ref b) => RegexF::alt(&a.deriv(c), &b.deriv(c)),
             RegexF::And(ref a, ref b) => RegexF::and(&a.deriv(c), &b.deriv(c)),
             RegexF::Star(ref a) => RegexF::app(&a.deriv(c), &RegexF::star(a)),
-            RegexF::Range(ref a, i, j) if i == j =>
-                a.repeat(*i).deriv(c),
-            RegexF::Range(ref a, i, j) =>
-                RegexF::alt(&a.range(*i+1, *j), &a.repeat(*i)).deriv(c),
+            RegexF::Range(ref a, i, j) if i == j => a.repeat(*i).deriv(c),
+            RegexF::Range(ref a, i, j) => RegexF::alt(&a.range(*i + 1, *j), &a.repeat(*i)).deriv(c),
         }
     }
 }
@@ -388,7 +387,6 @@ pub mod re {
     use crate::regex::{parser::RegexParser, Regex, RegexF};
     use crate::regex::{CharClass, G};
     use crate::safa::Skip;
-    use gmp_mpfr_sys::mpc::pow;
     use hashconsing::HashConsign;
     use std::array::TryFromSliceError;
     use std::collections::BTreeSet;
@@ -874,7 +872,7 @@ fn test_for_proj() {
 fn test_proj_cons() {
     let r = re::simpl(re::new(r"^.{3}.{4}$"));
     // LEF: Should be (7,8) no?
-    assert_eq!(projection(r.get()), vec![(7,8)]);
+    assert_eq!(projection(r.get()), vec![(7, 8)]);
 }
 
 #[test]
@@ -882,5 +880,5 @@ fn test_proj_alt() {
     let r = re::simpl(re::new(r"^(.{3})|(.{2})$"));
     println!("Intervals {:#?}", projection(r.get()));
     // LEF: Unsure what the answer should be, either [(2,3)] or [(3,4)] probably the union interval (2,4)?
-    assert_eq!(projection(r.get()), vec![(2,4)]);
+    assert_eq!(projection(r.get()), vec![(2, 4)]);
 }
