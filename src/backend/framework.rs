@@ -45,6 +45,7 @@ struct ProofInfo {
     commit: ReefCommitment<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
     doc_len: usize,
+    num_states: usize,
 }
 
 #[cfg(feature = "metrics")]
@@ -116,6 +117,7 @@ pub fn run_backend(
                 commit: reef_commit,
                 table: r1cs_converter.table.clone(),
                 doc_len: r1cs_converter.udoc.len(),
+                num_states: r1cs_converter.num_states,
             })
             .unwrap();
 
@@ -595,6 +597,7 @@ fn prove_and_verify(
         proof_info.pp,
         proof_info.commit,
         proof_info.table,
+        proof_info.num_states,
         proof_info.doc_len,
         ipi,
         ipa,
@@ -615,6 +618,7 @@ fn verify(
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     reef_commit: ReefCommitment<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
+    num_states: usize,
     doc_len: usize,
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
@@ -669,7 +673,8 @@ fn verify(
         Some(ipa),
     );
 
-    // TODO FINAL STATE CHECK!!! JESS
+    // final accepting
+    assert_eq!(zn[0], <G1 as Group>::Scalar::from(num_states as u64));
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Final Clear Checks");
