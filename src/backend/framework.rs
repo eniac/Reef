@@ -229,7 +229,6 @@ fn setup<'a>(
 
     let commit_blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
     let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
-    println!("SALT {:#?}", claim_blind);
 
     let current_state = r1cs_converter.safa.get_init().index();
 
@@ -266,7 +265,6 @@ fn solve<'a>(
 
     let commit_blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
     let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
-    println!("SALT {:#?}", claim_blind);
 
     let mut wits;
     let mut running_q: Option<Vec<Integer>> = None;
@@ -477,7 +475,6 @@ fn prove_and_verify(
     let cp_clone = circuit_primary.clone().unwrap();
     let pc = cp_clone.pc;
     let claim_blind = cp_clone.claim_blind;
-    println!("SALT {:#?}", claim_blind);
 
     while circuit_primary.is_some() {
         #[cfg(feature = "metrics")]
@@ -486,7 +483,6 @@ fn prove_and_verify(
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, &test, "prove step");
 
-        println!("PROVE STEP {:#?}", i);
         let result = RecursiveSNARK::prove_step(
             &proof_info.pp.lock().unwrap(),
             recursive_snark,
@@ -495,7 +491,6 @@ fn prove_and_verify(
             proof_info.z0_primary.clone(),
             z0_secondary.clone(),
         );
-        println!("prove step {:#?}", i);
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Prover, &test, "prove step");

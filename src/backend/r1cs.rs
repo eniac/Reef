@@ -91,8 +91,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }*/
         println!("BATCH {:#?}", sel_batch_size);
 
-        println!("batch_size {:#?}", sel_batch_size);
-
         //let mut batch_doc = doc.clone();
         let mut batch_doc_len = doc.len();
 
@@ -151,14 +149,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        //safa.write_pdf("safa1").unwrap();
+        safa.write_pdf("safa1").unwrap();
 
+        /*
         println!(
             "STATES {:#?}",
             safa.g
                 .node_indices()
                 .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-        );
+        );*/
 
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
@@ -231,7 +230,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                     // add table
                                     let in_state = all_state.index();
                                     let out_state = and_edges[i].target().index();
-                                    println!("AND OUT STATE {:#?}", out_state);
 
                                     let c = num_ab[&None]; //EPSILON
 
@@ -371,7 +369,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut table: Vec<Integer> = set_table.into_iter().collect();
 
-        println!("TABLE SET {:#?}", table.clone());
         // need to round out table size ?
         let base: usize = 2;
         let calc_fill = Integer::from(
@@ -398,7 +395,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             usize_doc.push(u);
             int_doc.push(Integer::from(u));
         }
-        println!("udoc {:#?}", usize_doc.clone());
 
         // EPSILON, STAR
         let ep_num = usize_doc.len();
@@ -410,8 +406,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let u = num_ab[&Some('*')];
         usize_doc.push(u);
         int_doc.push(Integer::from(u));
-
-        println!("TABLE {:#?}", table);
 
         let mut stack = vec![];
         for i in 0..max_stack {
@@ -457,8 +451,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         } else {
             unimplemented!();
         }
-
-        println!("{:#?} ACCEPTING? {:#?}", state, out);
 
         if out {
             1
@@ -669,8 +661,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 new_var(format!("stack_ptr_{}_{}", spb, spi)),
             ],
         );
-
-        println!("IF SP_{},{} == {} and kid {} not padding, then: update SP_{},{} <- SP_{},{} and STACK_{},{} <- STACK_{},{}", b, self.max_stack - 1, i, b, b+1, i, spb, spi, b+1, i, b, i);
 
         term(
             Op::Ite,
@@ -1396,8 +1386,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.stack_ptr -= 1;
         let mut popped_elt = self.stack[self.stack_ptr];
 
-        println!("POPPED PTR = {:#?}", self.stack_ptr);
-
         wits.insert(format!("cursor_{}", 0), new_wit(popped_elt.0));
         //wits.insert(format!("state_{}", self.batch_size), new_wit(popped_elt.1));
 
@@ -1428,8 +1416,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     self.stack_ptr
                 };
 
-                println!("CALC FOR UPDATE SP {}, {}", b, i);
-                println!("UPDATE PTR {:#?}", update_ptr);
                 wits.insert(
                     format!("stack_ptr_{}_{}", b, i), // updates sp_{+1} <- sp ( + 1)
                     new_wit(update_ptr),
@@ -1444,17 +1430,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         forall: Option<NodeIndex>,
         cur_cursor: usize,
     ) {
-        println!(
-            "PUSH WITS STACK: {:#?}, PTR: {:#?}, forall: {:#?}",
-            self.stack, self.stack_ptr, forall
-        );
-
         let mut forall_kids = match forall {
             Some(state) => self.foralls_w_kids[&state.index()][1..].to_vec(),
             None => vec![],
         };
 
-        println!("FORALL KIDS: {:#?}", forall_kids);
         let num_kids = forall_kids.len();
 
         let mut b = 0;
@@ -1462,8 +1442,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         b += 1;
 
         for kid in forall_kids.into_iter().rev() {
-            println!("KID {:#?}", kid);
-
             self.stack[self.stack_ptr] = (cur_cursor, kid);
             self.stack_set(wits, b, true);
             self.stack_ptr += 1;
@@ -1478,15 +1456,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             pad_kids.push(self.kid_padding);
         }
         for pad_kid in pad_kids {
-            println!("KID {:#?}", pad_kid);
-
             self.stack_set(wits, b, false);
 
             wits.insert(format!("forall_0_kid_{}", b - 1), new_wit(pad_kid));
             b += 1;
         }
-
-        println!("AFTER STACK {:#?}, PTR {:#?}", self.stack, self.stack_ptr);
     }
 
     // returns char_num, is_star
@@ -1584,10 +1558,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        println!(
+        /*println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );
+        );*/
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1670,10 +1644,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        println!(
+        /*println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );
+        );*/
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1736,8 +1710,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     i += 1;
                 }
             } else if sols[self.sol_num].is_empty() {
-                println!("TRANSITOIN");
-
                 // need to transition
                 char_num = self.num_ab[&None];
                 cursor_access.push(self.ep_num);
@@ -1784,7 +1756,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             } else {
                 // from solution
                 let te_peek = sols[self.sol_num].front().unwrap();
-                println!("TE PEEK {:#?}", te_peek);
 
                 // handle stack pushes during forall
                 if self.safa.g[te_peek.from_node].is_and() {
@@ -1854,7 +1825,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                     state_i = te.from_node.index();
                     next_state = te.to_node.index();
-                    println!("NEXT STATE IS {:#?}", next_state);
                     offset_i = te.to_cur - te.from_cur;
 
                     cursor_i += offset_i;
@@ -1894,7 +1864,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             state_i = next_state;
         }
 
-        println!("DONE LOOP");
+        //println!("DONE LOOP");
 
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
@@ -1905,8 +1875,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         assert!(running_q.is_some() || batch_num == 0);
         assert!(running_v.is_some() || batch_num == 0);
 
-        println!("Q,V = {:#?}, {:#?}", q, v);
-        println!("TABLE = {:#?}", self.table.clone());
         assert_eq!(v.len(), self.batch_size);
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
@@ -1922,8 +1890,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             cursor_access,
         );
         wits = w;
-        println!("SELF STACK PTR {:#?}", self.stack_ptr);
-        println!("WITS {:#?}", wits);
 
         (
             wits,
@@ -1953,8 +1919,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             v.push(self.idoc[access_at].clone());
         }
 
-        println!("DOC NLOOKUP Q V {:#?}, {:#?}", q, v);
-
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
         wits = w;
@@ -1978,9 +1942,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // running claim about T (optimization)
         // if first (not yet generated)
-        println!("prev running q,v {:#?}, {:#?}", running_q, running_v);
-        println!("table again {:#?}", table);
-
         let prev_running_q = match running_q {
             Some(q) => q,
             None => vec![Integer::from(0); sc_l],
@@ -1989,10 +1950,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             Some(v) => v,
             None => table[0].clone(),
         };
-        println!(
-            "prev running q,v {:#?}, {:#?}",
-            prev_running_q, prev_running_v
-        );
 
         wits.insert(
             format!("{}_prev_running_claim", id),
@@ -2003,8 +1960,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // q processing
         let mut combined_qs = vec![];
         let num_cqs = ((num_vs * sc_l) as f64 / 254.0).ceil() as usize;
-
-        //println!("num cqs {:#?}", num_cqs);
 
         let mut cq = 0;
         while cq < num_cqs {
@@ -2104,13 +2059,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         //let query_f: Vec<G1::Scalar> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
         SpongeAPI::absorb(&mut sponge, query.len() as u32, &query, acc);
-        println!("CLAIM INPUTS QUERY {:#?}", query);
-        // TODO - what needs to be public?
 
         // generate claim r
         let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
         let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
-        println!("CLAIM R {:#?}", claim_r.clone());
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
         let mut rs = vec![claim_r.clone()];
@@ -2171,7 +2123,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // last claim = g_v(r_v)
         let mut last_claim = g_xsq * &sc_r * &sc_r + g_x * &sc_r + g_const;
         last_claim = last_claim.rem_floor(cfg().field().modulus());
-        println!("LAST CLAIM {:#?}", last_claim);
         wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
 
         // update running claim
@@ -2183,7 +2134,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             None,
         );
         let next_running_q = sc_rs.clone();
-        println!("next running v {:#?}", next_running_v);
         wits.insert(
             format!("{}_next_running_claim", id),
             new_wit(next_running_v.clone()),
@@ -2423,17 +2373,13 @@ mod tests {
         let mut doc_idx = 0;
 
         let (pd, _vd) = r1cs_converter.to_circuit();
-        // println!("PD {:#?}", pd);
 
         let mut values;
         let mut next_state = 0;
 
         let trace = safa.solve(&chars);
-        //println!("TRACE {:#?}", trace);
 
         let mut sols = trace_preprocessing(&trace, &safa);
-
-        println!("SOLS {:#?}", sols);
 
         let mut i = 0;
         while r1cs_converter.sol_num < sols.len() {

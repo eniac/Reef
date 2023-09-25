@@ -178,7 +178,7 @@ pub fn normal_add_table<'a>(
     // this could probably be more efficient tho
     while let Some(state) = dfs_small.next(&safa.g) {
         let in_state = state.index();
-        println!("SMALL DFA STATE {:#?}", state);
+        //println!("SMALL DFA STATE {:#?}", state);
 
         if !final_exists_pass || !safa.g[state].is_and() {
             for edge in safa.g.edges(state) {
@@ -248,7 +248,6 @@ pub fn normal_add_table<'a>(
                             if rel > sub_max_rel {
                                 sub_max_rel = rel;
                             }
-                            println!("STAR EDGE {:#?} -{:#?}-> {:#?}", in_state, c, out_state);
                             set_table.insert(
                                 Integer::from(
                                     (rel * num_states
@@ -381,11 +380,11 @@ pub fn normal_add_table<'a>(
 
                 // TODO we have to make sure the multipliers are big enough
 
-                println!("ADDITIONAL FOR ACCEPTING");
+                /*println!("ADDITIONAL FOR ACCEPTING");
                 println!(
                     "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
                     in_state, out_state, c, lower_offset, upper_offset, rel,
-                );
+                );*/
 
                 set_table.insert(
                     Integer::from(
@@ -420,7 +419,6 @@ pub(crate) fn calc_rel<'a>(
     // >3 = in_state is forall, out_state is the "first branch"
     // 3 = in_state is forall, out_state is a "pop branch"
 
-    println!("IN STATE {:#?}", in_state);
     let mut rel = 0;
 
     if trans {
@@ -434,22 +432,13 @@ pub(crate) fn calc_rel<'a>(
         if children[0] == out_state {
             // push only for the "first branch"
 
-            println!("SPECIAL AND IN {:#?}, OUT {:#?}", in_state, out_state);
-            println!("CHILDREN {:#?}", children);
-
             rel = 4;
             for k in 1..children.len() {
-                println!("IN HASH {:#?}", children[k]);
                 rel += children[k] * num_states; //TODO
             }
             for k in 0..(max_branches - children.len() + 1) {
                 rel += kid_padding * num_states;
             }
-
-            println!(
-                "HASH for {:#?} -> {:#?} is rel={:#?}",
-                in_state, out_state, rel
-            );
         } else {
             // others are pops
             rel = 3;
