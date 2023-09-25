@@ -2526,8 +2526,8 @@ mod tests {
     fn naive_test() {
         init();
         test_func_no_hash(
-            "abcd".to_string(),
-            "^(?=a)ab(?=c)cd$".to_string(),
+            "abcd!".to_string(),
+            "^(?=a)ab(?=c)cd!$".to_string(),
             "abcd".to_string(),
             vec![1], // 2],
             true,
