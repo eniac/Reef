@@ -1,67 +1,21 @@
-./target/release/reef --input "B6u$r@s#R5mE" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "!73!v3JAhZP%" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "ZH&74d5#AqJ7" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "z8Ffa3%*#3Cc" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "^v56yWMW9U@$" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "MaJ@*n%!vx24" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "#5trXrNR$66x" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "YF75ZFh*^ts%" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "JWvm@q56j!9c" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "fpVz4W#$VB7%" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "@7uBv#qXP35A" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "^bU52UUzo!xJ" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "3^kh&L4mN6kc" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "bi5pz$U7nR^K" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "UoA3uEM%A@B5" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "273&kmC8m^^C" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "#%B44wdiAg&3" --output ./tests/results/good_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "q1w2e3r4" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "12341234" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "mar20lt" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "1qaz2wsx" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "qwerty" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "1234561" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "robert" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "jasmine" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "333333" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "101010" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "michelle" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "777777" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "vip" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "pepper" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "pokemon" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "jordan" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "823477aA" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input  "zxcvbnm" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "999999" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "7777777" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "love" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "D1lakiss" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "daniel" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "qazwsx" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "william" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "batman" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "1111" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "3601" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "jordan23" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "family" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "11111111" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "123123123" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "cheese" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "123qwe" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "freedom" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "matthew" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "mustang" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "azerty" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "password1" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "qwertyuiop" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "hello" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "232323" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input ./tests/docs/pass_test_bad --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "987654" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "usr" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "charlie" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "1234" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "iloveyou" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "samantha" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
-./target/release/reef --input "unknown" --output ./tests/results/bad_pass.txt -r "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
+./target/release/reef --input "B6u$r@s#R5mE" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "!73!v3JAhZP%" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "ZH&74d5#AqJ7" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "z8Ffa3%*#3Cc" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "^v56yWMW9U@$" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "MaJ@*n%!vx24" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "#5trXrNR$66x" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "YF75ZFh*^ts%" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "JWvm@q56j!9c" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "fpVz4W#$VB7%" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "q1w2e3r4" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "12341234" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "qwerty" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "1234561" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "vip" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "jordan23" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "family" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "11111111" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "123qwe" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "freedom" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
+./target/release/reef --input "password1" --output ./tests/results/bad_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
