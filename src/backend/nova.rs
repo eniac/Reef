@@ -171,7 +171,6 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         alloc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
     ) -> Result<bool, SynthesisError> {
         if s.starts_with(&format!("nl_prev_running_claim")) {
-            println!("NL PREV RUNNING CLAIM {:#?}", s);
             // not for doc v
             vars.insert(var, prev_v.get_variable());
 
@@ -252,7 +251,6 @@ where {
 
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
-            //println!("ISSUE {:#?}", s);
             alloc_vs[j] = v_j; // TODO check
 
             return Ok(true);

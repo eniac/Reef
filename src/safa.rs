@@ -361,20 +361,22 @@ impl SAFA<char> {
                 .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
                 .collect();
 
-            subsolutions.sort_by(|a, b| {
-                a.clone()
-                    .unwrap()
-                    .0
-                    .front()
-                    .unwrap()
-                    .to_node
-                    .index()
-                    .partial_cmp(&b.clone().unwrap().0.front().unwrap().to_node.index())
-                    .unwrap()
-            });
+            println!("subsolutions {:#?}", subsolutions);
 
             // All of them need to be set
             if subsolutions.iter().all(Option::is_some) {
+                subsolutions.sort_by(|a, b| {
+                    a.clone()
+                        .unwrap()
+                        .0
+                        .front()
+                        .unwrap()
+                        .to_node
+                        .index()
+                        .partial_cmp(&b.clone().unwrap().0.front().unwrap().to_node.index())
+                        .unwrap()
+                });
+
                 Some(Trace(
                     subsolutions
                         .into_iter()
