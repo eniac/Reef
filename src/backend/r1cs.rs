@@ -58,6 +58,8 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub stack_ptr: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
     pub doc_rc_v: Option<Integer>,
+    // proj
+    doc_subset: Option<(usize, usize)>,
 }
 
 fn type_of<T>(_: &T) {
@@ -69,6 +71,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         safa: &'a SAFA<char>,
         doc: &Vec<char>,
         batch_size: usize,
+        doc_subset: Option<(usize, usize)>,
         pcs: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
         //let nfa_match = nfa.is_match(doc);
@@ -323,6 +326,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // proceed from the beginning and add states until we reach a forall
         let mut exists_start = Dfs::new(&safa.g, safa.get_init());
 
+        // TODO we probably don't need a whole ass loop here
         while let Some(exists_state) = exists_start.next(&safa.g) {
             if safa.g[exists_state].is_and() {
                 break;
@@ -439,6 +443,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             stack_ptr: 0,
             pc: pcs,
             doc_rc_v: Some(Integer::from(1)), // Convert back to none later
+            doc_subset,
         }
     }
 
@@ -1331,6 +1336,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             char_lookups.push(new_var(format!("char_{}", c)));
         }
 
+        let len = if self.doc_subset.is_some() {
+            let ds = self.doc_subset.unwrap();
+            ds.1 - ds.0
+        } else {
+            self.udoc.len()
+        };
         self.nlookup_gadget(char_lookups, self.udoc.len(), "nldoc");
     }
 
@@ -1925,8 +1936,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             v.push(self.idoc[access_at].clone());
         }
 
+        //let subset = self.idoc[ds.0..ds.1].to_vec();
+        let doc = if self.doc_subset.is_some() {
+            let ds = self.doc_subset.unwrap();
+            &self.idoc[ds.0..ds.1]
+        } else {
+            &self.idoc
+        };
+
         let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
+            self.wit_nlookup_gadget(wits, doc, q, v, running_q, running_v, "nldoc");
         wits = w;
 
         (wits, next_running_q, next_running_v)
@@ -1935,7 +1954,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     fn wit_nlookup_gadget(
         &self,
         mut wits: FxHashMap<String, Value>,
-        table: &Vec<Integer>,
+        table: &[Integer],
         q: Vec<usize>,
         v: Vec<Integer>,
         running_q: Option<Vec<Integer>>,
@@ -2079,12 +2098,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut eq_table =
             gen_eq_table(&rs, &q, &prev_running_q.clone().into_iter().rev().collect());
         let mut sc_table = match id {
-            "nl" => table.clone(),
+            "nl" => table.to_vec(),
             "nldoc" => {
                 let base: usize = 2;
                 let len = base.pow(logmn(table.len()) as u32) - table.len();
 
-                let mut sct = table.clone();
+                let mut sct = table.to_vec();
                 sct.extend(vec![Integer::from(0); len]); // ep num = self.nfa.nchars()
                 sct
             }
@@ -2358,6 +2377,7 @@ mod tests {
         doc: String,
         batch_sizes: Vec<usize>,
         expected_match: bool,
+        proj: Option<(usize, usize)>,
     ) {
         let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
@@ -2365,7 +2385,7 @@ mod tests {
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-        let mut r1cs_converter = R1CS::new(&safa, &chars, 0, sc.clone());
+        let mut r1cs_converter = R1CS::new(&safa, &chars, 0, proj, sc.clone());
 
         let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
         r1cs_converter.reef_commit = Some(reef_commit.clone());
@@ -2489,6 +2509,7 @@ mod tests {
             "abcd".to_string(),
             vec![1], // 2],
             true,
+            None,
         );
     }
 
@@ -2501,6 +2522,7 @@ mod tests {
             "abcd".to_string(),
             vec![1], // 2],
             true,
+            None,
         );
     }
 
@@ -2513,6 +2535,7 @@ mod tests {
             "ab".to_string(),
             vec![0, 1],
             true,
+            None,
         );
         /*    test_func_no_hash(
             "abc".to_string(),
@@ -2539,6 +2562,7 @@ mod tests {
             "aaab".to_string(),
             vec![1],
             true,
+            None,
         );
         test_func_no_hash(
             "ab".to_string(),
@@ -2546,6 +2570,7 @@ mod tests {
             "aaaaaabbbbbbbbbbbbbb".to_string(),
             vec![0, 1, 2, 4],
             true,
+            None,
         );
         test_func_no_hash(
             "ab".to_string(),
@@ -2553,6 +2578,7 @@ mod tests {
             "aaaaaaaaaaab".to_string(),
             vec![1, 2, 4],
             true,
+            None,
         );
     }
 
@@ -2566,6 +2592,7 @@ mod tests {
             "c".to_string(),
             vec![1],
             false,
+            None,
         );
     }
 
@@ -2583,19 +2610,6 @@ mod tests {
     }*/
 
     #[test]
-    #[should_panic]
-    fn nfa_bad_substring_2() {
-        init();
-        test_func_no_hash(
-            "helowrd".to_string(),
-            "^hello".to_string(),
-            "helloworld".to_string(),
-            vec![1],
-            true,
-        );
-    }
-
-    #[test]
     fn nfa_ok_substring() {
         init();
         test_func_no_hash(
@@ -2604,6 +2618,7 @@ mod tests {
             "helloworld".to_string(),
             vec![1],
             true,
+            None,
         );
         /*
               test_func_no_hash(
@@ -2625,6 +2640,7 @@ mod tests {
             "helloworld".to_string(),
             vec![3, 4, 6, 7],
             true,
+            None,
         );
 
         /*    test_func_no_hash(
@@ -2646,6 +2662,7 @@ mod tests {
             "gaaaaaabbbbbbccccccddddddeeeeeef".to_string(),
             vec![33],
             true,
+            None,
         );
 
         test_func_no_hash(
@@ -2654,6 +2671,7 @@ mod tests {
             "gaaaaaabbbbbbccccccddddddeeeeeef".to_string(),
             vec![33],
             true,
+            None,
         );
     }
 
@@ -2668,77 +2686,7 @@ mod tests {
             fs::read_to_string("gov_text.txt").unwrap(),
             vec![1],
             true,
+            None,
         );
     }
-
-    /*
-    fn test_func_no_hash_kstride(
-        ab: String,
-        rstr: String,
-        doc: String,
-        batch_sizes: Vec<usize>,
-        k: usize,
-    ) {
-        let r = re::new(&rstr);
-        let mut safa = SAFA::new(&ab[..], r);
-        let mut d = doc.chars().map(|c| c.to_string()).collect();
-        d = nfa.k_stride(k, &d);
-        let nfa_match = nfa.is_match(&d);
-        // println!(
-        //     "DFA Size: {:#?}, |doc| : {}, |ab| : {}, match: {:?}",
-        //     nfa.nedges(),
-        //     d.len(),
-        //     nfa.ab.len(),
-        //     nfa_match
-        // );
-
-        //let chars: Vec<String> = d.clone();
-        //.chars().map(|c| c.to_string()).collect();
-
-        for s in batch_sizes {
-            for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
-                for c in vec![JCommit::HashChain, JCommit::Nlookup] {
-                    println!("Batching {:#?}", b.clone());
-                    println!("Commit {:#?}", c);
-                    println!("K {:#?}", k);
-                    println!(
-                        "cost model: {:#?}",
-                        costs::full_round_cost_model(&nfa, s, b.clone(), nfa_match, d.len(), c,)
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn k_stride2() {
-        init();
-        let preamble: String = "ffffabcdffffabcd".to_string();
-        let ab = "abcdef".to_string();
-        for i in 0..9 {
-            test_func_no_hash_kstride(
-                ab.clone(),
-                "^hello.*$".to_string(),
-                preamble.clone(),
-                vec![1],
-                i,
-            );
-        }
-    }
-
-    #[test]
-    fn k_stride() {
-        init();
-        let preamble: String = "we the people in order to form a more perfect union, establish justic ensure domestic tranquility, provide for the common defense, promote the general welfare and procure the blessings of liberty to ourselves and our posterity do ordain and establish this ".to_string();
-        let ab = " ,abcdefghijlmnopqrstuvwy".to_string();
-        for i in 0..9 {
-            test_func_no_hash_kstride(
-                ab.clone(),
-                "^.*order.to.*$".to_string(),
-                preamble.clone(),
-                vec![1],
-                i,
-            );
-        }
-    }*/
 }

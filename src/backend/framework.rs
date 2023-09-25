@@ -56,6 +56,7 @@ pub fn run_backend(
     safa: SAFA<char>,
     doc: Vec<char>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
+    projections: bool,
 ) {
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
@@ -79,7 +80,8 @@ pub fn run_backend(
             "R1CS",
             "Optimization Selection, R1CS precomputations",
         );
-        let mut r1cs_converter = R1CS::new(&safa, &doc, temp_batch_size, sc.clone());
+        // TODO feed in proj data here
+        let mut r1cs_converter = R1CS::new(&safa, &doc, temp_batch_size, None, sc.clone());
         #[cfg(feature = "metrics")]
         log::stop(
             Component::Compiler,
@@ -688,7 +690,7 @@ mod tests {
         let safa = SAFA::new(&ab[..], &r);
 
         init();
-        run_backend(safa.clone(), doc.clone(), batch_size);
+        run_backend(safa.clone(), doc.clone(), batch_size, false);
     }
 
     #[test]

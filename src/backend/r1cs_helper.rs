@@ -553,7 +553,7 @@ pub(crate) fn gen_eq_table(
 // O(mn log mn) :) - or was once upon a time, i'll update this later
 // x = eval_at, prods = coeffs of table/eq(), e's = e/q's
 pub(crate) fn prover_mle_partial_eval(
-    prods: &Vec<Integer>,
+    prods: &[Integer],
     x: &Vec<Integer>,
     es: &Vec<usize>,
     for_t: bool,
@@ -641,7 +641,7 @@ pub(crate) fn prover_mle_partial_eval(
 }
 
 // external full "partial" eval for table check
-pub fn verifier_mle_eval(table: &Vec<Integer>, q: &Vec<Integer>) -> Integer {
+pub fn verifier_mle_eval(table: &[Integer], q: &Vec<Integer>) -> Integer {
     let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
 
     con
