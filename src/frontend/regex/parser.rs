@@ -1,7 +1,7 @@
 use fancy_regex::{Expr, LookAround};
 use hashconsing::HashConsign;
 use regex_syntax::hir::{Class, HirKind, Literal};
-use crate::regex::{RegexF, Regex, re, G};
+use crate::frontend::regex::{RegexF, Regex, re, G};
 
 pub struct RegexParser();
 impl RegexParser {
@@ -112,6 +112,17 @@ impl RegexParser {
             _ => Err(format!("Unsupported regex (fancy_regex) {:#?}", e)),
         }
     }
+}
 
+#[test]
+fn test_regex_parser1 () {
+    let r = re::simpl(RegexParser::parse("^a$"));
+    assert_eq!(r, re::character('a'));
+}
+
+#[test]
+fn test_regex_parser2 () {
+    let r = re::simpl(RegexParser::parse("^a*$"));
+    assert_eq!(r, re::star(re::character('a')));
 }
 

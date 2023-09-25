@@ -1,5 +1,5 @@
 use crate::backend::nova::int_to_ff;
-use crate::safa::{Either, Skip, SAFA};
+use crate::frontend::safa::{Either, Skip, SAFA};
 use crate::trace::{Trace, TraceElem};
 use circ::cfg;
 use circ::cfg::*;

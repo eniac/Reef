@@ -9,7 +9,7 @@ type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
 use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
-use crate::safa::SAFA;
+use crate::frontend::safa::SAFA;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::{self, ProverData};
 use ff::Field;
@@ -680,8 +680,8 @@ mod tests {
 
     use crate::backend::framework::*;
     use crate::backend::r1cs_helper::init;
-    use crate::regex::{re, Regex};
-    use crate::safa::SAFA;
+    use crate::frontend::regex::{re, Regex};
+    use crate::frontend::safa::SAFA;
 
     fn backend_test(ab: String, rstr: String, doc: Vec<char>, batch_size: usize) {
         let r = re::new(&rstr);

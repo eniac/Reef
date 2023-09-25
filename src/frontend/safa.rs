@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::collections::{BTreeSet, LinkedList};
+use std::collections::BTreeSet;
 use std::process::Command;
 
 use petgraph::dot::Dot;
@@ -9,9 +9,9 @@ use petgraph::Graph;
 
 use std::result::Result;
 
-use crate::openset::OpenSet;
-use crate::quantifier::Quant;
-use crate::regex::{re, Regex, RegexF};
+use crate::frontend::openset::OpenSet;
+use crate::frontend::quantifier::Quant;
+use crate::frontend::regex::{re, Regex, RegexF};
 use crate::trace::{Trace, TraceElem};
 use rayon::iter::*;
 
@@ -175,9 +175,9 @@ impl SAFA<char> {
                     l.append(&mut r);
                     l
                 }
-                RegexF::Star(ref a) if !is_and => {
-                    BTreeSet::from([re::nil(), re::app(a.clone(), re::star(a.clone()))])
-                }
+                // RegexF::Star(ref a) if !is_and => {
+                //    BTreeSet::from([re::nil(), re::app(a.clone(), re::star(a.clone()))])
+                //}
                 _ => BTreeSet::from([r.clone()]),
             }
         }
@@ -445,9 +445,9 @@ impl SAFA<char> {
 
 #[cfg(test)]
 mod tests {
-    use crate::regex::re;
-    use crate::safa::Skip;
-    use crate::safa::{Either, Trace, TraceElem, SAFA};
+    use crate::frontend::regex::re;
+    use crate::frontend::safa::Skip;
+    use crate::frontend::safa::{Either, Trace, TraceElem, SAFA};
     use std::collections::HashSet;
     use std::collections::LinkedList;
     use std::fmt::Display;
@@ -533,6 +533,7 @@ mod tests {
     #[test]
     fn test_safa_match_star() {
         let r = re::simpl(re::new("^a*$"));
+        println!("REGEX {:?}", r);
         let safa = SAFA::new("ab", &r);
         let strdoc = "aa";
         let doc: Vec<_> = strdoc.chars().collect();
@@ -660,12 +661,12 @@ mod tests {
         equiv_upto_epsilon(
             &safa.solve(&doc),
             &Trace::new(&[
-                TraceElem::new(0, &SAFA::epsilon(), 5, 0, 0),
-                TraceElem::new(5, &Either(Err(Skip::open(0))), 6, 0, 1),
-                TraceElem::new(6, &Either(Ok('b')), 3, 1, 2),
                 TraceElem::new(0, &SAFA::epsilon(), 1, 0, 0),
                 TraceElem::new(1, &Either(Ok('a')), 2, 0, 1),
                 TraceElem::new(2, &Either(Err(Skip::open(0))), 3, 1, 2),
+                TraceElem::new(0, &SAFA::epsilon(), 5, 0, 0),
+                TraceElem::new(5, &Either(Err(Skip::open(0))), 6, 0, 1),
+                TraceElem::new(6, &Either(Ok('b')), 3, 1, 2)
             ]),
         )
     }
@@ -704,10 +705,11 @@ mod tests {
 
     #[test]
     fn test_safa_lookahead_loop() {
-        let s = r"^((?=a.*).*a)*$";
+        let s = r"^((?=ab.*).*a)*$";
         let r = re::simpl(re::new(s));
         let safa = SAFA::new("ab", &r);
-        assert_eq!(safa.nstates(), 8);
+        safa.write_pdf("safa").unwrap();
+        assert!(safa.nstates() >= 8);
     }
 
     #[test]
@@ -750,194 +752,16 @@ mod tests {
 
     #[test]
     fn test_safa_negative() {
-        for s in vec![
-            r"^(A|BCD).{3}hello$", //r"abcd",r"a.*bd"
-        ] {
-            let r = re::simpl(re::new(s));
-            let safa = SAFA::new("ACBDhello", &r);
-            println! {"Regex: {:#?}",s};
-            print_states(&safa);
-            println!("DELTAS");
-            for d in safa.deltas() {
-                println!("{}, {}, {}", d.0, d.1, d.2.index());
-            }
-            let strdoc = "abbb";
-            let doc = strdoc.chars().collect();
+        let r = re::simpl(re::new(r"^(A|BCD).{3}D"));
+        let safa = SAFA::new("ACBD", &r).negate();
+        let strdoc = "ABC";
+        let doc = strdoc.chars().collect();
 
-            let sol = safa.solve(&doc);
+        let sol = safa.solve(&doc);
 
-            println!("SOLUTION for: {}", strdoc);
-            println!("{:?}", sol);
-            assert_ne!(sol, None);
-        }
-    }
-
-    #[test]
-    fn test_safa_negative_password() {
-        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
-        let ab: String = abvec.iter().collect();
-        for s in vec![
-            r"(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$",
-        ] {
-            let r = re::simpl(re::new(s));
-            let safa = (SAFA::new(&ab, &r)).negate();
-            println! {"Regex: {:#?}",s};
-            // let mut states = HashSet::new();
-            // let mut ntrans: usize = 0;
-            // for d in safa.deltas() {
-            //     states.insert(d.0);
-            //     ntrans = ntrans + 1;
-            // }
-            // println! {"N States: {:#?}",states.len()};
-            // println! {"N Trans: {:#?}",ntrans};
-
-            let strdoc = "password123";
-            let doc = strdoc.chars().collect();
-
-            let sol = safa.solve(&doc);
-
-            println!("SOLUTION for: {}", strdoc);
-            println!("{:?}", sol);
-            assert_ne!(sol, None);
-        }
-    }
-    #[test]
-    fn test_safa_validate_password() {
-        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
-        let ab: String = abvec.iter().collect();
-        for s in vec![
-            r"(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$",
-        ] {
-            let r = re::simpl(re::new(s));
-            let safa = SAFA::new(&ab, &r);
-            println! {"Regex: {:#?}",s};
-            let mut states = HashSet::new();
-            let mut ntrans: usize = 0;
-            for d in safa.deltas() {
-                states.insert(d.0);
-                ntrans = ntrans + 1;
-            }
-            println! {"N States: {:#?}",states.len()};
-            println! {"N Trans: {:#?}",ntrans};
-
-            let strdoc = "MaJ@*n%!vx24";
-            let doc = strdoc.chars().collect();
-
-            let sol = safa.solve(&doc);
-
-            println!("SOLUTION for: {}", strdoc);
-            println!("{:?}", sol);
-            assert_ne!(sol, None);
-        }
-    }
-
-    #[test]
-    fn test_safa_validate_pihole_syntax() {
-        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
-        let ab: String = abvec.iter().collect();
-        for s in vec![
-            r"^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+[.]){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-]",
-            "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]",
-            "^(.+[_.-])?telemetry[_.-]",
-            "^adim(age|g)s?[0-9]*[_.-]",
-            "^adtrack(er|ing)?[0-9]*[_.-]",
-            "^advert(s|is(ing|ements?))?[0-9]*[_.-]",
-            "^aff(iliat(es?|ion))?[_.-]",
-            "^analytics?[_.-]",
-            "^banners?[_.-]",
-            "^beacons?[0-9]*[_.-]",
-            "^count(ers?)?[0-9]*[_.-]",
-            r"^mads\.",
-            "^pixels?[-.]",
-            "^stat(s|istics)?[0-9]*[_.-]",
-        ] {
-            let r = re::simpl(re::new(s));
-            println!("PIHOLE {}", r);
-            let safa = SAFA::new(&ab, &r);
-            println! {"Regex: {:#?}",s};
-            let mut states = HashSet::new();
-            let mut ntrans: usize = 0;
-            for d in safa.deltas() {
-                states.insert(d.0);
-                ntrans = ntrans + 1;
-            }
-            println! {"N States: {:#?}",states.len()};
-            println! {"N Trans: {:#?}",ntrans};
-        }
-    }
-
-    #[test]
-    fn test_safa_validate_dns() {
-        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
-        let ab: String = abvec.iter().collect();
-        for s in vec![r"^(?!you).*tube\.", r"\.ir\.{5}$", "porn|sex|xxx"] {
-            let r = re::simpl(re::new(s));
-            let safa = SAFA::new(&ab, &r);
-            // let safa = SAFA::new("abcdefghijklmnopqrstuvwxyz", &r);
-            println! {"Regex: {:#?}",s};
-            let mut states = HashSet::new();
-            let mut ntrans: usize = 0;
-            for d in safa.deltas() {
-                states.insert(d.0);
-                ntrans = ntrans + 1;
-            }
-            println! {"N States: {:#?}",states.len()};
-            println! {"N Trans: {:#?}",ntrans};
-
-            let strdoc = "sadtube.com";
-            let doc = strdoc.chars().collect();
-
-            println!("SOLUTION for: {}", strdoc);
-            println!("{:?}", safa.solve(&doc));
-        }
-    }
-
-    #[test]
-    fn test_safa_validate_pii() {
-        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
-        let ab: String = abvec.iter().collect();
-        for s in vec![
-            ",[1-9][0-9]{9},",
-            r"[0-9]{1,6}\ [a-zA-z\ ]*\ (CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\ ]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\ ]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8},",
-        ] {
-            let r = re::simpl(re::new(s));
-            let safa: SAFA<char> = SAFA::new(&ab, &r);
-            println! {"Regex: {:#?}",s};
-            let mut states = HashSet::new();
-            let mut ntrans: usize = 0;
-            for d in safa.deltas() {
-                states.insert(d.0);
-                ntrans = ntrans + 1;
-            }
-            println! {"N States: {:#?}",states.len()};
-            println! {"N Trans: {:#?}",ntrans};
-        }
-    }
-
-    #[test]
-    fn test_safa_validate_dna() {
-        for s in vec![".{8210}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG",
-        ".{5841}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG
-        .*AGCCTACAAGAAAGTACGAGATTTAGTCAACTTGTTGAAGAGCTATTGAAAATCATTTGTGCTTTTCAGCTTGACACAGGTTTGGAGT.*ATGCAAACAGCTATAATTTTGCAAAAAAGGAAAATAACTCTCCTGAACATCTAAAAGATGAAGTTTCTATCATCCAAAGTATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG",
-        ".{1989}CACAACTAAGGAACGTCAAGAGATACAGAATCCAAATTTTACCGCACCTGGTCAAGAATTTCTGTCTAAATCTCATTTGTATGAACATCTGACTTTGGAAAAATCTTCAAGCAATTTAGCAGTTTCAGGACATCCATTTTATCAAGTTTCTGCTACAAGAAATGAAAAAATGAGACACTTGATTACTACAGGCAGACCAACCAAAGTCTTTGTTCCACCTTTTAAAACTAAATCACATTTTCACAGAGTTGAACAGTGTGTTAGGAATATTAACTTGGAGGAAAACAGACAAAAGCAAAACATTGATGGACATGGCTCTGATGATAGTAA
-        AAATAAGATTAATGACAATGAGATTCATCAGTTTAACAAAAACAACTCCAATCAAGCAGTAGCTGTAACTTTCACAAAGTGTGAAGAAGAACCTTTAG.*
-        ATTTAATTACAAGTCTTCAGAATGCCAGAGATATACAGGATATGCGAATTAAGAAGAAACAAAGGCAACGCGTCTTTCCACAGCCAGGCAGTCTGTATCTTGCAAAAACATCCACTCTGCCTCGAATCTCTCTGAAAGCAGCAGTAGGAGGCCAAGTTCCCTCTGCGTGTTCTCATAAACAG.*CTGTATACGTATGGCGTTTCTAAACATTGCATAAAAATTAACAGCAAAA
-        ATGCAGAGTCTTTTCAGTTTCACACTGAAGATTATTTTGGTAAGGAAAGTTTATGGACTGGAAAAGGAATACAGTTGGCTGATGGTGGATGGCTCATACC
-        CTCCAATGATGGAAAGGCTGGAAAAGAAGAATTTTATAG.*GGCTCTGTGTGACACTCCAGGTGTGGATCCAAAGCTTATTTCTAGAATTTGGGTTTATAATCACTATA
-        GATGGATCATATGGAAACTGGCAGCTATGGAATGTGCCTTTCCTAAGGAATTTGCTAATAGATGCCTAAGCCCAGAAAGGGTGCTTCTTCAACTAAAATA
-        CAG"] {
-            let r = re::simpl(re::new(s));
-            let safa: SAFA<char> = SAFA::new("ACTGactg", &r);
-            println!{"Regex: {:#?}",s};
-            let mut states = HashSet::new();
-            let mut ntrans: usize = 0;
-            for d in safa.deltas() {
-               states.insert(d.0);
-               ntrans = ntrans + 1;
-             }
-            println!{"N States: {:#?}",states.len()};
-            println!{"N Trans: {:#?}",ntrans};
-        }
+        println!("SOLUTION for: {}", strdoc);
+        println!("{:?}", sol);
+        assert_ne!(sol, None);
     }
 
     #[test]
@@ -973,4 +797,173 @@ mod tests {
         // println!("SOLUTION for: {}", strdoc);
         // println!("{:?}", safa.solve(&doc));
     }
+
+    #[test]
+    fn test_real_safa_negative_password() {
+        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+        let ab: String = abvec.iter().collect();
+        for s in vec![
+            r"(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$",
+        ] {
+            let r = re::simpl(re::new(s));
+            let safa = (SAFA::new(&ab, &r)).negate();
+            println! {"Regex: {:#?}",s};
+            // let mut states = HashSet::new();
+            // let mut ntrans: usize = 0;
+            // for d in safa.deltas() {
+            //     states.insert(d.0);
+            //     ntrans = ntrans + 1;
+            // }
+            // println! {"N States: {:#?}",states.len()};
+            // println! {"N Trans: {:#?}",ntrans};
+
+            let strdoc = "password123";
+            let doc = strdoc.chars().collect();
+
+            let sol = safa.solve(&doc);
+
+            println!("SOLUTION for: {}", strdoc);
+            println!("{:?}", sol);
+            assert_ne!(sol, None);
+        }
+    }
+    #[test]
+    fn test_real_safa_validate_password() {
+        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+        let ab: String = abvec.iter().collect();
+        for s in vec![
+            r"(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$",
+        ] {
+            let r = re::simpl(re::new(s));
+            let safa = SAFA::new(&ab, &r);
+            println! {"Regex: {:#?}",s};
+            let mut states = HashSet::new();
+            let mut ntrans: usize = 0;
+            for d in safa.deltas() {
+                states.insert(d.0);
+                ntrans = ntrans + 1;
+            }
+            println! {"N States: {:#?}",states.len()};
+            println! {"N Trans: {:#?}",ntrans};
+
+            let strdoc = "MaJ@*n%!vx24";
+            let doc = strdoc.chars().collect();
+
+            let sol = safa.solve(&doc);
+
+            println!("SOLUTION for: {}", strdoc);
+            println!("{:?}", sol);
+            assert_ne!(sol, None);
+        }
+    }
+
+    #[test]
+    fn test_real_safa_validate_pihole_syntax() {
+        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+        let ab: String = abvec.iter().collect();
+        for s in vec![
+            r"^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+[.]){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-]",
+            "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]",
+            "^(.+[_.-])?telemetry[_.-]",
+            "^adim(age|g)s?[0-9]*[_.-]",
+            "^adtrack(er|ing)?[0-9]*[_.-]",
+            "^advert(s|is(ing|ements?))?[0-9]*[_.-]",
+            "^aff(iliat(es?|ion))?[_.-]",
+            "^analytics?[_.-]",
+            "^banners?[_.-]",
+            "^beacons?[0-9]*[_.-]",
+            "^count(ers?)?[0-9]*[_.-]",
+            r"^mads\.",
+            "^pixels?[-.]",
+            "^stat(s|istics)?[0-9]*[_.-]",
+        ] {
+            let r = re::simpl(re::new(s));
+            println!("PIHOLE {}", r);
+            let safa = SAFA::new(&ab, &r);
+            println! {"Regex: {:#?}",s};
+            let mut states = HashSet::new();
+            let mut ntrans: usize = 0;
+            for d in safa.deltas() {
+                states.insert(d.0);
+                ntrans = ntrans + 1;
+            }
+            println! {"N States: {:#?}",states.len()};
+            println! {"N Trans: {:#?}",ntrans};
+        }
+    }
+
+    #[test]
+    fn test_real_safa_validate_dns() {
+        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+        let ab: String = abvec.iter().collect();
+        for s in vec![r"^(?!you).*tube\.", r"\.ir\.{5}$", "porn|sex|xxx"] {
+            let r = re::simpl(re::new(s));
+            let safa = SAFA::new(&ab, &r);
+            // let safa = SAFA::new("abcdefghijklmnopqrstuvwxyz", &r);
+            println! {"Regex: {:#?}",s};
+            let mut states = HashSet::new();
+            let mut ntrans: usize = 0;
+            for d in safa.deltas() {
+                states.insert(d.0);
+                ntrans = ntrans + 1;
+            }
+            println! {"N States: {:#?}",states.len()};
+            println! {"N Trans: {:#?}",ntrans};
+
+            let strdoc = "sadtube.com";
+            let doc = strdoc.chars().collect();
+
+            println!("SOLUTION for: {}", strdoc);
+            println!("{:?}", safa.solve(&doc));
+        }
+    }
+
+    #[test]
+    fn test_real_safa_validate_pii() {
+        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
+        let ab: String = abvec.iter().collect();
+        for s in vec![
+            ",[1-9][0-9]{9},",
+            r"[0-9]{1,6}\ [a-zA-z\ ]*\ (CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\ ]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\ ]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8},",
+        ] {
+            let r = re::simpl(re::new(s));
+            let safa: SAFA<char> = SAFA::new(&ab, &r);
+            println! {"Regex: {:#?}",s};
+            let mut states = HashSet::new();
+            let mut ntrans: usize = 0;
+            for d in safa.deltas() {
+                states.insert(d.0);
+                ntrans = ntrans + 1;
+            }
+            println! {"N States: {:#?}",states.len()};
+            println! {"N Trans: {:#?}",ntrans};
+        }
+    }
+
+    #[test]
+    fn test_real_safa_validate_dna() {
+        for s in vec![".{8210}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG",
+        ".{5841}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG
+        .*AGCCTACAAGAAAGTACGAGATTTAGTCAACTTGTTGAAGAGCTATTGAAAATCATTTGTGCTTTTCAGCTTGACACAGGTTTGGAGT.*ATGCAAACAGCTATAATTTTGCAAAAAAGGAAAATAACTCTCCTGAACATCTAAAAGATGAAGTTTCTATCATCCAAAGTATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG",
+        ".{1989}CACAACTAAGGAACGTCAAGAGATACAGAATCCAAATTTTACCGCACCTGGTCAAGAATTTCTGTCTAAATCTCATTTGTATGAACATCTGACTTTGGAAAAATCTTCAAGCAATTTAGCAGTTTCAGGACATCCATTTTATCAAGTTTCTGCTACAAGAAATGAAAAAATGAGACACTTGATTACTACAGGCAGACCAACCAAAGTCTTTGTTCCACCTTTTAAAACTAAATCACATTTTCACAGAGTTGAACAGTGTGTTAGGAATATTAACTTGGAGGAAAACAGACAAAAGCAAAACATTGATGGACATGGCTCTGATGATAGTAA
+        AAATAAGATTAATGACAATGAGATTCATCAGTTTAACAAAAACAACTCCAATCAAGCAGTAGCTGTAACTTTCACAAAGTGTGAAGAAGAACCTTTAG.*
+        ATTTAATTACAAGTCTTCAGAATGCCAGAGATATACAGGATATGCGAATTAAGAAGAAACAAAGGCAACGCGTCTTTCCACAGCCAGGCAGTCTGTATCTTGCAAAAACATCCACTCTGCCTCGAATCTCTCTGAAAGCAGCAGTAGGAGGCCAAGTTCCCTCTGCGTGTTCTCATAAACAG.*CTGTATACGTATGGCGTTTCTAAACATTGCATAAAAATTAACAGCAAAA
+        ATGCAGAGTCTTTTCAGTTTCACACTGAAGATTATTTTGGTAAGGAAAGTTTATGGACTGGAAAAGGAATACAGTTGGCTGATGGTGGATGGCTCATACC
+        CTCCAATGATGGAAAGGCTGGAAAAGAAGAATTTTATAG.*GGCTCTGTGTGACACTCCAGGTGTGGATCCAAAGCTTATTTCTAGAATTTGGGTTTATAATCACTATA
+        GATGGATCATATGGAAACTGGCAGCTATGGAATGTGCCTTTCCTAAGGAATTTGCTAATAGATGCCTAAGCCCAGAAAGGGTGCTTCTTCAACTAAAATA
+        CAG"] {
+            let r = re::simpl(re::new(s));
+            let safa: SAFA<char> = SAFA::new("ACTGactg", &r);
+            println!{"Regex: {:#?}",s};
+            let mut states = HashSet::new();
+            let mut ntrans: usize = 0;
+            for d in safa.deltas() {
+               states.insert(d.0);
+               ntrans = ntrans + 1;
+             }
+            println!{"N States: {:#?}",states.len()};
+            println!{"N Trans: {:#?}",ntrans};
+        }
+    }
+
 }

@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use crate::regex::{RegexF, RegexF::*};
+use crate::frontend::regex::{RegexF, RegexF::*};
 
 impl PartialOrd for RegexF {
     fn partial_cmp(&self, other: &RegexF) -> Option<std::cmp::Ordering> {

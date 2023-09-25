@@ -1,14 +1,12 @@
 use std::collections::LinkedList;
-
 use petgraph::graph::NodeIndex;
-use rayon::iter::*;
 
 use core::fmt;
 use core::fmt::{Display, Formatter};
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use crate::safa::{Either, Skip};
+use crate::frontend::safa::{Either, Skip};
 
 /// Type of solver result, a matchign [Trace]
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]

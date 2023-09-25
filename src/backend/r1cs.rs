@@ -1,7 +1,7 @@
 use crate::backend::nova::int_to_ff;
 use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
-use crate::openset::OpenSet;
-use crate::safa::{Either, Skip, SAFA};
+use crate::frontend::openset::OpenSet;
+use crate::frontend::safa::{Either, Skip, SAFA};
 use crate::trace::{Trace, TraceElem};
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
@@ -2171,11 +2171,9 @@ pub fn ceil_div(a: usize, b: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::backend::costs;
     use crate::backend::r1cs::*;
-    use crate::regex::re;
-    use crate::safa::SAFA;
+    use crate::frontend::regex::re;
+    use crate::frontend::safa::SAFA;
     use neptune::Strength;
     use nova_snark::traits::Group;
     type G1 = pasta_curves::pallas::Point;

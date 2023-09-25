@@ -3,7 +3,7 @@ use core::fmt::{Display, Formatter};
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use crate::regex::Regex;
+use crate::frontend::regex::Regex;
 
 use petgraph::graph::NodeIndex;
 

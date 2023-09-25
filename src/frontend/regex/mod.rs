@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 #![allow(missing_docs)]
 use hashconsing::{consign, HConsed, HashConsign};
-use itertools::Itertools;
 
-use crate::openset::OpenSet;
-use crate::safa::Skip;
+use crate::frontend::openset::OpenSet;
+use crate::frontend::safa::Skip;
+use crate::frontend::regex::dnf::OrSet;
 use core::fmt;
 use core::fmt::Formatter;
 
@@ -15,7 +15,6 @@ pub mod dnf;
 pub mod ord;
 pub mod parser;
 
-use crate::regex::dnf::OrSet;
 /// the type of character classes
 pub type CharClass = OpenSet<char>;
 
@@ -422,13 +421,11 @@ impl RegexF {
 
 /// Top level module with hash-consing constructors
 pub mod re {
-    use crate::openset::OpenSet;
-    use crate::regex::{parser::RegexParser, Regex, RegexF};
-    use crate::regex::{CharClass, G};
-    use crate::safa::Skip;
+    use crate::frontend::openset::OpenSet;
+    use crate::frontend::regex::{parser::RegexParser, Regex, RegexF};
+    use crate::frontend::regex::{CharClass, G};
+    use crate::frontend::safa::Skip;
     use hashconsing::HashConsign;
-    use std::array::TryFromSliceError;
-    use std::collections::BTreeSet;
 
     /// Constructor
     pub fn new<'a>(s: &'a str) -> Regex {
