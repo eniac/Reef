@@ -126,7 +126,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         let mut num_offsets = 0;
                         let mut iter = openset.0.iter();
                         if let Some(r) = iter.next() {
-                            num_offsets += r.end.unwrap() - r.start;
+                            if r.end.is_some() {
+                                num_offsets += r.end.unwrap() - r.start;
+                            }
                         }
                         max_offsets = max(max_offsets, num_offsets);
                     }
@@ -149,7 +151,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        safa.write_pdf("safa1").unwrap();
+        //safa.write_pdf("safa1").unwrap();
 
         /*
         println!(
@@ -1478,7 +1480,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     // [0,*]
                     self.num_ab[&Some('*')]
                 } else {
-                    // ranges
+                    // ranges (and [!0, *])
                     self.num_ab[&None]
                 }
             }
@@ -1601,7 +1603,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             if let Some(r) = iter.next() {
                                 // ranges
                                 lower_offset_i = r.start;
-                                upper_offset_i = r.end.unwrap();
+                                upper_offset_i = if r.end.is_some() {
+                                    r.end.unwrap()
+                                } else {
+                                    self.max_offsets
+                                };
                             } else {
                                 panic!("found edge with bad range");
                             }

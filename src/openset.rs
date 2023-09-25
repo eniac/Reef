@@ -475,31 +475,34 @@ fn test_openrange_merge() {
 #[test]
 fn test_openrange_intersect_closed() {
     assert_eq!(
-        OpenRange::closed(1, 2).intersection(&OpenRange::closed(2,2)),
-        OpenSet::closed(2,2))
+        OpenRange::closed(1, 2).intersection(&OpenRange::closed(2, 2)),
+        OpenSet::closed(2, 2)
+    )
 }
 
 #[test]
 fn test_openrange_intersect_open() {
     assert_eq!(
         OpenRange::open(1).intersection(&OpenRange::open(3)),
-        OpenSet::open(3))
+        OpenSet::open(3)
+    )
 }
 
 #[test]
 fn test_openrange_intersect_nooverlap() {
     assert_eq!(
-        OpenRange::open(4).intersection(&OpenRange::closed(0,2)),
-        OpenSet::empty())
+        OpenRange::open(4).intersection(&OpenRange::closed(0, 2)),
+        OpenSet::empty()
+    )
 }
 
 #[test]
 fn test_openrange_intersect_char() {
     assert_eq!(
-        OpenRange::open('b').intersection(&OpenRange::closed('b','c')),
-        OpenSet::closed('b', 'c'))
+        OpenRange::open('b').intersection(&OpenRange::closed('b', 'c')),
+        OpenSet::closed('b', 'c')
+    )
 }
-
 
 #[test]
 fn test_openset_insert() {
@@ -515,8 +518,8 @@ fn test_openset_repeat() {
 
 #[test]
 fn test_openset_intersect_bug() {
-    assert_eq!(OpenSet::build(&"abc".chars().collect())
-                  .intersection(&OpenSet::single('a').negate()),
-        OpenSet::closed('b', 'c'))
+    assert_eq!(
+        OpenSet::build(&"abc".chars().collect()).intersection(&OpenSet::single('a').negate()),
+        OpenSet::closed('b', 'c')
+    )
 }
-

@@ -269,11 +269,14 @@ pub fn normal_add_table<'a>(
                             );
                         } else {
                             // ranges
-                            assert!(openset.len() == 1); // TODO :(
                             let mut iter = openset.0.iter();
                             if let Some(r) = iter.next() {
                                 let lower_offset = r.start;
-                                let upper_offset = r.end.unwrap();
+                                let upper_offset = if r.end.is_some() {
+                                    r.end.unwrap()
+                                } else {
+                                    max_offsets
+                                };
 
                                 let c = num_ab[&None]; //EPSILON
                                 let rel = calc_rel(
