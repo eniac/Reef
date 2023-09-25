@@ -309,6 +309,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     NodeIndex::new(kids[k]),
                     backtrace_state,
                     kids.clone(),
+                    false,
                 );
                 if sub_max_rel > max_rel {
                     max_rel = sub_max_rel;
@@ -318,23 +319,28 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             max_stack += kids.len(); // overestimation - make this tighter
         }
 
-        if set_table.len() == 0 {
-            // no for alls, presumably (do we ever start on not a forall when
-            // we have foralls in the graph?)
+        // in case when we don't start on forall:
+        // proceed from the beginning and add states until we reach a forall
+        let mut exists_start = Dfs::new(&safa.g, safa.get_init());
+
+        while let Some(exists_state) = exists_start.next(&safa.g) {
+            if safa.g[exists_state].is_and() {
+                break;
+            }
 
             let sub_max_rel = normal_add_table(
                 &safa,
                 &mut num_ab,
-                //&mut current_forall_state_stack,
                 &mut set_table,
                 num_states,
                 num_chars,
                 kid_padding,
                 max_branches,
                 max_offsets,
-                NodeIndex::new(0), //all_state, TODO ?
-                num_states,        // backtrace state
+                exists_state,
+                num_states, // backtrace state
                 vec![],
+                true,
             );
             if sub_max_rel > max_rel {
                 max_rel = sub_max_rel;
@@ -2526,8 +2532,20 @@ mod tests {
     fn naive_test() {
         init();
         test_func_no_hash(
-            "abcd!".to_string(),
-            "^(?=a)ab(?=c)cd!$".to_string(),
+            "abcd".to_string(),
+            "^(?=a)ab(?=c)cd$".to_string(),
+            "abcd".to_string(),
+            vec![1], // 2],
+            true,
+        );
+    }
+
+    #[test]
+    fn naive_test_2() {
+        init();
+        test_func_no_hash(
+            "abcd".to_string(),
+            "(?=a)ab(?=c)cd".to_string(),
             "abcd".to_string(),
             vec![1], // 2],
             true,
