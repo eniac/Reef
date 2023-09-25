@@ -14,16 +14,14 @@ use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::{self, ProverData};
 use ff::Field;
 use generic_array::typenum;
-use neptune::circuit;
 use neptune::{
-    sponge::api::{IOPattern, SpongeAPI, SpongeOp},
-    sponge::vanilla::{Mode, Sponge, SpongeTrait},
+    sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
 use nova_snark::provider::ipa_pc::{InnerProductArgument, InnerProductInstance};
 use nova_snark::spartan::direct::*;
 use nova_snark::{
-    provider::pedersen::{Commitment, CommitmentGens, CompressedCommitment},
+    provider::pedersen::Commitment,
     traits::{
         circuit::TrivialTestCircuit,
         commitment::{CommitmentEngineTrait, CommitmentTrait},
@@ -665,9 +663,10 @@ fn verify(
         Some(zn[q_len + 1]),
         Some(zn[(2 + q_len)..(2 + q_len + qd_len)].to_vec()),
         Some(zn[2 + q_len + qd_len]),
+        None, // TODO
         Some(cap_d),
-        Some(ipi),
-        Some(ipa),
+        ipi,
+        ipa,
     );
 
     // final accepting

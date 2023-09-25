@@ -5,9 +5,6 @@ use std::io::{BufReader, Read};
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
-use crate::backend::costs::{JBatching, JCommit};
-use crate::regex::Regex;
-
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Options {

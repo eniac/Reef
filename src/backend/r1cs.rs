@@ -2468,8 +2468,9 @@ mod tests {
             drq,
             drv,
             None,
-            Some(ipi),
-            Some(ipa),
+            None,
+            ipi,
+            ipa,
         );
 
         /*
