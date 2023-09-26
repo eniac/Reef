@@ -316,7 +316,7 @@ pub fn final_clear_checks(
     match (final_doc_q, final_doc_v) {
         (Some(q), Some(v)) => {
             let doc_ext_len = doc_len.next_power_of_two();
-            println!("DOC EXT LEN {:#?}", doc_ext_len);
+            //println!("DOC EXT LEN {:#?}", doc_ext_len);
 
             let new_q = match doc_subset {
                 Some((start, end)) => {
@@ -324,11 +324,10 @@ pub fn final_clear_checks(
                     let chunk_size = end - start;
                     // assert end and start are power of 2
                     assert!(end & (end - 1) == 0);
-                    assert!(start & (start - 1) == 0);
+                    assert!(start == 0 || start & (start - 1) == 0);
                     assert!(start % chunk_size == 0);
 
                     let num_chunks = doc_ext_len / chunk_size;
-                    assert!(num_chunks > 1);
                     let mut start_idx = start / chunk_size;
 
                     println!(

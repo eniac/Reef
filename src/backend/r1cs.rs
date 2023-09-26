@@ -173,7 +173,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut max_rel = 1;
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
-            println!("PROCESS STATE {:#?}", all_state);
+            //println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
                 current_forall_node = all_state;
 
@@ -1132,8 +1132,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         combined_q = new_const(0);
                         next_slot = Integer::from(1);
                     } else {
-                        println!("J = {}", j);
-
                         combined_q = term(
                             Op::PfNaryOp(PfNaryOp::Add),
                             vec![
@@ -1988,8 +1986,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
         };
 
-        println!("Q {:#?}, V {:#?}", q, v);
-
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, doc, q, v, running_q, running_v, "nldoc");
         wits = w;
@@ -2141,7 +2137,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             rs.push(rs[i - 1].clone() * claim_r.clone());
         }
         // make eq table for this round
-        println!("Q {:#?}", q.clone());
         let mut eq_table =
             gen_eq_table(&rs, &q, &prev_running_q.clone().into_iter().rev().collect());
         let mut sc_table = match id {
@@ -2514,7 +2509,7 @@ mod tests {
             rv,
             drq,
             drv,
-            None,
+            proj,
             None,
             ipi,
             ipa,
@@ -2562,6 +2557,15 @@ mod tests {
             vec![1],              // 2],
             true,
             Some((4, 8)),
+        );
+        // sanity
+        test_func_no_hash(
+            "abcd".to_string(),
+            "^....cc$".to_string(),
+            "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
+            vec![1],              // 2],
+            true,
+            Some((0, 8)),
         );
     }
 
