@@ -78,8 +78,10 @@ pub fn run_backend(
             "R1CS",
             "Optimization Selection, R1CS precomputations",
         );
-        // TODO feed in proj data here
-        let mut r1cs_converter = R1CS::new(&safa, &doc, temp_batch_size, None, false, sc.clone());
+
+        let proj = if projections { safa.projection() } else { None };
+        let mut r1cs_converter = R1CS::new(&safa, &doc, temp_batch_size, proj, false, sc.clone());
+
         #[cfg(feature = "metrics")]
         log::stop(
             Component::Compiler,

@@ -73,7 +73,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         safa: &'a SAFA<char>,
         doc: &Vec<char>,
         batch_size: usize,
-        doc_subset: Option<(usize, usize)>,
+        projection: Option<usize>,
         hybrid: bool,
         pcs: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
@@ -420,14 +420,24 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             stack.push((0, 0)); // TODO CHANGE THIS TO THE PADDING
         }
 
-        let pub_len = table.len();
-        let priv_len;
-        if doc_subset.is_some() {
-            let ds = doc_subset.unwrap();
-            priv_len = ds.1 - ds.0;
+        let doc_subset = if projection.is_some() {
+            let start = projection.unwrap();
+            let end = usize_doc.len();
+            let len = end.next_power_of_two() - start;
+            assert!(len & (len - 1) == 0);
+
+            Some((start, end))
         } else {
-            priv_len = usize_doc.len();
-        }
+            None
+        };
+
+        let pub_len = table.len();
+        let priv_len = if doc_subset.is_some() {
+            let ds = doc_subset.unwrap();
+            ds.1 - ds.0
+        } else {
+            usize_doc.len()
+        };
 
         let hybrid_len = max(pub_len, priv_len).next_power_of_two() * 2;
 
@@ -2446,7 +2456,7 @@ mod tests {
         doc: String,
         batch_sizes: Vec<usize>,
         expected_match: bool,
-        proj: Option<(usize, usize)>,
+        proj: Option<usize>,
     ) {
         let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
@@ -2544,7 +2554,7 @@ mod tests {
             rv,
             drq,
             drv,
-            proj,
+            r1cs_converter.doc_subset,
             None,
             ipi,
             ipa,
@@ -2591,7 +2601,7 @@ mod tests {
             "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
             vec![1],              // 2],
             true,
-            Some((4, 8)),
+            Some(4),
         );
         // sanity
         test_func_no_hash(
@@ -2600,7 +2610,7 @@ mod tests {
             "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
             vec![1],              // 2],
             true,
-            Some((0, 8)),
+            Some(0),
         );
     }
 
