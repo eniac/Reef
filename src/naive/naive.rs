@@ -147,6 +147,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     }
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS","Public Params");
+
     let pp = create_public_params::<G1, G2>(r1cs.clone());
 
     println!("post pp");
@@ -164,9 +167,11 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         "total n constraints: {}",
         get_folded_cost(pp.num_constraints().0,doc_len)
     );
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS","Public Params");
 
     #[cfg(feature = "metrics")]
-    log::r1cs(Component::Compiler, "R1CS", "Size", r1cs.constraints.len());
+    log::r1cs(Component::Compiler, "R1CS", "Size", pp.num_constraints().0);
 
     println!(
         "Number of variables per step (primary circuit): {}",
@@ -177,6 +182,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         pp.num_variables().1
     );
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Compiler, "R1CS","Create Recursive Circuit");
+
     let recursive_snark = create_recursive_circuit(
         FileLocation::PathBuf(witness_generator_file),
         r1cs,
@@ -184,6 +192,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         start_public_input.to_vec(),
         &pp,
     ).unwrap();
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS","Create Recursive Circuit");
 
     let z0_secondary = [<G2 as Group>::Scalar::zero()];
 
@@ -196,6 +207,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!("Generating a CompressedSNARK using Spartan with IPA-PC...");
     type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
     type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Prover, "Prove","Prove");
+
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
     println!(
         "CompressedSNARK::prove: {:?}",
@@ -203,22 +218,32 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     );
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Prove","Prove");
 
     // // verify the compressed SNARK
     println!("Verifying a CompressedSNARK...");
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Verifier, "Verifier","Verify");
     let res = compressed_snark.verify(
         &pp,
         doc_len,
         start_public_input.to_vec().clone(),
         z0_secondary.to_vec(),
     );
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Verifier, "Verifier","Verify");
+
     println!(
         "CompressedSNARK::verify: {:?}",
         res.is_ok(),
     );
     assert!(res.is_ok());
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Verifier, "Verifier","Verify");
 
-    return;
     // #[cfg(feature = "metrics")]
     // log::tic(Component::Compiler,"Snark", "Setup");
     // let (pk, vk) = naive_spartan_snark_setup(circuit);
@@ -271,13 +296,13 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     // let snark = result.unwrap();
 
-    // #[cfg(feature = "metrics")]
-    // log::space(
-    //     Component::Prover,
-    //     "Proof Size",
-    //     "Spartan SNARK size",
-    //     serde_json::to_string(&snark).unwrap().len(),
-    // );
+    #[cfg(feature = "metrics")]
+    log::space(
+        Component::Prover,
+        "Proof Size",
+        "Spartan SNARK size",
+        serde_json::to_string(&compressed_snark).unwrap().len(),
+    );
 
     // // // verify the SNARK
     // println!("Verify");
@@ -295,27 +320,27 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     // assert!(verifier_result.is_ok()); 
 
-    // let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
-    // let mut wtr = Writer::from_writer(file);
-    // let _ = wtr.write_record(&[
-    // format!("{}_{}",&doc[..10],doc.len()),
-    // r,
-    // dfa_ndelta.to_string(), //nedges().to_string(),
-    // dfa_nstate.to_string(), //nstates().to_string(),
-    // ]);
-    // let spacer = "---------";
-    // let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-    // wtr.flush();
+    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
+    let mut wtr = Writer::from_writer(file);
+    let _ = wtr.write_record(&[
+    format!("{}_{}",&doc[..10],doc.len()),
+    r,
+    dfa_ndelta.to_string(), //nedges().to_string(),
+    dfa_nstate.to_string(), //nstates().to_string(),
+    ]);
+    let spacer = "---------";
+    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    wtr.flush();
 
-    // #[cfg(feature = "metrics")]
-    // log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    #[cfg(feature = "metrics")]
+    log::write_csv(&out_write.as_path().display().to_string()).unwrap();
 
     // remove_file("match.circom");
     // remove_file("match.sym");
     // remove_file("match.r1cs");
     // remove_file("circom_witness.wtns");
 
-    // return   
+    return   
 }
 
 
