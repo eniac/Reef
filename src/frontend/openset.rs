@@ -40,11 +40,17 @@ impl<C: Display + Debug + Step + Default + Ord + Copy + Clone> OpenRange<C> {
             end: Some(Default::default()),
         }
     }
+    pub fn star() -> Self {
+        Self::open(Default::default())
+    }
     pub fn is_open(&self) -> bool {
         self.end.is_none()
     }
     pub fn is_closed(&self) -> bool {
         self.end.is_some()
+    }
+    pub fn is_nullable(&self) -> bool {
+        self.start == Default::default()
     }
 
     pub fn len(&self) -> Option<usize> {
@@ -262,6 +268,12 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
         Self::open(Default::default())
     }
 
+    /// First OpenRange if it exists
+    pub fn first(self) -> Option<OpenRange<C>> {
+        let h = self.0.first()?;
+        Some(h.clone())
+    }
+
     /// Is it empty (∅)
     pub fn is_empty(&self) -> bool {
         self.0.len() == 0
@@ -278,7 +290,14 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
             false
         }
     }
-
+    /// Includes nil
+    pub fn is_nullable(&self) -> bool {
+        if let Some(z) = self.start() {
+            z ==  Default::default()
+        } else {
+            false
+        }
+    }
     /// Is it a single character, if yes return it
     pub fn is_single(&self) -> Option<C> {
         if self.0.len() == 1 {
