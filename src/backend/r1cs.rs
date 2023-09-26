@@ -1929,20 +1929,26 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let mut v = vec![];
         let mut q = vec![];
+        let doc;
 
-        for i in 0..self.batch_size {
-            let access_at = cursor_access[i];
-            q.push(access_at);
-            v.push(self.idoc[access_at].clone());
-        }
-
-        //let subset = self.idoc[ds.0..ds.1].to_vec();
-        let doc = if self.doc_subset.is_some() {
+        if self.doc_subset.is_some() {
             let ds = self.doc_subset.unwrap();
-            &self.idoc[ds.0..ds.1]
+            doc = &self.idoc[ds.0..ds.1];
+            for i in 0..self.batch_size {
+                let access_at = cursor_access[i];
+                q.push(access_at - ds.0);
+                v.push(self.idoc[access_at].clone());
+            }
         } else {
-            &self.idoc
+            doc = &self.idoc;
+            for i in 0..self.batch_size {
+                let access_at = cursor_access[i];
+                q.push(access_at);
+                v.push(self.idoc[access_at].clone());
+            }
         };
+
+        println!("Q {:#?}, V {:#?}", q, v);
 
         let (w, next_running_q, next_running_v) =
             self.wit_nlookup_gadget(wits, doc, q, v, running_q, running_v, "nldoc");
@@ -2095,6 +2101,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             rs.push(rs[i - 1].clone() * claim_r.clone());
         }
         // make eq table for this round
+        println!("Q {:#?}", q.clone());
         let mut eq_table =
             gen_eq_table(&rs, &q, &prev_running_q.clone().into_iter().rev().collect());
         let mut sc_table = match id {
@@ -2499,6 +2506,25 @@ mod tests {
                     c
                 )
         );*/
+    }
+
+    #[test]
+    fn projections_test() {
+        init();
+
+        // proj lower
+        test_func_no_hash(
+            "abcd".to_string(),
+            "^aabb....$".to_string(),
+            "aabbccdd".to_string(),
+            vec![1], // 2],
+            true,
+            Some((0, 4)),
+        );
+
+        // proj upper
+
+        // proj mid
     }
 
     #[test]

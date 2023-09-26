@@ -538,10 +538,10 @@ mod tests {
         }
 
         let uni_sub: Vec<Integer> = vec![
-            Integer::from(60),
-            Integer::from(80),
-            Integer::from(9),
-            Integer::from(4),
+            Integer::from(77), // 100
+            Integer::from(18), // 101
+            Integer::from(24), // 110
+            Integer::from(10), // 111
         ];
         let mle_sub = mle_from_pts(uni_sub.clone());
         let mut mle_sub_f: Vec<<G1 as Group>::Scalar> = vec![];
@@ -552,9 +552,9 @@ mod tests {
         // 011 = 6
         //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
         let q = vec![
-            <G1 as Group>::Scalar::from(1),
-            <G1 as Group>::Scalar::from(1),
             <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(1),
+            <G1 as Group>::Scalar::from(1), // selector
         ];
         let q_ext = q_to_mle_q(&q, mle_f.len());
         assert_eq!(mle_f.len(), q_ext.len());
@@ -565,7 +565,7 @@ mod tests {
         }
 
         let q_sub = vec![
-            <G1 as Group>::Scalar::from(1),
+            <G1 as Group>::Scalar::from(0),
             <G1 as Group>::Scalar::from(1),
         ];
         let q_ext_sub = q_to_mle_q(&q_sub, mle_sub_f.len());
@@ -577,5 +577,7 @@ mod tests {
             sum_sub += mle_sub_f[i].clone() * q_ext_sub[i].clone();
         }
         assert_eq!(sum, sum_sub);
+
+        //    println!("SUM {:#?}", sum.clone());
     }
 }
