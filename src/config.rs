@@ -1,3 +1,4 @@
+use crate::frontend::regex::Regex;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::fmt::Debug;
 use std::fs::File;

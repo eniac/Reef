@@ -1,6 +1,6 @@
 use core::{num, panic};
 
-use crate::safa::SAFA;
+use crate::frontend::safa::SAFA;
 use clap::ValueEnum;
 
 static POSEIDON_NUM: usize = 292;
