@@ -906,10 +906,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     fn cursor_circuit(&mut self) {
         for j in 0..self.batch_size {
-            // if star, geq
-            // else normal
-            // i_j+1 = i_j + offset
-
             let cursor_plus = term(
                 Op::Eq,
                 vec![
@@ -925,8 +921,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
             self.assertions.push(cursor_plus);
 
-            // TODO LIMIT bits here plus the other bullshit
-            let bit_limit = logmn(self.udoc.len()); // TODO :(
+            let bit_limit = logmn(self.udoc.len());
+            let cur_overflow = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("cursor_{}", j + 1))],
+                    ),
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("cursor_{}", j))],
+                    ),
+                ],
+            );
+            self.assertions.push(cur_overflow);
+
             let min_offset_leq = term(
                 Op::BvBinPred(BvBinPred::Uge),
                 vec![
