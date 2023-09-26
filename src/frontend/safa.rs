@@ -9,7 +9,7 @@ use petgraph::Graph;
 
 use std::result::Result;
 
-use crate::frontend::openset::OpenSet;
+use crate::frontend::openset::{OpenSet, OpenRange};
 use crate::frontend::quantifier::Quant;
 use crate::frontend::regex::{re, Regex, RegexF};
 use crate::trace::{Trace, TraceElem};
@@ -46,6 +46,12 @@ impl<A, B> Either<A, B> {
         match self.0 {
             Err(ref b) => f(b),
             _ => false,
+        }
+    }
+    fn right_or<'a>(&'a self, default: &'a B) -> &'a B {
+        match self.0 {
+            Ok(_) => default,
+            Err(ref e) => e
         }
     }
 }
@@ -361,8 +367,6 @@ impl SAFA<char> {
                 .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
                 .collect();
 
-            println!("subsolutions {:#?}", subsolutions);
-
             // All of them need to be set
             if subsolutions.iter().all(Option::is_some) {
                 subsolutions.sort_by(|a, b| {
@@ -392,6 +396,51 @@ impl SAFA<char> {
                 .into_par_iter()
                 .find_map_any(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
         }
+    }
+
+    fn projection_rec(&self, n: NodeIndex<u32>, m: Skip, visited: BTreeSet<NodeIndex<u32>>) -> Skip {
+        if visited.contains(&n) {
+            return m;
+        }
+        let mut v = visited.clone();
+        v.insert(n);
+
+        self.g.edges(n)
+              .filter(|e| e.source() != e.target())
+              .filter_map(|e| {
+                 let next = e.target();
+                 let s = e.weight().clone().0.err()?;
+                 if s.is_nullable() {
+                    Some((s, next))
+                 } else {
+                    None
+                 }
+              }).fold(m, |acc, (s, next)| {
+                 self.projection_rec(next, acc.intersection(&s), v.clone())
+              })
+    }
+
+    /// Returns the prefix of the document we can ignore, rounded down to nearest 2^n
+    /// Example: projection {9, 15}.a -> 3 (2^3 = 8 < 9)
+    pub fn projection(&self) -> Option<usize> {
+        let i = self.get_init();
+        let r = self.projection_rec(i, OpenSet::star(), BTreeSet::new()).first()?;
+        let e = r.end?;
+
+        // Round-down to nearest power of 2
+        if e == 0 {
+            return None;
+        }
+        else if e == 1 {
+            return Some(0);
+        }
+        let mut result = 1;
+        let mut exp = 0;
+        while result <= e {
+            result <<= 1;
+            exp += 1;
+        }
+        return Some(exp-1);
     }
 
     /// Solve at the root
@@ -533,7 +582,6 @@ mod tests {
     #[test]
     fn test_safa_match_star() {
         let r = re::simpl(re::new("^a*$"));
-        println!("REGEX {:?}", r);
         let safa = SAFA::new("ab", &r);
         let strdoc = "aa";
         let doc: Vec<_> = strdoc.chars().collect();
@@ -684,21 +732,11 @@ mod tests {
         for s in vec![r"(?=a.*).*ed$"] {
             let r = re::simpl(re::new(s));
             let safa = SAFA::new("abcde", &r);
-            println! {"Regex: {:#?}",r};
-
-            print_states(&safa);
-            println!("DELTAS");
-            for d in safa.deltas() {
-                println!("{}, {}, {}", d.0, d.1, d.2.index());
-            }
-
             let strdoc = "aed";
             let doc = strdoc.chars().collect();
 
             let sol = safa.solve(&doc);
 
-            println!("SOLUTION for: {}", strdoc);
-            println!("{:?}", sol);
             assert_ne!(sol, None);
         }
     }
@@ -966,4 +1004,16 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_safa_projection1() {
+        let r = re::simpl(re::new(r"^.{0,9}a$"));
+        let safa = SAFA::new(&"ab", &r);
+        assert_eq!(safa.projection(), Some(3));
+    }
+    #[test]
+    fn test_safa_projection2() {
+        let r = re::simpl(re::new(r".{0,2}a$"));
+        let safa = SAFA::new(&"ab", &r);
+        assert_eq!(safa.projection(), None);
+    }
 }

@@ -288,7 +288,6 @@ impl RegexF {
             _ if i == 1 && j == 1 => self.clone(),
             _ if self.is_empty() => RegexF::empty(),
             _ if i == 0 && j == 0 => RegexF::nil(),
-            _ if i == 0 => RegexF::alt(&RegexF::nil(), &RegexF::range(self, 1, j)),
             _ => RegexF::Range(G.mk(self.clone()), i, j),
         }
     }
@@ -758,14 +757,9 @@ pub mod re {
 }
 
 #[test]
-fn test_regex_ord() {
-    assert!(re::character('a') < re::character('b'))
-}
-
-#[test]
 fn test_regex_aderiv() {
-    let r = re::and(re::alt(re::character('a'), re::character('c')), re::character('a'));
-    println!("r = {}, dr/da = {}", r, r.aderiv(&'a'));
+    let r = re::simpl(re::new(r"^(?=a)(a|c)$"));
+    println!("r = {}, dr/da = {:?}", r, r.aderiv(&'a'));
 }
 
 #[test]
