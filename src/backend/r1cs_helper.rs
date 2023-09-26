@@ -550,7 +550,6 @@ pub(crate) fn gen_eq_table(
 // where -1 is the "hole"
 // returns (coeff (of "hole"), constant)
 // if no hole, returns (crap, full result)
-// O(mn log mn) :) - or was once upon a time, i'll update this later
 // x = eval_at, prods = coeffs of table/eq(), e's = e/q's
 pub(crate) fn prover_mle_partial_eval(
     prods: &[Integer],
@@ -646,65 +645,6 @@ pub fn verifier_mle_eval(table: &[Integer], q: &Vec<Integer>) -> Integer {
 
     con
 }
-
-/*
-// for sum check, computes the sum of many mle univar slices
-// takes raw table (pre mle'd), and rands = [r_0, r_1,...], leaving off the hole and x_i's
-pub(crate) fn prover_mle_sum_eval(
-    table: &Vec<Integer>,
-    rands: &Vec<Integer>,
-    qs: &Vec<usize>,
-    claim_r: &Integer,
-    last_q: Option<&Vec<Integer>>,
-) -> (Integer, Integer, Integer) {
-    let mut sum_xsq = Integer::from(0);
-    let mut sum_x = Integer::from(0);
-    let mut sum_con = Integer::from(0);
-    let hole = rands.len();
-    let total = logmn(table.len());
-
-    assert!(hole + 1 <= total, "batch size too small for nlookup");
-    let num_x = total - hole - 1;
-
-    let base: usize = 2;
-
-    for combo in 0..base.pow(num_x as u32) {
-        let mut eval_at = rands.clone();
-        eval_at.push(Integer::from(-1));
-
-        for i in 0..num_x {
-            eval_at.push(Integer::from((combo >> i) & 1));
-        }
-
-        //println!("eval at: {:#?}", eval_at.clone());
-        // T(j)
-        let (coeff_a, con_a) =
-            prover_mle_partial_eval(table, &eval_at, &(0..table.len()).collect(), true, None); // TODO
-                                                                                               //println!("T {:#?}, {:#?}", coeff_a, con_a);
-
-        // r^i * eq(q_i,j) for all i
-        // TODO - eq must be an MLE? ask
-
-        // make rs (horner esq)
-        let mut rs = vec![claim_r.clone()];
-        for i in 1..(qs.len() + 1) {
-            rs.push(rs[i - 1].clone() * claim_r);
-        }
-
-        let (coeff_b, con_b) = prover_mle_partial_eval(&rs, &eval_at, &qs, false, last_q);
-        sum_xsq += &coeff_a * &coeff_b;
-        sum_x += &coeff_b * &con_a;
-        sum_x += &coeff_a * &con_b;
-        sum_con += &con_a * &con_b;
-    }
-
-    (
-        sum_xsq.rem_floor(cfg().field().modulus()),
-        sum_x.rem_floor(cfg().field().modulus()),
-        sum_con.rem_floor(cfg().field().modulus()),
-    )
-}
-*/
 
 // CIRCUITS
 

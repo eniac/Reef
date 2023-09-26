@@ -59,6 +59,9 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub doc_rc_v: Option<Integer>,
     // proj
     doc_subset: Option<(usize, usize)>,
+    // hybrid
+    hybrid: bool,
+    hybrid_len: usize,
 }
 
 fn type_of<T>(_: &T) {
@@ -71,6 +74,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         doc: &Vec<char>,
         batch_size: usize,
         doc_subset: Option<(usize, usize)>,
+        hybrid: bool,
         pcs: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
         //let nfa_match = nfa.is_match(doc);
@@ -416,6 +420,17 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             stack.push((0, 0)); // TODO CHANGE THIS TO THE PADDING
         }
 
+        let pub_len = table.len();
+        let priv_len;
+        if doc_subset.is_some() {
+            let ds = doc_subset.unwrap();
+            priv_len = ds.1 - ds.0;
+        } else {
+            priv_len = usize_doc.len();
+        }
+
+        let hybrid_len = max(pub_len, priv_len).next_power_of_two() * 2;
+
         Self {
             safa,
             foralls_w_kids,
@@ -441,6 +456,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             pc: pcs,
             doc_rc_v: Some(Integer::from(1)), // Convert back to none later
             doc_subset,
+            hybrid,
+            hybrid_len,
         }
     }
 
@@ -1335,21 +1352,32 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     pub fn to_circuit(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs(true);
         assert_eq!(lookups.len(), self.batch_size);
-        self.nlookup_gadget(lookups, self.table.len(), "nl");
-        self.cursor_circuit();
-        self.last_state_accepting_circuit();
-        self.nlookup_doc_commit();
-
-        self.r1cs_conv()
-    }
-
-    fn nlookup_doc_commit(&mut self) {
-        // lookups and nl circuit
         let mut char_lookups = vec![];
         for c in 0..self.batch_size {
             char_lookups.push(new_var(format!("char_{}", c)));
         }
 
+        self.cursor_circuit();
+        self.last_state_accepting_circuit();
+
+        if self.hybrid {
+            self.nlookup_hybrid(lookups, char_lookups);
+        } else {
+            self.nlookup_gadget(lookups, self.table.len(), "nl");
+            self.nlookup_doc_commit(char_lookups);
+        }
+
+        self.r1cs_conv()
+    }
+
+    fn nlookup_hybrid(&mut self, mut pub_lookups: Vec<Term>, mut priv_lookups: Vec<Term>) {
+        // TODO ordering circuit
+
+        pub_lookups.append(&mut priv_lookups);
+        self.nlookup_gadget(pub_lookups, self.hybrid_len, "hybrid");
+    }
+
+    fn nlookup_doc_commit(&mut self, mut priv_lookups: Vec<Term>) {
         let len;
         if self.doc_subset.is_some() {
             let ds = self.doc_subset.unwrap();
@@ -1357,10 +1385,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         } else {
             len = self.udoc.len();
         }
-        println!("LEN {:#?}", len);
 
         self.q_ordering_circuit("nldoc", len);
-        self.nlookup_gadget(char_lookups, len, "nldoc");
+        self.nlookup_gadget(priv_lookups, len, "nldoc");
     }
 
     fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
@@ -1684,10 +1711,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         running_v: Option<Integer>,
         doc_running_q: Option<Vec<Integer>>,
         doc_running_v: Option<Integer>,
+        hybrid_running_q: Option<Vec<Integer>>,
+        hybrid_running_v: Option<Integer>,
         cursor_0: usize,
     ) -> (
         FxHashMap<String, Value>,
         usize,
+        Option<Vec<Integer>>,
+        Option<Integer>,
         Option<Vec<Integer>>,
         Option<Integer>,
         Option<Vec<Integer>>,
@@ -1891,70 +1922,105 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let accept = if rel_i == 2 { 1 } else { 0 }; //todo
         wits.insert(format!("accepting"), new_wit(accept));
 
-        assert!(running_q.is_some() || batch_num == 0);
-        assert!(running_v.is_some() || batch_num == 0);
-
         assert_eq!(v.len(), self.batch_size);
-        let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
-        wits = w;
 
-        assert!(doc_running_q.is_some() || batch_num == 0);
-        assert!(doc_running_v.is_some() || batch_num == 0);
-        let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
-            wits,
-            batch_num,
-            doc_running_q,
-            doc_running_v,
-            cursor_access,
-        );
-        wits = w;
+        // projections
+        let mut doc_v = vec![];
+        let mut doc_q = vec![];
+        let proj_doc;
+        if self.doc_subset.is_some() {
+            let ds = self.doc_subset.unwrap();
+            proj_doc = &self.idoc[ds.0..ds.1];
+            for i in 0..self.batch_size {
+                let access_at = cursor_access[i];
+                doc_q.push(access_at - ds.0);
+                doc_v.push(self.idoc[access_at].clone());
+            }
+        } else {
+            proj_doc = &self.idoc;
+            for i in 0..self.batch_size {
+                let access_at = cursor_access[i];
+                doc_q.push(access_at);
+                doc_v.push(self.idoc[access_at].clone());
+            }
+        };
+
+        let mut next_running_q = None;
+        let mut next_running_v = None;
+        let mut next_doc_running_q = None;
+        let mut next_doc_running_v = None;
+        let mut next_hybrid_running_q = None;
+        let mut next_hybrid_running_v = None;
+
+        if self.hybrid {
+            // pub T first, then priv D
+            let half_len = self.hybrid_len / 2;
+
+            let mut hybrid_table = self.table.clone();
+            hybrid_table.append(&mut vec![Integer::from(0); half_len - self.table.len()]);
+            hybrid_table.append(&mut proj_doc.to_vec());
+            hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
+
+            let mut hybrid_q = q.clone();
+            for qd in doc_q {
+                hybrid_q.push(qd + half_len); // idx'd by 1
+            }
+
+            let mut hybrid_v = v.clone();
+            hybrid_v.extend(doc_v);
+
+            assert!(hybrid_running_q.is_some() || batch_num == 0);
+            assert!(hybrid_running_v.is_some() || batch_num == 0);
+
+            let (w, rq, rv) = self.wit_nlookup_gadget(
+                wits,
+                &hybrid_table,
+                hybrid_q,
+                hybrid_v,
+                hybrid_running_q,
+                hybrid_running_v,
+                "hybrid",
+            );
+            wits = w;
+            next_hybrid_running_q = Some(rq);
+            next_hybrid_running_v = Some(rv);
+        } else {
+            assert!(running_q.is_some() || batch_num == 0);
+            assert!(running_v.is_some() || batch_num == 0);
+            let (w, rq, rv) =
+                self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
+            wits = w;
+            next_running_q = Some(rq);
+            next_running_v = Some(rv);
+
+            assert!(doc_running_q.is_some() || batch_num == 0);
+            assert!(doc_running_v.is_some() || batch_num == 0);
+
+            let (w, drq, drv) = self.wit_nlookup_gadget(
+                wits,
+                proj_doc,
+                doc_q,
+                doc_v,
+                doc_running_q,
+                doc_running_v,
+                "nldoc",
+            );
+            wits = w;
+            next_doc_running_q = Some(drq);
+            next_doc_running_v = Some(drv);
+        }
 
         (
             wits,
             next_state,
-            Some(next_running_q),
-            Some(next_running_v),
-            Some(next_doc_running_q),
-            Some(next_doc_running_v),
+            next_running_q,
+            next_running_v,
+            next_doc_running_q,
+            next_doc_running_v,
+            next_hybrid_running_q,
+            next_hybrid_running_v,
             cursor_i,
         )
-    }
-
-    fn wit_nlookup_doc_commit(
-        &self,
-        mut wits: FxHashMap<String, Value>,
-        batch_num: usize,
-        running_q: Option<Vec<Integer>>,
-        running_v: Option<Integer>,
-        cursor_access: Vec<usize>,
-    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
-        let mut v = vec![];
-        let mut q = vec![];
-        let doc;
-
-        if self.doc_subset.is_some() {
-            let ds = self.doc_subset.unwrap();
-            doc = &self.idoc[ds.0..ds.1];
-            for i in 0..self.batch_size {
-                let access_at = cursor_access[i];
-                q.push(access_at - ds.0);
-                v.push(self.idoc[access_at].clone());
-            }
-        } else {
-            doc = &self.idoc;
-            for i in 0..self.batch_size {
-                let access_at = cursor_access[i];
-                q.push(access_at);
-                v.push(self.idoc[access_at].clone());
-            }
-        };
-
-        let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, doc, q, v, running_q, running_v, "nldoc");
-        wits = w;
-
-        (wits, next_running_q, next_running_v)
     }
 
     fn wit_nlookup_gadget(
@@ -2131,7 +2197,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             (sc_r, g_xsq, g_x, g_const) =
                 linear_mle_product(&mut sc_table, &mut eq_table, sc_l, i, &mut sponge);
-            //prover_mle_sum_eval(table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
 
             // sanity
             if i > 1 {
@@ -2389,7 +2454,8 @@ mod tests {
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-        let mut r1cs_converter = R1CS::new(&safa, &chars, 0, proj, sc.clone());
+        let mut r1cs_converter = R1CS::new(&safa, &chars, 0, proj, false, sc.clone());
+        // TODO hybrid
 
         let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
         r1cs_converter.reef_commit = Some(reef_commit.clone());
@@ -2400,6 +2466,9 @@ mod tests {
         let mut running_v: Option<Integer> = None;
         let mut doc_running_q: Option<Vec<Integer>> = None;
         let mut doc_running_v: Option<Integer> = None;
+        let mut hybrid_running_q: Option<Vec<Integer>> = None;
+        let mut hybrid_running_v: Option<Integer> = None;
+
         let mut doc_idx = 0;
 
         let (pd, _vd) = r1cs_converter.to_circuit();
@@ -2421,6 +2490,8 @@ mod tests {
                 running_v,
                 doc_running_q,
                 doc_running_v,
+                hybrid_running_q,
+                hybrid_running_v,
                 doc_idx,
             ) = r1cs_converter.gen_wit_i(
                 &mut sols,
@@ -2429,6 +2500,8 @@ mod tests {
                 running_v.clone(),
                 doc_running_q.clone(),
                 doc_running_v.clone(),
+                hybrid_running_q.clone(),
+                hybrid_running_v.clone(),
                 doc_idx,
             );
 

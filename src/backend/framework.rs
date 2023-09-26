@@ -79,7 +79,7 @@ pub fn run_backend(
             "Optimization Selection, R1CS precomputations",
         );
         // TODO feed in proj data here
-        let mut r1cs_converter = R1CS::new(&safa, &doc, temp_batch_size, None, sc.clone());
+        let mut r1cs_converter = R1CS::new(&safa, &doc, temp_batch_size, None, false, sc.clone());
         #[cfg(feature = "metrics")]
         log::stop(
             Component::Compiler,
@@ -275,6 +275,10 @@ fn solve<'a>(
     let mut doc_running_v: Option<Integer> = None;
     let mut next_doc_running_q: Option<Vec<Integer>>;
     let mut next_doc_running_v: Option<Integer>;
+    let mut hybrid_running_q: Option<Vec<Integer>> = None;
+    let mut hybrid_running_v: Option<Integer> = None;
+    let mut next_hybrid_running_q: Option<Vec<Integer>>;
+    let mut next_hybrid_running_v: Option<Integer>;
 
     let mut prev_cursor_0 = 0;
     let mut next_cursor_0;
@@ -307,6 +311,8 @@ fn solve<'a>(
             next_running_v,
             next_doc_running_q,
             next_doc_running_v,
+            next_hybrid_running_q,
+            next_hybrid_running_v,
             next_cursor_0,
         ) = r1cs_converter.gen_wit_i(
             &mut sols,
@@ -315,6 +321,8 @@ fn solve<'a>(
             running_v.clone(),
             doc_running_q.clone(),
             doc_running_v.clone(),
+            hybrid_running_q.clone(),
+            hybrid_running_v.clone(),
             prev_cursor_0.clone(),
         );
         stack_ptr_popped = r1cs_converter.stack_ptr;
