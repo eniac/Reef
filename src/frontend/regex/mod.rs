@@ -3,8 +3,8 @@
 use hashconsing::{consign, HConsed, HashConsign};
 
 use crate::frontend::openset::OpenSet;
-use crate::frontend::safa::Skip;
 use crate::frontend::regex::dnf::OrSet;
+use crate::frontend::safa::Skip;
 use core::fmt;
 use core::fmt::Formatter;
 
@@ -354,9 +354,9 @@ impl RegexF {
         if *i == 0 && *j == 0 {
             RegexF::nil()
         } else if *i == 0 {
-            RegexF::range(self, 0, j-1)
+            RegexF::range(self, 0, j - 1)
         } else {
-            RegexF::range(self, i-1, j-1)
+            RegexF::range(self, i - 1, j - 1)
         }
     }
 
@@ -367,16 +367,13 @@ impl RegexF {
             RegexF::CharClass(cs) if cs.contains(c) => OrSet::single(&RegexF::nil()),
             RegexF::CharClass(_) => OrSet::empty(),
             RegexF::Dot => OrSet::single(&RegexF::nil()),
-            RegexF::App(ref a, ref b) if a.nullable() =>
-                a.aderiv(c).map(|r| RegexF::app(&r, b)).or(&b.aderiv(c)),
-            RegexF::App(ref a, ref b) =>
-                a.aderiv(c).map(|r| RegexF::app(&r, b)),
-            RegexF::Alt(ref a, ref b) =>
-                a.aderiv(c).or(&b.aderiv(c)),
-            RegexF::And(ref a, ref b) =>
-                a.aderiv(c).and(&b.aderiv(c)),
-            RegexF::Star(ref a) =>
-                a.aderiv(c).map(|r| RegexF::app(&r, &RegexF::star(a))),
+            RegexF::App(ref a, ref b) if a.nullable() => {
+                a.aderiv(c).map(|r| RegexF::app(&r, b)).or(&b.aderiv(c))
+            }
+            RegexF::App(ref a, ref b) => a.aderiv(c).map(|r| RegexF::app(&r, b)),
+            RegexF::Alt(ref a, ref b) => a.aderiv(c).or(&b.aderiv(c)),
+            RegexF::And(ref a, ref b) => a.aderiv(c).and(&b.aderiv(c)),
+            RegexF::Star(ref a) => a.aderiv(c).map(|r| RegexF::app(&r, &RegexF::star(a))),
             // The [nil] rule again
             RegexF::Range(_, i, j) if *i == 0 && *j == 0 => OrSet::empty(),
             // The app rule: a{i, j} = aa{i-1, j-1} but if a is nullable, repeat the app rule
@@ -385,8 +382,9 @@ impl RegexF {
                 a.aderiv(c).map(|r| RegexF::app(&r, &b)).or(&b.aderiv(c))
             }
             // The app rule: a{i, j} = aa{i-1, j-1}
-            RegexF::Range(ref a, i, j) =>
-                a.aderiv(c).map(|r| RegexF::app(&r, &RegexF::range_pred(a, i, j)))
+            RegexF::Range(ref a, i, j) => a
+                .aderiv(c)
+                .map(|r| RegexF::app(&r, &RegexF::range_pred(a, i, j))),
         }
     }
 
@@ -397,23 +395,22 @@ impl RegexF {
             RegexF::CharClass(cs) if cs.contains(c) => RegexF::nil(),
             RegexF::CharClass(_) => RegexF::empty(),
             RegexF::Dot => RegexF::nil(),
-            RegexF::App(ref a, ref b) if a.nullable() =>
-                RegexF::alt(&RegexF::app(&a.deriv(c), b), &b.deriv(c)),
+            RegexF::App(ref a, ref b) if a.nullable() => {
+                RegexF::alt(&RegexF::app(&a.deriv(c), b), &b.deriv(c))
+            }
             RegexF::App(ref a, ref b) => RegexF::app(&a.deriv(c), b),
             RegexF::Alt(ref a, ref b) => RegexF::alt(&a.deriv(c), &b.deriv(c)),
             RegexF::And(ref a, ref b) => RegexF::and(&a.deriv(c), &b.deriv(c)),
             RegexF::Star(ref a) => RegexF::app(&a.deriv(c), &RegexF::star(a)),
             // The [nil] rule again
-            RegexF::Range(ref a, i, j) if *i == 0 && *j == 0 =>
-                RegexF::empty(),
+            RegexF::Range(ref a, i, j) if *i == 0 && *j == 0 => RegexF::empty(),
             // The app rule: a{i, j} = aa{i-1, j-1} but if a is nullable, repeat the app rule
-            RegexF::Range(ref a, i, j) if a.nullable() =>
-                RegexF::alt(
-                    &RegexF::app(&a.deriv(c), &RegexF::range_pred(a, i, j)),
-                    &RegexF::range_pred(a, i, j).deriv(c)),
+            RegexF::Range(ref a, i, j) if a.nullable() => RegexF::alt(
+                &RegexF::app(&a.deriv(c), &RegexF::range_pred(a, i, j)),
+                &RegexF::range_pred(a, i, j).deriv(c),
+            ),
             // The app rule: a{i, j} = aa{i-1, j-1}
-            RegexF::Range(ref a, i, j) =>
-                RegexF::app(&a.deriv(c), &RegexF::range_pred(a, i, j))
+            RegexF::Range(ref a, i, j) => RegexF::app(&a.deriv(c), &RegexF::range_pred(a, i, j)),
         }
     }
 }
@@ -526,233 +523,6 @@ pub mod re {
     pub fn extract_skip(a: &Regex) -> Option<(Skip, Regex)> {
         let (s, rem) = (*a).extract_skip()?;
         Some((s, G.mk(rem)))
-    }
-
-    pub fn projection_intervals(r: &RegexF) -> Vec<(u32, u32)> {
-        let mut intervals = Vec::new();
-        let mut outR = r.clone();
-        let mut start: u32 = 0;
-        let mut end: u32 = 0;
-        let mut trailing_dot: u32 = 0;
-        while !outR.is_empty() {
-            outR = match outR {
-                RegexF::App(l, r) => {
-                    match l.simpl() {
-                        RegexF::Range(c, i, j) => {
-                            if i == j {
-                                match c.simpl() {
-                                    RegexF::Dot => {
-                                        if start == 0 && end == 0 {
-                                            start = start + (i as u32);
-                                            end = end + (i as u32);
-                                        } else {
-                                            if trailing_dot == 0 {
-                                                intervals.push((start, end));
-                                            }
-                                            trailing_dot = trailing_dot + (i as u32);
-                                        }
-                                    }
-                                    RegexF::CharClass(_) => {
-                                        if trailing_dot != 0 {
-                                            start = end + trailing_dot;
-                                            end = end + trailing_dot + (i as u32);
-                                            trailing_dot = 0;
-                                        } else {
-                                            end = end + (i as u32);
-                                        }
-                                    }
-                                    _ => (),
-                                }
-                            }
-                        }
-                        RegexF::CharClass(_) => {
-                            if trailing_dot != 0 {
-                                start = end + trailing_dot;
-                                end = end + trailing_dot + 1;
-                                trailing_dot = 0;
-                            } else {
-                                end = end + 1
-                            }
-                        }
-                        RegexF::Dot => {
-                            if start == 0 && end == 0 {
-                                start = start + 1;
-                                end = end + 1
-                            } else {
-                                if trailing_dot == 0 {
-                                    intervals.push((start, end));
-                                }
-                                trailing_dot = trailing_dot + 1
-                            }
-                        }
-                        RegexF::Star(_) => {
-                            return vec![(0, 0)];
-                        }
-                        RegexF::Alt(opt1, opt2) => {
-                            let opt1_len = get_len(&opt1, 0, true);
-                            let opt2_len = get_len(&opt2, 0, true);
-                            if opt1_len == opt2_len {
-                                if trailing_dot != 0 {
-                                    start = end + trailing_dot;
-                                    end = end + trailing_dot;
-                                    trailing_dot = 0;
-                                }
-                                end = end + opt1_len;
-                            } else {
-                                return vec![(0, 0)];
-                            }
-                        }
-                        _ => {}
-                    }
-                    let out = r.simpl();
-                    out.to_owned()
-                }
-                RegexF::Star(c) => match c.simpl() {
-                    RegexF::Dot => {
-                        intervals.push((start, end));
-                        return intervals;
-                    }
-                    _ => {
-                        return vec![(0, 0)];
-                    }
-                },
-                RegexF::CharClass(_) => {
-                    if trailing_dot != 0 {
-                        start = end + trailing_dot;
-                        end = end + trailing_dot;
-                        trailing_dot = 0;
-                    }
-                    end = end + 1;
-                    intervals.push((start, end));
-                    return intervals;
-                }
-                RegexF::Range(c, i, j) => {
-                    if i == j {
-                        match c.simpl() {
-                            RegexF::Dot => {
-                                if trailing_dot == 0 {
-                                    intervals.push((start, end));
-                                }
-                            }
-                            RegexF::CharClass(_) => {
-                                if trailing_dot != 0 {
-                                    start = end + trailing_dot;
-                                    end = end + trailing_dot + (i as u32);
-                                    trailing_dot = 0;
-                                } else {
-                                    end = end + (i as u32);
-                                }
-                                intervals.push((start, end));
-                            }
-                            _ => (),
-                        }
-                        return intervals;
-                    } else {
-                        return vec![(0, 0)];
-                    }
-                }
-                _ => outR,
-            };
-        }
-        intervals
-    }
-
-    pub fn get_len(r: &RegexF, size: u32, and_char: bool) -> u32 {
-        let mut out = 0;
-        match &r {
-            RegexF::Dot => {
-                out = 1;
-            }
-            RegexF::Nil | RegexF::CharClass(_) => {
-                if and_char {
-                    out = 1;
-                } else {
-                    out = 0;
-                }
-            }
-            RegexF::App(x, y) => {
-                let l = get_len(&x.simpl(), size, and_char);
-                let r = get_len(&y.simpl(), size, and_char);
-                if l > 0 {
-                    out = l + r;
-                } else {
-                    out = l;
-                }
-            }
-            RegexF::Alt(x, y) => {
-                let l = get_len(&x.simpl(), size, and_char);
-                let r = get_len(&x.simpl(), size, and_char);
-                if l == r {
-                    out = 0;
-                } else {
-                    out = l;
-                }
-            }
-            RegexF::Star(a) => out = 0,
-            RegexF::And(x, y) => {
-                let l = get_len(&x.simpl(), size, and_char);
-                let r = get_len(&y.simpl(), size, and_char);
-                if l > 0 {
-                    out = l + r;
-                } else {
-                    out = l;
-                }
-            }
-            RegexF::Range(a, i, j) => {
-                if i == j {
-                    out = get_len(&a.simpl(), size, and_char) * (*i as u32);
-                } else {
-                    out = 0;
-                }
-            }
-        }
-        return out;
-    }
-
-    pub fn projection(r: &RegexF) -> Vec<(u32, u32)> {
-        let mut intervals = projection_intervals(r);
-        intervals.dedup_by(|(a, b), (c, d)| a == c);
-        println!("{:#?}", intervals);
-        let mut pow2_intervals: Vec<(u32, u32)> = Vec::new();
-        if intervals[0].0 == 0 && intervals[0].1 == 0 {
-            return vec![(0, 0)];
-        }
-        let mut l;
-        let mut r;
-        let mut original_size;
-        let mut pow2padding;
-        let base: i32 = 2;
-        for i in 0..intervals.len() {
-            println!("{:#?}", i);
-            //always try and draw from the left
-            l = intervals[i].0;
-            r = intervals[i].1;
-            original_size = r - l;
-            pow2padding =
-                (base.pow((original_size as f32).log2().ceil() as u32) as u32) - original_size;
-            println!("{:#?},{:#?},{:#?}", l, r, pow2padding);
-            let last_interval = pow2_intervals.pop();
-            let mut new_interval: (u32, u32);
-            match last_interval {
-                None => {
-                    if l < pow2padding {
-                        new_interval = (0, r + (pow2padding - l) - 1);
-                    } else {
-                        new_interval = (l - pow2padding, r - 1);
-                    }
-                }
-                Some(v) => {
-                    if l - pow2padding < v.1 {
-                        new_interval = (v.1 + 1, r + (pow2padding - (l - v.1)) - 1);
-                    } else {
-                        new_interval = (l - pow2padding, r - 1);
-                    }
-                    pow2_intervals.push(v);
-                }
-            }
-            pow2_intervals.push(new_interval)
-        }
-        pow2_intervals
     }
 }
 
@@ -890,31 +660,4 @@ fn test_regex_negative_char_class_range() {
         ),
         re::simpl(re::new("[^a-d]e"))
     );
-}
-
-#[test]
-fn test_for_proj() {
-    let r = re::simpl(re::new(r"^.a(b|c)d{2}.{5}e{3}$"));
-    // println!("{:#?}",r);
-    println!("Intervals {:#?}", re::projection(r.get()));
-    // println!("{:#?}",re::get_proj_size(r.get(), 0, false));
-    // println!("{:#?}",re::get_proj_size(r.get(), 0, true));
-    // println!("{:#?}",re::projection_pow2(r.get()));
-    // println!("{:#?}",re::strip(r.get(),2));
-    // .abdd.....eee
-}
-
-#[test]
-fn test_proj_cons() {
-    let r = re::simpl(re::new(r"^.{3}.{4}$"));
-    // LEF: Should be (7,8) no?
-    assert_eq!(re::projection(r.get()), vec![(7,8)]);
-}
-
-#[test]
-fn test_proj_alt() {
-    let r = re::simpl(re::new(r"^(.{3})|(.{2})$"));
-    println!("Intervals {:#?}", re::projection(r.get()));
-    // LEF: Unsure what the answer should be, either [(2,3)] or [(3,4)] probably the union interval (2,4)?
-    assert_eq!(re::projection(r.get()), vec![(2,4)]);
 }
