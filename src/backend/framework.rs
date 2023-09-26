@@ -229,7 +229,6 @@ fn setup<'a>(
         pp.num_variables().1
     );
 
-    let commit_blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
     let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
 
     let current_state = r1cs_converter.safa.get_init().index();
@@ -452,6 +451,8 @@ fn solve<'a>(
         running_v = next_running_v;
         doc_running_q = next_doc_running_q;
         doc_running_v = next_doc_running_v;
+        hybrid_running_q = next_hybrid_running_q;
+        hybrid_running_v = next_hybrid_running_v;
         prev_cursor_0 = next_cursor_0;
         stack_ptr_0 = stack_ptr_popped;
         stack_in = stack_out;
@@ -476,8 +477,6 @@ fn prove_and_verify(
     // trivial circuit
     let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
-
-    let mut i = 0;
 
     // blocks until we receive first witness
     let mut circuit_primary = recv.recv().unwrap();
@@ -519,7 +518,6 @@ fn prove_and_verify(
         */
         recursive_snark = Some(result.unwrap());
 
-        i += 1;
         circuit_primary = recv.recv().unwrap()
     }
 
@@ -691,7 +689,7 @@ mod tests {
 
     use crate::backend::framework::*;
     use crate::backend::r1cs_helper::init;
-    use crate::frontend::regex::{re, Regex};
+    use crate::frontend::regex::re;
     use crate::frontend::safa::SAFA;
 
     fn backend_test(

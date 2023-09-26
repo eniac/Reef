@@ -677,32 +677,3 @@ pub(crate) fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
 
     horners
 }
-
-// eval circuit
-pub(crate) fn poly_eval_circuit(points: Vec<Integer>, x_lookup: Term) -> Term {
-    let mut eval = new_const(1); // dummy
-
-    for p in points {
-        // for sub
-        let sub = if p == 0 {
-            p
-        } else {
-            cfg().field().modulus() - p
-        };
-
-        eval = term(
-            Op::PfNaryOp(PfNaryOp::Mul),
-            vec![
-                eval,
-                term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![x_lookup.clone(), new_const(sub)], // subtraction
-                                                            // - TODO for
-                                                            // bit eq too
-                ),
-            ],
-        );
-    }
-
-    eval
-}

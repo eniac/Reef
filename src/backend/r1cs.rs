@@ -64,10 +64,6 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     hybrid_len: usize,
 }
 
-fn type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
-
 impl<'a, F: PrimeField> R1CS<'a, F, char> {
     pub fn new(
         safa: &'a SAFA<char>,
@@ -142,7 +138,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             if in_state.is_and() {
-                let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
+                let and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
                     .edges(in_state.inner)
                     .filter(|e| e.source() != e.target())
@@ -169,7 +165,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
-        let mut current_forall_node = NodeIndex::new(0);
         let kid_padding = 0; // TODO !!
         let mut max_stack = 1;
         let mut max_rel = 1;
@@ -177,8 +172,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             //println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
-                current_forall_node = all_state;
-
                 let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
                     .edges(all_state)
@@ -416,7 +409,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         int_doc.push(Integer::from(u));
 
         let mut stack = vec![];
-        for i in 0..max_stack {
+        for _i in 0..max_stack {
             stack.push((0, 0)); // TODO CHANGE THIS TO THE PADDING
         }
 
@@ -1387,7 +1380,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.nlookup_gadget(pub_lookups, self.hybrid_len, "hybrid");
     }
 
-    fn nlookup_doc_commit(&mut self, mut priv_lookups: Vec<Term>) {
+    fn nlookup_doc_commit(&mut self, priv_lookups: Vec<Term>) {
         let len;
         if self.doc_subset.is_some() {
             let ds = self.doc_subset.unwrap();
@@ -1453,7 +1446,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // only call in "active" cases
     fn pop_wit(&mut self, wits: &mut FxHashMap<String, Value>) -> usize {
         self.stack_ptr -= 1;
-        let mut popped_elt = self.stack[self.stack_ptr];
+        let popped_elt = self.stack[self.stack_ptr];
 
         wits.insert(format!("cursor_{}", 0), new_wit(popped_elt.0));
         //wits.insert(format!("state_{}", self.batch_size), new_wit(popped_elt.1));
@@ -1499,7 +1492,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         forall: Option<NodeIndex>,
         cur_cursor: usize,
     ) {
-        let mut forall_kids = match forall {
+        let forall_kids = match forall {
             Some(state) => self.foralls_w_kids[&state.index()][1..].to_vec(),
             None => vec![],
         };
@@ -1535,7 +1528,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // returns char_num, is_star
     fn get_char_num(&self, edge: Either<char, OpenSet<usize>>) -> usize {
         match edge {
-            Either(Err(openset)) => self.num_ab[&None],
+            Either(Err(_openset)) => self.num_ab[&None],
             Either(Ok(ch)) => self.num_ab[&Some(ch)],
         }
     }
@@ -1665,7 +1658,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             }
                         }
                     }
-                    Either(Ok(ch)) => {
+                    Either(Ok(_ch)) => {
                         lower_offset_i = 1;
                         upper_offset_i = 1;
                     }
