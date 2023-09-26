@@ -684,12 +684,32 @@ mod tests {
     use crate::regex::{re, Regex};
     use crate::safa::SAFA;
 
-    fn backend_test(ab: String, rstr: String, doc: Vec<char>, batch_size: usize) {
+    fn backend_test(
+        ab: String,
+        rstr: String,
+        doc: Vec<char>,
+        batch_size: usize,
+        projections: bool,
+    ) {
         let r = re::new(&rstr);
         let safa = SAFA::new(&ab[..], &r);
 
         init();
-        run_backend(safa.clone(), doc.clone(), batch_size, false);
+        run_backend(safa.clone(), doc.clone(), batch_size, projections);
+    }
+
+    #[test]
+    fn e2e_projections() {
+        backend_test(
+            "ab".to_string(),
+            "^a*b*$".to_string(),
+            ("aaab".to_string())
+                .chars()
+                //.map(|c| c.to_string())
+                .collect(),
+            0,
+            true,
+        );
     }
 
     #[test]
@@ -702,6 +722,7 @@ mod tests {
                 //.map(|c| c.to_string())
                 .collect(),
             33,
+            false,
         );
     }
 
@@ -715,6 +736,7 @@ mod tests {
                 //.map(|c| c.to_string())
                 .collect(),
             2,
+            false,
         );
     }
 
@@ -728,6 +750,7 @@ mod tests {
                 //.map(|c| c.to_string())
                 .collect(),
             0,
+            false,
         );
         /* backend_test(
                 "ab".to_string(),
