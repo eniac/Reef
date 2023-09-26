@@ -1132,6 +1132,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         combined_q = new_const(0);
                         next_slot = Integer::from(1);
                     } else {
+                        println!("J = {}", j);
+
                         combined_q = term(
                             Op::PfNaryOp(PfNaryOp::Add),
                             vec![
@@ -1254,14 +1256,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
-    fn q_ordering_circuit(&mut self, id: &str) {
+    fn q_ordering_circuit(&mut self, id: &str, doc_len: usize) {
         // q relations
         for i in 0..(self.batch_size - 1) {
             // not final q (running claim)
 
             let mut full_q = new_const(0); // dummy
             let mut next_slot = Integer::from(1);
-            let doc_l = logmn(self.udoc.len());
+            let doc_l = logmn(doc_len);
             for j in (0..doc_l).rev() {
                 full_q = term(
                     Op::PfNaryOp(PfNaryOp::Add),
@@ -1279,39 +1281,74 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 next_slot *= Integer::from(2);
             }
 
-            let q_eq = term(
-                Op::Eq,
-                vec![
-                    full_q.clone(),
-                    term(
-                        Op::Ite,
-                        vec![
-                            term(
-                                Op::Eq,
-                                vec![
-                                    new_var(format!("char_{}", i)),
-                                    new_const(self.num_ab[&None]),
-                                ],
-                            ),
-                            new_const(self.ep_num),
-                            term(
-                                Op::Ite,
-                                vec![
-                                    term(
-                                        Op::Eq,
-                                        vec![
-                                            new_var(format!("char_{}", i)),
-                                            new_const(self.num_ab[&Some('*')]),
-                                        ],
-                                    ),
-                                    new_const(self.star_num),
-                                    new_var(format!("cursor_{}", i)),
-                                ],
-                            ),
-                        ],
-                    ),
-                ],
-            );
+            let q_adjust = if self.doc_subset.is_some() {
+                let ds = self.doc_subset.unwrap();
+
+                term(
+                    Op::Ite,
+                    vec![
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_var(format!("char_{}", i)),
+                                new_const(self.num_ab[&None]),
+                            ],
+                        ),
+                        new_const(self.ep_num - ds.0),
+                        term(
+                            Op::Ite,
+                            vec![
+                                term(
+                                    Op::Eq,
+                                    vec![
+                                        new_var(format!("char_{}", i)),
+                                        new_const(self.num_ab[&Some('*')]),
+                                    ],
+                                ),
+                                new_const(self.star_num - ds.0),
+                                term(
+                                    Op::PfNaryOp(PfNaryOp::Add),
+                                    vec![
+                                        new_var(format!("cursor_{}", i)),
+                                        new_const(-1 * (ds.0 as isize)),
+                                    ],
+                                ),
+                            ],
+                        ),
+                    ],
+                )
+            } else {
+                term(
+                    Op::Ite,
+                    vec![
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_var(format!("char_{}", i)),
+                                new_const(self.num_ab[&None]),
+                            ],
+                        ),
+                        new_const(self.ep_num),
+                        term(
+                            Op::Ite,
+                            vec![
+                                term(
+                                    Op::Eq,
+                                    vec![
+                                        new_var(format!("char_{}", i)),
+                                        new_const(self.num_ab[&Some('*')]),
+                                    ],
+                                ),
+                                new_const(self.star_num),
+                                new_var(format!("cursor_{}", i)),
+                            ],
+                        ),
+                    ],
+                )
+            };
+
+            let q_eq = term(Op::Eq, vec![full_q, q_adjust]);
+
             self.assertions.push(q_eq);
         }
     }
@@ -1328,21 +1365,23 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn nlookup_doc_commit(&mut self) {
-        self.q_ordering_circuit("nldoc");
-
         // lookups and nl circuit
         let mut char_lookups = vec![];
         for c in 0..self.batch_size {
             char_lookups.push(new_var(format!("char_{}", c)));
         }
 
-        let len = if self.doc_subset.is_some() {
+        let len;
+        if self.doc_subset.is_some() {
             let ds = self.doc_subset.unwrap();
-            ds.1 - ds.0
+            len = ds.1 - ds.0;
         } else {
-            self.udoc.len()
-        };
-        self.nlookup_gadget(char_lookups, self.udoc.len(), "nldoc");
+            len = self.udoc.len();
+        }
+        println!("LEN {:#?}", len);
+
+        self.q_ordering_circuit("nldoc", len);
+        self.nlookup_gadget(char_lookups, len, "nldoc");
     }
 
     fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
@@ -1365,6 +1404,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // size of table (T -> mle)
         let sc_l = logmn(t_size);
+        println!("size of table {}", sc_l);
 
         self.sum_check_circuit(lhs, sc_l, id);
 
@@ -2512,19 +2552,17 @@ mod tests {
     fn projections_test() {
         init();
 
-        // proj lower
-        test_func_no_hash(
-            "abcd".to_string(),
-            "^aabb....$".to_string(),
-            "aabbccdd".to_string(),
-            vec![1], // 2],
-            true,
-            Some((0, 4)),
-        );
+        // proj lower/mid ain't happening
 
         // proj upper
-
-        // proj mid
+        test_func_no_hash(
+            "abcd".to_string(),
+            "^....cc$".to_string(),
+            "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
+            vec![1],              // 2],
+            true,
+            Some((4, 8)),
+        );
     }
 
     #[test]
