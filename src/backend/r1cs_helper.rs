@@ -231,7 +231,7 @@ pub fn normal_add_table<'a>(
                             );
                         } else if openset.is_full() {
                             // [0,*]
-                            let c = num_ab[&Some('*')];
+                            let c = num_ab[&None];
                             let lower_offset = 0;
                             let upper_offset = max_offsets; // TODO!!!
 

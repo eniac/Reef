@@ -44,7 +44,6 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     ep_num: usize,
-    star_num: usize,
     pub doc_extend: usize,
     is_match: bool,
     // circuit crap
@@ -112,9 +111,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_ab.insert(Some(c), i);
             i += 1;
         }
-        num_ab.insert(None, i); // EPSILON
-        num_ab.insert(Some('*'), i + 1); // STAR
-        num_ab.insert(Some('!'), i + 2); // EOF TODO
+        num_ab.insert(Some('$'), i); // EOF TODO
+        num_ab.insert(None, i + 1); // EPSILON
 
         // generate T
         let num_states = safa.g.node_count();
@@ -408,8 +406,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         usize_doc.push(u);
         int_doc.push(Integer::from(u));
 
-        let star_num = usize_doc.len();
-        let u = num_ab[&Some('*')];
+        let eof_num = usize_doc.len();
+        let u = num_ab[&Some('$')];
         usize_doc.push(u);
         int_doc.push(Integer::from(u));
 
@@ -431,7 +429,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
             ep_num,
-            star_num,
             doc_extend: epsilon_to_add,
             is_match,
             max_branches,
@@ -1294,23 +1291,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         ),
                         new_const(self.ep_num - ds.0),
                         term(
-                            Op::Ite,
+                            Op::PfNaryOp(PfNaryOp::Add),
                             vec![
-                                term(
-                                    Op::Eq,
-                                    vec![
-                                        new_var(format!("char_{}", i)),
-                                        new_const(self.num_ab[&Some('*')]),
-                                    ],
-                                ),
-                                new_const(self.star_num - ds.0),
-                                term(
-                                    Op::PfNaryOp(PfNaryOp::Add),
-                                    vec![
-                                        new_var(format!("cursor_{}", i)),
-                                        new_const(-1 * (ds.0 as isize)),
-                                    ],
-                                ),
+                                new_var(format!("cursor_{}", i)),
+                                new_const(-1 * (ds.0 as isize)),
                             ],
                         ),
                     ],
@@ -1327,20 +1311,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             ],
                         ),
                         new_const(self.ep_num),
-                        term(
-                            Op::Ite,
-                            vec![
-                                term(
-                                    Op::Eq,
-                                    vec![
-                                        new_var(format!("char_{}", i)),
-                                        new_const(self.num_ab[&Some('*')]),
-                                    ],
-                                ),
-                                new_const(self.star_num),
-                                new_var(format!("cursor_{}", i)),
-                            ],
-                        ),
+                        new_var(format!("cursor_{}", i)),
                     ],
                 )
             };
@@ -1517,22 +1488,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // returns char_num, is_star
     fn get_char_num(&self, edge: Either<char, OpenSet<usize>>) -> usize {
         match edge {
-            Either(Err(openset)) => {
-                let single = openset.is_single(); // single offset/epsilon
-                if single.is_some() {
-                    // is single
-                    // if offset == 0 { -> doesn't matter, always use epsilon for actual
-                    // epsilon and for jumps
-
-                    self.num_ab[&None]
-                } else if openset.is_full() {
-                    // [0,*]
-                    self.num_ab[&Some('*')]
-                } else {
-                    // ranges (and [!0, *])
-                    self.num_ab[&None]
-                }
-            }
+            Either(Err(openset)) => self.num_ab[&None],
             Either(Ok(ch)) => self.num_ab[&Some(ch)],
         }
     }
@@ -1872,8 +1828,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                     if char_num == self.num_ab[&None] {
                         cursor_access.push(self.ep_num);
-                    } else if char_num == self.num_ab[&Some('*')] {
-                        cursor_access.push(self.star_num);
                     } else {
                         cursor_access.push(cursor_i);
                     }
