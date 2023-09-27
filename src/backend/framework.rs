@@ -159,7 +159,7 @@ pub fn run_backend(
                 z0_primary,
                 commit: reef_commit,
                 table: r1cs_converter.table.clone(),
-                doc_len: r1cs_converter.udoc.len(),
+                doc_len: r1cs_converter.doc_len(),
                 num_states: r1cs_converter.num_states,
             })
             .unwrap();
@@ -184,7 +184,7 @@ fn setup<'a>(
     circ_data: &'a ProverData,
 ) -> (Vec<<G1 as Group>::Scalar>, PublicParams<G1, G2, C1, C2>) {
     let q_len = logmn(r1cs_converter.table.len());
-    let qd_len = logmn(r1cs_converter.udoc.len());
+    let qd_len = logmn(r1cs_converter.doc_len());
     let stack_len = r1cs_converter.max_stack;
 
     // use "empty" (witness-less) circuit to generate nova F
@@ -303,7 +303,7 @@ fn solve<'a>(
     doc: &Vec<char>,
 ) {
     let q_len = logmn(r1cs_converter.table.len());
-    let qd_len = logmn(r1cs_converter.udoc.len());
+    let qd_len = logmn(r1cs_converter.doc_len());
 
     let commit_blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
     let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;

@@ -272,6 +272,7 @@ pub fn final_clear_checks(
     reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
     table: &Vec<Integer>,
     doc_len: usize,
+    //    stack_ptr: <G1 as Group>::Scalar,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
     final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
@@ -281,6 +282,9 @@ pub fn final_clear_checks(
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
 ) {
+    // stack ptr is 0 (stack is empty)
+    //  assert_eq!(stack_ptr, <G1 as Group>::Scalar::from(0));
+
     //Asserting that d in z_n == d passed into spartan direct
     match cap_d {
         Some(d) => {

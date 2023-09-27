@@ -293,31 +293,23 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // in case when we don't start on forall:
         // proceed from the beginning and add states until we reach a forall
-        let mut exists_start = Dfs::new(&safa.g, safa.get_init());
 
-        // TODO we probably don't need a whole ass loop here
-        while let Some(exists_state) = exists_start.next(&safa.g) {
-            if safa.g[exists_state].is_and() {
-                break;
-            }
-
-            let sub_max_rel = normal_add_table(
-                &safa,
-                &mut num_ab,
-                &mut set_table,
-                num_states,
-                num_chars,
-                kid_padding,
-                max_branches,
-                max_offsets,
-                exists_state,
-                num_states, // backtrace state
-                vec![],
-                true,
-            );
-            if sub_max_rel > max_rel {
-                max_rel = sub_max_rel;
-            }
+        let sub_max_rel = normal_add_table(
+            &safa,
+            &mut num_ab,
+            &mut set_table,
+            num_states,
+            num_chars,
+            kid_padding,
+            max_branches,
+            max_offsets,
+            safa.get_init(), //exists_state,
+            num_states,      // backtrace state
+            vec![],
+            true,
+        );
+        if sub_max_rel > max_rel {
+            max_rel = sub_max_rel;
         }
 
         // add "last" loop
@@ -445,6 +437,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             doc_subset,
             hybrid,
             hybrid_len,
+        }
+    }
+
+    pub fn doc_len(&self) -> usize {
+        if self.doc_subset.is_some() {
+            let ds = self.doc_subset.unwrap();
+            ds.1 - ds.0
+        } else {
+            self.udoc.len()
         }
     }
 
@@ -1361,14 +1362,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn nlookup_doc_commit(&mut self, priv_lookups: Vec<Term>) {
-        let len;
-        if self.doc_subset.is_some() {
-            let ds = self.doc_subset.unwrap();
-            len = ds.1 - ds.0;
-        } else {
-            len = self.udoc.len();
-        }
-
+        let len = self.doc_len();
         self.q_ordering_circuit("nldoc", len);
         self.nlookup_gadget(priv_lookups, len, "nldoc");
     }
