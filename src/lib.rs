@@ -8,8 +8,5 @@ pub mod openset;
 pub mod regex;
 pub mod naive;
 
-#[cfg(feature = "metrics")]
-pub mod metrics;
-
 #[macro_use]
 extern crate lazy_static;

@@ -35,7 +35,7 @@ regex-syntax = "0.6.0"
 arbitrary = { version = "1.3.0", features = ["derive"] }
 backtrace-on-stack-overflow = "0.3.0"
 memory-stats = "1.1.0"
-nova-scotia = {path="./third_party/Nova-Scotia"}
+nova-scotia = {path="./Nova-Scotia"}
 execute = "0.2.12"
 num-bigint = "0.4.3"
 
