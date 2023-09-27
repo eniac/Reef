@@ -6,7 +6,7 @@ pub mod safa;
 pub mod quantifier;
 pub mod openset;
 pub mod regex;
-pub mod naive;
+pub mod naive_wr;
 
 #[macro_use]
 extern crate lazy_static;

@@ -36,7 +36,7 @@ use core::marker::PhantomData;
 use fxhash::{FxHashMap,FxHasher};
 use std::hash::BuildHasherDefault;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
-use crate::naive::dfa::*; 
+use crate::naive_wr::dfa::*; 
 use memory_stats::memory_stats;
 
 #[derive(Clone, Debug)]

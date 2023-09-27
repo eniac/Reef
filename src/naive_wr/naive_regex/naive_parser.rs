@@ -1,7 +1,7 @@
 use fancy_regex::{Expr, LookAround};
 use hashconsing::HashConsign;
 use regex_syntax::hir::{Class, HirKind, Literal};
-use crate::naive::naive_regex::{RegexF, Regex, re, G};
+use crate::naive_wr::naive_regex::{RegexF, Regex, re, G};
 
 pub struct RegexParser();
 impl RegexParser {

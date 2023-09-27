@@ -43,7 +43,7 @@ struct ProofInfo {
 }
 
 #[cfg(feature = "metrics")]
-use crate::metrics::{log, log::Component};
+use metrics::metrics::{log, log::Component};
 
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(

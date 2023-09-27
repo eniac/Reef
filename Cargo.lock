@@ -2436,6 +2436,7 @@ dependencies = [
  "lazy_static",
  "memory-stats",
  "merlin",
+ "metrics",
  "neptune",
  "nova-scotia",
  "nova-snark",

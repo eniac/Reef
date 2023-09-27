@@ -6,14 +6,14 @@ type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 
 // use crate::backend::{r1cs_helper::init};
-use crate::naive::naive_circom_writer::*;
-use crate::naive::naive_nova::{gen_commitment, gen_hash};
+use crate::naive_wr::naive_circom_writer::*;
+use crate::naive_wr::naive_nova::{gen_commitment, gen_hash};
 use std::{env::current_dir};
 use std::path::PathBuf;
 use std::fs::{File,remove_file};
 use std::io::prelude::*;
-use crate::naive::dfa::*; 
-use crate::naive::naive_regex::*;
+use crate::naive_wr::dfa::*; 
+use crate::naive_wr::naive_regex::*;
 use itertools::Itertools;
 use neptune::{
     poseidon::PoseidonConstants,
@@ -45,7 +45,7 @@ use execute::{Execute, shell};
 use std::{collections::HashMap};
 
 #[cfg(feature = "metrics")]
-use crate::metrics::{log, log::Component};
+use metrics::metrics::{log, log::Component};
 
 pub fn get_folded_cost(circuit_size: usize, n_foldings: usize) -> usize {
     let cost_folding = 2 * circuit_size * n_foldings;
@@ -244,57 +244,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verifier","Verify");
 
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Compiler,"Snark", "Setup");
-    // let (pk, vk) = naive_spartan_snark_setup(circuit);
-
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Compiler,"Snark","Setup");
-
-
-    // //witness generation
-    // println!("Wit Gen");
-    // let iteration_count = private_inputs.len();
-    // let public_input: [Fq;0] = [];
-    // let start_public_input_hex = public_input.iter().map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string()).collect::<Vec<String>>();
-    // let mut current_public_input = start_public_input_hex.clone();
-
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Solver,"Witness","Gen");
-
-    // let witnesses = compute_witness::<G1, G2>(
-    //     current_public_input,
-    //     private_inputs[0].clone(),
-    //     FileLocation::PathBuf(witness_generator_file),
-    //     &witness_generator_output,
-    // );
-
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Solver,"Witness","Gen");
-
-
-    // let prove_circuit = CircomCircuit {
-    //     r1cs: r1cs.clone(),
-    //     witness: Some(witnesses),
-    // };
-
-    // let z = vec![<G1 as Group>::Scalar::one()];
-
-    // println!("Prove");
-
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Prover,"Prover","Prove");
-
-    // let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
-
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Prover,"Prover","Prove");
-
-    // assert!(result.is_ok());
-
-    // let output = prove_circuit.output(&z);
-
-    // let snark = result.unwrap();
 
     #[cfg(feature = "metrics")]
     log::space(
@@ -304,21 +253,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         serde_json::to_string(&compressed_snark).unwrap().len(),
     );
 
-    // // // verify the SNARK
-    // println!("Verify");
-    // let io = z.into_iter()
-    //   .chain(output.clone().into_iter())
-    //   .collect::<Vec<_>>();
-
-    // #[cfg(feature = "metrics")]
-    // log::tic(Component::Verifier, "Verify", "Verify");
-
-    // let verifier_result = snark.verify(&vk, &io);
-
-    // #[cfg(feature = "metrics")]
-    // log::stop(Component::Verifier, "Verify", "Verify"); 
-
-    // assert!(verifier_result.is_ok()); 
 
     let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
     let mut wtr = Writer::from_writer(file);

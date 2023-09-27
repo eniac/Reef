@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::circom::reader::generate_witness_from_bin;
-use metrics::metrics;
+use metrics::metrics::{log, log::Component};
 use circom::circuit::{CircomCircuit, R1CS};
 use ff::Field;
 use nova_snark::{
@@ -176,12 +176,14 @@ where
         .collect::<Vec<String>>();
     let mut current_public_input = start_public_input_hex.clone();
 
+    log::tic(Component::Compiler, "R1CS", "Commitment Gen");
     let witness_0 = compute_witness::<G1, G2>(
         current_public_input.clone(),
         private_inputs[0].clone(),
         witness_generator_file.clone(),
         &witness_generator_output,
     );
+    log::stop(Component::Compiler, "R1CS", "Commitment Gen");
 
     let circuit_0 = CircomCircuit {
         r1cs: r1cs.clone(),

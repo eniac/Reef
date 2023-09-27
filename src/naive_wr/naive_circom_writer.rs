@@ -2,7 +2,7 @@
 
 use std::fs::File;
 use std::io::prelude::*;
-use crate::naive::dfa::*; 
+use crate::naive_wr::dfa::*; 
 
 pub fn make_vanishing(size: usize,name:&str,idx_string: String)-> String {
     format!("function roots{name}(i) {{

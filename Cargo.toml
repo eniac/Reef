@@ -38,6 +38,7 @@ memory-stats = "1.1.0"
 nova-scotia = {path="./Nova-Scotia"}
 execute = "0.2.12"
 num-bigint = "0.4.3"
+metrics = {path="./metrics"}
 
 [target.'cfg(all(not(windows), not(target_env = "musl")))'.dependencies]
 jemallocator = "0.3.0"
@@ -50,6 +51,8 @@ criterion = { version = "0.4", features = [ "html_reports" ] }
 default = []
 metrics = ["dep:dashmap"]
 plot = []
+nwr = []
+reef = []
 
 [[bench]]
 name = "bench"

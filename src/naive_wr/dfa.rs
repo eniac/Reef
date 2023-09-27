@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind, Result};
 
-use crate::naive::naive_regex::{re,Regex};
+use crate::naive_wr::naive_regex::{re,Regex};
 // use crate::regex::*;
 
 #[derive(Debug)]
