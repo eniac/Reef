@@ -70,7 +70,41 @@ pub fn run_backend(
 
     let solver_thread = thread::spawn(move || {
         // we do setup here to avoid unsafe passing
-        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
+        // stop gap for cost model - don't need to time >:)
+        let batch_size = if temp_batch_size == 0 {
+            let trace = safa.solve(&doc);
+            let mut sols = trace_preprocessing(&trace, &safa);
+
+            let mut paths = vec![];
+            let mut path_len = 1;
+
+            for sol in sols {
+                for elt in sol {
+                    if safa.g[elt.from_node].is_and() {
+                        if path_len > 1 {
+                            paths.push(path_len);
+                        }
+                        path_len = 1;
+                    } else if safa.accepting().contains(&elt.to_node) {
+                        path_len += 1;
+                        paths.push(path_len);
+                    } else {
+                        path_len += 1;
+                    }
+                }
+            }
+
+            if paths.len() == 1 {
+                paths.len() / 2
+            } else {
+                //average(paths)
+                (paths.iter().sum::<usize>() as f32 / paths.len() as f32).ceil() as usize
+            }
+        } else {
+            temp_batch_size
+        };
+        println!("BATCH SIZE {:#?}", batch_size);
 
         #[cfg(feature = "metrics")]
         log::tic(
@@ -79,8 +113,10 @@ pub fn run_backend(
             "Optimization Selection, R1CS precomputations",
         );
 
+        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
         let proj = if projections { safa.projection() } else { None };
-        let mut r1cs_converter = R1CS::new(&safa, &doc, temp_batch_size, proj, false, sc.clone());
+        let mut r1cs_converter = R1CS::new(&safa, &doc, batch_size, proj, false, sc.clone());
 
         #[cfg(feature = "metrics")]
         log::stop(
@@ -699,7 +735,7 @@ mod tests {
         batch_size: usize,
         projections: bool,
     ) {
-        let r = re::new(&rstr);
+        let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
 
         init();
@@ -709,15 +745,13 @@ mod tests {
     #[test]
     fn e2e_projections() {
         backend_test(
-            "ab".to_string(),
-            "^a*b*$".to_string(),
-            ("aaab".to_string())
-                .chars()
-                //.map(|c| c.to_string())
-                .collect(),
+            "abc".to_string(),
+            "^....cc$".to_string(),
+            ("aabbcc".to_string()).chars().collect(),
             0,
             true,
         );
+        panic!();
     }
 
     #[test]
@@ -727,7 +761,6 @@ mod tests {
             "gaa*bb*cc*dd*ee*f".to_string(),
             ("gaaaaaabbbbbbccccccddddddeeeeeef".to_string())
                 .chars()
-                //.map(|c| c.to_string())
                 .collect(),
             33,
             false,
@@ -739,11 +772,19 @@ mod tests {
         backend_test(
             "ab".to_string(),
             "bbb".to_string(),
-            ("aaabbbaaa".to_string())
-                .chars()
-                //.map(|c| c.to_string())
-                .collect(),
+            ("aaabbbaaa".to_string()).chars().collect(),
             2,
+            false,
+        );
+    }
+
+    #[test]
+    fn e2e_nest_forall() {
+        backend_test(
+            "abcd".to_string(),
+            "^(?=a)ab(?=c)cd$".to_string(),
+            ("abcd".to_string()).chars().collect(),
+            0,
             false,
         );
     }

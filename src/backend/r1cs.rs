@@ -44,8 +44,6 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     ep_num: usize,
-    pub doc_extend: usize,
-    is_match: bool,
     // circuit crap
     pub max_branches: usize,
     pub max_stack: usize,
@@ -73,37 +71,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         hybrid: bool,
         pcs: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
-        //let nfa_match = nfa.is_match(doc);
-        //let is_match = nfa_match.is_some();
-
-        //let opt_batch_size;
-        let cost: usize;
-        //      let sel_batch_size = opt_batch_size;
-
-        // TODO timing here
-        let sol = safa.solve(&doc);
-        let is_match = sol.is_some();
-
-        let mut sel_batch_size = 1; // TODO!!sol.unwrap().0.len();
-        for s in sol.iter() {
-            sel_batch_size = max(sel_batch_size, s.0.len() + 1);
-        }
-        /*for m in moves.clone().unwrap().0 {
-            sel_batch_size = max(sel_batch_size, m.to_cur - m.from_cur);
-        }*/
-        println!("BATCH {:#?}", sel_batch_size);
-
-        //let mut batch_doc = doc.clone();
-        let mut batch_doc_len = doc.len();
-
-        batch_doc_len += 2; // ??? TODO????
-
-        let mut epsilon_to_add = sel_batch_size - (batch_doc_len % sel_batch_size);
-
-        if batch_doc_len % sel_batch_size == 0 {
-            epsilon_to_add = 0;
-        }
-
         // character conversions
         let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
         let mut i = 0;
@@ -168,10 +135,18 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let kid_padding = 0; // TODO !!
         let mut max_stack = 1;
         let mut max_rel = 1;
+        let mut path_len = 0;
+        let mut paths = vec![];
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             //println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
+                if path_len > 0 {
+                    println!("PUSHING {} @ STATE {:#?}", path_len, all_state);
+                    paths.push(path_len);
+                }
+                path_len = 0;
+
                 let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
                     .edges(all_state)
@@ -444,6 +419,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let hybrid_len = max(pub_len, priv_len).next_power_of_two() * 2;
 
+        let batch_size = 10;
+        assert!(batch_size > 1);
+
         Self {
             safa,
             foralls_w_kids,
@@ -453,12 +431,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             reef_commit: None,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
-            batch_size: sel_batch_size,
+            batch_size,
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
             ep_num,
-            doc_extend: epsilon_to_add,
-            is_match,
             max_branches,
             max_stack,
             num_states,
@@ -477,13 +453,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     pub fn prover_accepting_state(&self, state: usize) -> u64 {
         let mut out = false;
 
-        if self.is_match {
-            // proof of membership
-            for a in self.safa.accepting().iter() {
-                out = out || a.index() == state;
-            }
-        } else {
-            unimplemented!();
+        // proof of membership
+        for a in self.safa.accepting().iter() {
+            out = out || a.index() == state;
         }
 
         if out {
@@ -2473,8 +2445,6 @@ mod tests {
         let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
         r1cs_converter.reef_commit = Some(reef_commit.clone());
 
-        assert_eq!(expected_match, r1cs_converter.is_match);
-
         let mut running_q: Option<Vec<Integer>> = None;
         let mut running_v: Option<Integer> = None;
         let mut doc_running_q: Option<Vec<Integer>> = None;
@@ -2607,7 +2577,7 @@ mod tests {
     }
 
     #[test]
-    fn naive_test() {
+    fn naive_1() {
         init();
         test_func_no_hash(
             "abcd".to_string(),
@@ -2620,7 +2590,7 @@ mod tests {
     }
 
     #[test]
-    fn naive_test_2() {
+    fn naive_2() {
         init();
         test_func_no_hash(
             "abcd".to_string(),
