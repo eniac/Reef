@@ -43,6 +43,7 @@ struct ProofInfo {
     commit: ReefCommitment<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
     doc_len: usize,
+    proj_doc_len: usize,
     num_states: usize,
 }
 
@@ -159,7 +160,8 @@ pub fn run_backend(
                 z0_primary,
                 commit: reef_commit,
                 table: r1cs_converter.table.clone(),
-                doc_len: r1cs_converter.doc_len(),
+                doc_len: r1cs_converter.udoc.len(),     // real
+                proj_doc_len: r1cs_converter.doc_len(), // projected
                 num_states: r1cs_converter.num_states,
             })
             .unwrap();
@@ -645,6 +647,7 @@ fn prove_and_verify(
         proof_info.table,
         proof_info.num_states,
         proof_info.doc_len,
+        proof_info.proj_doc_len,
         ipi,
         ipa,
         cap_d,
@@ -666,6 +669,7 @@ fn verify(
     table: Vec<Integer>,
     num_states: usize,
     doc_len: usize,
+    proj_doc_len: usize,
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
     cap_d: <G1 as Group>::Scalar,
@@ -675,7 +679,7 @@ fn verify(
     cap_v_commit: Commitment<G1>,
 ) {
     let q_len = logmn(table.len());
-    let qd_len = logmn(doc_len);
+    let qd_len = logmn(proj_doc_len);
 
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
@@ -758,7 +762,6 @@ mod tests {
             0,
             true,
         );
-        panic!();
     }
 
     #[test]

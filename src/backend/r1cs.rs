@@ -1703,6 +1703,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         Option<Integer>,
         usize,
     ) {
+        let mut wasted = 0;
         let mut wits = FxHashMap::default();
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
@@ -1736,7 +1737,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         cursor_i,
                         i,
                     ));
-
+                    wasted += 1;
                     i += 1;
                 }
             } else if sols[self.sol_num].is_empty() {
@@ -1834,7 +1835,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 cursor_i,
                                 i,
                             ));
-
+                            wasted += 1;
                             i += 1;
                         }
                     }
@@ -1903,6 +1904,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         //println!("DONE LOOP");
+        println!("'WASTED' SLOTS THIS ITERATION: {}", wasted);
 
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
