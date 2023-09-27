@@ -419,7 +419,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let hybrid_len = max(pub_len, priv_len).next_power_of_two() * 2;
 
-        let batch_size = 10;
         assert!(batch_size > 1);
 
         Self {
