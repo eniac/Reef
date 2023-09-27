@@ -275,7 +275,7 @@ pub fn final_clear_checks(
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
     final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
-    final_doc_v: Option<<G1 as Group>::Scalar>,
+    final_doc_hash: Option<<G1 as Group>::Scalar>,
     doc_subset: Option<(usize, usize)>, // projections
     cap_d: Option<<G1 as Group>::Scalar>,
     ipi: InnerProductInstance<G1>,
@@ -284,7 +284,7 @@ pub fn final_clear_checks(
     //Asserting that d in z_n == d passed into spartan direct
     match cap_d {
         Some(d) => {
-            assert_eq!(d, final_doc_v.unwrap());
+            assert_eq!(d, final_doc_hash.unwrap());
         }
         None => {}
     }
@@ -313,8 +313,8 @@ pub fn final_clear_checks(
         }
     }
 
-    match (final_doc_q, final_doc_v) {
-        (Some(q), Some(v)) => {
+    match (final_doc_q, final_doc_hash) {
+        (Some(q), Some(_)) => {
             let doc_ext_len = doc_len.next_power_of_two();
             //println!("DOC EXT LEN {:#?}", doc_ext_len);
 

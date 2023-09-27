@@ -9,7 +9,7 @@ use petgraph::Graph;
 
 use std::result::Result;
 
-use crate::frontend::openset::{OpenSet, OpenRange};
+use crate::frontend::openset::{OpenRange, OpenSet};
 use crate::frontend::quantifier::Quant;
 use crate::frontend::regex::{re, Regex, RegexF};
 use crate::trace::{Trace, TraceElem};
@@ -51,7 +51,7 @@ impl<A, B> Either<A, B> {
     fn right_or<'a>(&'a self, default: &'a B) -> &'a B {
         match self.0 {
             Ok(_) => default,
-            Err(ref e) => e
+            Err(ref e) => e,
         }
     }
 }
@@ -398,40 +398,48 @@ impl SAFA<char> {
         }
     }
 
-    fn projection_rec(&self, n: NodeIndex<u32>, m: Skip, visited: BTreeSet<NodeIndex<u32>>) -> Skip {
+    fn projection_rec(
+        &self,
+        n: NodeIndex<u32>,
+        m: Skip,
+        visited: BTreeSet<NodeIndex<u32>>,
+    ) -> Skip {
         if visited.contains(&n) {
             return m;
         }
         let mut v = visited.clone();
         v.insert(n);
 
-        self.g.edges(n)
-              .filter(|e| e.source() != e.target())
-              .filter_map(|e| {
-                 let next = e.target();
-                 let s = e.weight().clone().0.err()?;
-                 if s.is_nullable() {
+        self.g
+            .edges(n)
+            .filter(|e| e.source() != e.target())
+            .filter_map(|e| {
+                let next = e.target();
+                let s = e.weight().clone().0.err()?;
+                if s.is_nullable() {
                     Some((s, next))
-                 } else {
+                } else {
                     None
-                 }
-              }).fold(m, |acc, (s, next)| {
-                 self.projection_rec(next, acc.intersection(&s), v.clone())
-              })
+                }
+            })
+            .fold(m, |acc, (s, next)| {
+                self.projection_rec(next, acc.intersection(&s), v.clone())
+            })
     }
 
     /// Returns the prefix of the document we can ignore, rounded down to nearest 2^n
     /// Example: projection {9, 15}.a -> 3 (2^3 = 8 < 9)
     pub fn projection(&self) -> Option<usize> {
         let i = self.get_init();
-        let r = self.projection_rec(i, OpenSet::star(), BTreeSet::new()).first()?;
+        let r = self
+            .projection_rec(i, OpenSet::star(), BTreeSet::new())
+            .first()?;
         let e = r.end?;
 
         // Round-down to nearest power of 2
         if e == 0 {
             return None;
-        }
-        else if e == 1 {
+        } else if e == 1 {
             return Some(0);
         }
         let mut result = 1;
@@ -440,7 +448,7 @@ impl SAFA<char> {
             result <<= 1;
             exp += 1;
         }
-        return Some(exp-1);
+        return Some(exp - 1);
     }
 
     /// Solve at the root
@@ -714,7 +722,7 @@ mod tests {
                 TraceElem::new(2, &Either(Err(Skip::open(0))), 3, 1, 2),
                 TraceElem::new(0, &SAFA::epsilon(), 5, 0, 0),
                 TraceElem::new(5, &Either(Err(Skip::open(0))), 6, 0, 1),
-                TraceElem::new(6, &Either(Ok('b')), 3, 1, 2)
+                TraceElem::new(6, &Either(Ok('b')), 3, 1, 2),
             ]),
         )
     }
