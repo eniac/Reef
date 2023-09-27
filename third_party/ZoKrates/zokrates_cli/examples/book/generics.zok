@@ -1,0 +1,11 @@
+def sum<N>(field[N] a) -> field {
+    field mut res = 0;
+    for u32 i in 0..N {
+        res = res + a[i];
+    }
+    return res;
+}
+
+def main(field[3] a) -> field {
+    return sum(a);
+}

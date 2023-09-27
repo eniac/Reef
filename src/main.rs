@@ -32,7 +32,6 @@ fn main() {
             .map(|c| c.clone()) //to_string())
             .collect()
     } else {
-        //opt.input.chars().map(|c| c.to_string()).collect()
         opt.input.chars().collect()
     };
 
@@ -51,7 +50,12 @@ fn main() {
         let r = re::new(&opt.re);
         //    println!("REGEX: {:#?}", r));
 
-        let mut safa = SAFA::new(&ab, &r);
+    // Compile regex to SAFA
+    let safa = if opt.negate {
+        SAFA::new(&ab, &r).negate()
+    } else {
+        SAFA::new(&ab, &r)
+    };
 
         // Is document well-formed
         // nfa.well_formed(&doc);
@@ -59,9 +63,9 @@ fn main() {
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "DFA", "DFA");
 
-        // #[cfg(feature = "plot")]
-        // safa.as_str_safa().write_pdf("main")
-        //     .expect("Failed to plot NFA to a pdf file");
+    #[cfg(feature = "plot")]
+    safa.write_pdf("main")
+        .expect("Failed to plot NFA to a pdf file");
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Solver, "DFA Solving", "Clear Match");
@@ -80,31 +84,26 @@ fn main() {
 
         init();
 
-        run_backend(
-            safa.clone(),
-            doc,
-            opt.eval_type,
-            opt.commit_type,
-            opt.batch_size,
-        ); // auto select batching/commit
-        let file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .create(true)
-            .open(opt.output.clone())
-            .unwrap();
-        let mut wtr = Writer::from_writer(file);
-        let _ = wtr.write_record(&[
-            opt.input,
-            opt.re,
-            safa.g.edge_count().to_string(), //nedges().to_string(),
-            safa.g.node_count().to_string(), //nstates().to_string(),
-        ]);
-        let spacer = "---------";
-        let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-        wtr.flush();
-        #[cfg(feature = "metrics")]
-        log::write_csv(opt.output.to_str().unwrap()).unwrap();
-    }
-    return 
+    run_backend(safa.clone(), doc, opt.batch_size); // auto select batching/commit
+
+    let file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(opt.output.clone())
+        .unwrap();
+    let mut wtr = Writer::from_writer(file);
+    let _ = wtr.write_record(&[
+        opt.input,
+        opt.re,
+        safa.g.edge_count().to_string(), //nedges().to_string(),
+        safa.g.node_count().to_string(), //nstates().to_string(),
+    ]);
+    let spacer = "---------";
+    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    wtr.flush();
+    #[cfg(feature = "metrics")]
+    log::write_csv(opt.output.to_str().unwrap()).unwrap();
+
+    //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
 }

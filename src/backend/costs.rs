@@ -1,6 +1,6 @@
-use core::{panic, num};
+use core::{num, panic};
 
-use crate::safa::SAFA;
+use crate::frontend::safa::SAFA;
 use clap::ValueEnum;
 
 static POSEIDON_NUM: usize = 292;
@@ -41,9 +41,9 @@ pub fn accepting_circuit<'a>(nfa: &'a SAFA<char>, is_match: Option<(usize, usize
     // poly of degree (# final states - 1)
     // (alt, # non final states - 1)
     let cost: usize = 5; //constrain to boolean costs and bool accepting
-    let nstate =  match is_match {
-        None => nfa.non_accepting().len() as usize - 1 ,
-        _ => nfa.accepting.len() as usize - 1,
+    let nstate = match is_match {
+        None => nfa.non_accepting().len() as usize - 1,
+        _ => nfa.accepting().len() as usize - 1,
     };
     cost + nstate + 2
 }
@@ -138,7 +138,6 @@ fn commit_circuit_hash(
                 }
                 cost += n_sponge * 288;
             }
-
 
             //Sum check poseidon hashes
             cost += log_mn * 290;

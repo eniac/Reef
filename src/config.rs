@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 
 use crate::backend::costs::{JBatching, JCommit};
-use crate::regex::Regex;
+use crate::frontend::regex::Regex;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

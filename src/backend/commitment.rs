@@ -1,54 +1,54 @@
 use crate::backend::costs::{JBatching, JCommit};
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::verifier_mle_eval;
+use ::bellperson::{
+    gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
+    Variable,
+};
 use circ::cfg::cfg;
 use ff::{Field, PrimeField};
 use generic_array::typenum;
 use merlin::Transcript;
 use neptune::{
+    circuit2::Elt,
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
+    sponge::circuit::SpongeCircuit,
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
 };
+use nova_snark::spartan::direct::SpartanSNARK;
 use nova_snark::{
     errors::NovaError,
     provider::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pedersen::{CommitmentGens, CompressedCommitment},
+        pedersen::{Commitment, CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
-    traits::{commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait},
+    spartan::direct::SpartanVerifierKey,
+    traits::{
+        circuit::StepCircuit, commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait,
+    },
+    StepCounterType,
 };
 use rand::rngs::OsRng;
 use rug::{integer::Order, ops::RemRounding, Integer};
 
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
+type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
 #[derive(Debug, Clone)]
-pub enum ReefCommitment<F: PrimeField> {
-    HashChain(HashCommitmentStruct<F>),
-    Nlookup(DocCommitmentStruct<F>),
-}
-
-#[derive(Debug, Clone)]
-pub struct HashCommitmentStruct<F: PrimeField> {
-    pub commit: F,
-    pub blind: F,
-}
-
-#[derive(Debug, Clone)]
-pub struct DocCommitmentStruct<F> {
+pub struct ReefCommitment<F> {
     gens: CommitmentGens<G1>,
     gens_single: CommitmentGens<G1>,
     commit_doc: CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
     vec_t: Vec<F>, //<G1 as Group>::Scalar>,
     decommit_doc: F,
     pub commit_doc_hash: F,
+    pub s: F, // salt for hash
 }
 
 pub fn gen_commitment(
-    commit_docype: JCommit,
     doc: Vec<usize>,
     pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
 ) -> ReefCommitment<<G1 as Group>::Scalar>
@@ -56,106 +56,201 @@ where
     G1: Group<Base = <G2 as Group>::Scalar>,
     G2: Group<Base = <G1 as Group>::Scalar>,
 {
-    match commit_docype {
-        JCommit::HashChain => {
-            let mut hash;
+    let doc_ext_len = doc.len().next_power_of_two();
 
-            // H_0 = Hash(0, r, 0)
-            let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
-            let acc = &mut ();
+    let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
+    doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
 
-            let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-            sponge.start(parameter, None, acc);
+    let mle = mle_from_pts(doc_ext);
 
-            let blind = <G1 as Group>::Scalar::random(&mut OsRng);
+    let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
+    let blind = <G1 as Group>::Scalar::random(&mut OsRng);
+
+    let scalars: Vec<<G1 as Group>::Scalar> = //<G1 as Group>::Scalar> =
+                mle.into_iter().map(|x| int_to_ff(x)).collect();
+
+    let commit_doc = <G1 as Group>::CE::commit(&gens_t, &scalars, &blind);
+
+    // for in circuit hashing
+    let mut ro: PoseidonRO<<G2 as Group>::Scalar, <G1 as Group>::Scalar> =
+        PoseidonRO::new(PoseidonConstantsCircuit::new(), 3);
+    commit_doc.absorb_in_ro(&mut ro);
+    let commit_doc_hash = ro.squeeze(256); // todo
+
+    let salt = <G1 as Group>::Scalar::random(&mut OsRng);
+
+    return ReefCommitment {
+        gens: gens_t.clone(),
+        gens_single: CommitmentGens::<G1>::new_with_blinding_gen(
+            b"gens_s",
+            1,
+            &gens_t.get_blinding_gen(),
+        ),
+        commit_doc: commit_doc.compress(),
+        vec_t: scalars,
+        decommit_doc: blind,
+        commit_doc_hash: commit_doc_hash,
+        s: salt,
+    };
+}
+
+#[derive(Clone)]
+pub struct ConsistencyCircuit<F: PrimeField> {
+    pc: PoseidonConstants<F, typenum::U4>, // arity of PC can be changed as desired
+    d: F,
+    v: F,
+    s: F,
+}
+
+impl<F: PrimeField> ConsistencyCircuit<F> {
+    pub fn new(pc: PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
+        ConsistencyCircuit { pc, d, v, s }
+    }
+}
+
+impl<F> StepCircuit<F> for ConsistencyCircuit<F>
+where
+    F: PrimeField,
+{
+    fn arity(&self) -> usize {
+        1
+    }
+
+    fn output(&self, z: &[F]) -> Vec<F> {
+        assert_eq!(z[0], self.d);
+        z.to_vec()
+    }
+
+    #[allow(clippy::let_and_return)]
+    fn synthesize<CS>(
+        &self,
+        cs: &mut CS,
+        z: &[AllocatedNum<F>],
+    ) -> Result<Vec<AllocatedNum<F>>, SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+    {
+        let d_in = z[0].clone();
+
+        //v at index 0 (but technically 1 since io is allocated first)
+        let alloc_v = AllocatedNum::alloc(cs.namespace(|| "v"), || Ok(self.v))?;
+
+        let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s"), || Ok(self.s))?;
+
+        //poseidon(v,s) == d
+        let d_calc = {
+            let acc = &mut cs.namespace(|| "d hash circuit");
+            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+
+            sponge.start(
+                IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),
+                None,
+                acc,
+            );
 
             SpongeAPI::absorb(
                 &mut sponge,
                 2,
-                &[blind, <G1 as Group>::Scalar::from(0)],
+                &[Elt::Allocated(alloc_v), Elt::Allocated(alloc_s)],
                 acc,
             );
-            hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
+
+            let output = SpongeAPI::squeeze(&mut sponge, 1, acc);
             sponge.finish(acc).unwrap();
+            let out =
+                Elt::ensure_allocated(&output[0], &mut acc.namespace(|| "ensure allocated"), true)?;
+            out
+        };
 
-            let mut i = 0;
-            // H_i = Hash(H_i-1, char, i)
-            for c in doc.into_iter() {
-                let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
-                let acc = &mut ();
-
-                let parameter = IOPattern(vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
-                sponge.start(parameter, None, acc);
-
-                SpongeAPI::absorb(
-                    &mut sponge,
-                    3,
-                    &[
-                        hash[0],
-                        <G1 as Group>::Scalar::from(c as u64),
-                        <G1 as Group>::Scalar::from(i),
-                    ],
-                    acc,
-                );
-                hash = SpongeAPI::squeeze(&mut sponge, 1, acc);
-
-                sponge.finish(acc).unwrap();
-                i += 1;
-            }
-
-            return ReefCommitment::HashChain(HashCommitmentStruct {
-                commit: hash[0],
-                blind: blind,
-            });
+        // sanity
+        if d_calc.get_value().is_some() {
+            assert_eq!(d_in.get_value().unwrap(), d_calc.get_value().unwrap());
         }
-        JCommit::Nlookup => {
-            let doc_ext_len = doc.len().next_power_of_two();
 
-            let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
-            doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
+        cs.enforce(
+            || "d == d",
+            |z| z + d_in.get_variable(),
+            |z| z + CS::one(),
+            |z| z + d_calc.get_variable(),
+        );
 
-            let mle = mle_from_pts(doc_ext);
+        Ok(vec![d_calc]) // doesn't hugely matter
+    }
 
-            let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
-            let blind = <G1 as Group>::Scalar::random(&mut OsRng);
-
-            let scalars: Vec<<G1 as Group>::Scalar> = //<G1 as Group>::Scalar> =
-                mle.into_iter().map(|x| int_to_ff(x)).collect();
-
-            let commit_doc = <G1 as Group>::CE::commit(&gens_t, &scalars, &blind);
-
-            // for in circuit hashing
-            let mut ro: PoseidonRO<<G2 as Group>::Scalar, <G1 as Group>::Scalar> =
-                PoseidonRO::new(PoseidonConstantsCircuit::new(), 3);
-            commit_doc.absorb_in_ro(&mut ro);
-            let commit_doc_hash = ro.squeeze(256); // todo
-
-            let doc_commit = DocCommitmentStruct {
-                gens: gens_t.clone(),
-                gens_single: CommitmentGens::<G1>::new_with_blinding_gen(
-                    b"gens_s",
-                    1,
-                    &gens_t.get_blinding_gen(),
-                ),
-                commit_doc: commit_doc.compress(),
-                vec_t: scalars,
-                decommit_doc: blind,
-                commit_doc_hash: commit_doc_hash,
-            };
-
-            return ReefCommitment::Nlookup(doc_commit);
-        }
+    fn get_counter_type(&self) -> StepCounterType {
+        StepCounterType::Incremental
     }
 }
 
-// this crap will need to be seperated out
-pub fn proof_dot_prod(
-    dc: DocCommitmentStruct<<G1 as Group>::Scalar>,
+pub fn calc_d_clear(
+    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    claim_blind: <G1 as Group>::Scalar,
+    v: Integer,
+) -> <G1 as Group>::Scalar {
+    let mut sponge = Sponge::new_with_constants(&pc, Mode::Simplex);
+    let acc = &mut ();
+
+    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+    sponge.start(parameter, None, acc);
+
+    SpongeAPI::absorb(&mut sponge, 2, &[int_to_ff(v.clone()), claim_blind], acc);
+    let d_out_vec = SpongeAPI::squeeze(&mut sponge, 1, acc);
+    sponge.finish(acc).unwrap();
+
+    d_out_vec[0]
+}
+
+pub fn proof_dot_prod_verify(
+    dc: ReefCommitment<<G1 as Group>::Scalar>,
     running_q: Vec<<G1 as Group>::Scalar>,
-    running_v: <G1 as Group>::Scalar,
+    ipi: InnerProductInstance<G1>,
+    ipa: InnerProductArgument<G1>,
 ) -> Result<(), NovaError> {
-    let mut p_transcript = Transcript::new(b"dot_prod_proof");
     let mut v_transcript = Transcript::new(b"dot_prod_proof");
+    let num_vars = running_q.len();
+
+    ipa.verify(
+        &dc.gens,
+        &dc.gens_single,
+        num_vars,
+        &ipi,
+        &mut v_transcript.clone(),
+    )?;
+    println!("VERIFIED");
+    Ok(())
+}
+
+pub fn cap_verifier(
+    cap_d: <G1 as Group>::Scalar,
+    cap_snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
+    cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
+    vk: SpartanVerifierKey<G1, EE1>,
+    com_v: Commitment<G1>,
+) -> Result<(), NovaError> {
+    let z_0 = vec![cap_d];
+    let z_out = cap_circuit.output(&z_0);
+    let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
+    let res = cap_snark.cap_verify(&vk, &io, &com_v.compress());
+    res
+}
+
+pub fn proof_dot_prod_prover(
+    dc: &ReefCommitment<<G1 as Group>::Scalar>,
+    q: Vec<<G1 as Group>::Scalar>,
+    running_v: <G1 as Group>::Scalar,
+    doc_len: usize,
+) -> (
+    InnerProductInstance<G1>,
+    InnerProductArgument<G1>,
+    Commitment<G1>,
+    <G1 as Group>::Scalar,
+) {
+    let doc_ext_len = doc_len.next_power_of_two();
+
+    let mut p_transcript = Transcript::new(b"dot_prod_proof");
+
+    let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
+    let running_q = q_to_mle_q(&q_rev, doc_ext_len);
 
     // set up
     let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
@@ -170,51 +265,73 @@ pub fn proof_dot_prod(
     );
     let ipw =
         InnerProductWitness::new(&dc.vec_t, &dc.decommit_doc, &running_v, &decommit_running_v);
-    let ipa =
-        InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut p_transcript)?;
+    let ipa = InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut p_transcript)
+        .unwrap();
 
-    // verify
-    let num_vars = running_q.len();
-    ipa.verify(&dc.gens, &dc.gens_single, num_vars, &ipi, &mut v_transcript)?;
-
-    Ok(())
+    (ipi, ipa, commit_running_v, decommit_running_v)
 }
 
 pub fn final_clear_checks(
-    eval_type: JBatching,
     reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
-    accepting_state: <G1 as Group>::Scalar,
     table: &Vec<Integer>,
     doc_len: usize,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
-    final_hash: Option<<G1 as Group>::Scalar>,
     final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_doc_v: Option<<G1 as Group>::Scalar>,
+    cap_d: Option<<G1 as Group>::Scalar>,
+    ipi: Option<InnerProductInstance<G1>>,
+    ipa: Option<InnerProductArgument<G1>>,
 ) {
-    // state matches?
-    assert_eq!(accepting_state, <G1 as Group>::Scalar::from(1));
+    //Asserting that d in z_n == d passed into spartan direct
+    match cap_d {
+        Some(d) => {
+            assert_eq!(d, final_doc_v.unwrap());
+        }
+        None => {}
+    }
 
     // nlookup eval T check
     match (final_q, final_v) {
         (Some(q), Some(v)) => {
-            // T is in the clear for this case
-            match eval_type {
-                JBatching::NaivePolys => {
-                    panic!(
-                        "naive poly evaluation used, but running claim provided for verification"
-                    );
+            let mut q_i = vec![];
+            for f in q {
+                q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
+            }
+            // TODO mle eval over F
+            assert_eq!(
+                verifier_mle_eval(table, &q_i),
+                (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
+            );
+        }
+        (Some(_), None) => {
+            panic!("only half of running claim recieved");
+        }
+        (None, Some(_)) => {
+            panic!("only half of running claim recieved");
+        }
+        (None, None) => {
+            panic!("nlookup evaluation used, but no running claim provided for verification");
+        }
+    }
+
+    match (final_doc_q, final_doc_v) {
+        (Some(q), Some(v)) => {
+            let doc_ext_len = doc_len.next_power_of_two();
+            println!("DOC EXT LEN {:#?}", doc_ext_len);
+
+            // right form for inner product
+            let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
+            let q_ext = q_to_mle_q(&q_rev, doc_ext_len);
+            println!("Q EXT {:#?}", q_ext);
+
+            // Doc is commited to in this case
+            match (ipi, ipa) {
+                (Some(i), Some(a)) => {
+                    assert!(proof_dot_prod_verify(reef_commitment, q_ext, i, a).is_ok());
                 }
-                JBatching::Nlookup => {
-                    let mut q_i = vec![];
-                    for f in q {
-                        q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
-                    }
-                    // TODO mle eval over F
-                    assert_eq!(
-                        verifier_mle_eval(table, &q_i),
-                        (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
-                    );
+                (_, _) => {
+                    println!("no ipa or ipa checked (for testing)");
                 }
             }
         }
@@ -225,44 +342,7 @@ pub fn final_clear_checks(
             panic!("only half of running claim recieved");
         }
         (None, None) => {
-            if matches!(eval_type, JBatching::Nlookup) {
-                panic!("nlookup evaluation used, but no running claim provided for verification");
-            }
-        }
-    }
-
-    // todo vals align
-    // hash chain commitment check
-    match reef_commitment {
-        ReefCommitment::HashChain(h) => {
-            // todo substring
-            assert_eq!(h.commit, final_hash.unwrap());
-        }
-        ReefCommitment::Nlookup(dc) => {
-            // or - nlookup commitment check
-            match (final_doc_q, final_doc_v) {
-                (Some(q), Some(v)) => {
-                    let doc_ext_len = doc_len.next_power_of_two();
-
-                    // right form for inner product
-                    let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
-                    let q_ext = q_to_mle_q(&q_rev, doc_ext_len);
-
-                    // Doc is commited to in this case
-                    assert!(proof_dot_prod(dc, q_ext, v).is_ok());
-                }
-                (Some(_), None) => {
-                    panic!("only half of running claim recieved");
-                }
-                (None, Some(_)) => {
-                    panic!("only half of running claim recieved");
-                }
-                (None, None) => {
-                    panic!(
-                    "nlookup doc commitment used, but no running claim provided for verification"
-                );
-                }
-            }
+            panic!("nlookup doc commitment used, but no running claim provided for verification");
         }
     }
 }
