@@ -114,11 +114,7 @@ impl SAFA<char> {
         // Also add the complement skip since we know it always fails
         if !skip.is_full() && !skip.is_nil() {
             let n_empty = self.find_or_add(&re::empty(), false);
-            self.g.add_edge(
-                n,
-                n_empty,
-                Either::right(skip.negate().diff(&OpenSet::nil())),
-            );
+            self.g.add_edge(n, n_empty, Either::right(skip.negate()));
         }
         if recurse {
             self.add(n_c);
@@ -416,24 +412,28 @@ impl SAFA<char> {
             .filter_map(|e| {
                 let next = e.target();
                 let s = e.weight().clone().0.err()?;
-                if s.is_nullable() {
-                    Some((s, next))
-                } else {
+                if s.is_nullable() || s.is_open() {
                     None
+                } else {
+                    Some((s, next))
                 }
             })
             .fold(m, |acc, (s, next)| {
-                self.projection_rec(next, acc.intersection(&s), v.clone())
+                if self.g[n].is_and() {
+                    self.projection_rec(next, acc.intersection(&s), v.clone())
+                } else {
+                    self.projection_rec(next, acc.union(&s), v.clone())
+                }
             })
     }
 
     /// Returns the prefix of the document we can ignore
-    /// Example: projection ^{0, 15}.a$ -> Some(15)
+    /// Example: projection ^{4, 15}.a$ -> Some(4)
+    ///          projection ^{0, 15}.a$ -> None
     ///          projection .*{0,4).a   -> None
     pub fn projection(&self) -> Option<usize> {
-        self.projection_rec(self.get_init(), OpenSet::star(), BTreeSet::new())
-            .first()?
-            .end
+        let s = self.projection_rec(self.get_init(), OpenSet::empty(), BTreeSet::new());
+        Some(s.first()?.start)
     }
 
     /// Solve at the root
@@ -999,14 +999,23 @@ mod tests {
 
     #[test]
     fn test_safa_projection1() {
-        let r = re::simpl(re::new(r"^.{0,9}a$"));
+        let r = re::simpl(re::new(r"^.{4,9}a$"));
         let safa = SAFA::new(&"ab", &r);
-        assert_eq!(safa.projection(), Some(9));
+        assert_eq!(safa.projection(), Some(4));
     }
+
     #[test]
     fn test_safa_projection2() {
-        let r = re::simpl(re::new(r".{0,2}a$"));
+        let r = re::simpl(re::new(r"^.{0,2}a$"));
         let safa = SAFA::new(&"ab", &r);
+        assert_eq!(safa.projection(), None);
+    }
+
+    #[test]
+    fn test_safa_projection3() {
+        let r = re::simpl(re::new(r".{4,5}a$"));
+        let safa = SAFA::new(&"ab", &r);
+        safa.write_pdf("safa").unwrap();
         assert_eq!(safa.projection(), None);
     }
 }
