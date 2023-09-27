@@ -72,7 +72,7 @@ pub fn run_backend(
         // we do setup here to avoid unsafe passing
 
         // stop gap for cost model - don't need to time >:)
-        let batch_size = if temp_batch_size == 0 {
+        let mut batch_size = if temp_batch_size == 0 {
             let trace = safa.solve(&doc);
             let mut sols = trace_preprocessing(&trace, &safa);
 
@@ -104,6 +104,11 @@ pub fn run_backend(
         } else {
             temp_batch_size
         };
+        batch_size += 1; // to last
+
+        if batch_size < 2 {
+            batch_size = 2;
+        }
         println!("BATCH SIZE {:#?}", batch_size);
 
         #[cfg(feature = "metrics")]
@@ -327,7 +332,7 @@ fn solve<'a>(
     let mut current_state = r1cs_converter.safa.get_init().index();
     // TODO don't recalc :(
 
-    let mut next_state;
+    let mut next_state = 0;
 
     let trace = r1cs_converter.safa.solve(doc);
     let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
@@ -354,6 +359,7 @@ fn solve<'a>(
         ) = r1cs_converter.gen_wit_i(
             &mut sols,
             i,
+            next_state,
             running_q.clone(),
             running_v.clone(),
             doc_running_q.clone(),
@@ -371,7 +377,8 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, &test, "witness generation");
 
-        circ_data.check_all(&wits);
+        // just for debugging :)
+        //circ_data.check_all(&wits);
 
         let q = match running_q {
             Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),

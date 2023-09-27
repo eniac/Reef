@@ -383,11 +383,11 @@ pub fn normal_add_table<'a>(
 
                 // TODO we have to make sure the multipliers are big enough
 
-                /*println!("ADDITIONAL FOR ACCEPTING");
+                println!("ADDITIONAL FOR ACCEPTING");
                 println!(
                     "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
                     in_state, out_state, c, lower_offset, upper_offset, rel,
-                );*/
+                );
 
                 set_table.insert(
                     Integer::from(
@@ -425,7 +425,7 @@ pub(crate) fn calc_rel<'a>(
     let mut rel = 0;
 
     if trans {
-        //print!("in {:#?}, OUT {:#?}", in_state.index(), out_state);
+        print!("in {:#?}, OUT {:#?}", in_state, out_state);
         assert!(out_state == num_states || safa.g[NodeIndex::new(out_state)].is_and());
         assert!(safa.accepting().contains(&NodeIndex::new(in_state)));
         rel = 1;

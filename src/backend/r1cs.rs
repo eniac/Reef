@@ -121,13 +121,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         //safa.write_pdf("safa1").unwrap();
 
-        /*
         println!(
             "STATES {:#?}",
             safa.g
                 .node_indices()
                 .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-        );*/
+        );
 
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
@@ -1586,10 +1585,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        /*println!(
+        println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );*/
+        );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1676,10 +1675,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        /*println!(
+        println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );*/
+        );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1691,6 +1690,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         &mut self,
         sols: &mut Vec<LinkedList<TraceElem<char>>>, //move_num: (usize, usize),
         batch_num: usize,
+        in_state: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
         doc_running_q: Option<Vec<Integer>>,
@@ -1712,7 +1712,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut wits = FxHashMap::default();
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
-        let mut state_i = 0;
+        let mut state_i = in_state;
         let mut next_state = 0;
         let mut char_num;
         let mut offset_i;
@@ -1747,6 +1747,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
             } else if sols[self.sol_num].is_empty() {
                 // need to transition
+
+                // not forall (TODO check cursor_i correct)
+                if i == 0 {
+                    // must pad out the stack
+                    // fill stack vars with padding
+                    self.push_wit(&mut wits, None, cursor_i);
+                    // pad out "popped" vars, since there's no pop
+                    wits.insert(format!("cursor_{}", self.batch_size), new_wit(cursor_i));
+                    wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
+                }
                 char_num = self.num_ab[&None];
                 cursor_access.push(self.ep_num);
 
@@ -2438,126 +2448,118 @@ mod tests {
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-        let mut r1cs_converter = R1CS::new(&safa, &chars, 0, proj, false, sc.clone());
-        // TODO hybrid
 
-        let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
-        r1cs_converter.reef_commit = Some(reef_commit.clone());
+        for b in batch_sizes {
+            let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, false, sc.clone());
+            // TODO hybrid
 
-        let mut running_q: Option<Vec<Integer>> = None;
-        let mut running_v: Option<Integer> = None;
-        let mut doc_running_q: Option<Vec<Integer>> = None;
-        let mut doc_running_v: Option<Integer> = None;
-        let mut hybrid_running_q: Option<Vec<Integer>> = None;
-        let mut hybrid_running_v: Option<Integer> = None;
+            let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
+            r1cs_converter.reef_commit = Some(reef_commit.clone());
 
-        let mut doc_idx = 0;
+            let mut running_q: Option<Vec<Integer>> = None;
+            let mut running_v: Option<Integer> = None;
+            let mut doc_running_q: Option<Vec<Integer>> = None;
+            let mut doc_running_v: Option<Integer> = None;
+            let mut hybrid_running_q: Option<Vec<Integer>> = None;
+            let mut hybrid_running_v: Option<Integer> = None;
 
-        let (pd, _vd) = r1cs_converter.to_circuit();
+            let mut doc_idx = 0;
 
-        let mut values;
-        let mut next_state = 0;
+            let (pd, _vd) = r1cs_converter.to_circuit();
 
-        let trace = safa.solve(&chars);
+            let mut values;
+            let mut next_state = 0;
 
-        let mut sols = trace_preprocessing(&trace, &safa);
+            let trace = safa.solve(&chars);
 
-        let mut i = 0;
-        while r1cs_converter.sol_num < sols.len() {
-            println!("STEP {:#?}", i);
-            (
-                values,
-                next_state,
-                running_q,
-                running_v,
-                doc_running_q,
-                doc_running_v,
-                hybrid_running_q,
-                hybrid_running_v,
-                doc_idx,
-            ) = r1cs_converter.gen_wit_i(
-                &mut sols,
-                i,
-                running_q.clone(),
-                running_v.clone(),
-                doc_running_q.clone(),
-                doc_running_v.clone(),
-                hybrid_running_q.clone(),
-                hybrid_running_v.clone(),
-                doc_idx,
+            let mut sols = trace_preprocessing(&trace, &safa);
+
+            let mut i = 0;
+            while r1cs_converter.sol_num < sols.len() {
+                println!("STEP {:#?}", i);
+                (
+                    values,
+                    next_state,
+                    running_q,
+                    running_v,
+                    doc_running_q,
+                    doc_running_v,
+                    hybrid_running_q,
+                    hybrid_running_v,
+                    doc_idx,
+                ) = r1cs_converter.gen_wit_i(
+                    &mut sols,
+                    i,
+                    next_state,
+                    running_q.clone(),
+                    running_v.clone(),
+                    doc_running_q.clone(),
+                    doc_running_v.clone(),
+                    hybrid_running_q.clone(),
+                    hybrid_running_v.clone(),
+                    doc_idx,
+                );
+
+                pd.check_all(&values);
+
+                // for next i+1 round
+                i += 1;
+            }
+
+            let rq = match running_q {
+                Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+                None => None,
+            };
+            let rv = match running_v {
+                Some(x) => Some(int_to_ff(x)),
+                None => None,
+            };
+            let drq = match doc_running_q {
+                Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+                None => None,
+            };
+            let drv = match doc_running_v {
+                Some(x) => Some(int_to_ff(x)),
+                None => None,
+            };
+            assert_eq!(next_state, r1cs_converter.num_states);
+
+            let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
+                &r1cs_converter.reef_commit.unwrap(),
+                drq.clone().unwrap(),
+                drv.clone().unwrap(),
+                r1cs_converter.udoc.len(),
             );
 
-            pd.check_all(&values);
+            final_clear_checks(
+                reef_commit,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
+                rq,
+                rv,
+                drq,
+                drv,
+                r1cs_converter.doc_subset,
+                None,
+                ipi,
+                ipa,
+            );
 
-            // for next i+1 round
-            i += 1;
+            println!("actual cost: {:#?}", pd.r1cs.constraints.len());
+            println!("\n\n\n");
+
+            /*assert!(
+                pd.r1cs.constraints.len() as usize
+                    == costs::full_round_cost_model_nohash(
+                        &nfa,
+                        r1cs_converter.batch_size,
+                        b.clone(),
+                        nfa.is_match(&chars),
+                        doc.len(),
+                        c
+                    )
+            );*/
         }
-
-        let rq = match running_q {
-            Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
-            None => None,
-        };
-        let rv = match running_v {
-            Some(x) => Some(int_to_ff(x)),
-            None => None,
-        };
-        let drq = match doc_running_q {
-            Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
-            None => None,
-        };
-        let drv = match doc_running_v {
-            Some(x) => Some(int_to_ff(x)),
-            None => None,
-        };
-        assert_eq!(next_state, r1cs_converter.num_states);
-
-        let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
-            &r1cs_converter.reef_commit.unwrap(),
-            drq.clone().unwrap(),
-            drv.clone().unwrap(),
-            r1cs_converter.udoc.len(),
-        );
-
-        final_clear_checks(
-            reef_commit,
-            &r1cs_converter.table,
-            r1cs_converter.udoc.len(),
-            rq,
-            rv,
-            drq,
-            drv,
-            r1cs_converter.doc_subset,
-            None,
-            ipi,
-            ipa,
-        );
-
-        /*
-        println!(
-            "cost model: {:#?}",
-            costs::full_round_cost_model_nohash(
-                &safa,
-                r1cs_converter.batch_size,
-                b.clone(),
-                nfa.is_match(&chars),
-                doc.len(),
-                c,
-            )
-        );*/
-        println!("actual cost: {:#?}", pd.r1cs.constraints.len());
-        println!("\n\n\n");
-
-        /*assert!(
-            pd.r1cs.constraints.len() as usize
-                == costs::full_round_cost_model_nohash(
-                    &nfa,
-                    r1cs_converter.batch_size,
-                    b.clone(),
-                    nfa.is_match(&chars),
-                    doc.len(),
-                    c
-                )
-        );*/
     }
 
     #[test]
@@ -2569,7 +2571,7 @@ mod tests {
             "abcd".to_string(),
             "^.....c$".to_string(),
             "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
-            vec![1],              // 2],
+            vec![2],              // 2],
             true,
             Some(5), // (4,8)
         );
@@ -2582,7 +2584,7 @@ mod tests {
             "abcd".to_string(),
             "^(?=a)ab(?=c)cd$".to_string(),
             "abcd".to_string(),
-            vec![1], // 2],
+            vec![2], // 2],
             true,
             None,
         );
@@ -2595,7 +2597,7 @@ mod tests {
             "abcd".to_string(),
             "(?=a)ab(?=c)cd".to_string(),
             "abcd".to_string(),
-            vec![1], // 2],
+            vec![2], // 2],
             true,
             None,
         );
@@ -2608,7 +2610,7 @@ mod tests {
             "ab".to_string(),
             "^ab$".to_string(),
             "ab".to_string(),
-            vec![0, 1],
+            vec![2],
             true,
             None,
         );
@@ -2635,7 +2637,7 @@ mod tests {
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaab".to_string(),
-            vec![1],
+            vec![2],
             true,
             None,
         );
@@ -2643,7 +2645,7 @@ mod tests {
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaaaaabbbbbbbbbbbbbb".to_string(),
-            vec![0, 1, 2, 4],
+            vec![2, 4],
             true,
             None,
         );
@@ -2651,7 +2653,7 @@ mod tests {
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaaaaaaaaaab".to_string(),
-            vec![1, 2, 4],
+            vec![2, 4],
             true,
             None,
         );
@@ -2665,7 +2667,7 @@ mod tests {
             "ab".to_string(),
             "^a$".to_string(),
             "c".to_string(),
-            vec![1],
+            vec![2],
             false,
             None,
         );
@@ -2691,7 +2693,7 @@ mod tests {
             "helowrd".to_string(),
             "^hello.*$".to_string(),
             "helloworld".to_string(),
-            vec![1],
+            vec![2],
             true,
             None,
         );
@@ -2713,7 +2715,7 @@ mod tests {
             "helowrd".to_string(),
             "^hello.*$".to_string(),
             "helloworld".to_string(),
-            vec![3, 4, 6, 7],
+            vec![2, 3, 4, 6, 7],
             true,
             None,
         );
@@ -2759,7 +2761,7 @@ mod tests {
             ascii_chars.into_iter().collect::<String>(),
             "^.*our technology.*$".to_string(),
             fs::read_to_string("gov_text.txt").unwrap(),
-            vec![1],
+            vec![2],
             true,
             None,
         );
