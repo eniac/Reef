@@ -44,9 +44,6 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     ep_num: usize,
-    star_num: usize,
-    pub doc_extend: usize,
-    is_match: bool,
     // circuit crap
     pub max_branches: usize,
     pub max_stack: usize,
@@ -58,10 +55,11 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub stack_ptr: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
     pub doc_rc_v: Option<Integer>,
-}
-
-fn type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
+    // proj
+    doc_subset: Option<(usize, usize)>,
+    // hybrid
+    hybrid: bool,
+    hybrid_len: usize,
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F, char> {
@@ -69,39 +67,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         safa: &'a SAFA<char>,
         doc: &Vec<char>,
         batch_size: usize,
+        projection: Option<usize>,
+        hybrid: bool,
         pcs: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
-        //let nfa_match = nfa.is_match(doc);
-        //let is_match = nfa_match.is_some();
-
-        //let opt_batch_size;
-        let cost: usize;
-        //      let sel_batch_size = opt_batch_size;
-
-        // TODO timing here
-        let sol = safa.solve(&doc);
-        let is_match = sol.is_some();
-
-        let mut sel_batch_size = 1; // TODO!!sol.unwrap().0.len();
-        for s in sol.iter() {
-            sel_batch_size = max(sel_batch_size, s.0.len() + 1);
-        }
-        /*for m in moves.clone().unwrap().0 {
-            sel_batch_size = max(sel_batch_size, m.to_cur - m.from_cur);
-        }*/
-        println!("BATCH {:#?}", sel_batch_size);
-
-        //let mut batch_doc = doc.clone();
-        let mut batch_doc_len = doc.len();
-
-        batch_doc_len += 2; // ??? TODO????
-
-        let mut epsilon_to_add = sel_batch_size - (batch_doc_len % sel_batch_size);
-
-        if batch_doc_len % sel_batch_size == 0 {
-            epsilon_to_add = 0;
-        }
-
         // character conversions
         let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
         let mut i = 0;
@@ -109,9 +78,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_ab.insert(Some(c), i);
             i += 1;
         }
-        num_ab.insert(None, i); // EPSILON
-        num_ab.insert(Some('*'), i + 1); // STAR
-        num_ab.insert(Some('!'), i + 2); // EOF TODO
+        num_ab.insert(Some('$'), i); // EOF TODO
+        num_ab.insert(None, i + 1); // EPSILON
 
         // generate T
         let num_states = safa.g.node_count();
@@ -137,7 +105,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             if in_state.is_and() {
-                let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
+                let and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
                     .edges(in_state.inner)
                     .filter(|e| e.source() != e.target())
@@ -153,26 +121,30 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         //safa.write_pdf("safa1").unwrap();
 
-        /*
         println!(
             "STATES {:#?}",
             safa.g
                 .node_indices()
                 .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-        );*/
+        );
 
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
-        let mut current_forall_node = NodeIndex::new(0);
         let kid_padding = 0; // TODO !!
         let mut max_stack = 1;
         let mut max_rel = 1;
+        let mut path_len = 0;
+        let mut paths = vec![];
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
-            println!("PROCESS STATE {:#?}", all_state);
+            //println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
-                current_forall_node = all_state;
+                if path_len > 0 {
+                    println!("PUSHING {} @ STATE {:#?}", path_len, all_state);
+                    paths.push(path_len);
+                }
+                path_len = 0;
 
                 let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
@@ -321,30 +293,23 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // in case when we don't start on forall:
         // proceed from the beginning and add states until we reach a forall
-        let mut exists_start = Dfs::new(&safa.g, safa.get_init());
 
-        while let Some(exists_state) = exists_start.next(&safa.g) {
-            if safa.g[exists_state].is_and() {
-                break;
-            }
-
-            let sub_max_rel = normal_add_table(
-                &safa,
-                &mut num_ab,
-                &mut set_table,
-                num_states,
-                num_chars,
-                kid_padding,
-                max_branches,
-                max_offsets,
-                exists_state,
-                num_states, // backtrace state
-                vec![],
-                true,
-            );
-            if sub_max_rel > max_rel {
-                max_rel = sub_max_rel;
-            }
+        let sub_max_rel = normal_add_table(
+            &safa,
+            &mut num_ab,
+            &mut set_table,
+            num_states,
+            num_chars,
+            kid_padding,
+            max_branches,
+            max_offsets,
+            safa.get_init(), //exists_state,
+            num_states,      // backtrace state
+            vec![],
+            true,
+        );
+        if sub_max_rel > max_rel {
+            max_rel = sub_max_rel;
         }
 
         // add "last" loop
@@ -404,15 +369,48 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         usize_doc.push(u);
         int_doc.push(Integer::from(u));
 
-        let star_num = usize_doc.len();
-        let u = num_ab[&Some('*')];
+        let eof_num = usize_doc.len();
+        let u = num_ab[&Some('$')];
         usize_doc.push(u);
         int_doc.push(Integer::from(u));
 
         let mut stack = vec![];
-        for i in 0..max_stack {
+        for _i in 0..max_stack {
             stack.push((0, 0)); // TODO CHANGE THIS TO THE PADDING
         }
+
+        let doc_subset = if projection.is_some() {
+            let real_start = projection.unwrap();
+
+            let end = usize_doc.len().next_power_of_two();
+            let mut start = end - 1;
+            let mut jump = 1;
+
+            while start > real_start && start >= 0 {
+                start -= jump;
+                jump *= 2;
+            }
+            if start == 0 {
+                None
+            } else {
+                println!("USING PROJECTION {:#?}", ((start, end)));
+                Some((start, end)) // handle doc extension TODO?
+            }
+        } else {
+            None
+        };
+
+        let pub_len = table.len();
+        let priv_len = if doc_subset.is_some() {
+            let ds = doc_subset.unwrap();
+            ds.1 - ds.0
+        } else {
+            usize_doc.len()
+        };
+
+        let hybrid_len = max(pub_len, priv_len).next_power_of_two() * 2;
+
+        assert!(batch_size > 1);
 
         Self {
             safa,
@@ -423,13 +421,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             reef_commit: None,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
-            batch_size: sel_batch_size,
+            batch_size,
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
             ep_num,
-            star_num,
-            doc_extend: epsilon_to_add,
-            is_match,
             max_branches,
             max_stack,
             num_states,
@@ -439,19 +434,27 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             stack_ptr: 0,
             pc: pcs,
             doc_rc_v: Some(Integer::from(1)), // Convert back to none later
+            doc_subset,
+            hybrid,
+            hybrid_len,
+        }
+    }
+
+    pub fn doc_len(&self) -> usize {
+        if self.doc_subset.is_some() {
+            let ds = self.doc_subset.unwrap();
+            ds.1 - ds.0
+        } else {
+            self.udoc.len()
         }
     }
 
     pub fn prover_accepting_state(&self, state: usize) -> u64 {
         let mut out = false;
 
-        if self.is_match {
-            // proof of membership
-            for a in self.safa.accepting().iter() {
-                out = out || a.index() == state;
-            }
-        } else {
-            unimplemented!();
+        // proof of membership
+        for a in self.safa.accepting().iter() {
+            out = out || a.index() == state;
         }
 
         if out {
@@ -904,10 +907,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     fn cursor_circuit(&mut self) {
         for j in 0..self.batch_size {
-            // if star, geq
-            // else normal
-            // i_j+1 = i_j + offset
-
             let cursor_plus = term(
                 Op::Eq,
                 vec![
@@ -923,8 +922,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
             self.assertions.push(cursor_plus);
 
-            // TODO LIMIT bits here plus the other bullshit
-            let bit_limit = logmn(self.udoc.len()); // TODO :(
+            let bit_limit = logmn(self.udoc.len());
+            let cur_overflow = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("cursor_{}", j + 1))],
+                    ),
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("cursor_{}", j))],
+                    ),
+                ],
+            );
+            self.assertions.push(cur_overflow);
+
             let min_offset_leq = term(
                 Op::BvBinPred(BvBinPred::Uge),
                 vec![
@@ -1249,14 +1262,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
-    fn q_ordering_circuit(&mut self, id: &str) {
+    fn q_ordering_circuit(&mut self, id: &str, doc_len: usize) {
         // q relations
         for i in 0..(self.batch_size - 1) {
             // not final q (running claim)
 
             let mut full_q = new_const(0); // dummy
             let mut next_slot = Integer::from(1);
-            let doc_l = logmn(self.udoc.len());
+            let doc_l = logmn(doc_len);
             for j in (0..doc_l).rev() {
                 full_q = term(
                     Op::PfNaryOp(PfNaryOp::Add),
@@ -1274,39 +1287,48 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 next_slot *= Integer::from(2);
             }
 
-            let q_eq = term(
-                Op::Eq,
-                vec![
-                    full_q.clone(),
-                    term(
-                        Op::Ite,
-                        vec![
-                            term(
-                                Op::Eq,
-                                vec![
-                                    new_var(format!("char_{}", i)),
-                                    new_const(self.num_ab[&None]),
-                                ],
-                            ),
-                            new_const(self.ep_num),
-                            term(
-                                Op::Ite,
-                                vec![
-                                    term(
-                                        Op::Eq,
-                                        vec![
-                                            new_var(format!("char_{}", i)),
-                                            new_const(self.num_ab[&Some('*')]),
-                                        ],
-                                    ),
-                                    new_const(self.star_num),
-                                    new_var(format!("cursor_{}", i)),
-                                ],
-                            ),
-                        ],
-                    ),
-                ],
-            );
+            let q_adjust = if self.doc_subset.is_some() {
+                let ds = self.doc_subset.unwrap();
+
+                term(
+                    Op::Ite,
+                    vec![
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_var(format!("char_{}", i)),
+                                new_const(self.num_ab[&None]),
+                            ],
+                        ),
+                        new_const(self.ep_num - ds.0),
+                        term(
+                            Op::PfNaryOp(PfNaryOp::Add),
+                            vec![
+                                new_var(format!("cursor_{}", i)),
+                                new_const(-1 * (ds.0 as isize)),
+                            ],
+                        ),
+                    ],
+                )
+            } else {
+                term(
+                    Op::Ite,
+                    vec![
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_var(format!("char_{}", i)),
+                                new_const(self.num_ab[&None]),
+                            ],
+                        ),
+                        new_const(self.ep_num),
+                        new_var(format!("cursor_{}", i)),
+                    ],
+                )
+            };
+
+            let q_eq = term(Op::Eq, vec![full_q, q_adjust]);
+
             self.assertions.push(q_eq);
         }
     }
@@ -1314,24 +1336,35 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     pub fn to_circuit(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs(true);
         assert_eq!(lookups.len(), self.batch_size);
-        self.nlookup_gadget(lookups, self.table.len(), "nl");
-        self.cursor_circuit();
-        self.last_state_accepting_circuit();
-        self.nlookup_doc_commit();
-
-        self.r1cs_conv()
-    }
-
-    fn nlookup_doc_commit(&mut self) {
-        self.q_ordering_circuit("nldoc");
-
-        // lookups and nl circuit
         let mut char_lookups = vec![];
         for c in 0..self.batch_size {
             char_lookups.push(new_var(format!("char_{}", c)));
         }
 
-        self.nlookup_gadget(char_lookups, self.udoc.len(), "nldoc");
+        self.cursor_circuit();
+        self.last_state_accepting_circuit();
+
+        if self.hybrid {
+            self.nlookup_hybrid(lookups, char_lookups);
+        } else {
+            self.nlookup_gadget(lookups, self.table.len(), "nl");
+            self.nlookup_doc_commit(char_lookups);
+        }
+
+        self.r1cs_conv()
+    }
+
+    fn nlookup_hybrid(&mut self, mut pub_lookups: Vec<Term>, mut priv_lookups: Vec<Term>) {
+        // TODO ordering circuit
+
+        pub_lookups.append(&mut priv_lookups);
+        self.nlookup_gadget(pub_lookups, self.hybrid_len, "hybrid");
+    }
+
+    fn nlookup_doc_commit(&mut self, priv_lookups: Vec<Term>) {
+        let len = self.doc_len();
+        self.q_ordering_circuit("nldoc", len);
+        self.nlookup_gadget(priv_lookups, len, "nldoc");
     }
 
     fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
@@ -1354,6 +1387,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // size of table (T -> mle)
         let sc_l = logmn(t_size);
+        println!("size of table {}", sc_l);
 
         self.sum_check_circuit(lhs, sc_l, id);
 
@@ -1386,7 +1420,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // only call in "active" cases
     fn pop_wit(&mut self, wits: &mut FxHashMap<String, Value>) -> usize {
         self.stack_ptr -= 1;
-        let mut popped_elt = self.stack[self.stack_ptr];
+        let popped_elt = self.stack[self.stack_ptr];
 
         wits.insert(format!("cursor_{}", 0), new_wit(popped_elt.0));
         //wits.insert(format!("state_{}", self.batch_size), new_wit(popped_elt.1));
@@ -1432,7 +1466,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         forall: Option<NodeIndex>,
         cur_cursor: usize,
     ) {
-        let mut forall_kids = match forall {
+        let forall_kids = match forall {
             Some(state) => self.foralls_w_kids[&state.index()][1..].to_vec(),
             None => vec![],
         };
@@ -1468,22 +1502,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // returns char_num, is_star
     fn get_char_num(&self, edge: Either<char, OpenSet<usize>>) -> usize {
         match edge {
-            Either(Err(openset)) => {
-                let single = openset.is_single(); // single offset/epsilon
-                if single.is_some() {
-                    // is single
-                    // if offset == 0 { -> doesn't matter, always use epsilon for actual
-                    // epsilon and for jumps
-
-                    self.num_ab[&None]
-                } else if openset.is_full() {
-                    // [0,*]
-                    self.num_ab[&Some('*')]
-                } else {
-                    // ranges (and [!0, *])
-                    self.num_ab[&None]
-                }
-            }
+            Either(Err(_openset)) => self.num_ab[&None],
             Either(Ok(ch)) => self.num_ab[&Some(ch)],
         }
     }
@@ -1560,10 +1579,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        /*println!(
+        println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );*/
+        );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1613,7 +1632,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             }
                         }
                     }
-                    Either(Ok(ch)) => {
+                    Either(Ok(_ch)) => {
                         lower_offset_i = 1;
                         upper_offset_i = 1;
                     }
@@ -1650,10 +1669,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        /*println!(
+        println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );*/
+        );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1665,10 +1684,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         &mut self,
         sols: &mut Vec<LinkedList<TraceElem<char>>>, //move_num: (usize, usize),
         batch_num: usize,
+        in_state: usize,
         running_q: Option<Vec<Integer>>,
         running_v: Option<Integer>,
         doc_running_q: Option<Vec<Integer>>,
         doc_running_v: Option<Integer>,
+        hybrid_running_q: Option<Vec<Integer>>,
+        hybrid_running_v: Option<Integer>,
         cursor_0: usize,
     ) -> (
         FxHashMap<String, Value>,
@@ -1677,12 +1699,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         Option<Integer>,
         Option<Vec<Integer>>,
         Option<Integer>,
+        Option<Vec<Integer>>,
+        Option<Integer>,
         usize,
     ) {
+        let mut wasted = 0;
         let mut wits = FxHashMap::default();
 
         // generate claim v's (well, v isn't a real named var, generate the states/chars)
-        let mut state_i = 0;
+        let mut state_i = in_state;
         let mut next_state = 0;
         let mut char_num;
         let mut offset_i;
@@ -1712,11 +1737,21 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         cursor_i,
                         i,
                     ));
-
+                    wasted += 1;
                     i += 1;
                 }
             } else if sols[self.sol_num].is_empty() {
                 // need to transition
+
+                // not forall (TODO check cursor_i correct)
+                if i == 0 {
+                    // must pad out the stack
+                    // fill stack vars with padding
+                    self.push_wit(&mut wits, None, cursor_i);
+                    // pad out "popped" vars, since there's no pop
+                    wits.insert(format!("cursor_{}", self.batch_size), new_wit(cursor_i));
+                    wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
+                }
                 char_num = self.num_ab[&None];
                 cursor_access.push(self.ep_num);
 
@@ -1800,7 +1835,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 cursor_i,
                                 i,
                             ));
-
+                            wasted += 1;
                             i += 1;
                         }
                     }
@@ -1823,8 +1858,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                     if char_num == self.num_ab[&None] {
                         cursor_access.push(self.ep_num);
-                    } else if char_num == self.num_ab[&Some('*')] {
-                        cursor_access.push(self.star_num);
                     } else {
                         cursor_access.push(cursor_i);
                     }
@@ -1871,6 +1904,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         //println!("DONE LOOP");
+        println!("'WASTED' SLOTS THIS ITERATION: {}", wasted);
 
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
@@ -1878,64 +1912,111 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let accept = if rel_i == 2 { 1 } else { 0 }; //todo
         wits.insert(format!("accepting"), new_wit(accept));
 
-        assert!(running_q.is_some() || batch_num == 0);
-        assert!(running_v.is_some() || batch_num == 0);
-
         assert_eq!(v.len(), self.batch_size);
-        let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
-        wits = w;
 
-        assert!(doc_running_q.is_some() || batch_num == 0);
-        assert!(doc_running_v.is_some() || batch_num == 0);
-        let (w, next_doc_running_q, next_doc_running_v) = self.wit_nlookup_doc_commit(
-            wits,
-            batch_num,
-            doc_running_q,
-            doc_running_v,
-            cursor_access,
-        );
-        wits = w;
+        // projections
+        let mut doc_v = vec![];
+        let mut doc_q = vec![];
+        let proj_doc;
+        if self.doc_subset.is_some() {
+            let ds = self.doc_subset.unwrap();
+            proj_doc = &self.idoc[ds.0..ds.1];
+            for i in 0..self.batch_size {
+                let access_at = cursor_access[i];
+                doc_q.push(access_at - ds.0);
+                doc_v.push(self.idoc[access_at].clone());
+            }
+        } else {
+            proj_doc = &self.idoc;
+            for i in 0..self.batch_size {
+                let access_at = cursor_access[i];
+                doc_q.push(access_at);
+                doc_v.push(self.idoc[access_at].clone());
+            }
+        };
+
+        let mut next_running_q = None;
+        let mut next_running_v = None;
+        let mut next_doc_running_q = None;
+        let mut next_doc_running_v = None;
+        let mut next_hybrid_running_q = None;
+        let mut next_hybrid_running_v = None;
+
+        if self.hybrid {
+            // pub T first, then priv D
+            let half_len = self.hybrid_len / 2;
+
+            let mut hybrid_table = self.table.clone();
+            hybrid_table.append(&mut vec![Integer::from(0); half_len - self.table.len()]);
+            hybrid_table.append(&mut proj_doc.to_vec());
+            hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
+
+            let mut hybrid_q = q.clone();
+            for qd in doc_q {
+                hybrid_q.push(qd + half_len); // idx'd by 1
+            }
+
+            let mut hybrid_v = v.clone();
+            hybrid_v.extend(doc_v);
+
+            assert!(hybrid_running_q.is_some() || batch_num == 0);
+            assert!(hybrid_running_v.is_some() || batch_num == 0);
+
+            let (w, rq, rv) = self.wit_nlookup_gadget(
+                wits,
+                &hybrid_table,
+                hybrid_q,
+                hybrid_v,
+                hybrid_running_q,
+                hybrid_running_v,
+                "hybrid",
+            );
+            wits = w;
+            next_hybrid_running_q = Some(rq);
+            next_hybrid_running_v = Some(rv);
+        } else {
+            assert!(running_q.is_some() || batch_num == 0);
+            assert!(running_v.is_some() || batch_num == 0);
+            let (w, rq, rv) =
+                self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
+            wits = w;
+            next_running_q = Some(rq);
+            next_running_v = Some(rv);
+
+            assert!(doc_running_q.is_some() || batch_num == 0);
+            assert!(doc_running_v.is_some() || batch_num == 0);
+
+            let (w, drq, drv) = self.wit_nlookup_gadget(
+                wits,
+                proj_doc,
+                doc_q,
+                doc_v,
+                doc_running_q,
+                doc_running_v,
+                "nldoc",
+            );
+            wits = w;
+            next_doc_running_q = Some(drq);
+            next_doc_running_v = Some(drv);
+        }
 
         (
             wits,
             next_state,
-            Some(next_running_q),
-            Some(next_running_v),
-            Some(next_doc_running_q),
-            Some(next_doc_running_v),
+            next_running_q,
+            next_running_v,
+            next_doc_running_q,
+            next_doc_running_v,
+            next_hybrid_running_q,
+            next_hybrid_running_v,
             cursor_i,
         )
-    }
-
-    fn wit_nlookup_doc_commit(
-        &self,
-        mut wits: FxHashMap<String, Value>,
-        batch_num: usize,
-        running_q: Option<Vec<Integer>>,
-        running_v: Option<Integer>,
-        cursor_access: Vec<usize>,
-    ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
-        let mut v = vec![];
-        let mut q = vec![];
-
-        for i in 0..self.batch_size {
-            let access_at = cursor_access[i];
-            q.push(access_at);
-            v.push(self.idoc[access_at].clone());
-        }
-
-        let (w, next_running_q, next_running_v) =
-            self.wit_nlookup_gadget(wits, &self.idoc, q, v, running_q, running_v, "nldoc");
-        wits = w;
-
-        (wits, next_running_q, next_running_v)
     }
 
     fn wit_nlookup_gadget(
         &self,
         mut wits: FxHashMap<String, Value>,
-        table: &Vec<Integer>,
+        table: &[Integer],
         q: Vec<usize>,
         v: Vec<Integer>,
         running_q: Option<Vec<Integer>>,
@@ -2079,12 +2160,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut eq_table =
             gen_eq_table(&rs, &q, &prev_running_q.clone().into_iter().rev().collect());
         let mut sc_table = match id {
-            "nl" => table.clone(),
+            "nl" => table.to_vec(),
             "nldoc" => {
                 let base: usize = 2;
                 let len = base.pow(logmn(table.len()) as u32) - table.len();
 
-                let mut sct = table.clone();
+                let mut sct = table.to_vec();
                 sct.extend(vec![Integer::from(0); len]); // ep num = self.nfa.nchars()
                 sct
             }
@@ -2106,7 +2187,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             (sc_r, g_xsq, g_x, g_const) =
                 linear_mle_product(&mut sc_table, &mut eq_table, sc_l, i, &mut sponge);
-            //prover_mle_sum_eval(table, &sc_rs, &q, &claim_r, Some(&prev_running_q));
 
             // sanity
             if i > 1 {
@@ -2356,6 +2436,7 @@ mod tests {
         doc: String,
         batch_sizes: Vec<usize>,
         expected_match: bool,
+        proj: Option<usize>,
     ) {
         let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
@@ -2363,142 +2444,158 @@ mod tests {
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-        let mut r1cs_converter = R1CS::new(&safa, &chars, 0, sc.clone());
 
-        let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
-        r1cs_converter.reef_commit = Some(reef_commit.clone());
+        for b in batch_sizes {
+            let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, false, sc.clone());
+            // TODO hybrid
 
-        assert_eq!(expected_match, r1cs_converter.is_match);
+            let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
+            r1cs_converter.reef_commit = Some(reef_commit.clone());
 
-        let mut running_q: Option<Vec<Integer>> = None;
-        let mut running_v: Option<Integer> = None;
-        let mut doc_running_q: Option<Vec<Integer>> = None;
-        let mut doc_running_v: Option<Integer> = None;
-        let mut doc_idx = 0;
+            let mut running_q: Option<Vec<Integer>> = None;
+            let mut running_v: Option<Integer> = None;
+            let mut doc_running_q: Option<Vec<Integer>> = None;
+            let mut doc_running_v: Option<Integer> = None;
+            let mut hybrid_running_q: Option<Vec<Integer>> = None;
+            let mut hybrid_running_v: Option<Integer> = None;
 
-        let (pd, _vd) = r1cs_converter.to_circuit();
+            let mut doc_idx = 0;
 
-        let mut values;
-        let mut next_state = 0;
+            let (pd, _vd) = r1cs_converter.to_circuit();
 
-        let trace = safa.solve(&chars);
+            let mut values;
+            let mut next_state = 0;
 
-        let mut sols = trace_preprocessing(&trace, &safa);
+            let trace = safa.solve(&chars);
 
-        let mut i = 0;
-        while r1cs_converter.sol_num < sols.len() {
-            println!("STEP {:#?}", i);
-            (
-                values,
-                next_state,
-                running_q,
-                running_v,
-                doc_running_q,
-                doc_running_v,
-                doc_idx,
-            ) = r1cs_converter.gen_wit_i(
-                &mut sols,
-                i,
-                running_q.clone(),
-                running_v.clone(),
-                doc_running_q.clone(),
-                doc_running_v.clone(),
-                doc_idx,
+            let mut sols = trace_preprocessing(&trace, &safa);
+
+            let mut i = 0;
+            while r1cs_converter.sol_num < sols.len() {
+                println!("STEP {:#?}", i);
+                (
+                    values,
+                    next_state,
+                    running_q,
+                    running_v,
+                    doc_running_q,
+                    doc_running_v,
+                    hybrid_running_q,
+                    hybrid_running_v,
+                    doc_idx,
+                ) = r1cs_converter.gen_wit_i(
+                    &mut sols,
+                    i,
+                    next_state,
+                    running_q.clone(),
+                    running_v.clone(),
+                    doc_running_q.clone(),
+                    doc_running_v.clone(),
+                    hybrid_running_q.clone(),
+                    hybrid_running_v.clone(),
+                    doc_idx,
+                );
+
+                pd.check_all(&values);
+
+                // for next i+1 round
+                i += 1;
+            }
+
+            let rq = match running_q {
+                Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+                None => None,
+            };
+            let rv = match running_v {
+                Some(x) => Some(int_to_ff(x)),
+                None => None,
+            };
+            let drq = match doc_running_q {
+                Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+                None => None,
+            };
+            let drv = match doc_running_v {
+                Some(x) => Some(int_to_ff(x)),
+                None => None,
+            };
+            assert_eq!(next_state, r1cs_converter.num_states);
+
+            let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
+                &r1cs_converter.reef_commit.unwrap(),
+                drq.clone().unwrap(),
+                drv.clone().unwrap(),
+                r1cs_converter.udoc.len(),
             );
 
-            pd.check_all(&values);
+            final_clear_checks(
+                reef_commit,
+                &r1cs_converter.table,
+                r1cs_converter.udoc.len(),
+                rq,
+                rv,
+                drq,
+                drv,
+                r1cs_converter.doc_subset,
+                None,
+                ipi,
+                ipa,
+            );
 
-            // for next i+1 round
-            i += 1;
+            println!("actual cost: {:#?}", pd.r1cs.constraints.len());
+            println!("\n\n\n");
+
+            /*assert!(
+                pd.r1cs.constraints.len() as usize
+                    == costs::full_round_cost_model_nohash(
+                        &nfa,
+                        r1cs_converter.batch_size,
+                        b.clone(),
+                        nfa.is_match(&chars),
+                        doc.len(),
+                        c
+                    )
+            );*/
         }
-
-        let rq = match running_q {
-            Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
-            None => None,
-        };
-        let rv = match running_v {
-            Some(x) => Some(int_to_ff(x)),
-            None => None,
-        };
-        let drq = match doc_running_q {
-            Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
-            None => None,
-        };
-        let drv = match doc_running_v {
-            Some(x) => Some(int_to_ff(x)),
-            None => None,
-        };
-        assert_eq!(next_state, r1cs_converter.num_states);
-
-        let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
-            &r1cs_converter.reef_commit.unwrap(),
-            drq.clone().unwrap(),
-            drv.clone().unwrap(),
-            r1cs_converter.udoc.len(),
-        );
-
-        final_clear_checks(
-            reef_commit,
-            &r1cs_converter.table,
-            r1cs_converter.udoc.len(),
-            rq,
-            rv,
-            drq,
-            drv,
-            None,
-            Some(ipi),
-            Some(ipa),
-        );
-
-        /*
-        println!(
-            "cost model: {:#?}",
-            costs::full_round_cost_model_nohash(
-                &safa,
-                r1cs_converter.batch_size,
-                b.clone(),
-                nfa.is_match(&chars),
-                doc.len(),
-                c,
-            )
-        );*/
-        println!("actual cost: {:#?}", pd.r1cs.constraints.len());
-        println!("\n\n\n");
-
-        /*assert!(
-            pd.r1cs.constraints.len() as usize
-                == costs::full_round_cost_model_nohash(
-                    &nfa,
-                    r1cs_converter.batch_size,
-                    b.clone(),
-                    nfa.is_match(&chars),
-                    doc.len(),
-                    c
-                )
-        );*/
     }
 
     #[test]
-    fn naive_test() {
+    fn projections() {
+        init();
+
+        // proj upper
+        test_func_no_hash(
+            "abcd".to_string(),
+            "^.....c$".to_string(),
+            "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
+            vec![2],              // 2],
+            true,
+            Some(5), // (4,8)
+        );
+    }
+
+    #[test]
+    fn naive_1() {
         init();
         test_func_no_hash(
             "abcd".to_string(),
             "^(?=a)ab(?=c)cd$".to_string(),
             "abcd".to_string(),
-            vec![1], // 2],
+            vec![2], // 2],
             true,
+            None,
         );
     }
 
     #[test]
-    fn naive_test_2() {
+    fn naive_2() {
         init();
         test_func_no_hash(
             "abcd".to_string(),
             "(?=a)ab(?=c)cd".to_string(),
             "abcd".to_string(),
-            vec![1], // 2],
+            vec![2], // 2],
             true,
+            None,
         );
     }
 
@@ -2509,8 +2606,9 @@ mod tests {
             "ab".to_string(),
             "^ab$".to_string(),
             "ab".to_string(),
-            vec![0, 1],
+            vec![2],
             true,
+            None,
         );
         /*    test_func_no_hash(
             "abc".to_string(),
@@ -2535,22 +2633,25 @@ mod tests {
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaab".to_string(),
-            vec![1],
+            vec![2],
             true,
+            None,
         );
         test_func_no_hash(
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaaaaabbbbbbbbbbbbbb".to_string(),
-            vec![0, 1, 2, 4],
+            vec![2, 4],
             true,
+            None,
         );
         test_func_no_hash(
             "ab".to_string(),
             "^a*b*$".to_string(),
             "aaaaaaaaaaab".to_string(),
-            vec![1, 2, 4],
+            vec![2, 4],
             true,
+            None,
         );
     }
 
@@ -2562,8 +2663,9 @@ mod tests {
             "ab".to_string(),
             "^a$".to_string(),
             "c".to_string(),
-            vec![1],
+            vec![2],
             false,
+            None,
         );
     }
 
@@ -2581,27 +2683,15 @@ mod tests {
     }*/
 
     #[test]
-    #[should_panic]
-    fn nfa_bad_substring_2() {
-        init();
-        test_func_no_hash(
-            "helowrd".to_string(),
-            "^hello".to_string(),
-            "helloworld".to_string(),
-            vec![1],
-            true,
-        );
-    }
-
-    #[test]
     fn nfa_ok_substring() {
         init();
         test_func_no_hash(
             "helowrd".to_string(),
             "^hello.*$".to_string(),
             "helloworld".to_string(),
-            vec![1],
+            vec![2],
             true,
+            None,
         );
         /*
               test_func_no_hash(
@@ -2621,8 +2711,9 @@ mod tests {
             "helowrd".to_string(),
             "^hello.*$".to_string(),
             "helloworld".to_string(),
-            vec![3, 4, 6, 7],
+            vec![2, 3, 4, 6, 7],
             true,
+            None,
         );
 
         /*    test_func_no_hash(
@@ -2644,6 +2735,7 @@ mod tests {
             "gaaaaaabbbbbbccccccddddddeeeeeef".to_string(),
             vec![33],
             true,
+            None,
         );
 
         test_func_no_hash(
@@ -2652,6 +2744,7 @@ mod tests {
             "gaaaaaabbbbbbccccccddddddeeeeeef".to_string(),
             vec![33],
             true,
+            None,
         );
     }
 
@@ -2664,79 +2757,9 @@ mod tests {
             ascii_chars.into_iter().collect::<String>(),
             "^.*our technology.*$".to_string(),
             fs::read_to_string("gov_text.txt").unwrap(),
-            vec![1],
+            vec![2],
             true,
+            None,
         );
     }
-
-    /*
-    fn test_func_no_hash_kstride(
-        ab: String,
-        rstr: String,
-        doc: String,
-        batch_sizes: Vec<usize>,
-        k: usize,
-    ) {
-        let r = re::new(&rstr);
-        let mut safa = SAFA::new(&ab[..], r);
-        let mut d = doc.chars().map(|c| c.to_string()).collect();
-        d = nfa.k_stride(k, &d);
-        let nfa_match = nfa.is_match(&d);
-        // println!(
-        //     "DFA Size: {:#?}, |doc| : {}, |ab| : {}, match: {:?}",
-        //     nfa.nedges(),
-        //     d.len(),
-        //     nfa.ab.len(),
-        //     nfa_match
-        // );
-
-        //let chars: Vec<String> = d.clone();
-        //.chars().map(|c| c.to_string()).collect();
-
-        for s in batch_sizes {
-            for b in vec![JBatching::NaivePolys, JBatching::Nlookup] {
-                for c in vec![JCommit::HashChain, JCommit::Nlookup] {
-                    println!("Batching {:#?}", b.clone());
-                    println!("Commit {:#?}", c);
-                    println!("K {:#?}", k);
-                    println!(
-                        "cost model: {:#?}",
-                        costs::full_round_cost_model(&nfa, s, b.clone(), nfa_match, d.len(), c,)
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn k_stride2() {
-        init();
-        let preamble: String = "ffffabcdffffabcd".to_string();
-        let ab = "abcdef".to_string();
-        for i in 0..9 {
-            test_func_no_hash_kstride(
-                ab.clone(),
-                "^hello.*$".to_string(),
-                preamble.clone(),
-                vec![1],
-                i,
-            );
-        }
-    }
-
-    #[test]
-    fn k_stride() {
-        init();
-        let preamble: String = "we the people in order to form a more perfect union, establish justic ensure domestic tranquility, provide for the common defense, promote the general welfare and procure the blessings of liberty to ourselves and our posterity do ordain and establish this ".to_string();
-        let ab = " ,abcdefghijlmnopqrstuvwy".to_string();
-        for i in 0..9 {
-            test_func_no_hash_kstride(
-                ab.clone(),
-                "^.*order.to.*$".to_string(),
-                preamble.clone(),
-                vec![1],
-                i,
-            );
-        }
-    }*/
 }

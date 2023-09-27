@@ -9,7 +9,7 @@ use petgraph::Graph;
 
 use std::result::Result;
 
-use crate::frontend::openset::{OpenSet, OpenRange};
+use crate::frontend::openset::{OpenRange, OpenSet};
 use crate::frontend::quantifier::Quant;
 use crate::frontend::regex::{re, Regex, RegexF};
 use crate::trace::{Trace, TraceElem};
@@ -51,7 +51,7 @@ impl<A, B> Either<A, B> {
     fn right_or<'a>(&'a self, default: &'a B) -> &'a B {
         match self.0 {
             Ok(_) => default,
-            Err(ref e) => e
+            Err(ref e) => e,
         }
     }
 }
@@ -114,11 +114,7 @@ impl SAFA<char> {
         // Also add the complement skip since we know it always fails
         if !skip.is_full() && !skip.is_nil() {
             let n_empty = self.find_or_add(&re::empty(), false);
-            self.g.add_edge(
-                n,
-                n_empty,
-                Either::right(skip.negate()),
-            );
+            self.g.add_edge(n, n_empty, Either::right(skip.negate()));
         }
         if recurse {
             self.add(n_c);
@@ -398,30 +394,37 @@ impl SAFA<char> {
         }
     }
 
-    fn projection_rec(&self, n: NodeIndex<u32>, m: Skip, visited: BTreeSet<NodeIndex<u32>>) -> Skip {
+    fn projection_rec(
+        &self,
+        n: NodeIndex<u32>,
+        m: Skip,
+        visited: BTreeSet<NodeIndex<u32>>,
+    ) -> Skip {
         if visited.contains(&n) {
             return m;
         }
         let mut v = visited.clone();
         v.insert(n);
 
-        self.g.edges(n)
-              .filter(|e| e.source() != e.target())
-              .filter_map(|e| {
-                 let next = e.target();
-                 let s = e.weight().clone().0.err()?;
-                 if s.is_nullable() || s.is_open() {
+        self.g
+            .edges(n)
+            .filter(|e| e.source() != e.target())
+            .filter_map(|e| {
+                let next = e.target();
+                let s = e.weight().clone().0.err()?;
+                if s.is_nullable() || s.is_open() {
                     None
-                 } else {
+                } else {
                     Some((s, next))
-                 }
-              }).fold(m, |acc, (s, next)| {
-                 if self.g[n].is_and() {
+                }
+            })
+            .fold(m, |acc, (s, next)| {
+                if self.g[n].is_and() {
                     self.projection_rec(next, acc.intersection(&s), v.clone())
-                 } else {
+                } else {
                     self.projection_rec(next, acc.union(&s), v.clone())
-                 }
-              })
+                }
+            })
     }
 
     /// Returns the prefix of the document we can ignore
@@ -704,7 +707,7 @@ mod tests {
                 TraceElem::new(2, &Either(Err(Skip::open(0))), 3, 1, 2),
                 TraceElem::new(0, &SAFA::epsilon(), 5, 0, 0),
                 TraceElem::new(5, &Either(Err(Skip::open(0))), 6, 0, 1),
-                TraceElem::new(6, &Either(Ok('b')), 3, 1, 2)
+                TraceElem::new(6, &Either(Ok('b')), 3, 1, 2),
             ]),
         )
     }

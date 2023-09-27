@@ -1,10 +1,7 @@
-use crate::backend::costs::{JBatching, JCommit};
+use crate::backend::costs::logmn;
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::verifier_mle_eval;
-use ::bellperson::{
-    gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
-    Variable,
-};
+use ::bellperson::{gadgets::num::AllocatedNum, ConstraintSystem, SynthesisError};
 use circ::cfg::cfg;
 use ff::{Field, PrimeField};
 use generic_array::typenum;
@@ -275,18 +272,23 @@ pub fn final_clear_checks(
     reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
     table: &Vec<Integer>,
     doc_len: usize,
+    //    stack_ptr: <G1 as Group>::Scalar,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
     final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
-    final_doc_v: Option<<G1 as Group>::Scalar>,
+    final_doc_hash: Option<<G1 as Group>::Scalar>,
+    doc_subset: Option<(usize, usize)>, // projections
     cap_d: Option<<G1 as Group>::Scalar>,
-    ipi: Option<InnerProductInstance<G1>>,
-    ipa: Option<InnerProductArgument<G1>>,
+    ipi: InnerProductInstance<G1>,
+    ipa: InnerProductArgument<G1>,
 ) {
+    // stack ptr is 0 (stack is empty)
+    //  assert_eq!(stack_ptr, <G1 as Group>::Scalar::from(0));
+
     //Asserting that d in z_n == d passed into spartan direct
     match cap_d {
         Some(d) => {
-            assert_eq!(d, final_doc_v.unwrap());
+            assert_eq!(d, final_doc_hash.unwrap());
         }
         None => {}
     }
@@ -315,25 +317,46 @@ pub fn final_clear_checks(
         }
     }
 
-    match (final_doc_q, final_doc_v) {
-        (Some(q), Some(v)) => {
+    match (final_doc_q, final_doc_hash) {
+        (Some(q), Some(_)) => {
             let doc_ext_len = doc_len.next_power_of_two();
-            println!("DOC EXT LEN {:#?}", doc_ext_len);
+            //println!("DOC EXT LEN {:#?}", doc_ext_len);
+
+            let new_q = match doc_subset {
+                Some((start, end)) => {
+                    // what's s?
+                    let chunk_size = end - start;
+                    // assert end and start are power of 2
+                    assert!(end & (end - 1) == 0);
+                    assert!(start == 0 || start & (start - 1) == 0);
+                    assert!(start % chunk_size == 0);
+
+                    let num_chunks = doc_ext_len / chunk_size;
+                    let mut start_idx = start / chunk_size;
+
+                    println!(
+                        "chunk size {}, num chunks {}, s = {}",
+                        chunk_size, num_chunks, start_idx
+                    );
+
+                    let mut q_add = vec![];
+                    for i in 0..logmn(num_chunks) {
+                        q_add.push(<G1 as Group>::Scalar::from((start_idx % 2) as u64));
+                        start_idx = start_idx >> 1;
+                    }
+                    q_add.extend(q);
+                    q_add
+                }
+                None => q,
+            };
 
             // right form for inner product
-            let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
+            let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
             let q_ext = q_to_mle_q(&q_rev, doc_ext_len);
             println!("Q EXT {:#?}", q_ext);
 
             // Doc is commited to in this case
-            match (ipi, ipa) {
-                (Some(i), Some(a)) => {
-                    assert!(proof_dot_prod_verify(reef_commitment, q_ext, i, a).is_ok());
-                }
-                (_, _) => {
-                    println!("no ipa or ipa checked (for testing)");
-                }
-            }
+            assert!(proof_dot_prod_verify(reef_commitment, q_ext, ipi, ipa).is_ok());
         }
         (Some(_), None) => {
             panic!("only half of running claim recieved");
@@ -455,7 +478,6 @@ mod tests {
             .unwrap()
             .verify(&gens_t, &gens_single, num_vars, &ipi, &mut v_transcript);
 
-        // this doesn't pass
         assert!(res.is_ok());
     }
 
@@ -497,5 +519,68 @@ mod tests {
             sum += mle_f[i].clone() * q_ext[i].clone();
         }
         assert_eq!(sum, <G1 as Group>::Scalar::from(1162));
+    }
+
+    #[test]
+    fn projections() {
+        init();
+        let uni: Vec<Integer> = vec![
+            Integer::from(60), // 000
+            Integer::from(80), // 001
+            Integer::from(9),  // 010
+            Integer::from(4),  // 011
+            Integer::from(77), // 100
+            Integer::from(18), // 101
+            Integer::from(24), // 110
+            Integer::from(10), // 111
+        ];
+        let mle = mle_from_pts(uni.clone());
+        let mut mle_f: Vec<<G1 as Group>::Scalar> = vec![];
+        for m in &mle {
+            mle_f.push(int_to_ff(m.clone()));
+        }
+
+        let uni_sub: Vec<Integer> = vec![
+            Integer::from(77), // 100
+            Integer::from(18), // 101
+            Integer::from(24), // 110
+            Integer::from(10), // 111
+        ];
+        let mle_sub = mle_from_pts(uni_sub.clone());
+        let mut mle_sub_f: Vec<<G1 as Group>::Scalar> = vec![];
+        for m in &mle_sub {
+            mle_sub_f.push(int_to_ff(m.clone()));
+        }
+
+        // 011 = 6
+        //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
+        let q = vec![
+            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(1),
+            <G1 as Group>::Scalar::from(1), // selector
+        ];
+        let q_ext = q_to_mle_q(&q, mle_f.len());
+        assert_eq!(mle_f.len(), q_ext.len());
+        // inner product
+        let mut sum = <G1 as Group>::Scalar::from(0);
+        for i in 0..mle.len() {
+            sum += mle_f[i].clone() * q_ext[i].clone();
+        }
+
+        let q_sub = vec![
+            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(1),
+        ];
+        let q_ext_sub = q_to_mle_q(&q_sub, mle_sub_f.len());
+        assert_eq!(mle_sub_f.len(), q_ext_sub.len());
+
+        // inner product
+        let mut sum_sub = <G1 as Group>::Scalar::from(0);
+        for i in 0..mle_sub.len() {
+            sum_sub += mle_sub_f[i].clone() * q_ext_sub[i].clone();
+        }
+        assert_eq!(sum, sum_sub);
+
+        //    println!("SUM {:#?}", sum.clone());
     }
 }

@@ -14,16 +14,14 @@ use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::{self, ProverData};
 use ff::Field;
 use generic_array::typenum;
-use neptune::circuit;
 use neptune::{
-    sponge::api::{IOPattern, SpongeAPI, SpongeOp},
-    sponge::vanilla::{Mode, Sponge, SpongeTrait},
+    sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
 use nova_snark::provider::ipa_pc::{InnerProductArgument, InnerProductInstance};
 use nova_snark::spartan::direct::*;
 use nova_snark::{
-    provider::pedersen::{Commitment, CommitmentGens, CompressedCommitment},
+    provider::pedersen::Commitment,
     traits::{
         circuit::TrivialTestCircuit,
         commitment::{CommitmentEngineTrait, CommitmentTrait},
@@ -45,6 +43,7 @@ struct ProofInfo {
     commit: ReefCommitment<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
     doc_len: usize,
+    proj_doc_len: usize,
     num_states: usize,
 }
 
@@ -56,6 +55,7 @@ pub fn run_backend(
     safa: SAFA<char>,
     doc: Vec<char>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
+    projections: bool,
 ) {
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
@@ -71,7 +71,46 @@ pub fn run_backend(
 
     let solver_thread = thread::spawn(move || {
         // we do setup here to avoid unsafe passing
-        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
+        // stop gap for cost model - don't need to time >:)
+        let mut batch_size = if temp_batch_size == 0 {
+            let trace = safa.solve(&doc);
+            let mut sols = trace_preprocessing(&trace, &safa);
+
+            let mut paths = vec![];
+            let mut path_len = 1;
+
+            for sol in sols {
+                for elt in sol {
+                    if safa.g[elt.from_node].is_and() {
+                        if path_len > 1 {
+                            paths.push(path_len);
+                        }
+                        path_len = 1;
+                    } else if safa.accepting().contains(&elt.to_node) {
+                        path_len += 1;
+                        paths.push(path_len);
+                    } else {
+                        path_len += 1;
+                    }
+                }
+            }
+
+            if paths.len() == 1 {
+                paths.len() / 2
+            } else {
+                //average(paths)
+                (paths.iter().sum::<usize>() as f32 / paths.len() as f32).ceil() as usize
+            }
+        } else {
+            temp_batch_size
+        };
+        batch_size += 1; // to last
+
+        if batch_size < 2 {
+            batch_size = 2;
+        }
+        println!("BATCH SIZE {:#?}", batch_size);
 
         #[cfg(feature = "metrics")]
         log::tic(
@@ -79,7 +118,12 @@ pub fn run_backend(
             "R1CS",
             "Optimization Selection, R1CS precomputations",
         );
-        let mut r1cs_converter = R1CS::new(&safa, &doc, temp_batch_size, sc.clone());
+
+        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
+        let proj = if projections { safa.projection() } else { None };
+        let mut r1cs_converter = R1CS::new(&safa, &doc, batch_size, proj, false, sc.clone());
+
         #[cfg(feature = "metrics")]
         log::stop(
             Component::Compiler,
@@ -116,7 +160,8 @@ pub fn run_backend(
                 z0_primary,
                 commit: reef_commit,
                 table: r1cs_converter.table.clone(),
-                doc_len: r1cs_converter.udoc.len(),
+                doc_len: r1cs_converter.udoc.len(),     // real
+                proj_doc_len: r1cs_converter.doc_len(), // projected
                 num_states: r1cs_converter.num_states,
             })
             .unwrap();
@@ -141,7 +186,7 @@ fn setup<'a>(
     circ_data: &'a ProverData,
 ) -> (Vec<<G1 as Group>::Scalar>, PublicParams<G1, G2, C1, C2>) {
     let q_len = logmn(r1cs_converter.table.len());
-    let qd_len = logmn(r1cs_converter.udoc.len());
+    let qd_len = logmn(r1cs_converter.doc_len());
     let stack_len = r1cs_converter.max_stack;
 
     // use "empty" (witness-less) circuit to generate nova F
@@ -227,7 +272,6 @@ fn setup<'a>(
         pp.num_variables().1
     );
 
-    let commit_blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
     let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
 
     let current_state = r1cs_converter.safa.get_init().index();
@@ -261,7 +305,7 @@ fn solve<'a>(
     doc: &Vec<char>,
 ) {
     let q_len = logmn(r1cs_converter.table.len());
-    let qd_len = logmn(r1cs_converter.udoc.len());
+    let qd_len = logmn(r1cs_converter.doc_len());
 
     let commit_blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
     let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
@@ -275,6 +319,10 @@ fn solve<'a>(
     let mut doc_running_v: Option<Integer> = None;
     let mut next_doc_running_q: Option<Vec<Integer>>;
     let mut next_doc_running_v: Option<Integer>;
+    let mut hybrid_running_q: Option<Vec<Integer>> = None;
+    let mut hybrid_running_v: Option<Integer> = None;
+    let mut next_hybrid_running_q: Option<Vec<Integer>>;
+    let mut next_hybrid_running_v: Option<Integer>;
 
     let mut prev_cursor_0 = 0;
     let mut next_cursor_0;
@@ -286,7 +334,7 @@ fn solve<'a>(
     let mut current_state = r1cs_converter.safa.get_init().index();
     // TODO don't recalc :(
 
-    let mut next_state;
+    let mut next_state = 0;
 
     let trace = r1cs_converter.safa.solve(doc);
     let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
@@ -307,14 +355,19 @@ fn solve<'a>(
             next_running_v,
             next_doc_running_q,
             next_doc_running_v,
+            next_hybrid_running_q,
+            next_hybrid_running_v,
             next_cursor_0,
         ) = r1cs_converter.gen_wit_i(
             &mut sols,
             i,
+            next_state,
             running_q.clone(),
             running_v.clone(),
             doc_running_q.clone(),
             doc_running_v.clone(),
+            hybrid_running_q.clone(),
+            hybrid_running_v.clone(),
             prev_cursor_0.clone(),
         );
         stack_ptr_popped = r1cs_converter.stack_ptr;
@@ -326,7 +379,8 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, &test, "witness generation");
 
-        circ_data.check_all(&wits);
+        // just for debugging :)
+        //circ_data.check_all(&wits);
 
         let q = match running_q {
             Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
@@ -442,6 +496,8 @@ fn solve<'a>(
         running_v = next_running_v;
         doc_running_q = next_doc_running_q;
         doc_running_v = next_doc_running_v;
+        hybrid_running_q = next_hybrid_running_q;
+        hybrid_running_v = next_hybrid_running_v;
         prev_cursor_0 = next_cursor_0;
         stack_ptr_0 = stack_ptr_popped;
         stack_in = stack_out;
@@ -466,8 +522,6 @@ fn prove_and_verify(
     // trivial circuit
     let circuit_secondary = TrivialTestCircuit::new(StepCounterType::External);
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
-
-    let mut i = 0;
 
     // blocks until we receive first witness
     let mut circuit_primary = recv.recv().unwrap();
@@ -509,7 +563,6 @@ fn prove_and_verify(
         */
         recursive_snark = Some(result.unwrap());
 
-        i += 1;
         circuit_primary = recv.recv().unwrap()
     }
 
@@ -594,6 +647,7 @@ fn prove_and_verify(
         proof_info.table,
         proof_info.num_states,
         proof_info.doc_len,
+        proof_info.proj_doc_len,
         ipi,
         ipa,
         cap_d,
@@ -615,6 +669,7 @@ fn verify(
     table: Vec<Integer>,
     num_states: usize,
     doc_len: usize,
+    proj_doc_len: usize,
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
     cap_d: <G1 as Group>::Scalar,
@@ -624,7 +679,7 @@ fn verify(
     cap_v_commit: Commitment<G1>,
 ) {
     let q_len = logmn(table.len());
-    let qd_len = logmn(doc_len);
+    let qd_len = logmn(proj_doc_len);
 
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
@@ -663,9 +718,10 @@ fn verify(
         Some(zn[q_len + 1]),
         Some(zn[(2 + q_len)..(2 + q_len + qd_len)].to_vec()),
         Some(zn[2 + q_len + qd_len]),
+        None, // TODO
         Some(cap_d),
-        Some(ipi),
-        Some(ipa),
+        ipi,
+        ipa,
     );
 
     // final accepting
@@ -680,15 +736,32 @@ mod tests {
 
     use crate::backend::framework::*;
     use crate::backend::r1cs_helper::init;
-    use crate::frontend::regex::{re, Regex};
+    use crate::frontend::regex::re;
     use crate::frontend::safa::SAFA;
 
-    fn backend_test(ab: String, rstr: String, doc: Vec<char>, batch_size: usize) {
-        let r = re::new(&rstr);
+    fn backend_test(
+        ab: String,
+        rstr: String,
+        doc: Vec<char>,
+        batch_size: usize,
+        projections: bool,
+    ) {
+        let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
 
         init();
-        run_backend(safa.clone(), doc.clone(), batch_size);
+        run_backend(safa.clone(), doc.clone(), batch_size, projections);
+    }
+
+    #[test]
+    fn e2e_projections() {
+        backend_test(
+            "abc".to_string(),
+            "^....cc$".to_string(),
+            ("aabbcc".to_string()).chars().collect(),
+            0,
+            true,
+        );
     }
 
     #[test]
@@ -698,9 +771,9 @@ mod tests {
             "gaa*bb*cc*dd*ee*f".to_string(),
             ("gaaaaaabbbbbbccccccddddddeeeeeef".to_string())
                 .chars()
-                //.map(|c| c.to_string())
                 .collect(),
             33,
+            false,
         );
     }
 
@@ -709,11 +782,20 @@ mod tests {
         backend_test(
             "ab".to_string(),
             "bbb".to_string(),
-            ("aaabbbaaa".to_string())
-                .chars()
-                //.map(|c| c.to_string())
-                .collect(),
+            ("aaabbbaaa".to_string()).chars().collect(),
             2,
+            false,
+        );
+    }
+
+    #[test]
+    fn e2e_nest_forall() {
+        backend_test(
+            "abcd".to_string(),
+            "^(?=a)ab(?=c)cd$".to_string(),
+            ("abcd".to_string()).chars().collect(),
+            0,
+            false,
         );
     }
 
@@ -727,6 +809,7 @@ mod tests {
                 //.map(|c| c.to_string())
                 .collect(),
             0,
+            false,
         );
         /* backend_test(
                 "ab".to_string(),

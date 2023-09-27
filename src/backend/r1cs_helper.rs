@@ -231,7 +231,7 @@ pub fn normal_add_table<'a>(
                             );
                         } else if openset.is_full() {
                             // [0,*]
-                            let c = num_ab[&Some('*')];
+                            let c = num_ab[&None];
                             let lower_offset = 0;
                             let upper_offset = max_offsets; // TODO!!!
 
@@ -383,11 +383,11 @@ pub fn normal_add_table<'a>(
 
                 // TODO we have to make sure the multipliers are big enough
 
-                /*println!("ADDITIONAL FOR ACCEPTING");
+                println!("ADDITIONAL FOR ACCEPTING");
                 println!(
                     "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
                     in_state, out_state, c, lower_offset, upper_offset, rel,
-                );*/
+                );
 
                 set_table.insert(
                     Integer::from(
@@ -425,7 +425,7 @@ pub(crate) fn calc_rel<'a>(
     let mut rel = 0;
 
     if trans {
-        //print!("in {:#?}, OUT {:#?}", in_state.index(), out_state);
+        print!("in {:#?}, OUT {:#?}", in_state, out_state);
         assert!(out_state == num_states || safa.g[NodeIndex::new(out_state)].is_and());
         assert!(safa.accepting().contains(&NodeIndex::new(in_state)));
         rel = 1;
@@ -550,10 +550,9 @@ pub(crate) fn gen_eq_table(
 // where -1 is the "hole"
 // returns (coeff (of "hole"), constant)
 // if no hole, returns (crap, full result)
-// O(mn log mn) :) - or was once upon a time, i'll update this later
 // x = eval_at, prods = coeffs of table/eq(), e's = e/q's
 pub(crate) fn prover_mle_partial_eval(
-    prods: &Vec<Integer>,
+    prods: &[Integer],
     x: &Vec<Integer>,
     es: &Vec<usize>,
     for_t: bool,
@@ -641,70 +640,11 @@ pub(crate) fn prover_mle_partial_eval(
 }
 
 // external full "partial" eval for table check
-pub fn verifier_mle_eval(table: &Vec<Integer>, q: &Vec<Integer>) -> Integer {
+pub fn verifier_mle_eval(table: &[Integer], q: &Vec<Integer>) -> Integer {
     let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
 
     con
 }
-
-/*
-// for sum check, computes the sum of many mle univar slices
-// takes raw table (pre mle'd), and rands = [r_0, r_1,...], leaving off the hole and x_i's
-pub(crate) fn prover_mle_sum_eval(
-    table: &Vec<Integer>,
-    rands: &Vec<Integer>,
-    qs: &Vec<usize>,
-    claim_r: &Integer,
-    last_q: Option<&Vec<Integer>>,
-) -> (Integer, Integer, Integer) {
-    let mut sum_xsq = Integer::from(0);
-    let mut sum_x = Integer::from(0);
-    let mut sum_con = Integer::from(0);
-    let hole = rands.len();
-    let total = logmn(table.len());
-
-    assert!(hole + 1 <= total, "batch size too small for nlookup");
-    let num_x = total - hole - 1;
-
-    let base: usize = 2;
-
-    for combo in 0..base.pow(num_x as u32) {
-        let mut eval_at = rands.clone();
-        eval_at.push(Integer::from(-1));
-
-        for i in 0..num_x {
-            eval_at.push(Integer::from((combo >> i) & 1));
-        }
-
-        //println!("eval at: {:#?}", eval_at.clone());
-        // T(j)
-        let (coeff_a, con_a) =
-            prover_mle_partial_eval(table, &eval_at, &(0..table.len()).collect(), true, None); // TODO
-                                                                                               //println!("T {:#?}, {:#?}", coeff_a, con_a);
-
-        // r^i * eq(q_i,j) for all i
-        // TODO - eq must be an MLE? ask
-
-        // make rs (horner esq)
-        let mut rs = vec![claim_r.clone()];
-        for i in 1..(qs.len() + 1) {
-            rs.push(rs[i - 1].clone() * claim_r);
-        }
-
-        let (coeff_b, con_b) = prover_mle_partial_eval(&rs, &eval_at, &qs, false, last_q);
-        sum_xsq += &coeff_a * &coeff_b;
-        sum_x += &coeff_b * &con_a;
-        sum_x += &coeff_a * &con_b;
-        sum_con += &con_a * &con_b;
-    }
-
-    (
-        sum_xsq.rem_floor(cfg().field().modulus()),
-        sum_x.rem_floor(cfg().field().modulus()),
-        sum_con.rem_floor(cfg().field().modulus()),
-    )
-}
-*/
 
 // CIRCUITS
 
@@ -736,33 +676,4 @@ pub(crate) fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
     );
 
     horners
-}
-
-// eval circuit
-pub(crate) fn poly_eval_circuit(points: Vec<Integer>, x_lookup: Term) -> Term {
-    let mut eval = new_const(1); // dummy
-
-    for p in points {
-        // for sub
-        let sub = if p == 0 {
-            p
-        } else {
-            cfg().field().modulus() - p
-        };
-
-        eval = term(
-            Op::PfNaryOp(PfNaryOp::Mul),
-            vec![
-                eval,
-                term(
-                    Op::PfNaryOp(PfNaryOp::Add),
-                    vec![x_lookup.clone(), new_const(sub)], // subtraction
-                                                            // - TODO for
-                                                            // bit eq too
-                ),
-            ],
-        );
-    }
-
-    eval
 }
