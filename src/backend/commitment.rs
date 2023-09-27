@@ -1,3 +1,7 @@
+type G1 = pasta_curves::pallas::Point;
+type G2 = pasta_curves::vesta::Point;
+type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+
 use crate::backend::costs::logmn;
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::verifier_mle_eval;
@@ -29,10 +33,6 @@ use nova_snark::{
 };
 use rand::rngs::OsRng;
 use rug::{integer::Order, ops::RemRounding, Integer};
-
-type G1 = pasta_curves::pallas::Point;
-type G2 = pasta_curves::vesta::Point;
-type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
 #[derive(Debug, Clone)]
 pub struct ReefCommitment<F> {
@@ -272,18 +272,20 @@ pub fn final_clear_checks(
     reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
     table: &Vec<Integer>,
     doc_len: usize,
-    //    stack_ptr: <G1 as Group>::Scalar,
+    stack_ptr: <G1 as Group>::Scalar,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
     final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_doc_hash: Option<<G1 as Group>::Scalar>,
+    final_hybrid_q:  Option<Vec<<G1 as Group>::Scalar>>,
+    final_hybrid_v: Option<<G1 as Group>::Scalar>,
     doc_subset: Option<(usize, usize)>, // projections
     cap_d: Option<<G1 as Group>::Scalar>,
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
 ) {
     // stack ptr is 0 (stack is empty)
-    //  assert_eq!(stack_ptr, <G1 as Group>::Scalar::from(0));
+    assert_eq!(stack_ptr, <G1 as Group>::Scalar::from(0));
 
     //Asserting that d in z_n == d passed into spartan direct
     match cap_d {
@@ -367,6 +369,31 @@ pub fn final_clear_checks(
         (None, None) => {
             panic!("nlookup doc commitment used, but no running claim provided for verification");
         }
+
+
+        // nlookup eval T check
+    match (final_hybrid_q, final_hybrid_v) {
+        (Some(q), Some(v)) => {
+            let mut q_i = vec![];
+            for f in q {
+                q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
+            }
+            // TODO mle eval over F
+            assert_eq!(
+                verifier_mle_eval(table, &q_i),
+                (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
+            );
+        }
+        (Some(_), None) => {
+            panic!("only half of running claim recieved");
+        }
+        (None, Some(_)) => {
+            panic!("only half of running claim recieved");
+        }
+        (None, None) => {
+            panic!("nlookup hybrid evaluation used, but no running claim provided for verification");
+        }
+    }
     }
 }
 
