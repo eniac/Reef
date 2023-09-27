@@ -3,10 +3,8 @@ pub mod backend;
 pub mod config;
 pub mod trace;
 pub mod frontend;
-pub mod naive;
-
-#[cfg(feature = "metrics")]
-pub mod metrics;
+pub mod regex;
+pub mod naive_wr;
 
 #[macro_use]
 extern crate lazy_static;

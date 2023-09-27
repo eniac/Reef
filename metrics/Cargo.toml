@@ -1,0 +1,17 @@
+[package]
+name = "metrics"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1.4.0"
+csv = "1.2"
+dashmap = { version = "5.4"}
+
+[features]
+default = []
+
+[lib]
+name = "metrics"
+path = "./lib.rs"  
+

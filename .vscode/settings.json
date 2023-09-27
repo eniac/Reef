@@ -3,6 +3,8 @@
         "main"
     ],
     "rust-analyzer.linkedProjects": [
-        "./Cargo.toml"
-    ]
+        "./Cargo.toml",
+        "./third_party/ZoKrates/Nova-Scotia/Cargo.toml"
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false
 }

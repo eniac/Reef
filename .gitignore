@@ -5,7 +5,6 @@ out*
 *.dot
 *.lock
 *.pdf
-*.txt
 *.csv
 fast*
 slow*

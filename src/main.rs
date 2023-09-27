@@ -3,19 +3,20 @@ use clap::Parser;
 use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
-use reef::frontend::regex::re;
-use reef::frontend::safa::SAFA;
+use reef::naive_wr::naive_wr;
+use reef::regex::re;
+use reef::safa::SAFA;
 // use reef::naive::*;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
 
-#[cfg(all(not(windows), not(target_env = "musl")))]
-#[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+// #[cfg(all(not(windows), not(target_env = "musl")))]
+// #[global_allocator]
+// static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[cfg(feature = "metrics")]
-use reef::metrics::{log, log::Component};
+use metrics::metrics::{log, log::Component};
 
 fn main() {
     let opt = Options::parse();
@@ -24,7 +25,7 @@ fn main() {
     let ab = String::from_iter(opt.config.alphabet());
 
     // Input document
-    let doc = if Path::exists(Path::new(&opt.input)) {
+    let doc: Vec<char> = if Path::exists(Path::new(&opt.input)) {
         opt.config
             .read_file(&PathBuf::from(&opt.input))
             .iter()
@@ -34,14 +35,20 @@ fn main() {
         opt.input.chars().collect()
     };
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "Compiler", "Full");
+    #[cfg(feature = "nwr")]
+    naive_wr::naive_bench(opt.re,ab,doc.iter().collect::<String>(),opt.output);
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "DFA", "DFA");
 
-    let r = re::new(&opt.re);
-    //    println!("REGEX: {:#?}", r));
+    #[cfg(feature = "reef")] 
+    {
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Compiler, "Compiler", "Full");
+
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Compiler, "DFA", "DFA");
+
+        let r = re::new(&opt.re);
+        //    println!("REGEX: {:#?}", r));
 
     // Compile regex to SAFA
     let safa = if opt.negate {
@@ -50,32 +57,32 @@ fn main() {
         SAFA::new(&ab, &r)
     };
 
-    // Is document well-formed
-    // nfa.well_formed(&doc);
+        // Is document well-formed
+        // nfa.well_formed(&doc);
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "DFA", "DFA");
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Compiler, "DFA", "DFA");
 
     #[cfg(feature = "plot")]
     safa.write_pdf("main")
         .expect("Failed to plot NFA to a pdf file");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Solver, "DFA Solving", "Clear Match");
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Solver, "DFA Solving", "Clear Match");
 
-    /*
-    println!(
-        "Match: {}",
-        nfa.is_match(&doc)
-            .map(|c| format!("{:?}", c))
-            .unwrap_or(String::from("NONE"))
-    );*/
-    // TODO solving here, pass result to R1CS
+        /*
+        println!(
+            "Match: {}",
+            nfa.is_match(&doc)
+                .map(|c| format!("{:?}", c))
+                .unwrap_or(String::from("NONE"))
+        );*/
+        // TODO solving here, pass result to R1CS
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Solver, "DFA Solving", "Clear Match");
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Solver, "DFA Solving", "Clear Match");
 
-    init();
+        init();
 
     run_backend(safa.clone(), doc, opt.batch_size, opt.projections); // auto select batching/commit
 
