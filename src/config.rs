@@ -1,12 +1,10 @@
+use crate::frontend::regex::Regex;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::marker::PhantomData;
 use std::path::PathBuf;
-
-use crate::backend::costs::{JBatching, JCommit};
-use crate::frontend::regex::Regex;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -21,20 +19,6 @@ pub struct Options {
     #[arg(short = 'r', long, help = "Perl-style regular expression")]
     pub re: String,
     #[arg(
-        short = 'e',
-        long = "eval-type",
-        value_name = "EVAL TYPE",
-        help = "naive-polys or nlookup evals (override auto select)"
-    )]
-    pub eval_type: Option<JBatching>,
-    #[arg(
-        short = 'c',
-        long = "commit-type",
-        value_name = "COMMIT TYPE",
-        help = "hash-chain or nlookup commitment (override auto select)"
-    )]
-    pub commit_type: Option<JCommit>,
-    #[arg(
         short = 'b',
         long = "batch-size",
         value_name = "USIZE",
@@ -42,6 +26,14 @@ pub struct Options {
         default_value_t = 0, // auto select
     )]
     pub batch_size: usize,
+    #[arg(
+        short = 'p',
+        long = "projections",
+        value_name = "PROJECTIONS?",
+        help = "Use document projections",
+        default_value_t = false
+    )]
+    pub projections: bool,
     #[arg(
         short = 'n',
         long = "negate",
@@ -84,7 +76,7 @@ pub enum Config {
         rulesfile: PathBuf,
     },
     #[clap(about = "Accepts DNA base ASCII files")]
-    Dna { },
+    Dna {},
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -213,7 +205,8 @@ impl BaseParser<char> for AsciiParser {
             .read_to_end(&mut buffer)
             .expect("Could not parse document");
 
-        buffer.into_iter()
+        buffer
+            .into_iter()
             .map(|i| i as char)
             .filter(|c| *c != '\n' && *c != '\r')
             .collect()

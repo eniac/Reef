@@ -84,7 +84,7 @@ fn main() {
 
         init();
 
-    run_backend(safa.clone(), doc, opt.batch_size); // auto select batching/commit
+    run_backend(safa.clone(), doc, opt.batch_size, opt.projections); // auto select batching/commit
 
     let file = OpenOptions::new()
         .write(true)
