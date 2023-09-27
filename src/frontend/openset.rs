@@ -298,6 +298,12 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
             false
         }
     }
+
+    /// Is open ended on the right
+    pub fn is_open(&self) -> bool {
+        self.0.iter().any(|r| r.is_open())
+    }
+
     /// Is it a single character, if yes return it
     pub fn is_single(&self) -> Option<C> {
         if self.0.len() == 1 {
