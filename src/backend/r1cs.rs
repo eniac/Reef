@@ -414,13 +414,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         let doc_subset = if projection.is_some() {
-            let base: usize = 2;
-            let start = base.pow(projection.unwrap() as u32);
-            let end = usize_doc.len();
-            let len = end.next_power_of_two() - start;
-            assert!(len & (len - 1) == 0);
+            let real_start = projection.unwrap();
 
-            Some((start, end))
+            let end = usize_doc.len().next_power_of_two();
+            let mut start = end - 1;
+            let mut jump = 1;
+
+            while start > real_start && start >= 0 {
+                start -= jump;
+                jump *= 2;
+            }
+            if start == 0 {
+                None
+            } else {
+                println!("USING PROJECTION {:#?}", ((start, end)));
+                Some((start, end)) // handle doc extension TODO?
+            }
         } else {
             None
         };
@@ -2586,16 +2595,14 @@ mod tests {
     fn projections() {
         init();
 
-        // proj lower/mid ain't happening
-
         // proj upper
         test_func_no_hash(
             "abcd".to_string(),
-            "^....cc$".to_string(),
+            "^.....c$".to_string(),
             "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
             vec![1],              // 2],
             true,
-            Some(2), // 2^2 = 4
+            Some(5), // (4,8)
         );
     }
 

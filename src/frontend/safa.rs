@@ -427,28 +427,13 @@ impl SAFA<char> {
             })
     }
 
-    /// Returns the prefix of the document we can ignore, rounded down to nearest 2^n
-    /// Example: projection {9, 15}.a -> 3 (2^3 = 8 < 9)
+    /// Returns the prefix of the document we can ignore
+    /// Example: projection ^{0, 15}.a$ -> Some(15)
+    ///          projection .*{0,4).a   -> None
     pub fn projection(&self) -> Option<usize> {
-        let i = self.get_init();
-        let r = self
-            .projection_rec(i, OpenSet::star(), BTreeSet::new())
-            .first()?;
-        let e = r.end?;
-
-        // Round-down to nearest power of 2
-        if e == 0 {
-            return None;
-        } else if e == 1 {
-            return Some(0);
-        }
-        let mut result = 1;
-        let mut exp = 0;
-        while result <= e {
-            result <<= 1;
-            exp += 1;
-        }
-        return Some(exp - 1);
+        self.projection_rec(self.get_init(), OpenSet::star(), BTreeSet::new())
+            .first()?
+            .end
     }
 
     /// Solve at the root
@@ -1016,7 +1001,7 @@ mod tests {
     fn test_safa_projection1() {
         let r = re::simpl(re::new(r"^.{0,9}a$"));
         let safa = SAFA::new(&"ab", &r);
-        assert_eq!(safa.projection(), Some(3));
+        assert_eq!(safa.projection(), Some(9));
     }
     #[test]
     fn test_safa_projection2() {
