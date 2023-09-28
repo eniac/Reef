@@ -2524,18 +2524,20 @@ mod tests {
                 &r1cs_converter.reef_commit.unwrap(),
                 drq.clone().unwrap(),
                 drv.clone().unwrap(),
+                r1cs_converter.doc_subset(),
                 r1cs_converter.udoc.len(),
             );
 
-            final_clear_checks(
+            final_verifier_checks(
                 reef_commit,
                 &r1cs_converter.table,
                 r1cs_converter.udoc.len(),
+                <G1 as Group>::Scalar::from(r1cs_converter.stack_ptr as u64),
                 rq,
                 rv,
-                drq,
                 drv,
-                r1cs_converter.doc_subset,
+                None,
+                None,
                 None,
                 ipi,
                 ipa,

@@ -585,12 +585,12 @@ fn prove_and_verify(
     let (q, v) = recv_qv.recv().unwrap();
 
     //Doc dot prod
-
     let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
         &proof_info.commit,
         q.into_iter().map(|x| int_to_ff(x)).collect(),
         int_to_ff(v.clone()),
         proof_info.doc_len,
+        proof_info.proj_doc_len,
     );
 
     //CAP Proving
@@ -704,21 +704,19 @@ fn verify(
     let cap_res = cap_verifier(cap_d, cap_snark, cap_circuit, cap_vk, cap_v_commit);
     assert!(cap_res.is_ok());
 
-    // state, char, opt<hash>, opt<v,q for eval>, opt<v,q for doc>, accepting
+    // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
     let zn = res.unwrap().0;
 
-    // eval type, reef commitment, accepting state bool, table, doc, final_q, final_v, final_hash,
-    // final_doc_q, final_doc_v
-
-    final_clear_checks(
+    final_verifier_checks(
         reef_commit,
         &table,
         doc_len,
-        Some(zn[1..(q_len + 1)].to_vec()),
-        Some(zn[q_len + 1]),
-        Some(zn[(2 + q_len)..(2 + q_len + qd_len)].to_vec()),
-        Some(zn[2 + q_len + qd_len]),
-        None, // TODO
+        zn[(q_len + qd_len + 3)],          // stack ptr
+        Some(zn[1..(q_len + 1)].to_vec()), // eval q
+        Some(zn[q_len + 1]),               // eval v
+        Some(zn[2 + q_len + qd_len]),      // doc hash
+        None,                              // hybrid q
+        None,                              // hybrid hash
         Some(cap_d),
         ipi,
         ipa,

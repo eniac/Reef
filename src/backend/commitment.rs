@@ -199,21 +199,14 @@ pub fn calc_d_clear(
 
 pub fn proof_dot_prod_verify(
     dc: ReefCommitment<<G1 as Group>::Scalar>,
-    running_q: Vec<<G1 as Group>::Scalar>,
+    num_vars: usize,
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
 ) -> Result<(), NovaError> {
     let mut v_transcript = Transcript::new(b"dot_prod_proof");
-    let num_vars = running_q.len();
 
-    ipa.verify(
-        &dc.gens,
-        &dc.gens_single,
-        num_vars,
-        &ipi,
-        &mut v_transcript.clone(),
-    )?;
-    println!("VERIFIED");
+    ipa.verify(&dc.gens, &dc.gens_single, num_vars, &ipi, &mut v_transcript)?;
+
     Ok(())
 }
 
@@ -236,6 +229,7 @@ pub fn proof_dot_prod_prover(
     q: Vec<<G1 as Group>::Scalar>,
     running_v: <G1 as Group>::Scalar,
     doc_len: usize,
+    proj_doc_len: usize,
 ) -> (
     InnerProductInstance<G1>,
     InnerProductArgument<G1>,
@@ -246,7 +240,15 @@ pub fn proof_dot_prod_prover(
 
     let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
-    let q_rev = q.clone().into_iter().rev().collect(); // todo get rid clone
+    let new_q = if doc_len != proj_doc_len {
+        let mut q_add = proj_prefix(proj_doc_len, doc_ext_len);
+        q_add.extend(q);
+        q_add
+    } else {
+        q
+    };
+
+    let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
     let running_q = q_to_mle_q(&q_rev, doc_ext_len);
 
     // set up
@@ -268,18 +270,16 @@ pub fn proof_dot_prod_prover(
     (ipi, ipa, commit_running_v, decommit_running_v)
 }
 
-pub fn final_clear_checks(
+pub fn final_verifier_checks(
     reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
     table: &Vec<Integer>,
     doc_len: usize,
     stack_ptr: <G1 as Group>::Scalar,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
-    final_doc_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_doc_hash: Option<<G1 as Group>::Scalar>,
-    final_hybrid_q:  Option<Vec<<G1 as Group>::Scalar>>,
-    final_hybrid_v: Option<<G1 as Group>::Scalar>,
-    doc_subset: Option<(usize, usize)>, // projections
+    final_hybrid_q: Option<Vec<<G1 as Group>::Scalar>>,
+    final_hybrid_hash: Option<<G1 as Group>::Scalar>,
     cap_d: Option<<G1 as Group>::Scalar>,
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
@@ -287,93 +287,36 @@ pub fn final_clear_checks(
     // stack ptr is 0 (stack is empty)
     assert_eq!(stack_ptr, <G1 as Group>::Scalar::from(0));
 
-    //Asserting that d in z_n == d passed into spartan direct
-    match cap_d {
-        Some(d) => {
-            assert_eq!(d, final_doc_hash.unwrap());
-        }
-        None => {}
-    }
-
-    // nlookup eval T check
-    match (final_q, final_v) {
-        (Some(q), Some(v)) => {
+    match (
+        final_q,
+        final_v,
+        cap_d,
+        final_doc_hash,
+        final_hybrid_q,
+        final_hybrid_hash,
+    ) {
+        // hybrid
+        (None, None, Some(d), None, Some(q), Some(hash)) => {
+            // table
             let mut q_i = vec![];
             for f in q {
                 q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
             }
-            // TODO mle eval over F
-            assert_eq!(
-                verifier_mle_eval(table, &q_i),
-                (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
-            );
-        }
-        (Some(_), None) => {
-            panic!("only half of running claim recieved");
-        }
-        (None, Some(_)) => {
-            panic!("only half of running claim recieved");
-        }
-        (None, None) => {
-            panic!("nlookup evaluation used, but no running claim provided for verification");
-        }
-    }
 
-    match (final_doc_q, final_doc_hash) {
-        (Some(q), Some(_)) => {
+            let table_v = verifier_mle_eval(table, &q_i);
+            // TODO
+
+            // document
+            assert_eq!(d, hash);
+
+            // verification of ipa (D(running q) == running v)
             let doc_ext_len = doc_len.next_power_of_two();
-            //println!("DOC EXT LEN {:#?}", doc_ext_len);
-
-            let new_q = match doc_subset {
-                Some((start, end)) => {
-                    // what's s?
-                    let chunk_size = end - start;
-                    // assert end and start are power of 2
-                    assert!(end & (end - 1) == 0);
-                    assert!(start == 0 || start & (start - 1) == 0);
-                    assert!(start % chunk_size == 0);
-
-                    let num_chunks = doc_ext_len / chunk_size;
-                    let mut start_idx = start / chunk_size;
-
-                    println!(
-                        "chunk size {}, num chunks {}, s = {}",
-                        chunk_size, num_chunks, start_idx
-                    );
-
-                    let mut q_add = vec![];
-                    for i in 0..logmn(num_chunks) {
-                        q_add.push(<G1 as Group>::Scalar::from((start_idx % 2) as u64));
-                        start_idx = start_idx >> 1;
-                    }
-                    q_add.extend(q);
-                    q_add
-                }
-                None => q,
-            };
-
-            // right form for inner product
-            let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
-            let q_ext = q_to_mle_q(&q_rev, doc_ext_len);
-            println!("Q EXT {:#?}", q_ext);
-
-            // Doc is commited to in this case
-            assert!(proof_dot_prod_verify(reef_commitment, q_ext, ipi, ipa).is_ok());
-        }
-        (Some(_), None) => {
-            panic!("only half of running claim recieved");
-        }
-        (None, Some(_)) => {
-            panic!("only half of running claim recieved");
-        }
-        (None, None) => {
-            panic!("nlookup doc commitment used, but no running claim provided for verification");
+            assert!(proof_dot_prod_verify(reef_commitment, doc_ext_len, ipi, ipa).is_ok());
         }
 
-
-        // nlookup eval T check
-    match (final_hybrid_q, final_hybrid_v) {
-        (Some(q), Some(v)) => {
+        // split
+        (Some(q), Some(v), Some(d), Some(hash), None, None) => {
+            // table
             let mut q_i = vec![];
             for f in q {
                 q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
@@ -383,18 +326,43 @@ pub fn final_clear_checks(
                 verifier_mle_eval(table, &q_i),
                 (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
             );
+
+            // document
+            assert_eq!(d, hash);
+
+            // verification of ipa (D(running q) == running v)
+            let doc_ext_len = doc_len.next_power_of_two();
+            assert!(proof_dot_prod_verify(reef_commitment, doc_ext_len, ipi, ipa).is_ok());
         }
-        (Some(_), None) => {
-            panic!("only half of running claim recieved");
-        }
-        (None, Some(_)) => {
-            panic!("only half of running claim recieved");
-        }
-        (None, None) => {
-            panic!("nlookup hybrid evaluation used, but no running claim provided for verification");
+
+        // bad combo
+        _ => {
+            panic!("weird combination of parameters to the final verification check");
         }
     }
+}
+
+fn proj_prefix(proj_doc_len: usize, doc_ext_len: usize) -> Vec<<G1 as Group>::Scalar> {
+    // what's s?
+    let chunk_size = proj_doc_len;
+    let start = doc_ext_len - proj_doc_len;
+    assert!(start % chunk_size == 0);
+
+    let num_chunks = doc_ext_len / chunk_size;
+
+    let mut start_idx = start / chunk_size;
+
+    println!(
+        "chunk size {}, num chunks {}, s = {}",
+        chunk_size, num_chunks, start_idx
+    );
+
+    let mut q_add = vec![];
+    for i in 0..logmn(num_chunks) {
+        q_add.push(<G1 as Group>::Scalar::from((start_idx % 2) as u64));
+        start_idx = start_idx >> 1;
     }
+    q_add
 }
 
 // TODO test, TODO over ff, not Integers
