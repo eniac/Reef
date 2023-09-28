@@ -593,40 +593,7 @@ fn prove_and_verify(
         proof_info.proj_doc_len,
     );
 
-    //CAP Proving
-    let cap_d = calc_d_clear(pc.clone(), claim_blind, v.clone());
-
-    // CAP circuit
-    let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
-        ConsistencyCircuit::new(pc, cap_d, int_to_ff(v.clone()), claim_blind);
-
-    // produce CAP keys
-    let (cap_pk, cap_vk) =
-        SpartanSNARK::<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>::setup(
-            cap_circuit.clone(),
-        )
-        .unwrap();
-
-    let cap_blind_v = <G1 as Group>::Scalar::random(&mut OsRng);
-    let cap_com_v = <G1 as Group>::CE::commit(
-        cap_pk.pk.gens.get_scalar_gen(),
-        &[int_to_ff(v.clone())],
-        &cap_blind_v,
-    );
-
-    let cap_z = vec![cap_d];
-
-    let cap_res = SpartanSNARK::cap_prove(
-        &cap_pk,
-        cap_circuit.clone(),
-        &cap_z,
-        &cap_com_v.compress(),
-        &int_to_ff(v),
-        &cap_blind_v,
-    );
-    assert!(cap_res.is_ok());
-
-    let cap_snark = cap_res.unwrap();
+    let consistency_proof = ConsistencyProof::prove(v, claim_blind, &pc);
 
     #[cfg(feature = "metrics")]
     log::space(
@@ -650,11 +617,7 @@ fn prove_and_verify(
         proof_info.proj_doc_len,
         ipi,
         ipa,
-        cap_d,
-        cap_circuit,
-        cap_snark,
-        cap_vk,
-        cap_com_v,
+        consistency_proof,
     );
 
     #[cfg(feature = "metrics")]
@@ -672,11 +635,7 @@ fn verify(
     proj_doc_len: usize,
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
-    cap_d: <G1 as Group>::Scalar,
-    cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
-    cap_snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
-    cap_vk: SpartanVerifierKey<G1, EE1>,
-    cap_v_commit: Commitment<G1>,
+    consistency_proof: ConsistencyProof,
 ) {
     let q_len = logmn(table.len());
     let qd_len = logmn(proj_doc_len);
@@ -701,7 +660,7 @@ fn verify(
     log::tic(Component::Verifier, "Verification", "Final Clear Checks");
 
     //CAP verify
-    let cap_res = cap_verifier(cap_d, cap_snark, cap_circuit, cap_vk, cap_v_commit);
+    let cap_res = consistency_proof.verify();
     assert!(cap_res.is_ok());
 
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
@@ -717,7 +676,7 @@ fn verify(
         Some(zn[2 + q_len + qd_len]),      // doc hash
         None,                              // hybrid q
         None,                              // hybrid hash
-        Some(cap_d),
+        Some(consistency_proof.hash_d),
         ipi,
         ipa,
     );

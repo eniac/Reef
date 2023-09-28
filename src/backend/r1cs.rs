@@ -2514,31 +2514,36 @@ mod tests {
                 Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
                 None => None,
             };
+            let int_drv = doc_running_v.clone();
             let drv = match doc_running_v {
                 Some(x) => Some(int_to_ff(x)),
                 None => None,
             };
             assert_eq!(next_state, r1cs_converter.num_states);
 
+            let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
+            let doc_len = r1cs_converter.udoc.len();
+            let proj_len = r1cs_converter.doc_len();
             let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
                 &r1cs_converter.reef_commit.unwrap(),
                 drq.clone().unwrap(),
                 drv.clone().unwrap(),
-                r1cs_converter.doc_subset(),
-                r1cs_converter.udoc.len(),
+                doc_len,  // real
+                proj_len, // proj
             );
+            let consistency_proof = ConsistencyProof::prove(int_drv.unwrap(), claim_blind, &sc);
 
             final_verifier_checks(
                 reef_commit,
                 &r1cs_converter.table,
-                r1cs_converter.udoc.len(),
+                doc_len,
                 <G1 as Group>::Scalar::from(r1cs_converter.stack_ptr as u64),
                 rq,
                 rv,
-                drv,
+                Some(consistency_proof.hash_d), // fake check
                 None,
                 None,
-                None,
+                Some(consistency_proof.hash_d),
                 ipi,
                 ipa,
             );

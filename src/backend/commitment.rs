@@ -27,7 +27,8 @@ use nova_snark::{
     },
     spartan::direct::SpartanVerifierKey,
     traits::{
-        circuit::StepCircuit, commitment::*, AbsorbInROTrait, Group, ROConstantsTrait, ROTrait,
+        circuit::StepCircuit, commitment::*, evaluation::GetGeneratorsTrait, AbsorbInROTrait,
+        Group, ROConstantsTrait, ROTrait,
     },
     StepCounterType,
 };
@@ -179,6 +180,74 @@ where
     }
 }
 
+pub struct ConsistencyProof {
+    pub hash_d: <G1 as Group>::Scalar,
+    circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
+    snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
+    vk: SpartanVerifierKey<G1, EE1>,
+    commit_v: Commitment<G1>,
+}
+
+impl ConsistencyProof {
+    pub fn prove(
+        v: Integer,
+        claim_blind: <G1 as Group>::Scalar,
+        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    ) -> Self {
+        //CAP Proving
+        let cap_d = calc_d_clear(pc.clone(), claim_blind, v.clone());
+
+        let v_ff = int_to_ff(v);
+
+        // CAP circuit
+        let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
+            ConsistencyCircuit::new(pc.clone(), cap_d, v_ff, claim_blind);
+
+        // produce CAP keys
+        let (cap_pk, cap_vk) =
+            SpartanSNARK::<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>::setup(
+                cap_circuit.clone(),
+            )
+            .unwrap();
+
+        let cap_blind_v = <G1 as Group>::Scalar::random(&mut OsRng);
+        let cap_com_v =
+            <G1 as Group>::CE::commit(cap_pk.pk.gens.get_scalar_gen(), &[v_ff], &cap_blind_v);
+
+        let cap_z = vec![cap_d];
+
+        let cap_res = SpartanSNARK::cap_prove(
+            &cap_pk,
+            cap_circuit.clone(),
+            &cap_z,
+            &cap_com_v.compress(),
+            &v_ff,
+            &cap_blind_v,
+        );
+        assert!(cap_res.is_ok());
+
+        let cap_snark = cap_res.unwrap();
+
+        ConsistencyProof {
+            hash_d: cap_d,
+            circuit: cap_circuit,
+            snark: cap_snark,
+            vk: cap_vk,
+            commit_v: cap_com_v,
+        }
+    }
+
+    pub fn verify(&self) -> Result<(), NovaError> {
+        let z_0 = vec![self.hash_d];
+        let z_out = self.circuit.output(&z_0);
+        let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
+        let res = self
+            .snark
+            .cap_verify(&self.vk, &io, &self.commit_v.compress());
+        res
+    }
+}
+
 pub fn calc_d_clear(
     pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     claim_blind: <G1 as Group>::Scalar,
@@ -195,33 +264,6 @@ pub fn calc_d_clear(
     sponge.finish(acc).unwrap();
 
     d_out_vec[0]
-}
-
-pub fn proof_dot_prod_verify(
-    dc: ReefCommitment<<G1 as Group>::Scalar>,
-    num_vars: usize,
-    ipi: InnerProductInstance<G1>,
-    ipa: InnerProductArgument<G1>,
-) -> Result<(), NovaError> {
-    let mut v_transcript = Transcript::new(b"dot_prod_proof");
-
-    ipa.verify(&dc.gens, &dc.gens_single, num_vars, &ipi, &mut v_transcript)?;
-
-    Ok(())
-}
-
-pub fn cap_verifier(
-    cap_d: <G1 as Group>::Scalar,
-    cap_snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
-    cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
-    vk: SpartanVerifierKey<G1, EE1>,
-    com_v: Commitment<G1>,
-) -> Result<(), NovaError> {
-    let z_0 = vec![cap_d];
-    let z_out = cap_circuit.output(&z_0);
-    let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
-    let res = cap_snark.cap_verify(&vk, &io, &com_v.compress());
-    res
 }
 
 pub fn proof_dot_prod_prover(
@@ -268,6 +310,19 @@ pub fn proof_dot_prod_prover(
         .unwrap();
 
     (ipi, ipa, commit_running_v, decommit_running_v)
+}
+
+fn proof_dot_prod_verify(
+    dc: ReefCommitment<<G1 as Group>::Scalar>,
+    num_vars: usize,
+    ipi: InnerProductInstance<G1>,
+    ipa: InnerProductArgument<G1>,
+) -> Result<(), NovaError> {
+    let mut v_transcript = Transcript::new(b"dot_prod_proof");
+
+    ipa.verify(&dc.gens, &dc.gens_single, num_vars, &ipi, &mut v_transcript)?;
+
+    Ok(())
 }
 
 pub fn final_verifier_checks(
