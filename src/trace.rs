@@ -1,14 +1,12 @@
 use std::collections::LinkedList;
-
 use petgraph::graph::NodeIndex;
-use rayon::iter::*;
 
 use core::fmt;
 use core::fmt::{Display, Formatter};
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use crate::safa::{Either, Skip};
+use crate::frontend::safa::{Either, Skip};
 
 /// Type of solver result, a matchign [Trace]
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
@@ -23,9 +21,9 @@ impl<C: Clone> Trace<C> {
         Trace(l)
     }
     pub fn prepend(v: Option<Self>, a: TraceElem<C>) -> Option<Self> {
-            let mut l = v?.0;
-            l.push_front(a);
-            Some(Self(l))
+        let mut l = v?.0;
+        l.push_front(a);
+        Some(Self(l))
     }
     pub fn empty() -> Self {
         Self(LinkedList::new())
@@ -42,13 +40,7 @@ pub struct TraceElem<C> {
 }
 
 impl<C: Clone> TraceElem<C> {
-    pub fn new(
-        from: usize,
-        e: &Either<C, Skip>,
-        to: usize,
-        i: usize,
-        j: usize,
-    ) -> Self {
+    pub fn new(from: usize, e: &Either<C, Skip>, to: usize, i: usize, j: usize) -> Self {
         Self {
             from_node: NodeIndex::new(from),
             edge: e.clone(),
@@ -89,4 +81,3 @@ impl<C: Display> Display for Trace<C> {
         write!(f, "{}", s.join(", "))
     }
 }
-

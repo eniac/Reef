@@ -124,3 +124,42 @@ compiler,R1CS,Circom,1210334644,μs
 solver,DFA Solving,Clear Match,3349646,μs
 compiler,R1CS,Size,17092121,constraints
 prover,Proof Size,Spartan SNARK size,58220,bytes
+compiler,R1CS,Create Recursive Circuit,52146499,μs
+compiler,DFA,DFA,19612,μs
+solver,DFA Solving,Clear Match,42646,μs
+prover,Prove,Prove,1618584,μs
+verifier,Verifier,Verify,1374022,μs
+compiler,R1CS,Loading,2846,μs
+compiler,R1CS,Commitment Gen,34002,μs
+compiler,R1CS,Public Params,4629238,μs
+compiler,R1CS,Circom,4798637,μs
+compiler,R1CS,Size,12379,constraints
+prover,Proof Size,Spartan SNARK size,70470,bytes
+To sestyTo_2000,([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?),2304,18
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,Circom,4842587,μs
+verifier,Verifier,Verify,1344806,μs
+compiler,R1CS,Public Params,4621434,μs
+solver,DFA Solving,Clear Match,982418,μs
+prover,Prove,Prove,1522798,μs
+compiler,R1CS,Commitment Gen,66942,μs
+compiler,R1CS,Loading,2859,μs
+compiler,DFA,DFA,20141,μs
+compiler,R1CS,Create Recursive Circuit,1036239671,μs
+compiler,R1CS,Size,12379,constraints
+prover,Proof Size,Spartan SNARK size,70575,bytes
+To strut b_100,"(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))",48640,380
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+prover,Prove,Prove,4164347,μs
+solver,DFA Solving,Clear Match,972293,μs
+compiler,R1CS,Create Recursive Circuit,2211564672,μs
+compiler,DFA,DFA,7811700,μs
+verifier,Verifier,Verify,2931249,μs
+compiler,R1CS,Circom,2775921176,μs
+compiler,R1CS,Commitment Gen,33985,μs
+compiler,R1CS,Public Params,6948517,μs
+compiler,R1CS,Loading,45087,μs
+compiler,R1CS,Size,58942,constraints
+prover,Proof Size,Spartan SNARK size,74957,bytes

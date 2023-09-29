@@ -1,0 +1,6 @@
+const field a = 1;
+
+def main() -> field {
+    a = 2; // not allowed
+    return a;
+}

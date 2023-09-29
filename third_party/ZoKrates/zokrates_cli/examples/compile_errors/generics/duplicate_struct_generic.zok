@@ -1,0 +1,7 @@
+struct A<N, N> {
+    field[N] a;
+}
+
+def main() {
+    return;
+}
