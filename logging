@@ -1,0 +1,16 @@
+doc len: 399
+Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00
+N States: 797
+solution length: 400
+doc length: 399
+[32mtemplate instances[0m: 82
+non-linear constraints: 40743813
+linear constraints: 0
+public inputs: 0
+public outputs: 1
+private inputs: 800
+private outputs: 0
+wires: 40744213
+labels: 162975927
+[32mWritten successfully:[0m ./match.r1cs
+[32mWritten successfully:[0m ./match.sym

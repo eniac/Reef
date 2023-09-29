@@ -35,6 +35,7 @@ impl<'a> DFA<'a> {
         // Recursive funtion
         fn mk_dfa(d: &mut DFA, q: &Regex) {
           // Add to DFA if not already there
+          //println!("initial state:{}",q);
           d.add_state(q);
 
           // Explore derivatives

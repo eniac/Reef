@@ -55,9 +55,10 @@ pub fn get_folded_cost(circuit_size: usize, n_foldings: usize) -> usize {
 }
 
 pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
+    println!("doc len: {}",doc.len());
+    println!("{}",r);
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
     let doc_len = doc_vec.len();
-
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "DFA","DFA");
@@ -71,10 +72,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::stop(Component::Compiler, "DFA","DFA");
 
     println!("N States: {:#?}",dfa_nstate);
-    println!("N Delta: {:#?}",dfa_ndelta);
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Solver,"DFA Solving", "Clear Match");
+
     let is_match = dfa.is_match(&doc);
     let solution = dfa.solve(&doc);
     let mut prover_states: Vec<u32> = solution.clone().into_iter().map(|(a,b,c)| a).collect_vec();
@@ -109,6 +110,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::stop(Component::Compiler, "R1CS", "Circom");
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
+
+    remove_file("match.circom");
 
     let circuit_filepath = "match.r1cs";
     let witness_gen_filepath = "match_js/match.wasm";
@@ -280,9 +283,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
 #[test]
 fn test_1() {
-    let r  = "([^a]+)a".to_string();
-    //let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
-    let ab: String = "abc".to_string();
+    let r  = "abc";
+    //"Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text\/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00".to_string();
+    let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
+    // let ab: String = "abc".to_string();
     //let ab = abvec.iter().collect();
     let doc = "abc".to_owned();
     naive_bench(r,ab, doc, PathBuf::from("out_test"));
