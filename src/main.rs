@@ -3,9 +3,9 @@ use clap::Parser;
 use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
-use reef::naive_wr::naive_wr;
-use reef::regex::re;
-use reef::safa::SAFA;
+use reef::naive::naive_wr;
+use reef::frontend::regex::re;
+use reef::frontend::safa::SAFA;
 // use reef::naive::*;
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -35,7 +35,7 @@ fn main() {
         opt.input.chars().collect()
     };
 
-    #[cfg(feature = "nwr")]
+    // #[cfg(feature = "nwr")]
     naive_wr::naive_bench(opt.re,ab,doc.iter().collect::<String>(),opt.output);
 
 
@@ -106,4 +106,5 @@ fn main() {
     log::write_csv(opt.output.to_str().unwrap()).unwrap();
 
     //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
+    }
 }

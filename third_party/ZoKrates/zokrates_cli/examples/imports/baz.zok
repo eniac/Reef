@@ -1,7 +1,0 @@
-struct Baz {}
-
-const field BAZ = 123;
-
-def main() -> field {
-    return BAZ;
-}

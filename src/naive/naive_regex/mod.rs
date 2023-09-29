@@ -3,8 +3,8 @@
 use hashconsing::{consign, HConsed, HashConsign};
 use std::collections::BTreeSet;
 
-use crate::openset::{OpenRange, OpenSet};
-use crate::safa::Skip;
+use crate::frontend::openset::{OpenRange, OpenSet};
+use crate::frontend::safa::Skip;
 use core::fmt;
 use core::fmt::Formatter;
 
@@ -358,10 +358,10 @@ impl RegexF {
 
 /// Top level module with hash-consing constructors
 pub mod re {
-    use crate::openset::OpenSet;
+    use crate::frontend::openset::OpenSet;
     use crate::naive::naive_regex::{naive_parser::RegexParser, Regex, RegexF};
     use crate::naive::naive_regex::{CharClass, G};
-    use crate::safa::Skip;
+    use crate::frontend::safa::Skip;
     use gmp_mpfr_sys::mpc::pow;
     use hashconsing::HashConsign;
     use std::array::TryFromSliceError;

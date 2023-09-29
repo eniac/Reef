@@ -1,4 +1,0 @@
-def main() {
-    assert(1f == 2f);
-    return;
-}

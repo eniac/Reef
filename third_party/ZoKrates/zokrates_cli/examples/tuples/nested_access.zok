@@ -1,4 +1,0 @@
-def main(((field,),) b) {
-    field a = b.0.0;
-    return;
-}

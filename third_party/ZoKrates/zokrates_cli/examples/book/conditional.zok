@@ -1,4 +1,0 @@
-def main(field x) -> field {
-    field y = if x + 2 == 3 { 1 } else { 5 };
-    return y;
-}

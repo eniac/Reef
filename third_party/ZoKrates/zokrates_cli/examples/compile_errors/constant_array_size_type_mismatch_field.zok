@@ -1,5 +1,0 @@
-const field SIZE = 2;
-
-def main(field[SIZE] n) {
-    return;
-}

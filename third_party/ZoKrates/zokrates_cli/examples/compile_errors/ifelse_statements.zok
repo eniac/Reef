@@ -1,9 +1,0 @@
-def main(bool flag) -> field {
-    field a = 1;
-    return if flag {
-        field b = a; // not supported
-        b
-    } else {
-        false
-    };
-}

@@ -1,4 +1,0 @@
-def main() {
-    for u32 i in 0..-1 {}
-    return;
-}

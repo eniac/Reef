@@ -1,6 +1,0 @@
-def assert() {
-    return;
-}
-
-def main():
-    return

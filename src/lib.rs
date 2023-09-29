@@ -3,8 +3,7 @@ pub mod backend;
 pub mod config;
 pub mod trace;
 pub mod frontend;
-pub mod regex;
-pub mod naive_wr;
+pub mod naive;
 
 #[macro_use]
 extern crate lazy_static;

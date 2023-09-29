@@ -1,6 +1,0 @@
-import "hashes/poseidon/poseidon" as poseidon;
-
-def main(field[5] i) -> field {
-    field output = poseidon(i);
-    return output;
-}

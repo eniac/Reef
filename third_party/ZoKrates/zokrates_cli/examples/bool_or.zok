@@ -1,7 +1,0 @@
-// example using if-then-else-fi with ||
-def main(field a, field b) -> field {
-    field y = a + 2 == 4 || b * 2 == 2 ? 1 : 0;
-    field z = y == 1 || y == 0 ? y : 1;
-    assert(z == 1);
-    return z;
-}

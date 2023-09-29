@@ -61,7 +61,7 @@ struct CircomInput {
 }
 
 #[cfg(not(target_family = "wasm"))]
-fn compute_witness<G1, G2>(
+pub fn compute_witness<G1, G2>(
     current_public_input: Vec<String>,
     private_input: HashMap<String, Value>,
     witness_generator_file: FileLocation,
