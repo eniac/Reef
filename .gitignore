@@ -5,5 +5,6 @@ out*
 *.dot
 *.pdf
 *.csv
+Cargo.lock
 fast*
 slow*
