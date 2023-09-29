@@ -176,14 +176,14 @@ where
         .collect::<Vec<String>>();
     let mut current_public_input = start_public_input_hex.clone();
 
-    log::tic(Component::Compiler, "R1CS", "Commitment Gen");
+    log::tic(Component::Solver, "Witness", "Compute");
     let witness_0 = compute_witness::<G1, G2>(
         current_public_input.clone(),
         private_inputs[0].clone(),
         witness_generator_file.clone(),
         &witness_generator_output,
     );
-    log::stop(Component::Compiler, "R1CS", "Commitment Gen");
+    log::stop(Component::Solver, "Witness", "Compute");
 
     let circuit_0 = CircomCircuit {
         r1cs: r1cs.clone(),
@@ -195,12 +195,14 @@ where
     let mut recursive_snark: Option<RecursiveSNARK<G1, G2, _, _>> = None;
 
     for i in 0..iteration_count {
+        log::tic(Component::Solver, "Witness", format!("Compute_{}",i).as_str());
         let witness = compute_witness::<G1, G2>(
             current_public_input.clone(),
             private_inputs[i].clone(),
             witness_generator_file.clone(),
             &witness_generator_output,
         );
+        log::stop(Component::Solver, "Witness", format!("Compute_{}",i).as_str());
 
         let circuit = CircomCircuit {
             r1cs: r1cs.clone(),
@@ -213,6 +215,7 @@ where
             .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
             .collect();
 
+        log::tic(Component::Prover, "Prove", format!("Prove_{}",i).as_str());
         let res = RecursiveSNARK::<G1, G2, C1<G1>, C2<G2>>::prove_step(
             &pp,
             recursive_snark,
@@ -221,6 +224,8 @@ where
             start_public_input.clone(),
             z0_secondary.clone(),
         );
+        log::stop(Component::Solver, "Witness", format!("Prove_{}",i).as_str());
+
         assert!(res.is_ok());
         recursive_snark = Some(res.unwrap());
     }

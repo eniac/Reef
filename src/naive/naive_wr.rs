@@ -5,7 +5,6 @@ type G2 = pasta_curves::vesta::Point;
 type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 
-// use crate::backend::{r1cs_helper::init};
 use crate::naive::naive_wr_circom_writer::*;
 use crate::naive::naive_wr_nova::*;
 use std::{env::current_dir};
@@ -111,7 +110,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
-    remove_file("match.circom");
+    //remove_file("match.circom");
 
     let circuit_filepath = "match.r1cs";
     let witness_gen_filepath = "match_js/match.wasm";
@@ -134,7 +133,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let start_public_input = [
         F::<G1>::from(0),
         gen_hash(vec![commitment.blind], &pc),
-        F::<G1>::from(1)
+        F::<G1>::from(1),
+        gen_hash(vec![F::<G1>::from(prover_states[0])], &pc),
     ];
 
     println!("pub inputs");
@@ -154,8 +154,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::tic(Component::Compiler, "R1CS","Public Params");
 
     let pp = create_public_params::<G1, G2>(r1cs.clone());
-
-    println!("post pp");
+    
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Compiler, "R1CS","Public Params");
  
     println!(
         "Number of constraints per step (primary circuit): {}",
@@ -170,8 +171,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         "total n constraints: {}",
         get_folded_cost(pp.num_constraints().0,doc_len)
     );
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS","Public Params");
+
 
     #[cfg(feature = "metrics")]
     log::r1cs(Component::Compiler, "R1CS", "Size", pp.num_constraints().0);
@@ -185,9 +185,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         pp.num_variables().1
     );
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS","Create Recursive Circuit");
-
     let recursive_snark = create_recursive_circuit(
         FileLocation::PathBuf(witness_generator_file),
         r1cs,
@@ -195,9 +192,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         start_public_input.to_vec(),
         &pp,
     ).unwrap();
-
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS","Create Recursive Circuit");
 
     let z0_secondary = [<G2 as Group>::Scalar::zero()];
 
@@ -212,17 +206,19 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Prover, "Prove","Prove");
+    log::tic(Component::Prover, "Prove","Prove Compressed");
 
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
     println!(
         "CompressedSNARK::prove: {:?}",
         res.is_ok(),
     );
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Prove","Prove Compressed");
+
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Prover, "Prove","Prove");
+
 
     // // verify the compressed SNARK
     println!("Verifying a CompressedSNARK...");
@@ -244,9 +240,17 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         res.is_ok(),
     );
     assert!(res.is_ok());
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Verifier, "Verifier","Verify");
 
+    // index,hash.out, valid_match.out,next_state_hash.out;
+    println!(
+        "zn? {:?}",
+        res.unwrap().0,
+    );
+
+    println!(
+        "commitment {:?}",
+        commitment,
+    );
 
     #[cfg(feature = "metrics")]
     log::space(
@@ -281,13 +285,13 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 }
 
 
-// #[test]
-// fn test_1() {
-//     let r  = "abc";
-//     //"Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text\/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00".to_string();
-//     let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
-//     // let ab: String = "abc".to_string();
-//     //let ab = abvec.iter().collect();
-//     let doc = "abc".to_owned();
-//     naive_bench(r,ab, doc, PathBuf::from("out_test"));
-// }
+#[test]
+fn test_1() {
+    let r  = "abc";
+    //"Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text\/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00".to_string();
+    //let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
+    let ab: String = "abc".to_string();
+    //let ab = abvec.iter().collect();
+    let doc = "abc".to_owned();
+    naive_bench(r.to_string(),ab, doc, PathBuf::from("out_test"));
+}

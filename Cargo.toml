@@ -53,6 +53,7 @@ metrics = ["dep:dashmap"]
 plot = []
 nwr = []
 reef = []
+naive = []
 
 [[bench]]
 name = "bench"

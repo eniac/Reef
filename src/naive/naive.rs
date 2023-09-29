@@ -102,7 +102,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
-    // remove_file("match.circom");
+    let _ = remove_file("match.circom");
 
     let circuit_filepath = "match.r1cs";
     let witness_gen_filepath = "match_js/match.wasm";
@@ -172,9 +172,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver,"Witness","Gen");
 
-    // remove_file("match.sym");
-    // remove_file("match.r1cs");
-    // remove_file("circom_witness.wtns");
+    remove_file("match.sym");
+    remove_file("match.r1cs");
+    remove_file("circom_witness.wtns");
 
     let prove_circuit = CircomCircuit {
         r1cs: r1cs.clone(),
@@ -245,7 +245,13 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 fn test_1() {
     let r  = "abc";
     //"Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text\/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00".to_string();
+    let r  = "abc";
+    //"Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text\/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00".to_string();
     //let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
+    let ab: String = "abc".to_string();
+    //let ab = abvec.iter().collect();
+    let doc = "abcccccccccccccccccccccccccccc".to_owned();
+    naive_bench(r.to_string(),ab, doc, PathBuf::from("out_test"));
     let ab: String = "abc".to_string();
     //let ab = abvec.iter().collect();
     let doc = "abcccccccccccccccccccccccccccc".to_owned();

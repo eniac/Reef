@@ -4,6 +4,7 @@ use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
 use reef::naive::naive_wr;
+use reef::naive::naive;
 use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
 // use reef::naive::*;
@@ -35,9 +36,11 @@ fn main() {
         opt.input.chars().collect()
     };
 
-    // #[cfg(feature = "nwr")]
+    #[cfg(feature = "nwr")]
     naive_wr::naive_bench(opt.re,ab,doc.iter().collect::<String>(),opt.output);
 
+    #[cfg(feature = "naive")]
+    naive::naive_bench(opt.re,ab,doc.iter().collect::<String>(),opt.output);
 
     #[cfg(feature = "reef")] 
     {
@@ -47,31 +50,31 @@ fn main() {
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "DFA", "DFA");
 
-        let r = re::new(&opt.re);
+        let r = re::simpl(re::new(&opt.re));
         //    println!("REGEX: {:#?}", r));
 
-    // Compile regex to SAFA
-    let safa = if opt.negate {
-        SAFA::new(&ab, &r).negate()
-    } else {
-        SAFA::new(&ab, &r)
-    };
+        // Compile regex to SAFA
+        let safa = if opt.negate {
+            SAFA::new(&ab, &r).negate()
+        } else {
+            SAFA::new(&ab, &r)
+        };
 
-        // Is document well-formed
-        // nfa.well_formed(&doc);
+            // Is document well-formed
+            // nfa.well_formed(&doc);
 
-        #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "DFA", "DFA");
+            #[cfg(feature = "metrics")]
+            log::stop(Component::Compiler, "DFA", "DFA");
 
-    #[cfg(feature = "plot")]
-    safa.write_pdf("main")
-        .expect("Failed to plot NFA to a pdf file");
+        #[cfg(feature = "plot")]
+        safa.write_pdf("main")
+            .expect("Failed to plot NFA to a pdf file");
 
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Solver, "DFA Solving", "Clear Match");
+            #[cfg(feature = "metrics")]
+            log::tic(Component::Solver, "DFA Solving", "Clear Match");
 
-        /*
-        println!(
+            /*
+            println!(
             "Match: {}",
             nfa.is_match(&doc)
                 .map(|c| format!("{:?}", c))
@@ -84,27 +87,27 @@ fn main() {
 
         init();
 
-    run_backend(safa.clone(), doc, opt.batch_size, opt.projections); // auto select batching/commit
+        run_backend(safa.clone(), doc, opt.batch_size, opt.projections); // auto select batching/commit
 
-    let file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(opt.output.clone())
-        .unwrap();
-    let mut wtr = Writer::from_writer(file);
-    let _ = wtr.write_record(&[
-        opt.input,
-        opt.re,
-        safa.g.edge_count().to_string(), //nedges().to_string(),
-        safa.g.node_count().to_string(), //nstates().to_string(),
-    ]);
-    let spacer = "---------";
-    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-    wtr.flush();
-    #[cfg(feature = "metrics")]
-    log::write_csv(opt.output.to_str().unwrap()).unwrap();
+        let file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(opt.output.clone())
+            .unwrap();
+        let mut wtr = Writer::from_writer(file);
+        let _ = wtr.write_record(&[
+            format!("{}_{}",&opt.input[..10],opt.input.len()),
+            opt.re,
+            safa.g.edge_count().to_string(), //nedges().to_string(),
+            safa.g.node_count().to_string(), //nstates().to_string(),
+        ]);
+        let spacer = "---------";
+        let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+        wtr.flush();
+        #[cfg(feature = "metrics")]
+        log::write_csv(opt.output.to_str().unwrap()).unwrap();
 
-    //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
+        //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
     }
 }

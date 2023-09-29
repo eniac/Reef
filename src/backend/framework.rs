@@ -168,8 +168,14 @@ pub fn run_backend(
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "Compiler", "Full");
-
+        
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Solver, "Solve", "Framework Solve");
         solve(sender, sender_qv, &mut r1cs_converter, &prover_data, &doc);
+
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Solver, "Solve", "Framework Solve");
+        
     });
 
     //get args
@@ -530,8 +536,9 @@ fn prove_and_verify(
     let pc = cp_clone.pc;
     let claim_blind = cp_clone.claim_blind;
 
+    let mut i = 0;
     while circuit_primary.is_some() {
-        #[cfg(feature = "metrics")]
+        #[cfg(feature = "metrics")] 
         let test = format!("step {}", i);
 
         #[cfg(feature = "metrics")]
@@ -563,7 +570,8 @@ fn prove_and_verify(
         */
         recursive_snark = Some(result.unwrap());
 
-        circuit_primary = recv.recv().unwrap()
+        i +=1;
+        circuit_primary = recv.recv().unwrap();
     }
 
     assert!(recursive_snark.is_some());
