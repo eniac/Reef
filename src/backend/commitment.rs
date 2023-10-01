@@ -82,9 +82,6 @@ impl ReefCommitment {
             )
             .unwrap();
 
-        let single_gen = cap_pk.pk.gens.get_scalar_gen();
-        let vector_gen = cap_pk.pk.gens.get_vector_gen();
-
         // salf for H(s||v) proof
         let salt = <G1 as Group>::Scalar::random(&mut OsRng);
 
@@ -97,6 +94,13 @@ impl ReefCommitment {
         let mle = mle_from_pts(doc_ext);
 
         //let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
+        let single_gen = cap_pk.pk.gens.get_scalar_gen();
+        let vector_gen = CommitmentGens::<G1>::new_with_blinding_gen(
+            b"vector_gen_doc",
+            mle.len(),
+            &single_gen.get_blinding_gen(),
+        );
+
         let blind = <G1 as Group>::Scalar::random(&mut OsRng);
 
         let scalars: Vec<<G1 as Group>::Scalar> = //<G1 as Group>::Scalar> =
@@ -182,6 +186,7 @@ impl ReefCommitment {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
         println!("PROJECTIONS OLD Q {:#?}", q.clone());
+        println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
         let new_q = if self.doc_len != proj_doc_len {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q);
@@ -219,7 +224,16 @@ impl ReefCommitment {
             &mut p_transcript,
         )
         .unwrap();
+        /*
+                // sanity - TODO DEL
+                let mut sum = <G1 as Group>::Scalar::from(0);
+                for i in 0..self.mle_doc.len() {
+                    sum += self.mle_doc[i].clone() * running_q[i].clone();
+                }
+                // this passes
+                assert_eq!(sum, running_v); // <MLE_scalars * running_q> = running_v
 
+        */
         (ipi, ipa, commit_running_v, decommit_running_v)
     }
 

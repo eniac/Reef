@@ -445,7 +445,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let ds = self.doc_subset.unwrap();
             ds.1 - ds.0
         } else {
-            self.udoc.len()
+            self.udoc.len().next_power_of_two()
         }
     }
 
@@ -1387,7 +1387,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // size of table (T -> mle)
         let sc_l = logmn(t_size);
-        println!("size of table {}", sc_l);
+        // println!("size of table {}", sc_l);
 
         self.sum_check_circuit(lhs, sc_l, id);
 
@@ -1578,12 +1578,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-
-        println!(
-            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );
-
+        /*
+                println!(
+                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+                );
+        */
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -1668,12 +1668,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-
-        println!(
-            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );
-
+        /*
+                println!(
+                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+                );
+        */
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
