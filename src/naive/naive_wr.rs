@@ -134,14 +134,16 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         F::<G1>::from(0),
         gen_hash(vec![commitment.blind], &pc),
         F::<G1>::from(1),
-        gen_hash(vec![F::<G1>::from(prover_states[0])], &pc),
+        gen_hash(vec![F::<G1>::from(prover_states[0] as u64)], &pc),
     ];
 
-    println!("pub inputs");
+    println!("pub inputs: {:#?}",start_public_input);
+    print!("cur_state: {:#?}",F::<G1>::from(prover_states[0] as u64));
 
     let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
 
-    for i in 0..doc_len {
+    for i in 0..1{
+    //doc_len {
         let mut private_input = HashMap::new();
         private_input.insert("cur_state".to_string(), json!(prover_states[i]));
         private_input.insert("next_state".to_string(), json!(prover_states[i+1]));
@@ -287,11 +289,11 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
 #[test]
 fn test_1() {
-    let r  = "abc";
+    let r  = "a";
     //"Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text\/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00".to_string();
     //let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
     let ab: String = "abc".to_string();
     //let ab = abvec.iter().collect();
-    let doc = "abc".to_owned();
+    let doc = "a".to_owned();
     naive_bench(r.to_string(),ab, doc, PathBuf::from("out_test"));
 }
