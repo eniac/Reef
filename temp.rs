@@ -34,128 +34,119 @@ use nova_snark::{
 use rand::rngs::OsRng;
 use rug::{integer::Order, ops::RemRounding, Integer};
 
-#[derive(Clone)]
 pub struct ReefCommitment {
     // commitment to doc
+    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     vector_gens: CommitmentGens<G1>,
     single_gens: CommitmentGens<G1>,
     mle_doc: Vec<<G1 as Group>::Scalar>,
     doc_commit: CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
     doc_decommit: <G1 as Group>::Scalar,
-    pub doc_commit_hash: <G1 as Group>::Scalar
+    pub doc_commit_hash: <G1 as Group>::Scalar,
     pub hash_salt: <G1 as Group>::Scalar,
     // consistency verification
     cap_pk: SpartanProverKey<G1, EE1>,
     cap_vk: SpartanVerifierKey<G1, EE1>,
-    pub hash_d: <G1 as Group>::Scalar,
     doc_len: usize,
-circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
+}
+
+pub struct ConsistencyProof
+    pub hash_d: <G1 as Group>::Scalar,
+    circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
     snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
     v_commit: Commitment<G1>,
     // dot prod verification
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
-
 }
 
 impl ReefCommitment {
-pub fn new(
-    doc: Vec<usize>,
-    pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-) -> (
-    ReefCommitment<<G1 as Group>::Scalar>,
-)
-where
-    G1: Group<Base = <G2 as Group>::Scalar>,
-    G2: Group<Base = <G1 as Group>::Scalar>,
-{
-    // keys for the H(s||v) proof later
-    // need empty circuit
-    let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(
-        pc.clone(),
-        <G1 as Group>::Scalar::from(0),
-        <G1 as Group>::Scalar::from(0),
-        <G1 as Group>::Scalar::from(0),
-    );
+    pub fn new(doc: Vec<usize>, pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>) -> Self
+    where
+        G1: Group<Base = <G2 as Group>::Scalar>,
+        G2: Group<Base = <G1 as Group>::Scalar>,
+    {
+        // keys for the H(s||v) proof later
+        // need empty circuit
+        let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(
+            &pc,
+            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(0),
+        );
 
-    // produce CAP keys
-    let (cap_pk, cap_vk) =
-        SpartanSNARK::<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>::setup(
-            cap_circuit.clone(),
-        )
-        .unwrap();
+        // produce CAP keys
+        let (cap_pk, cap_vk) =
+            SpartanSNARK::<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>::setup(
+                cap_circuit.clone(),
+            )
+            .unwrap();
 
-    let single_gen = cap_pk.pk.gens.get_scalar_gen();
-    let vector_gen = cap_pk.pk.gens.get_vector_gen();
+        let single_gen = cap_pk.pk.gens.get_scalar_gen();
+        let vector_gen = cap_pk.pk.gens.get_vector_gen();
 
-    // salf for H(s||v) proof
-    let salt = <G1 as Group>::Scalar::random(&mut OsRng);
+        // salf for H(s||v) proof
+        let salt = <G1 as Group>::Scalar::random(&mut OsRng);
 
-    // commitment to document
-    let doc_ext_len = doc.len().next_power_of_two();
+        // commitment to document
+        let doc_ext_len = doc.len().next_power_of_two();
 
-    let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
-    doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
+        let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
+        doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
 
-    let mle = mle_from_pts(doc_ext);
+        let mle = mle_from_pts(doc_ext);
 
-    //let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
-    let blind = <G1 as Group>::Scalar::random(&mut OsRng);
+        //let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
+        let blind = <G1 as Group>::Scalar::random(&mut OsRng);
 
-    let scalars: Vec<<G1 as Group>::Scalar> = //<G1 as Group>::Scalar> =
+        let scalars: Vec<<G1 as Group>::Scalar> = //<G1 as Group>::Scalar> =
                 mle.into_iter().map(|x| int_to_ff(x)).collect();
 
-    let commit_doc = <G1 as Group>::CE::commit(&vector_gen, &scalars, &blind);
+        let commit_doc = <G1 as Group>::CE::commit(&vector_gen, &scalars, &blind);
 
-    // for in-circuit fiat shamir
-    let mut ro: PoseidonRO<<G2 as Group>::Scalar, <G1 as Group>::Scalar> =
-        PoseidonRO::new(PoseidonConstantsCircuit::new(), 3);
-    commit_doc.absorb_in_ro(&mut ro);
-    let commit_doc_hash = ro.squeeze(256); // todo
+        // for in-circuit fiat shamir
+        let mut ro: PoseidonRO<<G2 as Group>::Scalar, <G1 as Group>::Scalar> =
+            PoseidonRO::new(PoseidonConstantsCircuit::new(), 3);
+        commit_doc.absorb_in_ro(&mut ro);
+        let commit_doc_hash = ro.squeeze(256); // todo
 
-    return (
-        ReefCommitment {
-            gens: vector_gen.clone(),
-            gens_single: single_gen.clone(),
-            commit_doc: commit_doc.compress(),
-            vec_t: scalars,
-            decommit_doc: blind,
-            commit_doc_hash: commit_doc_hash,
-            s: salt,
-        },
-        cap_pk,
-        cap_vk,
-    );
-}
+        return Self {
+            pc: pc.clone(),
+            vector_gens: vector_gen.clone(),
+            single_gens: single_gen.clone(),
+            mle_doc: scalars,
+            doc_commit: commit_doc.compress(),
+            doc_decommit: blind,
+            doc_commit_hash: commit_doc_hash,
+            hash_salt: salt,
+            cap_pk,
+            cap_vk,
+            doc_len: doc_ext_len,
+        };
+    }
 
     pub fn prove_consistency(
-        reef_commit: &ReefCommitment<<G1 as Group>::Scalar>,
-        cap_pk: SpartanProverKey<G1, EE1>,
-        cap_vk: SpartanVerifierKey<G1, EE1>,
-        doc_len: usize,
+        &mut self,
         proj_doc_len: usize,
         q: Vec<Integer>, //<G1 as Group>::Scalar>,
         v: Integer,      //<G1 as Group>::Scalar,
-        claim_blind: <G1 as Group>::Scalar,
-        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    ) -> Self {
+    ) -> ConsistencyProof {
         //CAP Proving
-        let cap_d = calc_d_clear(pc.clone(), claim_blind, v.clone());
+        let cap_d = calc_d_clear(&self.pc, self.hash_salt, v.clone());
 
         let v_ff = int_to_ff(v);
         let q_ff = q.into_iter().map(|x| int_to_ff(x)).collect();
 
-        let (ipi, ipa, v_commit, v_decommit) =
-            ConsistencyProof::proof_dot_prod_prover(reef_commit, q_ff, v_ff, doc_len, proj_doc_len);
+        let (ipi, ipa, v_commit, v_decommit) = self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len);
 
         // CAP circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
-            ConsistencyCircuit::new(pc.clone(), cap_d, v_ff, claim_blind);
+            ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt);
 
         let cap_z = vec![cap_d];
 
         let cap_res = SpartanSNARK::cap_prove(
-            &cap_pk,
+            &self.cap_pk,
             cap_circuit.clone(),
             &cap_z,
             &v_commit.compress(),
@@ -166,25 +157,21 @@ where
 
         let cap_snark = cap_res.unwrap();
 
-        ConsistencyProof {
+        // set params
+        return ConsistencyProof {
             hash_d: cap_d,
-            doc_len,
-            circuit: cap_circuit,
-            snark: cap_snark,
-            vk: cap_vk,
-            v_commit,
             ipi,
             ipa,
-            dot_gens: reef_commit.gens,
-            dot_gens_single: reef_commit.gens_single,
-        }
+            v_commit,
+            circuit: cap_circuit;
+            snark: cap_snark;
+        };
     }
 
     fn proof_dot_prod_prover(
-        dc: &ReefCommitment<<G1 as Group>::Scalar>,
+        &self,
         q: Vec<<G1 as Group>::Scalar>,
         running_v: <G1 as Group>::Scalar,
-        doc_len: usize,
         proj_doc_len: usize,
     ) -> (
         InnerProductInstance<G1>,
@@ -192,13 +179,11 @@ where
         Commitment<G1>,
         <G1 as Group>::Scalar,
     ) {
-        let doc_ext_len = doc_len.next_power_of_two();
-
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
         println!("PROJECTIONS OLD Q {:#?}", q.clone());
-        let new_q = if doc_len != proj_doc_len {
-            let mut q_add = proj_prefix(proj_doc_len, doc_ext_len);
+        let new_q = if self.doc_len != proj_doc_len {
+            let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q);
             println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
             q_add
@@ -207,50 +192,59 @@ where
         };
 
         let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
-        let running_q = q_to_mle_q(&q_rev, doc_ext_len);
+        let running_q = q_to_mle_q(&q_rev, self.doc_len);
 
         // set up
         let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
         let commit_running_v =
-            <G1 as Group>::CE::commit(&dc.gens_single, &[running_v.clone()], &decommit_running_v);
+            <G1 as Group>::CE::commit(&self.single_gens, &[running_v.clone()], &decommit_running_v);
 
         // prove
         let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
-            &dc.commit_doc.decompress().unwrap(),
+            &self.doc_commit.decompress().unwrap(),
             &running_q,
             &commit_running_v,
         );
-        let ipw =
-            InnerProductWitness::new(&dc.vec_t, &dc.decommit_doc, &running_v, &decommit_running_v);
-        let ipa =
-            InnerProductArgument::prove(&dc.gens, &dc.gens_single, &ipi, &ipw, &mut p_transcript)
-                .unwrap();
+        let ipw = InnerProductWitness::new(
+            &self.mle_doc,
+            &self.doc_decommit,
+            &running_v,
+            &decommit_running_v,
+        );
+        let ipa = InnerProductArgument::prove(
+            &self.vector_gens,
+            &self.single_gens,
+            &ipi,
+            &ipw,
+            &mut p_transcript,
+        )
+        .unwrap();
 
         (ipi, ipa, commit_running_v, decommit_running_v)
     }
 
-    pub fn verify_consistency(&self) {
-        assert!(self.proof_dot_prod_verify().is_ok());
+    pub fn verify_consistency(&self, proof: ConsistencyProof) {
+        assert!(self.proof_dot_prod_verify(&proof.ipi).is_ok());
 
         // cap verify
-        let z_0 = vec![self.hash_d];
-        let z_out = self.circuit.output(&z_0);
+        let z_0 = vec![proof.hash_d];
+        let z_out = proof.circuit.output(&z_0);
         let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
-        let res = self
-            .snark
-            .cap_verify(&self.vk, &io, &self.v_commit.compress());
-
+        let res =
+            proof.snark
+                .cap_verify(&self.cap_vk, &io, &proof.v_commit.compress());
+        // TODO compress()
         assert!(res.is_ok());
     }
 
-    fn proof_dot_prod_verify(&self) -> Result<(), NovaError> {
+    fn proof_dot_prod_verify(&self, ipi: &InnerProductInstance<G1>) -> Result<(), NovaError> {
         let mut v_transcript = Transcript::new(b"dot_prod_proof");
 
-        self.ipa.verify(
-            &self.dot_gens,
-            &self.dot_gens_single,
+        self.ipa.unwrap().verify(
+            &self.vector_gens,
+            &self.single_gens,
             self.doc_len,
-            &self.ipi,
+            ipi,
             &mut v_transcript,
         )?;
 
@@ -259,11 +253,11 @@ where
 }
 
 pub fn calc_d_clear(
-    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     claim_blind: <G1 as Group>::Scalar,
     v: Integer,
 ) -> <G1 as Group>::Scalar {
-    let mut sponge = Sponge::new_with_constants(&pc, Mode::Simplex);
+    let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
     let acc = &mut ();
 
     let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
@@ -277,7 +271,6 @@ pub fn calc_d_clear(
 }
 
 pub fn final_verifier_checks(
-    reef_commitment: ReefCommitment<<G1 as Group>::Scalar>,
     table: &Vec<Integer>,
     doc_len: usize,
     stack_ptr: <G1 as Group>::Scalar,
@@ -417,8 +410,13 @@ pub struct ConsistencyCircuit<F: PrimeField> {
 }
 
 impl<F: PrimeField> ConsistencyCircuit<F> {
-    pub fn new(pc: PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
-        ConsistencyCircuit { pc, d, v, s }
+    pub fn new(pc: &PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
+        ConsistencyCircuit {
+            pc: pc.clone(),
+            d,
+            v,
+            s,
+        }
     }
 }
 
@@ -461,7 +459,7 @@ where
                 None,
                 acc,
             );
-                        SpongeAPI::absorb(
+            SpongeAPI::absorb(
                 &mut sponge,
                 2,
                 &[Elt::Allocated(alloc_v), Elt::Allocated(alloc_s)],
@@ -494,8 +492,6 @@ where
         StepCounterType::Incremental
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

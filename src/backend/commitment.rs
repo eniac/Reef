@@ -47,14 +47,17 @@ pub struct ReefCommitment {
     // consistency verification
     cap_pk: SpartanProverKey<G1, EE1>,
     cap_vk: SpartanVerifierKey<G1, EE1>,
-    pub hash_d: Option<<G1 as Group>::Scalar>,
     doc_len: usize,
-    circuit: Option<ConsistencyCircuit<<G1 as Group>::Scalar>>,
-    snark: Option<SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>>,
-    v_commit: Option<Commitment<G1>>,
+}
+
+pub struct ConsistencyProof {
+    pub hash_d: <G1 as Group>::Scalar,
+    circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
+    snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
+    v_commit: Commitment<G1>,
     // dot prod verification
-    ipi: Option<InnerProductInstance<G1>>,
-    ipa: Option<InnerProductArgument<G1>>,
+    ipi: InnerProductInstance<G1>,
+    ipa: InnerProductArgument<G1>,
 }
 
 impl ReefCommitment {
@@ -66,7 +69,7 @@ impl ReefCommitment {
         // keys for the H(s||v) proof later
         // need empty circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(
-            pc.clone(),
+            &pc,
             <G1 as Group>::Scalar::from(0),
             <G1 as Group>::Scalar::from(0),
             <G1 as Group>::Scalar::from(0),
@@ -118,13 +121,7 @@ impl ReefCommitment {
             hash_salt: salt,
             cap_pk,
             cap_vk,
-            hash_d: None,
             doc_len: doc_ext_len,
-            circuit: None,
-            snark: None,
-            v_commit: None,
-            ipi: None,
-            ipa: None,
         };
     }
 
@@ -133,9 +130,9 @@ impl ReefCommitment {
         proj_doc_len: usize,
         q: Vec<Integer>, //<G1 as Group>::Scalar>,
         v: Integer,      //<G1 as Group>::Scalar,
-    ) {
+    ) -> ConsistencyProof {
         //CAP Proving
-        let cap_d = calc_d_clear(self.pc, self.hash_salt, v.clone());
+        let cap_d = calc_d_clear(&self.pc, self.hash_salt, v.clone());
 
         let v_ff = int_to_ff(v);
         let q_ff = q.into_iter().map(|x| int_to_ff(x)).collect();
@@ -161,12 +158,14 @@ impl ReefCommitment {
         let cap_snark = cap_res.unwrap();
 
         // set params
-        self.hash_d = Some(cap_d);
-        self.ipi = Some(ipi);
-        self.ipa = Some(ipa);
-        self.v_commit = Some(v_commit);
-        self.circuit = Some(cap_circuit);
-        self.snark = Some(cap_snark);
+        return ConsistencyProof {
+            hash_d: cap_d,
+            ipi,
+            ipa,
+            v_commit,
+            circuit: cap_circuit,
+            snark: cap_snark,
+        };
     }
 
     fn proof_dot_prod_prover(
@@ -224,29 +223,32 @@ impl ReefCommitment {
         (ipi, ipa, commit_running_v, decommit_running_v)
     }
 
-    pub fn verify_consistency(&self) {
-        assert!(self.proof_dot_prod_verify().is_ok());
+    pub fn verify_consistency(&self, proof: ConsistencyProof) {
+        assert!(self.proof_dot_prod_verify(&proof.ipi, proof.ipa).is_ok());
 
         // cap verify
-        let z_0 = vec![self.hash_d.unwrap()];
-        let z_out = self.circuit.unwrap().output(&z_0);
+        let z_0 = vec![proof.hash_d];
+        let z_out = proof.circuit.output(&z_0);
         let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
-        let res =
-            self.snark
-                .unwrap()
-                .cap_verify(&self.cap_vk, &io, &self.v_commit.unwrap().compress());
+        let res = proof
+            .snark
+            .cap_verify(&self.cap_vk, &io, &proof.v_commit.compress());
         // TODO compress()
         assert!(res.is_ok());
     }
 
-    fn proof_dot_prod_verify(&self) -> Result<(), NovaError> {
+    fn proof_dot_prod_verify(
+        &self,
+        ipi: &InnerProductInstance<G1>,
+        ipa: InnerProductArgument<G1>,
+    ) -> Result<(), NovaError> {
         let mut v_transcript = Transcript::new(b"dot_prod_proof");
 
-        self.ipa.unwrap().verify(
+        ipa.verify(
             &self.vector_gens,
             &self.single_gens,
             self.doc_len,
-            &self.ipi.unwrap(),
+            ipi,
             &mut v_transcript,
         )?;
 
@@ -405,15 +407,20 @@ fn q_to_mle_q<F: PrimeField>(q: &Vec<F>, mle_len: usize) -> Vec<F> {
 
 #[derive(Clone)]
 pub struct ConsistencyCircuit<F: PrimeField> {
-    pc: &PoseidonConstants<F, typenum::U4>, // arity of PC can be changed as desired
+    pc: PoseidonConstants<F, typenum::U4>, // arity of PC can be changed as desired
     d: F,
     v: F,
     s: F,
 }
 
 impl<F: PrimeField> ConsistencyCircuit<F> {
-    pub fn new(pc: PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
-        ConsistencyCircuit { pc, d, v, s }
+    pub fn new(pc: &PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
+        ConsistencyCircuit {
+            pc: pc.clone(),
+            d,
+            v,
+            s,
+        }
     }
 }
 
@@ -449,7 +456,7 @@ where
         //poseidon(v,s) == d
         let d_calc = {
             let acc = &mut cs.namespace(|| "d hash circuit");
-            let mut sponge = SpongeCircuit::new_with_constants(self.pc, Mode::Simplex);
+            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
 
             sponge.start(
                 IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),

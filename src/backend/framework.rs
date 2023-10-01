@@ -282,7 +282,7 @@ fn setup<'a>(
 
     z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
     let d = calc_d_clear(
-        r1cs_converter.pc.clone(),
+        &r1cs_converter.pc,
         claim_blind,
         Integer::from(r1cs_converter.udoc[0] as u64),
     );
@@ -412,7 +412,7 @@ fn solve<'a>(
             Some(rv) => rv,
             None => Integer::from(r1cs_converter.udoc[0] as u64),
         };
-        let doc_v_hash = calc_d_clear(r1cs_converter.pc.clone(), claim_blind, doc_v.clone());
+        let doc_v_hash = calc_d_clear(&r1cs_converter.pc, claim_blind, doc_v.clone());
 
         let next_doc_q = next_doc_running_q
             .clone()
@@ -421,8 +421,7 @@ fn solve<'a>(
             .map(|x| int_to_ff(x))
             .collect();
         let next_doc_v = next_doc_running_v.clone().unwrap();
-        let next_doc_v_hash =
-            calc_d_clear(r1cs_converter.pc.clone(), claim_blind, next_doc_v.clone());
+        let next_doc_v_hash = calc_d_clear(&r1cs_converter.pc, claim_blind, next_doc_v.clone());
 
         let sp_0 = <G1 as Group>::Scalar::from(stack_ptr_0 as u64);
         let spp = <G1 as Group>::Scalar::from(stack_ptr_popped as u64);
@@ -512,7 +511,7 @@ fn solve<'a>(
 fn prove_and_verify(
     recv: Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     recv_qv: Receiver<(Vec<Integer>, Integer)>,
-    proof_info: mut ProofInfo,
+    mut proof_info: ProofInfo,
 ) {
     println!("Proving thread starting...");
 
@@ -584,7 +583,7 @@ fn prove_and_verify(
     let (q, v) = recv_qv.recv().unwrap();
 
     //Doc dot prod and consistency
-    proof_info
+    let consist_proof = proof_info
         .commit
         .prove_consistency(proof_info.proj_doc_len, q, v);
 
@@ -608,6 +607,7 @@ fn prove_and_verify(
         proof_info.num_states,
         proof_info.doc_len,
         proof_info.proj_doc_len,
+        consist_proof,
     );
 
     #[cfg(feature = "metrics")]
@@ -623,6 +623,7 @@ fn verify(
     num_states: usize,
     doc_len: usize,
     proj_doc_len: usize,
+    consist_proof: ConsistencyProof,
 ) {
     let q_len = logmn(table.len());
     let qd_len = logmn(proj_doc_len);
@@ -647,7 +648,8 @@ fn verify(
     log::tic(Component::Verifier, "Verification", "Final Clear Checks");
 
     //CAP verify
-    reef_commit.verify_consistency();
+    let cap_d = consist_proof.hash_d.clone();
+    reef_commit.verify_consistency(consist_proof);
 
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
     let zn = res.unwrap().0;
@@ -661,7 +663,7 @@ fn verify(
         Some(zn[2 + q_len + qd_len]),      // doc hash
         None,                              // hybrid q
         None,                              // hybrid hash
-        reef_commit.hash_d,
+        Some(cap_d),
     );
 
     // final accepting
