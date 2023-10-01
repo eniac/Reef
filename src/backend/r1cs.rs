@@ -32,7 +32,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     max_offsets: usize,
-    pub reef_commit: Option<ReefCommitment<F>>,
+    pub doc_hash: Option<F>,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -418,7 +418,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_ab,
             table, // TODO fix else
             max_offsets,
-            reef_commit: None,
+            doc_hash: None,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size,
@@ -2123,10 +2123,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         sponge.start(IOPattern(pattern), None, acc);
         let mut query: Vec<F> = match id {
             "nl" => vec![],
-            "nldoc" => match &self.reef_commit {
-                Some(dcs) => vec![dcs.commit_doc_hash],
-                _ => panic!("commitment not found"),
-            },
+            "nldoc" => vec![self.doc_hash.unwrap()],
             _ => panic!("weird tag"),
         };
         for cq in combined_qs {

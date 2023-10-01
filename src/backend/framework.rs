@@ -40,7 +40,7 @@ use std::thread;
 struct ProofInfo {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
-    commit: ReefCommitment<<G1 as Group>::Scalar>,
+    commit: ReefCommitment,
     table: Vec<Integer>,
     doc_len: usize,
     proj_doc_len: usize,
@@ -113,11 +113,7 @@ pub fn run_backend(
         println!("BATCH SIZE {:#?}", batch_size);
 
         #[cfg(feature = "metrics")]
-        log::tic(
-            Component::Compiler,
-            "R1CS",
-            "Optimization Selection, R1CS precomputations",
-        );
+        log::tic(Component::Compiler, "R1CS", "R1CS precomputations");
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
@@ -125,16 +121,13 @@ pub fn run_backend(
         let mut r1cs_converter = R1CS::new(&safa, &doc, batch_size, proj, false, sc.clone());
 
         #[cfg(feature = "metrics")]
-        log::stop(
-            Component::Compiler,
-            "R1CS",
-            "Optimization Selection, R1CS precomputations",
-        );
+        log::stop(Component::Compiler, "R1CS", "R1CS precomputations");
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Commitment Generations");
-        let reef_commit = gen_commitment(r1cs_converter.udoc.clone(), &sc);
-        r1cs_converter.reef_commit = Some(reef_commit.clone());
+        let reef_commit = ReefCommitment::new(r1cs_converter.udoc.clone(), &sc);
+        r1cs_converter.doc_hash = Some(reef_commit.doc_commit_hash);
+        let hash_salt = reef_commit.hash_salt.clone();
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "R1CS", "Commitment Generations");
@@ -149,7 +142,7 @@ pub fn run_backend(
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Proof Setup");
-        let (z0_primary, pp) = setup(&r1cs_converter, &prover_data);
+        let (z0_primary, pp) = setup(&r1cs_converter, &prover_data, hash_salt);
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "R1CS", "Proof Setup");
@@ -169,7 +162,14 @@ pub fn run_backend(
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "Compiler", "Full");
 
-        solve(sender, sender_qv, &mut r1cs_converter, &prover_data, &doc);
+        solve(
+            sender,
+            sender_qv,
+            &mut r1cs_converter,
+            &prover_data,
+            &doc,
+            hash_salt,
+        );
     });
 
     //get args
@@ -184,6 +184,7 @@ pub fn run_backend(
 fn setup<'a>(
     r1cs_converter: &R1CS<<G1 as Group>::Scalar, char>,
     circ_data: &'a ProverData,
+    claim_blind: <G1 as Group>::Scalar,
 ) -> (Vec<<G1 as Group>::Scalar>, PublicParams<G1, G2, C1, C2>) {
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.doc_len());
@@ -272,8 +273,6 @@ fn setup<'a>(
         pp.num_variables().1
     );
 
-    let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
-
     let current_state = r1cs_converter.safa.get_init().index();
 
     let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
@@ -303,12 +302,10 @@ fn solve<'a>(
     r1cs_converter: &mut R1CS<<G1 as Group>::Scalar, char>,
     circ_data: &'a ProverData,
     doc: &Vec<char>,
+    claim_blind: <G1 as Group>::Scalar,
 ) {
     let q_len = logmn(r1cs_converter.table.len());
     let qd_len = logmn(r1cs_converter.doc_len());
-
-    let commit_blind = r1cs_converter.reef_commit.clone().unwrap().commit_doc_hash;
-    let claim_blind = r1cs_converter.reef_commit.clone().unwrap().s;
 
     let mut wits;
     let mut running_q: Option<Vec<Integer>> = None;
@@ -338,6 +335,8 @@ fn solve<'a>(
 
     let trace = r1cs_converter.safa.solve(doc);
     let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
+
+    let commit_blind = r1cs_converter.doc_hash.unwrap();
 
     let mut i = 0;
     while r1cs_converter.sol_num < sols.len() {
@@ -513,7 +512,7 @@ fn solve<'a>(
 fn prove_and_verify(
     recv: Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     recv_qv: Receiver<(Vec<Integer>, Integer)>,
-    proof_info: ProofInfo,
+    proof_info: mut ProofInfo,
 ) {
     println!("Proving thread starting...");
 
@@ -584,16 +583,10 @@ fn prove_and_verify(
 
     let (q, v) = recv_qv.recv().unwrap();
 
-    //Doc dot prod
-    let (ipi, ipa, v_commit, v_decommit) = proof_dot_prod_prover(
-        &proof_info.commit,
-        q.into_iter().map(|x| int_to_ff(x)).collect(),
-        int_to_ff(v.clone()),
-        proof_info.doc_len,
-        proof_info.proj_doc_len,
-    );
-
-    let consistency_proof = ConsistencyProof::prove(v, claim_blind, &pc);
+    //Doc dot prod and consistency
+    proof_info
+        .commit
+        .prove_consistency(proof_info.proj_doc_len, q, v);
 
     #[cfg(feature = "metrics")]
     log::space(
@@ -615,9 +608,6 @@ fn prove_and_verify(
         proof_info.num_states,
         proof_info.doc_len,
         proof_info.proj_doc_len,
-        ipi,
-        ipa,
-        consistency_proof,
     );
 
     #[cfg(feature = "metrics")]
@@ -628,14 +618,11 @@ fn verify(
     compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
-    reef_commit: ReefCommitment<<G1 as Group>::Scalar>,
+    reef_commit: ReefCommitment,
     table: Vec<Integer>,
     num_states: usize,
     doc_len: usize,
     proj_doc_len: usize,
-    ipi: InnerProductInstance<G1>,
-    ipa: InnerProductArgument<G1>,
-    consistency_proof: ConsistencyProof,
 ) {
     let q_len = logmn(table.len());
     let qd_len = logmn(proj_doc_len);
@@ -660,14 +647,12 @@ fn verify(
     log::tic(Component::Verifier, "Verification", "Final Clear Checks");
 
     //CAP verify
-    let cap_res = consistency_proof.verify();
-    assert!(cap_res.is_ok());
+    reef_commit.verify_consistency();
 
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
     let zn = res.unwrap().0;
 
     final_verifier_checks(
-        reef_commit,
         &table,
         doc_len,
         zn[(q_len + qd_len + 3)],          // stack ptr
@@ -676,9 +661,7 @@ fn verify(
         Some(zn[2 + q_len + qd_len]),      // doc hash
         None,                              // hybrid q
         None,                              // hybrid hash
-        Some(consistency_proof.hash_d),
-        ipi,
-        ipa,
+        reef_commit.hash_d,
     );
 
     // final accepting
@@ -719,6 +702,7 @@ mod tests {
             0,
             true,
         );
+        panic!();
     }
 
     #[test]
