@@ -1,474 +1,481 @@
+#![allow(missing_docs)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
-
-use crate::backend::costs::logmn;
-use crate::backend::nova::int_to_ff;
-use crate::backend::r1cs_helper::verifier_mle_eval;
-use ::bellperson::{gadgets::num::AllocatedNum, ConstraintSystem, SynthesisError};
-use circ::cfg::cfg;
+use ::bellperson::{
+    gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
+    Variable,
+};
+use circ::{ir::term::Value, target::r1cs::*};
 use ff::{Field, PrimeField};
 use generic_array::typenum;
-use merlin::Transcript;
+use gmp_mpfr_sys::gmp::limb_t;
 use neptune::{
     circuit2::Elt,
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::circuit::SpongeCircuit,
-    sponge::vanilla::{Mode, Sponge, SpongeTrait},
+    sponge::vanilla::{Mode, SpongeTrait},
 };
 use nova_snark::{
-    errors::NovaError,
-    provider::{
-        ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pedersen::{Commitment, CommitmentGens, CompressedCommitment},
-        poseidon::{PoseidonConstantsCircuit, PoseidonRO},
-    },
-    spartan::direct::{SpartanProverKey, SpartanSNARK, SpartanVerifierKey},
-    traits::{
-        circuit::StepCircuit, commitment::*, evaluation::GetGeneratorsTrait, AbsorbInROTrait,
-        Group, ROConstantsTrait, ROTrait,
-    },
+    traits::{circuit::StepCircuit, Group},
     StepCounterType,
 };
-use rand::rngs::OsRng;
-use rug::{integer::Order, ops::RemRounding, Integer};
+use rug::integer::{IsPrime, Order};
+use rug::Integer;
+use std::collections::HashMap;
 
-pub struct ReefCommitment {
-    // commitment to doc
-    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    vector_gens: CommitmentGens<G1>,
-    single_gens: CommitmentGens<G1>,
-    mle_doc: Vec<<G1 as Group>::Scalar>,
-    doc_commit: CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
-    doc_decommit: <G1 as Group>::Scalar,
-    pub doc_commit_hash: <G1 as Group>::Scalar,
-    pub hash_salt: <G1 as Group>::Scalar,
-    // consistency verification
-    cap_pk: SpartanProverKey<G1, EE1>,
-    cap_vk: SpartanVerifierKey<G1, EE1>,
-    doc_len: usize,
-}
-
-pub struct ConsistencyProof {
-    // consistency verification
-    pub hash_d: <G1 as Group>::Scalar,
-    circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
-    snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
-    v_commit: Commitment<G1>,
-    // dot prod verification
-    ipi: InnerProductInstance<G1>,
-    ipa: InnerProductArgument<G1>,
-}
-
-impl ReefCommitment {
-    pub fn new(doc: Vec<usize>,  pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>) -> Self
-    where
-        G1: Group<Base = <G2 as Group>::Scalar>,
-        G2: Group<Base = <G1 as Group>::Scalar>,
-    {
-        // keys for the H(s||v) proof later
-        // need empty circuit
-        let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(
-            &pc,
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-            false,
-            <G1 as Group>::Scalar::from(0)
-        );
-
-        // produce CAP keys
-        let (cap_pk, cap_vk) =
-            SpartanSNARK::<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>::setup(
-                cap_circuit.clone(),
-            )
-            .unwrap();
-
-        // salf for H(s||v) proof
-        let salt = <G1 as Group>::Scalar::random(&mut OsRng);
-
-        // commitment to document
-        let doc_ext_len = doc.len().next_power_of_two();
-
-        let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
-        doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
-
-        let mle = mle_from_pts(doc_ext);
-
-        //let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
-        let single_gen = cap_pk.pk.gens.get_scalar_gen();
-        let vector_gen = CommitmentGens::<G1>::new_with_blinding_gen(
-            b"vector_gen_doc",
-            mle.len(),
-            &single_gen.get_blinding_gen(),
-        );
-
-        let blind = <G1 as Group>::Scalar::random(&mut OsRng);
-
-        let scalars: Vec<<G1 as Group>::Scalar> = //<G1 as Group>::Scalar> =
-                mle.into_iter().map(|x| int_to_ff(x)).collect();
-
-        let commit_doc = <G1 as Group>::CE::commit(&vector_gen, &scalars, &blind);
-
-        // for in-circuit fiat shamir
-        let mut ro: PoseidonRO<<G2 as Group>::Scalar, <G1 as Group>::Scalar> =
-            PoseidonRO::new(PoseidonConstantsCircuit::new(), 3);
-        commit_doc.absorb_in_ro(&mut ro);
-        let commit_doc_hash = ro.squeeze(256); // todo
-
-        return Self {
-            pc: pc.clone(),
-            vector_gens: vector_gen.clone(),
-            single_gens: single_gen.clone(),
-            mle_doc: scalars,
-            doc_commit: commit_doc.compress(),
-            doc_decommit: blind,
-            doc_commit_hash: commit_doc_hash,
-            hash_salt: salt,
-            cap_pk,
-            cap_vk,
-            doc_len: doc_ext_len,
-        };
+/// Convert a (rug) integer to a prime field element.
+pub fn int_to_ff<F: PrimeField>(i: Integer) -> F {
+    let mut accumulator = F::from(0);
+    let limb_bits = (std::mem::size_of::<limb_t>() as u64) << 3;
+    let limb_base = F::from(2).pow_vartime([limb_bits]);
+    // as_ref yeilds a least-significant-first array.
+    for digit in i.as_ref().iter().rev() {
+        accumulator *= limb_base;
+        accumulator += F::from(*digit);
     }
+    accumulator
+}
 
-    pub fn prove_consistency(
-        &mut self,
-        proj_doc_len: usize,
-        q: Vec<Integer>, //<G1 as Group>::Scalar>,
-        v: Integer,      //<G1 as Group>::Scalar,
-        hybrid: bool,
-        ) -> ConsistencyProof {
+/// Convert one our our linear combinations to a bellman linear combination.
+/// Takes a zero linear combination. We could build it locally, but bellman provides one, so...
+fn lc_to_bellman<F: PrimeField, CS: ConstraintSystem<F>>(
+    vars: &HashMap<Var, Variable>,
+    lc: &Lc,
+    zero_lc: LinearCombination<F>,
+) -> LinearCombination<F> {
+    let mut lc_bellman = zero_lc;
+    // This zero test is needed until https://github.com/zkcrypto/bellman/pull/78 is resolved
+    if !lc.constant.is_zero() {
+        lc_bellman = lc_bellman + (int_to_ff((&lc.constant).into()), CS::one());
+    }
+    for (v, c) in &lc.monomials {
+        // ditto
+        if !c.is_zero() {
+            lc_bellman = lc_bellman + (int_to_ff(c.into()), *vars.get(v).unwrap());
+        }
+    }
+    lc_bellman
+}
 
-        let cap_d = calc_d_clear(&self.pc, self.hash_salt, v.clone());
+// hmmm... this should work essentially all the time, I think
+fn get_modulus<F: Field + PrimeField>() -> Integer {
+    let neg_1_f = -F::one();
+    let p_lsf: Integer = Integer::from_digits(neg_1_f.to_repr().as_ref(), Order::Lsf) + 1;
+    let p_msf: Integer = Integer::from_digits(neg_1_f.to_repr().as_ref(), Order::Msf) + 1;
+    if p_lsf.is_probably_prime(30) != IsPrime::No {
+        p_lsf
+    } else if p_msf.is_probably_prime(30) != IsPrime::No {
+        p_msf
+    } else {
+        panic!("could not determine ff::Field byte order")
+    }
+}
 
-        let v_ff = int_to_ff(v);
-        let q_ff = if !hybrid {q.into_iter().map(|x| int_to_ff(x)).collect()} else {
-            let q_prime = vec![];
-            for i in 1..q.len() {
-                q_prime.push(int_to_ff(q[i]));
+#[derive(Clone, Debug)]
+pub enum GlueOpts<F: PrimeField> {
+    Split((Vec<F>, F, Vec<F>, F, F, Vec<F>)), // q, v, doc q, doc v, stack ptr, stack
+    Hybrid((Vec<F>, F, F, Vec<F>)),           // hybrid q, hybrid v, stack ptr, stack
+}
 
+#[derive(Clone, Debug)]
+pub struct NFAStepCircuit<F: PrimeField> {
+    r1cs: R1csFinal, // TODO later ref
+    values: Option<Vec<Value>>,
+    batch_size: usize,
+    max_branches: usize,
+    states: Vec<F>,
+    glue: Vec<GlueOpts<F>>,
+    pub commit_blind: F,
+    pub pc: PoseidonConstants<F, typenum::U4>,
+    pub claim_blind: F,
+}
+
+// note that this will generate a single round, and no witnesses, unlike nova example code
+// witness and loops will happen at higher level bc its my code and i can do what i want
+impl<F: PrimeField> NFAStepCircuit<F> {
+    pub fn new(
+        r1cs: R1csFinal,
+        values: Option<Vec<Value>>,
+        states: Vec<F>,
+        glue: Vec<GlueOpts<F>>,
+        commit_blind: F,
+        batch_size: usize,
+        max_branches: usize,
+        pcs: PoseidonConstants<F, typenum::U4>,
+        claim_blind: F,
+    ) -> Self {
+        assert_eq!(states.len(), 2);
+        assert_eq!(glue.len(), 2);
+
+        // todo blind, first checking here
+        match (&glue[0], &glue[1]) {
+            (GlueOpts::Split(_), GlueOpts::Split(_)) => {}
+            (GlueOpts::Hybrid(_), GlueOpts::Hybrid(_)) => {}
+            (_, _) => {
+                panic!("glue I/O does not match");
             }
-            q_prime
+        }
 
-        };
-
-
-        let (ipi, ipa, v_commit, v_decommit) = self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len);
-
-        // CAP circuit
-        let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
-            ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt, hybrid, v_prime);
-
-        let cap_z = vec![cap_d];
-
-        let cap_res = SpartanSNARK::cap_prove(
-            &self.cap_pk,
-            cap_circuit.clone(),
-            &cap_z,
-            &v_commit.compress(),
-            &v_ff,
-            &v_decommit,
-        );
-        assert!(cap_res.is_ok());
-
-        let cap_snark = cap_res.unwrap();
-
-        // set params
-        return ConsistencyProof {
-            hash_d: cap_d,
-            ipi,
-            ipa,
-            v_commit,
-            circuit: cap_circuit,
-            snark: cap_snark,
-        };
+        NFAStepCircuit {
+            r1cs: r1cs,
+            values: values,
+            batch_size: batch_size,
+            max_branches: max_branches,
+            states: states,
+            glue: glue,
+            commit_blind: commit_blind,
+            pc: pcs,
+            claim_blind: claim_blind,
+        }
     }
 
-    fn proof_dot_prod_prover(
+    fn generate_variable_info(&self, var: Var) -> (String, String) {
+        assert!(
+            !matches!(var.ty(), VarType::CWit),
+            "Nova doesn't support committed witnesses"
+        );
+        assert!(
+            !matches!(var.ty(), VarType::RoundWit | VarType::Chall),
+            "Nova doesn't support rounds"
+        );
+        //let public = matches!(var.ty(), VarType::Inst); // but we really dont care
+        let name_f = format!("{var:?}");
+
+        let s = self.r1cs.names[&var].clone();
+
+        (name_f, s)
+    }
+
+    fn input_variable_parsing(
         &self,
-        q: Vec<<G1 as Group>::Scalar>,
-        running_v: <G1 as Group>::Scalar,
-        proj_doc_len: usize,
-    ) -> (
-        InnerProductInstance<G1>,
-        InnerProductArgument<G1>,
-        Commitment<G1>,
-        <G1 as Group>::Scalar,
-    ) {
-        let mut p_transcript = Transcript::new(b"dot_prod_proof");
+        vars: &mut HashMap<Var, Variable>,
+        s: &String,
+        var: Var,
+        state_0: AllocatedNum<F>,
+    ) -> Result<bool, SynthesisError> {
+        if s.starts_with("state_0") {
+            vars.insert(var, state_0.get_variable());
 
-        println!("PROJECTIONS OLD Q {:#?}", q.clone());
-        println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
-        let new_q = if self.doc_len != proj_doc_len {
-            let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
-            q_add.extend(q);
-            println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
-            q_add
-        } else {
-            q
-        };
+            return Ok(true);
+        }
+        return Ok(false);
+    }
 
-        let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
-        let running_q = q_to_mle_q(&q_rev, self.doc_len);
+    fn input_variable_qv_parsing(
+        &self,
+        vars: &mut HashMap<Var, Variable>,
+        s: &String,
+        var: Var,
+        tag: &str,
+        sc_l: usize,
+        prev_q: &Vec<AllocatedNum<F>>,
+        prev_v: &AllocatedNum<F>,
+        alloc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
+    ) -> Result<bool, SynthesisError> {
+        if s.starts_with(&format!("nl_prev_running_claim")) {
+            // not for doc v
+            vars.insert(var, prev_v.get_variable());
 
-        // set up
-        let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
-        let commit_running_v =
-            <G1 as Group>::CE::commit(&self.single_gens, &[running_v.clone()], &decommit_running_v);
+            alloc_prev_rc[sc_l] = Some(prev_v.clone());
+            return Ok(true);
+        } else if s.starts_with(&format!("{}_eq_{}_q", tag, self.batch_size)) {
+            // q
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let q: usize = s_sub[4].parse().unwrap();
 
-        // prove
-        let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
-            &self.doc_commit.decompress().unwrap(),
-            &running_q,
-            &commit_running_v,
-        );
-        let ipw = InnerProductWitness::new(
-            &self.mle_doc,
-            &self.doc_decommit,
-            &running_v,
-            &decommit_running_v,
-        );
-        let ipa = InnerProductArgument::prove(
-            &self.vector_gens,
-            &self.single_gens,
-            &ipi,
-            &ipw,
-            &mut p_transcript,
-        )
-        .unwrap();
-        /*
-                // sanity - TODO DEL
-                let mut sum = <G1 as Group>::Scalar::from(0);
-                for i in 0..self.mle_doc.len() {
-                    sum += self.mle_doc[i].clone() * running_q[i].clone();
+            vars.insert(var, prev_q[q].get_variable());
+            alloc_prev_rc[q] = Some(prev_q[q].clone());
+
+            return Ok(true);
+        }
+
+        return Ok(false);
+    }
+
+    fn stack_parsing(
+        &self,
+        s: &String,
+        alloc_v: &AllocatedNum<F>,
+        alloc_stack_ptr_popped: &mut Option<AllocatedNum<F>>,
+        alloc_stack_out: &mut Vec<Option<AllocatedNum<F>>>,
+    ) -> Result<bool, SynthesisError>
+where {
+        if s.starts_with(&format!("stack_ptr_popped")) {
+            *alloc_stack_ptr_popped = Some(alloc_v.clone()); //.get_variable();
+            return Ok(true);
+        } else if s.starts_with(&format!("stack_{}_", self.max_branches)) {
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[2].parse().unwrap();
+            alloc_stack_out[j] = Some(alloc_v.clone());
+
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    fn default_parsing(
+        &self,
+        s: &String,
+        alloc_v: &AllocatedNum<F>,
+        last_state: &mut Option<AllocatedNum<F>>,
+    ) -> Result<(), SynthesisError>
+where {
+        if s.starts_with(&format!("state_{}", self.batch_size)) {
+            *last_state = Some(alloc_v.clone()); //.get_variable();
+        }
+        Ok(())
+    }
+
+    fn intm_fs_parsing(
+        &self,
+        alloc_v: &AllocatedNum<F>,
+        //vars: &mut HashMap<Var, Variable>,
+        s: &String,
+        //var: Var,
+        is_doc_nl: bool,
+        //alloc_qv: &mut Vec<Option<AllocatedNum<F>>>,
+        alloc_qs: &mut Vec<Option<AllocatedNum<F>>>,
+        alloc_vs: &mut Vec<Option<AllocatedNum<F>>>,
+        alloc_claim_r: &mut Option<AllocatedNum<F>>,
+        alloc_gs: &mut Vec<Vec<Option<AllocatedNum<F>>>>,
+    ) -> Result<bool, SynthesisError> {
+        // intermediate (in circ) wits
+        if (!is_doc_nl && s.starts_with("nl_combined_q"))
+            || (is_doc_nl && s.starts_with("nldoc_combined_q"))
+        {
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[3].parse().unwrap();
+            alloc_qs[j] = Some(alloc_v.clone());
+
+            return Ok(true);
+        } else if !is_doc_nl && s.starts_with("v_") {
+            let v_j = Some(alloc_v.clone()); //.get_variable();
+
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[1].parse().unwrap();
+            alloc_vs[j] = v_j; // TODO check
+
+            return Ok(true);
+        } else if is_doc_nl && s.starts_with("char_") {
+            let v_j = Some(alloc_v.clone()); //.get_variable();
+
+            //let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[1].parse().unwrap();
+
+            if j < self.batch_size {
+                alloc_vs[j] = v_j; // j+1 -> j
+            } // don't add the last one
+
+            return Ok(true);
+        } else if (!is_doc_nl && s.starts_with("nl_claim_r"))
+            || (is_doc_nl && s.starts_with("nldoc_claim_r"))
+        {
+            *alloc_claim_r = Some(alloc_v.clone());
+        } else if (!is_doc_nl && s.starts_with("nl_sc_g"))
+            || (is_doc_nl && s.starts_with("nldoc_sc_g"))
+        {
+            let gij = Some(alloc_v.clone());
+
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[3].parse().unwrap();
+
+            match s_sub[4] {
+                "const" => {
+                    alloc_gs[j - 1][0] = gij;
                 }
-                // this passes
-                assert_eq!(sum, running_v); // <MLE_scalars * running_q> = running_v
-
-        */
-        (ipi, ipa, commit_running_v, decommit_running_v)
+                "x" => {
+                    alloc_gs[j - 1][1] = gij;
+                }
+                "xsq" => {
+                    alloc_gs[j - 1][2] = gij;
+                }
+                _ => {
+                    panic!("weird variable name for sumcheck polys");
+                }
+            }
+        }
+        return Ok(false);
     }
 
-    pub fn verify_consistency(&self, proof: ConsistencyProof) {
-        assert!(self.proof_dot_prod_verify(&proof.ipi, proof.ipa).is_ok());
-
-        // cap verify
-        let z_0 = vec![proof.hash_d];
-        let z_out = proof.circuit.output(&z_0);
-        let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
-        let res = proof
-            .snark
-            .cap_verify(&self.cap_vk, &io, &proof.v_commit.compress());
-        // TODO compress()
-        assert!(res.is_ok());
-    }
-
-    fn proof_dot_prod_verify(
+    fn fiatshamir_circuit<'b, CS>(
         &self,
-        ipi: &InnerProductInstance<G1>,
-        ipa: InnerProductArgument<G1>,
-    ) -> Result<(), NovaError> {
-        let mut v_transcript = Transcript::new(b"dot_prod_proof");
+        //cs: &mut CS,
+        //alloc_v: &AllocatedNum<F>,
+        //namespace: String,
+        query: &[Elt<F>],
+        sponge: &mut SpongeCircuit<'b, F, typenum::U4, CS>,
+        sponge_ns: &mut Namespace<'b, F, CS>,
+        input_eq: AllocatedNum<F>,
+        tag: &str,
+    ) -> Result<(), SynthesisError>
+    where
+        //A: Arity<F>,
+        CS: ConstraintSystem<F>,
+    {
+        // original var alloc'd before
 
-        ipa.verify(
-            &self.vector_gens,
-            &self.single_gens,
-            self.doc_len,
-            ipi,
-            &mut v_transcript,
-        )?;
+        let new_pos = {
+            SpongeAPI::absorb(sponge, query.len() as u32, query, sponge_ns);
+
+            let output = SpongeAPI::squeeze(sponge, 1, sponge_ns);
+
+            Elt::ensure_allocated(
+                &output[0],
+                &mut sponge_ns.namespace(|| format!("ensure allocated {}", tag)), // name must be the same
+                // (??)
+                true,
+            )?
+        };
+
+        assert_eq!(new_pos.clone().get_value(), input_eq.clone().get_value());
+
+        sponge_ns.enforce(
+            || format!("eq {}", tag),
+            |z| z + new_pos.get_variable(),
+            |z| z + CS::one(),
+            |z| z + input_eq.get_variable(),
+        );
 
         Ok(())
     }
-}
 
-pub fn calc_d_clear(
-    pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    claim_blind: <G1 as Group>::Scalar,
-    v: Integer,
-) -> <G1 as Group>::Scalar {
-    let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
-    let acc = &mut ();
-
-    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-    sponge.start(parameter, None, acc);
-
-    SpongeAPI::absorb(&mut sponge, 2, &[int_to_ff(v.clone()), claim_blind], acc);
-    let d_out_vec = SpongeAPI::squeeze(&mut sponge, 1, acc);
-    sponge.finish(acc).unwrap();
-
-    d_out_vec[0]
-}
-
-pub fn final_clear_checks(
-    stack_ptr: <G1 as Group>::Scalar,
-    table: &Vec<Integer>,
-    final_q: Option<Vec<<G1 as Group>::Scalar>>,
-    final_v: Option<<G1 as Group>::Scalar>,
-    final_hybrid_q: Option<Vec<<G1 as Group>::Scalar>>,
-    final_hybrid_hash: Option<<G1 as Group>::Scalar>,
-) {
-    // stack ptr is 0 (stack is empty)
-    assert_eq!(stack_ptr, <G1 as Group>::Scalar::from(0));
-
-    match (final_q, final_v, final_hybrid_q, final_hybrid_hash) {
-        // split
-        (Some(q), Some(v), None, None) => {
-            let mut q_i = vec![];
-            for f in q {
-                q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
-            }
-            assert_eq!(
-                verifier_mle_eval(table, &q_i),
-                (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
-            );
-
-            // document
-            // TODO MOVE THIS
-            // assert_eq!(d, hash);
-        }
-
-        // hybrid
-        (None, None, Some(q), Some(d)) => {
-            let mut q_i = vec![];
-            for f in q {
-                q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
-            }
-
-            let q0 = q.first();
-            let q_prime = &q[1..];
-
-            let t = verifier_mle_eval(table, &q_prime);
-        }
-
-        // bad combo
-        _ => {
-            panic!("weird combination of parameters to the final verification check");
-        }
-    }
-}
-
-fn proj_prefix(proj_doc_len: usize, doc_ext_len: usize) -> Vec<<G1 as Group>::Scalar> {
-    // what's s?
-    let chunk_size = proj_doc_len;
-    let start = doc_ext_len - proj_doc_len;
-    assert!(start % chunk_size == 0);
-
-    let num_chunks = doc_ext_len / chunk_size;
-
-    let mut start_idx = start / chunk_size;
-
-    println!(
-        "chunk size {}, num chunks {}, s = {}",
-        chunk_size, num_chunks, start_idx
-    );
-
-    let mut q_add = vec![];
-    for i in 0..logmn(num_chunks) {
-        q_add.push(<G1 as Group>::Scalar::from((start_idx % 2) as u64));
-        start_idx = start_idx >> 1;
-    }
-    q_add
-}
-
-// TODO test, TODO over ff, not Integers
-// calculate multilinear extension from evals of univariate
-// must "pad out" pts to power of 2 !
-fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
-    let num_pts = pts.len();
-    if num_pts == 1 {
-        return vec![pts[0].clone()];
-    }
-
-    let h = num_pts / 2;
-
-    let mut l = mle_from_pts(pts[..h].to_vec());
-    let mut r = mle_from_pts(pts[h..].to_vec());
-
-    for i in 0..r.len() {
-        r[i] -= &l[i];
-        l.push(r[i].clone().rem_floor(cfg().field().modulus()));
-    }
-
-    l
-}
-
-fn q_to_mle_q<F: PrimeField>(q: &Vec<F>, mle_len: usize) -> Vec<F> {
-    let mut q_out = vec![];
-    let base: usize = 2;
-
-    for idx in 0..mle_len {
-        let mut new_term = F::from(1);
-        for j in 0..q.len() {
-            // for each possible var in this term
-            if (idx / base.pow(j as u32)) % 2 == 1 {
-                // is this var in this term?
-                new_term *= q[j].clone(); // todo?
-                                          // note this loop is never triggered for constant :)
-            }
-        }
-
-        q_out.push(new_term); //.rem_floor(cfg().field().modulus()));
-    }
-
-    q_out
-}
-
-#[derive(Clone)]
-pub struct ConsistencyCircuit<F: PrimeField> {
-    pc: PoseidonConstants<F, typenum::U4>, // arity of PC can be changed as desired
-    d: F,
-    v: F,
-    s: F,
-    hybrid: bool,
-    v_prime: F,
-}
-
-impl<F: PrimeField> ConsistencyCircuit<F> {
-    pub fn new(pc: &PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F, hybrid, v_prime) -> Self {
-        ConsistencyCircuit {
-            pc: pc.clone(),
-            d,
-            v,
-            s,
-            hybrid,
-            v_prime,
-        }
-    }
-}
-
-impl<F> StepCircuit<F> for ConsistencyCircuit<F>
-where
-    F: PrimeField,
-{
-    fn arity(&self) -> usize {
-        if self.hybrid {
-            3 } else {
-        1}
-    }
-
-    fn output(&self, z: &[F]) -> Vec<F> {
-        assert_eq!(z[0], self.d);
-
-        z.to_vec()
-    }
-
-    #[allow(clippy::let_and_return)]
-    fn synthesize<CS>(
+    fn nl_eval_fiatshamir<'b, CS>(
         &self,
         cs: &mut CS,
-        z: &[AllocatedNum<F>],
-    ) -> Result<Vec<AllocatedNum<F>>, SynthesisError>
+        tag: &str,
+        sc_l: usize,
+        alloc_qs: &Vec<Option<AllocatedNum<F>>>,
+        alloc_vs: &Vec<Option<AllocatedNum<F>>>,
+        alloc_prev_rc: &Vec<Option<AllocatedNum<F>>>,
+        alloc_rc: &Vec<Option<AllocatedNum<F>>>,
+        alloc_claim_r: &Option<AllocatedNum<F>>,
+        alloc_gs: &Vec<Vec<Option<AllocatedNum<F>>>>,
+        vesta_hash: F,
+    ) -> Result<(), SynthesisError>
+    where
+        //A: Arity<F>,
+        CS: ConstraintSystem<F>,
+    {
+        let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
+
+        let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+        let mut sponge_ns = cs.namespace(|| format!("{} sponge", tag));
+
+        let mut pattern = match tag {
+            "eval" => vec![
+                SpongeOp::Absorb((self.batch_size + sc_l + 1 + num_cqs) as u32), // vs,
+                // combined_q,
+                // running q,v
+                SpongeOp::Squeeze(1),
+            ],
+            "doc" => vec![
+                SpongeOp::Absorb((self.batch_size + sc_l + 2 + num_cqs) as u32), // vs,
+                SpongeOp::Squeeze(1),
+            ],
+            _ => panic!("weird tag"),
+        };
+        for _i in 0..sc_l {
+            // sum check rounds
+            pattern.append(&mut vec![SpongeOp::Absorb(3), SpongeOp::Squeeze(1)]);
+        }
+
+        sponge.start(IOPattern(pattern), None, &mut sponge_ns);
+
+        // (combined_q, vs, running_q, running_v)
+        let mut elts = vec![];
+        //println!("FIAT SHAMIR ELTS");
+
+        // if DOC
+        if matches!(tag, "doc") {
+            let e = AllocatedNum::alloc(sponge_ns.namespace(|| "doc commit hash start"), || {
+                Ok(vesta_hash)
+            })?;
+
+            //println!("e: {:#?}", e.clone().get_value());
+            elts.push(Elt::Allocated(e));
+        }
+        for e in alloc_qs {
+            elts.push(Elt::Allocated(e.clone().unwrap()));
+            //println!("e: {:#?}", e.clone().unwrap().get_value());
+        }
+        for e in alloc_vs {
+            elts.push(Elt::Allocated(e.clone().unwrap()));
+            //println!("e: {:#?}", e.clone().unwrap().get_value());
+        }
+        for e in alloc_prev_rc {
+            elts.push(Elt::Allocated(e.clone().unwrap()));
+            //println!("e: {:#?}", e.clone().unwrap().get_value());
+        }
+
+        self.fiatshamir_circuit(
+            &elts,
+            &mut sponge,
+            &mut sponge_ns,
+            alloc_claim_r.clone().unwrap(),
+            "claim_r",
+        )?;
+
+        for j in 0..sc_l {
+            let mut elts = vec![];
+            for coeffs in &alloc_gs[j] {
+                for e in coeffs {
+                    elts.push(Elt::Allocated(e.clone()));
+                }
+            }
+
+            self.fiatshamir_circuit(
+                &elts,
+                &mut sponge,
+                &mut sponge_ns,
+                alloc_rc[j].clone().unwrap(),
+                &format!("sc_r_{}", j),
+            )?;
+        }
+
+        sponge.finish(&mut sponge_ns).unwrap();
+        return Ok(());
+    }
+
+    fn nl_eval_parsing(
+        &self,
+        alloc_v: &AllocatedNum<F>,
+        s: &String,
+        sc_l: usize,
+        alloc_rc: &mut Vec<Option<AllocatedNum<F>>>,
+        tag: &str,
+        alloc_prev_rc: &mut Vec<Option<AllocatedNum<F>>>,
+    ) -> Result<bool, SynthesisError> {
+        if s.starts_with(&format!("{}_next_running_claim", tag)) {
+            // v
+            alloc_rc[sc_l] = Some(alloc_v.clone());
+
+            return Ok(true);
+        } else if s.starts_with(&format!("{}_sc_r_", tag)) {
+            // TODO move, do this in order
+            // q
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let q: usize = s_sub[3].parse().unwrap();
+
+            alloc_rc[q - 1] = Some(alloc_v.clone());
+
+            return Ok(true);
+        } else if s.starts_with(&format!("nldoc_prev_running_claim")) && tag.starts_with("nldoc") {
+            alloc_prev_rc[sc_l] = Some(alloc_v.clone());
+        }
+        return Ok(false);
+    }
+
+    fn hiding_running_claim<CS>(
+        &self,
+        cs: &mut CS,
+        v: &AllocatedNum<F>,
+    ) -> Result<AllocatedNum<F>, SynthesisError>
     where
         CS: ConstraintSystem<F>,
     {
-        let d_in = z[0].clone();
-
-        //v at index 0 (but technically 1 since io is allocated first)
-        let alloc_v = AllocatedNum::alloc(cs.namespace(|| "v"), || Ok(self.v))?;
-
-        let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s"), || Ok(self.s))?;
+        let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s_rc"), || Ok(self.claim_blind))?;
 
         //poseidon(v,s) == d
         let d_calc = {
@@ -480,10 +487,11 @@ where
                 None,
                 acc,
             );
+
             SpongeAPI::absorb(
                 &mut sponge,
                 2,
-                &[Elt::Allocated(alloc_v), Elt::Allocated(alloc_s)],
+                &[Elt::Allocated(v.clone()), Elt::Allocated(alloc_s)],
                 acc,
             );
 
@@ -494,211 +502,536 @@ where
             out
         };
 
-        // sanity
-        if d_calc.get_value().is_some() {
-            assert_eq!(d_in.get_value().unwrap(), d_calc.get_value().unwrap());
-        }
-
-        cs.enforce(
-            || "d == d",
-            |z| z + d_in.get_variable(),
-            |z| z + CS::one(),
-            |z| z + d_calc.get_variable(),
-        );
-
-        // for hybrid only
-        if self.hybrid {
-            let t = z[1].clone();
-            let q_0 = z[2].clone();
-
-            // v = t + v_prime * q[0]
-            let alloc_v_prime =
-                AllocatedNum::alloc(cs.namespace(|| "v_prime"), || Ok(self.v_prime))?;
-
-            cs.enforce(
-                || "v_prime * q[0] = v - t",
-                |z| z + alloc_v_prime.get_variable(),
-                |z| z + q_0.get_variable(),
-                |z| z + alloc_v.get_variable() - t.get_variable(),
-            );
-        }
-
-        Ok(vec![d_calc]) // doesn't hugely matter
-    }
-
-    fn get_counter_type(&self) -> StepCounterType {
-        StepCounterType::Incremental
+        Ok(d_calc)
     }
 }
 
-#[cfg(test)]
-mod tests {
+impl<F> StepCircuit<F> for NFAStepCircuit<F>
+where
+    F: PrimeField,
+{
+    fn arity(&self) -> usize {
+        // [state, optional<q,v for eval claim>, optional<q,"v"(hash), for doc claim>,
+        // optional<q, "v"(hash) for hybrid claim>, stack_ptr, <stack>]
 
-    use crate::backend::commitment::*;
-    use crate::backend::nova::int_to_ff;
-    use crate::backend::r1cs_helper::init;
-    use rug::Integer;
-    type G1 = pasta_curves::pallas::Point;
-
-    #[test]
-    fn commit() {
-        // "document"
-        let scalars = vec![
-            <<G1 as Group>::Scalar>::from(0),
-            <<G1 as Group>::Scalar>::from(1),
-            <<G1 as Group>::Scalar>::from(0),
-            <<G1 as Group>::Scalar>::from(1),
-        ];
-
-        let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", scalars.len()); // n is dimension
-        let decommit_doc = <G1 as Group>::Scalar::random(&mut OsRng);
-        let commit_doc = <G1 as Group>::CE::commit(&gens_t, &scalars, &decommit_doc);
-
-        let running_q = vec![
-            <<G1 as Group>::Scalar>::from(2),
-            <<G1 as Group>::Scalar>::from(3),
-            <<G1 as Group>::Scalar>::from(5),
-            <<G1 as Group>::Scalar>::from(7),
-        ];
-
-        let running_v = <<G1 as Group>::Scalar>::from(10);
-
-        // sanity
-        let mut sum = <G1 as Group>::Scalar::from(0);
-        for i in 0..scalars.len() {
-            sum += scalars[i].clone() * running_q[i].clone();
+        let mut arity = 1;
+        match &self.glue[0] {
+            GlueOpts::Split((q, _, dq, _, _, stack)) => {
+                arity += q.len() + 1 + dq.len() + 1;
+                arity += stack.len() + 1;
+            }
+            GlueOpts::Hybrid((hq, _, _, stack)) => {
+                arity += hq.len() + 1;
+                arity += stack.len() + 1;
+            }
         }
-        // this passes
-        assert_eq!(sum, running_v); // <MLE_scalars * running_q> = running_v
-
-        // proof of dot prod
-        let mut p_transcript = Transcript::new(b"dot_prod_proof");
-        let mut v_transcript = Transcript::new(b"dot_prod_proof");
-
-        // set up
-        let gens_single =
-            CommitmentGens::<G1>::new_with_blinding_gen(b"gens_s", 1, &gens_t.get_blinding_gen());
-        let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
-        let commit_running_v =
-            <G1 as Group>::CE::commit(&gens_single, &[running_v.clone()], &decommit_running_v);
-
-        // prove
-        let ipi: InnerProductInstance<G1> =
-            InnerProductInstance::new(&commit_doc, &running_q, &commit_running_v);
-        let ipw =
-            InnerProductWitness::new(&scalars, &decommit_doc, &running_v, &decommit_running_v);
-        let ipa = InnerProductArgument::prove(&gens_t, &gens_single, &ipi, &ipw, &mut p_transcript);
-
-        // verify
-        let num_vars = running_q.len();
-
-        let res = ipa
-            .unwrap()
-            .verify(&gens_t, &gens_single, num_vars, &ipi, &mut v_transcript);
-
-        assert!(res.is_ok());
+        arity
     }
 
-    #[test]
-    fn mle_q_ext() {
-        init();
-        let uni: Vec<Integer> = vec![
-            Integer::from(60),
-            Integer::from(80),
-            Integer::from(9),
-            Integer::from(4),
-            Integer::from(77),
-            Integer::from(18),
-            Integer::from(24),
-            Integer::from(10),
-        ];
+    fn output(&self, z: &[F]) -> Vec<F> {
+        // sanity check
+        assert_eq!(z.len(), self.arity());
 
-        let mle = mle_from_pts(uni.clone());
+        assert_eq!(z[0], self.states[0]); // "current state"
+                                          //assert_eq!(z[1], self.chars[0]);
 
-        // 011 = 6
-        //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
-        let q = vec![
-            <G1 as Group>::Scalar::from(2),
-            <G1 as Group>::Scalar::from(3),
-            <G1 as Group>::Scalar::from(5),
-        ];
+        let mut i = 1;
+        match self.glue[0] {
+            GlueOpts::Split((q, v, dq, dv, sp, stack)) => {
+                for qi in q.clone() {
+                    assert_eq!(z[i], qi);
+                    i += 1;
+                }
+                assert_eq!(z[i], v);
+                i += 1;
+                for qi in dq.clone() {
+                    assert_eq!(z[i], qi);
+                    i += 1;
+                }
+                assert_eq!(z[i], dv);
+                i += 1;
 
-        let mut mle_f: Vec<<G1 as Group>::Scalar> = vec![];
-        for m in &mle {
-            mle_f.push(int_to_ff(m.clone()));
+                assert_eq!(z[i], sp);
+                i += 1;
+                for si in stack.clone() {
+                    assert_eq!(z[i], si);
+                    i += 1;
+                }
+            }
+            GlueOpts::Hybrid((hq, hv, sp, stack)) => {
+                for qi in hq.clone() {
+                    assert_eq!(z[i], qi);
+                    i += 1;
+                }
+                assert_eq!(z[i], hv);
+                i += 1;
+                assert_eq!(z[i], sp);
+                i += 1;
+                for si in stack.clone() {
+                    assert_eq!(z[i], si);
+                    i += 1;
+                }
+            }
         }
 
-        let q_ext = q_to_mle_q(&q, mle_f.len());
-
-        assert_eq!(mle_f.len(), q_ext.len());
-        // inner product
-        let mut sum = <G1 as Group>::Scalar::from(0);
-        for i in 0..mle.len() {
-            sum += mle_f[i].clone() * q_ext[i].clone();
+        let mut out = vec![
+            self.states[1], // "next state"
+        ];
+        match self.glue[1] {
+            GlueOpts::Split((q, v, dq, dv, sp, stack)) => {
+                out.extend(q.clone());
+                out.push(v);
+                out.extend(dq.clone());
+                out.push(dv);
+                out.push(sp);
+                out.extend(stack.clone());
+            }
+            GlueOpts::Hybrid((hq, hv, sp, stack)) => {
+                out.extend(hq.clone());
+                out.push(hv);
+                out.push(sp);
+                out.extend(stack.clone());
+            }
         }
-        assert_eq!(sum, <G1 as Group>::Scalar::from(1162));
+        out
     }
 
-    #[test]
-    fn projections() {
-        init();
-        let uni: Vec<Integer> = vec![
-            Integer::from(60), // 000
-            Integer::from(80), // 001
-            Integer::from(9),  // 010
-            Integer::from(4),  // 011
-            Integer::from(77), // 100
-            Integer::from(18), // 101
-            Integer::from(24), // 110
-            Integer::from(10), // 111
-        ];
-        let mle = mle_from_pts(uni.clone());
-        let mut mle_f: Vec<<G1 as Group>::Scalar> = vec![];
-        for m in &mle {
-            mle_f.push(int_to_ff(m.clone()));
+    fn get_counter_type(&self) -> StepCounterType {
+        StepCounterType::External
+    }
+
+    // nova wants this to return the "output" of each step
+    fn synthesize<CS>(
+        &self,
+        cs: &mut CS,
+        z: &[AllocatedNum<F>],
+    ) -> Result<Vec<AllocatedNum<F>>, SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+        G1: Group<Base = <G2 as Group>::Scalar>,
+        G2: Group<Base = <G1 as Group>::Scalar>,
+    {
+        // inputs
+        let state_0 = z[0].clone();
+
+        // ouputs
+        let mut last_state = None;
+        let mut out = vec![];
+
+        // convert
+        let f_mod = get_modulus::<F>(); // TODO
+
+        assert_eq!(
+            self.r1cs.field.modulus(),
+            &f_mod,
+            "\nR1CS has modulus \n{},\n but Nova CS expects \n{}",
+            self.r1cs.field,
+            f_mod
+        );
+
+        let mut vars = HashMap::with_capacity(self.r1cs.vars.len());
+        let glue = &self.glue[0];
+
+        match glue {
+            GlueOpts::Split((q, v, dq, dv, sp, stack)) => {
+                let sc_l = q.len();
+                let doc_l = dq.len();
+                let stack_len = stack.len();
+
+                let mut alloc_claim_r = None;
+                let mut alloc_doc_claim_r = None;
+
+                let mut alloc_rc = vec![None; sc_l + 1];
+                let mut alloc_prev_rc = vec![None; sc_l + 1];
+                let mut alloc_gs = vec![vec![None; 3]; sc_l];
+
+                let mut alloc_doc_rc = vec![None; doc_l + 1];
+                let mut alloc_doc_prev_rc = vec![None; doc_l + 1];
+                let mut alloc_doc_gs = vec![vec![None; 3]; doc_l];
+
+                let mut alloc_stack_ptr_popped = None;
+                let mut alloc_stack_out = vec![None; stack_len];
+
+                let prev_q = z[1..(1 + sc_l)].to_vec(); //.clone();
+                let prev_v = z[1 + sc_l].clone();
+                let prev_dq = z[(sc_l + 2)..(sc_l + doc_l + 2)].to_vec(); //.clone();
+                let prev_dv = z[sc_l + doc_l + 2].clone();
+
+                let stack_ptr_0 = z[sc_l + doc_l + 3].clone();
+                let stack_in = z[(sc_l + doc_l + 4)..(sc_l + doc_l + 4 + stack_len)].to_vec();
+
+                let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
+                let mut alloc_qs = vec![None; num_cqs];
+                let mut alloc_vs = vec![None; self.batch_size];
+
+                let num_doc_cqs = ((self.batch_size * doc_l) as f64 / 254.0).ceil() as usize;
+                let mut alloc_doc_q = vec![None; num_doc_cqs];
+                let mut alloc_doc_v = vec![None; self.batch_size];
+
+                for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
+                    let (name_f, s) = self.generate_variable_info(var);
+
+                    let val_f = || {
+                        Ok({
+                            let i_val = &self.values.as_ref().expect("missing values")[i];
+                            let ff_val = int_to_ff(i_val.as_pf().into());
+                            //debug!("value : {var:?} -> {ff_val:?} ({i_val})");
+                            ff_val
+                        })
+                    };
+                    // println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+                    let mut matched = self
+                        .input_variable_parsing(
+                            &mut vars,
+                            &s,
+                            var,
+                            state_0.clone(),
+                            //   char_0.clone(),
+                        )
+                        .unwrap();
+                    if !matched {
+                        matched = self
+                            .input_variable_qv_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                "nl",
+                                sc_l,
+                                &prev_q,
+                                &prev_v,
+                                &mut alloc_prev_rc,
+                            )
+                            .unwrap();
+                    }
+                    if !matched {
+                        matched = self
+                            .input_variable_qv_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                "nldoc",
+                                doc_l,
+                                &prev_dq,
+                                &prev_dv,
+                                &mut alloc_doc_prev_rc,
+                            )
+                            .unwrap();
+                    }
+
+                    if !matched {
+                        let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
+                        vars.insert(var, alloc_v.get_variable());
+
+                        matched = self
+                            .stack_parsing(
+                                &s,
+                                &alloc_v,
+                                &mut alloc_stack_ptr_popped,
+                                &mut alloc_stack_out,
+                            )
+                            .unwrap();
+                        if !matched {
+                            matched = self
+                                .intm_fs_parsing(
+                                    &alloc_v,
+                                    &s,
+                                    false,
+                                    &mut alloc_qs,
+                                    &mut alloc_vs,
+                                    &mut alloc_claim_r,
+                                    &mut alloc_gs,
+                                )
+                                .unwrap();
+                        }
+                        if !matched {
+                            matched = self
+                                .intm_fs_parsing(
+                                    &alloc_v,
+                                    &s,
+                                    true,
+                                    &mut alloc_doc_q,
+                                    &mut alloc_doc_v,
+                                    &mut alloc_doc_claim_r,
+                                    &mut alloc_doc_gs,
+                                )
+                                .unwrap();
+                            if !matched {
+                                matched = self
+                                    .nl_eval_parsing(
+                                        &alloc_v,
+                                        &s,
+                                        sc_l,
+                                        &mut alloc_rc,
+                                        "nl",
+                                        &mut alloc_prev_rc,
+                                    )
+                                    .unwrap();
+                                if !matched {
+                                    matched = self
+                                        .nl_eval_parsing(
+                                            &alloc_v,
+                                            &s,
+                                            doc_l,
+                                            &mut alloc_doc_rc,
+                                            "nldoc",
+                                            &mut alloc_doc_prev_rc,
+                                        )
+                                        .unwrap();
+
+                                    if !matched {
+                                        self.default_parsing(&s, &alloc_v, &mut last_state)
+                                            .unwrap();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                self.nl_eval_fiatshamir(
+                    cs,
+                    "eval",
+                    sc_l,
+                    &alloc_qs,
+                    &alloc_vs,
+                    &alloc_prev_rc,
+                    &alloc_rc,
+                    &alloc_claim_r,
+                    &alloc_gs,
+                    self.commit_blind,
+                )?;
+                self.nl_eval_fiatshamir(
+                    cs,
+                    "doc",
+                    doc_l,
+                    &alloc_doc_q,
+                    &alloc_doc_v,
+                    &alloc_doc_prev_rc,
+                    &alloc_doc_rc,
+                    &alloc_doc_claim_r,
+                    &alloc_doc_gs,
+                    self.commit_blind,
+                )?;
+
+                let hidden_rc =
+                    self.hiding_running_claim(cs, &alloc_doc_rc[doc_l].clone().unwrap())?;
+                alloc_doc_rc[doc_l] = Some(hidden_rc);
+
+                out.push(last_state.clone().unwrap());
+                for qv in alloc_rc {
+                    out.push(qv.unwrap());
+                }
+                for qv in alloc_doc_rc {
+                    out.push(qv.unwrap());
+                }
+                out.push(alloc_stack_ptr_popped.unwrap());
+                for si in alloc_stack_out {
+                    out.push(si.unwrap());
+                }
+            }
+            GlueOpts::Hybrid((hq, hv, sp, stack)) => panic!(),
+                let hyb_l = hq.len();
+                let stack_len = stack.len();
+
+                let mut alloc_claim_r = None;
+
+                let mut alloc_rc = vec![None; hyb_l + 1];
+                let mut alloc_prev_rc = vec![None; hyb_l + 1];
+                let mut alloc_gs = vec![vec![None; 3]; hyb_l];
+
+                let mut alloc_stack_ptr_popped = None;
+                let mut alloc_stack_out = vec![None; stack_len];
+
+                let prev_q = z[1..(1 + hyb_l)].to_vec(); //.clone();
+                let prev_v = z[1 + hyb_l].clone();
+
+                let stack_ptr_0 = z[hyb_l + 2].clone();
+                let stack_in = z[(hyb_l + 3)..(hyb_l + 3 + stack_len)].to_vec();
+
+                let num_cqs = ((self.batch_size * hyb_l) as f64 / 254.0).ceil() as usize;
+                let mut alloc_qs = vec![None; num_cqs];
+                let mut alloc_vs = vec![None; self.batch_size];
+
+                for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
+                    let (name_f, s) = self.generate_variable_info(var);
+
+                    let val_f = || {
+                        Ok({
+                            let i_val = &self.values.as_ref().expect("missing values")[i];
+                            let ff_val = int_to_ff(i_val.as_pf().into());
+                            //debug!("value : {var:?} -> {ff_val:?} ({i_val})");
+                            ff_val
+                        })
+                    };
+                    // println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+                    let mut matched = self
+                        .input_variable_parsing(
+                            &mut vars,
+                            &s,
+                            var,
+                            state_0.clone(),
+                            //   char_0.clone(),
+                        )
+                        .unwrap();
+                    if !matched {
+                        matched = self
+                            .input_variable_qv_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                "nl",
+                                sc_l,
+                                &prev_q,
+                                &prev_v,
+                                &mut alloc_prev_rc,
+                            )
+                            .unwrap();
+                    }
+                    if !matched {
+                        matched = self
+                            .input_variable_qv_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                "nldoc",
+                                doc_l,
+                                &prev_dq,
+                                &prev_dv,
+                                &mut alloc_doc_prev_rc,
+                            )
+                            .unwrap();
+                    }
+
+                    if !matched {
+                        let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
+                        vars.insert(var, alloc_v.get_variable());
+
+                        matched = self
+                            .stack_parsing(
+                                &s,
+                                &alloc_v,
+                                &mut alloc_stack_ptr_popped,
+                                &mut alloc_stack_out,
+                            )
+                            .unwrap();
+                        if !matched {
+                            matched = self
+                                .intm_fs_parsing(
+                                    &alloc_v,
+                                    &s,
+                                    false,
+                                    &mut alloc_qs,
+                                    &mut alloc_vs,
+                                    &mut alloc_claim_r,
+                                    &mut alloc_gs,
+                                )
+                                .unwrap();
+                        }
+                        if !matched {
+                            matched = self
+                                .intm_fs_parsing(
+                                    &alloc_v,
+                                    &s,
+                                    true,
+                                    &mut alloc_doc_q,
+                                    &mut alloc_doc_v,
+                                    &mut alloc_doc_claim_r,
+                                    &mut alloc_doc_gs,
+                                )
+                                .unwrap();
+                            if !matched {
+                                matched = self
+                                    .nl_eval_parsing(
+                                        &alloc_v,
+                                        &s,
+                                        sc_l,
+                                        &mut alloc_rc,
+                                        "nl",
+                                        &mut alloc_prev_rc,
+                                    )
+                                    .unwrap();
+                                if !matched {
+                                    matched = self
+                                        .nl_eval_parsing(
+                                            &alloc_v,
+                                            &s,
+                                            doc_l,
+                                            &mut alloc_doc_rc,
+                                            "nldoc",
+                                            &mut alloc_doc_prev_rc,
+                                        )
+                                        .unwrap();
+
+                                    if !matched {
+                                        self.default_parsing(&s, &alloc_v, &mut last_state)
+                                            .unwrap();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                self.nl_eval_fiatshamir(
+                    cs,
+                    "eval",
+                    sc_l,
+                    &alloc_qs,
+                    &alloc_vs,
+                    &alloc_prev_rc,
+                    &alloc_rc,
+                    &alloc_claim_r,
+                    &alloc_gs,
+                    self.commit_blind,
+                )?;
+                self.nl_eval_fiatshamir(
+                    cs,
+                    "doc",
+                    doc_l,
+                    &alloc_doc_q,
+                    &alloc_doc_v,
+                    &alloc_doc_prev_rc,
+                    &alloc_doc_rc,
+                    &alloc_doc_claim_r,
+                    &alloc_doc_gs,
+                    self.commit_blind,
+                )?;
+
+                let hidden_rc =
+                    self.hiding_running_claim(cs, &alloc_doc_rc[doc_l].clone().unwrap())?;
+                alloc_doc_rc[doc_l] = Some(hidden_rc);
+
+                out.push(last_state.clone().unwrap());
+                for qv in alloc_rc {
+                    out.push(qv.unwrap());
+                }
+                for qv in alloc_doc_rc {
+                    out.push(qv.unwrap());
+                }
+                out.push(alloc_stack_ptr_popped.unwrap());
+                for si in alloc_stack_out {
+                    out.push(si.unwrap());
+                }
+            }
+        
+
         }
 
-        let uni_sub: Vec<Integer> = vec![
-            Integer::from(77), // 100
-            Integer::from(18), // 101
-            Integer::from(24), // 110
-            Integer::from(10), // 111
-        ];
-        let mle_sub = mle_from_pts(uni_sub.clone());
-        let mut mle_sub_f: Vec<<G1 as Group>::Scalar> = vec![];
-        for m in &mle_sub {
-            mle_sub_f.push(int_to_ff(m.clone()));
+        for (i, (a, b, c)) in self.r1cs.constraints.iter().enumerate() {
+            cs.enforce(
+                || format!("con{}", i),
+                |z| lc_to_bellman::<F, CS>(&vars, a, z),
+                |z| lc_to_bellman::<F, CS>(&vars, b, z),
+                |z| lc_to_bellman::<F, CS>(&vars, c, z),
+            );
         }
 
-        // 011 = 6
-        //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
-        let q = vec![
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(1),
-            <G1 as Group>::Scalar::from(1), // selector
-        ];
-        let q_ext = q_to_mle_q(&q, mle_f.len());
-        assert_eq!(mle_f.len(), q_ext.len());
-        // inner product
-        let mut sum = <G1 as Group>::Scalar::from(0);
-        for i in 0..mle.len() {
-            sum += mle_f[i].clone() * q_ext[i].clone();
-        }
+        /*println!(
+            "done with synth: {} vars {} cs",
+            vars.len(),
+            self.r1cs.constraints.len()
+        );*/
 
-        let q_sub = vec![
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(1),
-        ];
-        let q_ext_sub = q_to_mle_q(&q_sub, mle_sub_f.len());
-        assert_eq!(mle_sub_f.len(), q_ext_sub.len());
-
-        // inner product
-        let mut sum_sub = <G1 as Group>::Scalar::from(0);
-        for i in 0..mle_sub.len() {
-            sum_sub += mle_sub_f[i].clone() * q_ext_sub[i].clone();
-        }
-        assert_eq!(sum, sum_sub);
-
-        //    println!("SUM {:#?}", sum.clone());
+        Ok(out)
     }
 }

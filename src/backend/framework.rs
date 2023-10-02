@@ -192,36 +192,66 @@ fn setup<'a>(
     circ_data: &'a ProverData,
     claim_blind: <G1 as Group>::Scalar,
 ) -> (Vec<<G1 as Group>::Scalar>, PublicParams<G1, G2, C1, C2>) {
-    let q_len = logmn(r1cs_converter.table.len());
-    let qd_len = logmn(r1cs_converter.doc_len());
+    let current_state = r1cs_converter.safa.get_init().index();
+
+    let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
+
     let stack_len = r1cs_converter.max_stack;
 
     // use "empty" (witness-less) circuit to generate nova F
-    let q = vec![<G1 as Group>::Scalar::from(0); q_len];
-    let v = <G1 as Group>::Scalar::from(0);
-    let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
-    let doc_v = <G1 as Group>::Scalar::from(0);
     let stack_ptr = <G1 as Group>::Scalar::from(0);
     let stack = vec![<G1 as Group>::Scalar::from(0); stack_len];
 
-    let empty_glue = vec![
-        Glue {
-            q: q.clone(),
-            v: v.clone(),
-            doc_q: doc_q.clone(),
-            doc_v: doc_v.clone(),
-            stack_ptr: stack_ptr.clone(),
-            stack: stack.clone(),
-        },
-        Glue {
-            q: q,
-            v: v,
-            doc_q: doc_q,
-            doc_v: doc_v,
-            stack_ptr: stack_ptr,
-            stack: stack,
-        },
-    ];
+    let empty_glue;
+    if r1cs_converter.hybrid_len.is_none() {
+        let q_len = logmn(r1cs_converter.table.len());
+        let qd_len = logmn(r1cs_converter.doc_len());
+
+        let q = vec![<G1 as Group>::Scalar::from(0); q_len];
+        let v = <G1 as Group>::Scalar::from(0);
+        let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
+        let doc_v = <G1 as Group>::Scalar::from(0);
+
+        empty_glue = vec![
+            GlueOpts::Split((
+                q.clone(),
+                v.clone(),
+                doc_q.clone(),
+                doc_v.clone(),
+                stack_ptr.clone(),
+                stack.clone(),
+            )),
+            GlueOpts::Split((q, v, doc_q, doc_v, stack_ptr, stack)),
+        ];
+        z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
+        z.push(int_to_ff(r1cs_converter.table[0].clone()));
+        z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
+        let d = calc_d_clear(
+            &r1cs_converter.pc,
+            claim_blind,
+            Integer::from(r1cs_converter.udoc[0] as u64),
+        );
+        z.push(d);
+    } else {
+        let hq_len = logmn(r1cs_converter.hybrid_len.unwrap());
+        let hq = vec![<G1 as Group>::Scalar::from(0); hq_len];
+        let hv = <G1 as Group>::Scalar::from(0);
+        empty_glue = vec![
+            GlueOpts::Hybrid((hq.clone(), hv.clone(), stack_ptr.clone(), stack.clone())),
+            GlueOpts::Hybrid((hq, hv, stack_ptr, stack)),
+        ];
+        z.append(&mut vec![<G1 as Group>::Scalar::from(0); hq_len]);
+        let d = calc_d_clear(
+            &r1cs_converter.pc,
+            claim_blind,
+            r1cs_converter.table[0].clone(), // start with table
+        );
+
+        z.push(d);
+    }
+
+    z.push(<G1 as Group>::Scalar::from(0 as u64));
+    z.append(&mut vec![<G1 as Group>::Scalar::from(0); stack_len]);
 
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
         circ_data.r1cs.clone(),
@@ -279,24 +309,6 @@ fn setup<'a>(
         pp.num_variables().1
     );
 
-    let current_state = r1cs_converter.safa.get_init().index();
-
-    let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
-
-    z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
-    z.push(int_to_ff(r1cs_converter.table[0].clone()));
-
-    z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
-    let d = calc_d_clear(
-        &r1cs_converter.pc,
-        claim_blind,
-        Integer::from(r1cs_converter.udoc[0] as u64),
-    );
-    //z.push(<G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64));
-    z.push(d);
-
-    z.push(<G1 as Group>::Scalar::from(0 as u64));
-    z.append(&mut vec![<G1 as Group>::Scalar::from(0); stack_len]);
     let z0_primary = z;
 
     (z0_primary, pp)
@@ -310,9 +322,6 @@ fn solve<'a>(
     doc: &Vec<char>,
     claim_blind: <G1 as Group>::Scalar,
 ) {
-    let q_len = logmn(r1cs_converter.table.len());
-    let qd_len = logmn(r1cs_converter.doc_len());
-
     let mut wits;
     let mut running_q: Option<Vec<Integer>> = None;
     let mut running_v: Option<Integer> = None;
@@ -387,48 +396,6 @@ fn solve<'a>(
         // just for debugging :)
         //circ_data.check_all(&wits);
 
-        let q = match running_q {
-            Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-            None => vec![<G1 as Group>::Scalar::from(0); q_len],
-        };
-
-        let v = match running_v {
-            Some(rv) => int_to_ff(rv),
-            None => int_to_ff(r1cs_converter.table[0].clone()),
-        };
-
-        let next_q = next_running_q
-            .clone()
-            .unwrap()
-            .into_iter()
-            .map(|x| int_to_ff(x))
-            .collect();
-        let next_v = int_to_ff(next_running_v.clone().unwrap());
-
-        let doc_q = match doc_running_q {
-            Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-            None => vec![<G1 as Group>::Scalar::from(0); qd_len],
-        };
-
-        /*let doc_v = match doc_running_v {
-            Some(rv) => int_to_ff(rv),
-            None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
-        };*/
-        let doc_v = match doc_running_v {
-            Some(rv) => rv,
-            None => Integer::from(r1cs_converter.udoc[0] as u64),
-        };
-        let doc_v_hash = calc_d_clear(&r1cs_converter.pc, claim_blind, doc_v.clone());
-
-        let next_doc_q = next_doc_running_q
-            .clone()
-            .unwrap()
-            .into_iter()
-            .map(|x| int_to_ff(x))
-            .collect();
-        let next_doc_v = next_doc_running_v.clone().unwrap();
-        let next_doc_v_hash = calc_d_clear(&r1cs_converter.pc, claim_blind, next_doc_v.clone());
-
         let sp_0 = <G1 as Group>::Scalar::from(stack_ptr_0 as u64);
         let spp = <G1 as Group>::Scalar::from(stack_ptr_popped as u64);
         let stk_in = stack_in
@@ -442,24 +409,80 @@ fn solve<'a>(
             .map(|x| <G1 as Group>::Scalar::from(x as u64))
             .collect();
 
-        let glue = vec![
-            Glue {
-                q: q,
-                v: v,
-                doc_q: doc_q,
-                doc_v: doc_v_hash,
-                stack_ptr: sp_0,
-                stack: stk_in,
-            },
-            Glue {
-                q: next_q,
-                v: next_v,
-                doc_q: next_doc_q,
-                doc_v: next_doc_v_hash,
-                stack_ptr: spp,
-                stack: stk_out,
-            },
-        ];
+        let glue = if r1cs_converter.hybrid_len.is_none() {
+            let q_len = logmn(r1cs_converter.table.len());
+            let qd_len = logmn(r1cs_converter.doc_len());
+
+            let q = match running_q {
+                Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+                None => vec![<G1 as Group>::Scalar::from(0); q_len],
+            };
+
+            let v = match running_v {
+                Some(rv) => int_to_ff(rv),
+                None => int_to_ff(r1cs_converter.table[0].clone()),
+            };
+
+            let next_q = next_running_q
+                .clone()
+                .unwrap()
+                .into_iter()
+                .map(|x| int_to_ff(x))
+                .collect();
+            let next_v = int_to_ff(next_running_v.clone().unwrap());
+
+            let doc_q = match doc_running_q {
+                Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
+                None => vec![<G1 as Group>::Scalar::from(0); qd_len],
+            };
+
+            let doc_v = match doc_running_v {
+                Some(rv) => rv,
+                None => Integer::from(r1cs_converter.udoc[0] as u64),
+            };
+            let doc_v_hash = calc_d_clear(&r1cs_converter.pc, claim_blind, doc_v.clone());
+
+            let next_doc_q = next_doc_running_q
+                .clone()
+                .unwrap()
+                .into_iter()
+                .map(|x| int_to_ff(x))
+                .collect();
+            let next_doc_v = next_doc_running_v.clone().unwrap();
+            let next_doc_v_hash = calc_d_clear(&r1cs_converter.pc, claim_blind, next_doc_v.clone());
+
+            vec![
+                GlueOpts::Split((q, v, doc_q, doc_v_hash, sp_0, stk_in)),
+                GlueOpts::Split((next_q, next_v, next_doc_q, next_doc_v_hash, spp, stk_out)),
+            ]
+        } else {
+            let hq_len = logmn(r1cs_converter.hybrid_len.unwrap());
+
+            let hq = match hybrid_running_q {
+                Some(hq) => hq.into_iter().map(|x| int_to_ff(x)).collect(),
+                None => vec![<G1 as Group>::Scalar::from(0); hq_len],
+            };
+
+            let hv = match hybrid_running_v {
+                Some(hv) => hv,
+                None => Integer::from(r1cs_converter.table[0].clone()), // table goes first
+            };
+            let hv_hash = calc_d_clear(&r1cs_converter.pc, claim_blind, hv.clone());
+
+            let next_hq = next_hybrid_running_q
+                .clone()
+                .unwrap()
+                .into_iter()
+                .map(|x| int_to_ff(x))
+                .collect();
+            let next_hv = next_hybrid_running_v.clone().unwrap();
+            let next_hv_hash = calc_d_clear(&r1cs_converter.pc, claim_blind, next_hv.clone());
+
+            vec![
+                GlueOpts::Hybrid((hq, hv_hash, sp_0, stk_in)),
+                GlueOpts::Hybrid((next_hq, next_hv_hash, spp, stk_out)),
+            ]
+        };
 
         let values: Option<Vec<_>> = Some(wits).map(|values| {
             let mut evaluator = StagedWitCompEvaluator::new(&circ_data.precompute);
