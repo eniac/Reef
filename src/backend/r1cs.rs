@@ -2061,6 +2061,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let q_name = format!("{}_eq_{}", id, i);
                 for j in 0..sc_l {
                     let qj = (q[i] >> j) & 1;
+                    println!(
+                        "{}_q_{} = {:#?} from {:#?}",
+                        q_name,
+                        (sc_l - 1 - j),
+                        qj.clone(),
+                        q[i].clone()
+                    );
                     wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
                     qjs.push(qj);
                 }
@@ -2526,16 +2533,25 @@ mod tests {
                 Some(x) => Some(int_to_ff(x)),
                 None => None,
             };
-            let int_drq = doc_running_q.clone();
-            /*let drq = match doc_running_q {
+
+            let (priv_rq, priv_rv) = if !hybrid {
+                (doc_running_q.unwrap(), doc_running_v.unwrap())
+            } else {
+                (
+                    hybrid_running_q.clone().unwrap(),
+                    hybrid_running_v.clone().unwrap(),
+                )
+            };
+
+            let hrq = match hybrid_running_q {
                 Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
                 None => None,
-            };*/
-            let int_drv = doc_running_v.clone();
-            /*let drv = match doc_running_v {
+            };
+            let hrv = match hybrid_running_v {
                 Some(x) => Some(int_to_ff(x)),
                 None => None,
-            };*/
+            };
+
             assert_eq!(next_state, r1cs_converter.num_states);
 
             let doc_len = r1cs_converter.udoc.len();
@@ -2544,8 +2560,8 @@ mod tests {
             let consist_proof = reef_commit.prove_consistency(
                 &r1cs_converter.table,
                 proj_len,
-                int_drq.unwrap(),
-                int_drv.unwrap(),
+                priv_rq,
+                priv_rv,
                 r1cs_converter.hybrid,
             );
 
@@ -2556,8 +2572,8 @@ mod tests {
                 &r1cs_converter.table,
                 rq,
                 rv,
-                None,
-                None,
+                hrq,
+                hrv,
             );
 
             reef_commit.verify_consistency(consist_proof, t, q_0);
@@ -2602,10 +2618,10 @@ mod tests {
         init();
 
         test_func_no_hash(
-            "abcd".to_string(),
-            "^aabbccdd$".to_string(),
-            "aabbccdd".to_string(), // really [ aabbcc, EOF, epsilon ]
-            vec![4],                // 2],
+            "ab".to_string(),
+            "^ab$".to_string(),
+            "ab".to_string(), // really [ aabbcc, EOF, epsilon ]
+            vec![2],          // 2],
             true,
             None,
             true,

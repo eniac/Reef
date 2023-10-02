@@ -148,6 +148,7 @@ impl ReefCommitment {
             // calculate t
             let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
             let t = verifier_mle_eval(table, q_prime);
+            println!("t = {:#?}, q0 = {:#?}", t.clone(), q[0].clone());
 
             vec![cap_d, int_to_ff(t), int_to_ff(q[0].clone())]
         };
@@ -207,14 +208,14 @@ impl ReefCommitment {
             q
         } else {
             let mut q_prime = vec![];
-            for i in 1..q.len() {
+            for i in 1..(q.len()) {
                 q_prime.push(q[i]);
             }
             q_prime
         };
 
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
-        //println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
+        println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
         let new_q = if self.doc_len != proj_doc_len {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q_hybrid);
@@ -231,6 +232,7 @@ impl ReefCommitment {
         let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
         let commit_running_v =
             <G1 as Group>::CE::commit(&self.single_gens, &[running_v.clone()], &decommit_running_v);
+        println!("V = {:#?}", running_v.clone());
 
         let (decommit_v_prime, commit_v_prime, v_prime) = if !hybrid {
             (None, None, None)
@@ -240,6 +242,7 @@ impl ReefCommitment {
                 // right order? TODO
                 v_prime += &self.mle_doc[i].clone() * running_q[i].clone();
             }
+            println!("V PRIME {:#?}", v_prime);
 
             let decommit_v_prime = <G1 as Group>::Scalar::random(&mut OsRng);
             let commit_v_prime =
@@ -582,20 +585,22 @@ where
         if self.hybrid {
             let t = z[1].clone();
             let q_0 = z[2].clone();
+            /*
+                // v = t + v_prime * q[0]
+                let alloc_v_prime =
+                    AllocatedNum::alloc(cs.namespace(|| "v_prime"), || Ok(self.v_prime.unwrap()))?;
 
-            // v = t + v_prime * q[0]
-            let alloc_v_prime =
-                AllocatedNum::alloc(cs.namespace(|| "v_prime"), || Ok(self.v_prime.unwrap()))?;
-
-            cs.enforce(
-                || "v_prime * q[0] = v - t",
-                |z| z + alloc_v_prime.get_variable(),
-                |z| z + q_0.get_variable(),
-                |z| z + alloc_v.get_variable() - t.get_variable(),
-            );
+                cs.enforce(
+                    || "v_prime * q[0] = v - t",
+                    |z| z + alloc_v_prime.get_variable(),
+                    |z| z + q_0.get_variable(),
+                    |z| z + alloc_v.get_variable() - t.get_variable(),
+                );
+            */
+            Ok(vec![d_calc, t, q_0]) // doesn't hugely matter
+        } else {
+            Ok(vec![d_calc])
         }
-
-        Ok(vec![d_calc]) // doesn't hugely matter
     }
 
     fn get_counter_type(&self) -> StepCounterType {
