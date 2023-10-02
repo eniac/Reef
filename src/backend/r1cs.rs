@@ -136,6 +136,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut max_rel = 1;
         let mut path_len = 0;
         let mut paths = vec![];
+        let deltas = safa
+            .g
+            .node_indices()
+            .flat_map(|n| {
+                safa.g.edges(n).filter_map(|e| {
+                    // Filter out sink state transitions
+                    if safa.is_sink(e.source()) || safa.is_sink(e.target()) {
+                        None
+                    } else if safa.g[e.source()].is_and() {
+                        Some((e.source(), e.weight().clone(), e.target()))
+                    } else {
+                        Some((e.source(), e.weight().clone(), e.target()))
+                    }
+                })
+            })
+            .collect();
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             //println!("PROCESS STATE {:#?}", all_state);
@@ -271,6 +287,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 let sub_max_rel = normal_add_table(
                     &safa,
+                    &deltas,
                     &mut num_ab,
                     &mut set_table,
                     num_states,
@@ -296,6 +313,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let sub_max_rel = normal_add_table(
             &safa,
+            &deltas,
             &mut num_ab,
             &mut set_table,
             num_states,
@@ -1669,12 +1687,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-        /*
-                println!(
-                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-                );
-        */
+
+        println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        );
+
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
