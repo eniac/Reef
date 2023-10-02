@@ -62,7 +62,7 @@ pub struct ConsistencyProof {
 }
 
 impl ReefCommitment {
-    pub fn new(doc: Vec<usize>, pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>) -> Self
+    pub fn new(doc: Vec<usize>,  pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>) -> Self
     where
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,
@@ -75,7 +75,7 @@ impl ReefCommitment {
             <G1 as Group>::Scalar::from(0),
             <G1 as Group>::Scalar::from(0),
             false,
-            None,
+            <G1 as Group>::Scalar::from(0)
         );
 
         // produce CAP keys
@@ -134,33 +134,33 @@ impl ReefCommitment {
 
     pub fn prove_consistency(
         &mut self,
-        table: &Vec<Integer>,
         proj_doc_len: usize,
         q: Vec<Integer>, //<G1 as Group>::Scalar>,
         v: Integer,      //<G1 as Group>::Scalar,
         hybrid: bool,
-    ) -> ConsistencyProof {
+        ) -> ConsistencyProof {
+
         let cap_d = calc_d_clear(&self.pc, self.hash_salt, v.clone());
 
-        let cap_z = if !hybrid {
-            vec![cap_d]
-        } else {
-            // calculate t
-            let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
-            let t = verifier_mle_eval(table, q_prime);
+        let v_ff = int_to_ff(v);
+        let q_ff = if !hybrid {q.into_iter().map(|x| int_to_ff(x)).collect()} else {
+            let q_prime = vec![];
+            for i in 1..q.len() {
+                q_prime.push(int_to_ff(q[i]));
 
-            vec![cap_d, int_to_ff(t), int_to_ff(q[0].clone())]
+            }
+            q_prime
+
         };
 
-        let v_ff = int_to_ff(v);
-        let q_ff = q.into_iter().map(|x| int_to_ff(x)).collect();
 
-        let (ipi, ipa, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
-            self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len, hybrid);
+        let (ipi, ipa, v_commit, v_decommit) = self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len);
 
         // CAP circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
             ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt, hybrid, v_prime);
+
+        let cap_z = vec![cap_d];
 
         let cap_res = SpartanSNARK::cap_prove(
             &self.cap_pk,
@@ -190,38 +190,23 @@ impl ReefCommitment {
         q: Vec<<G1 as Group>::Scalar>,
         running_v: <G1 as Group>::Scalar,
         proj_doc_len: usize,
-        hybrid: bool,
     ) -> (
         InnerProductInstance<G1>,
         InnerProductArgument<G1>,
         Commitment<G1>,
         <G1 as Group>::Scalar,
-        Option<Commitment<G1>>,
-        Option<<G1 as Group>::Scalar>,
-        Option<<G1 as Group>::Scalar>,
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
-        // hybrid
-        let q_hybrid = if !hybrid {
-            q
-        } else {
-            let mut q_prime = vec![];
-            for i in 1..q.len() {
-                q_prime.push(q[i]);
-            }
-            q_prime
-        };
-
-        //println!("PROJECTIONS OLD Q {:#?}", q.clone());
-        //println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
+        println!("PROJECTIONS OLD Q {:#?}", q.clone());
+        println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
         let new_q = if self.doc_len != proj_doc_len {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
-            q_add.extend(q_hybrid);
-            //println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
+            q_add.extend(q);
+            println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
             q_add
         } else {
-            q_hybrid
+            q
         };
 
         let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
@@ -232,52 +217,18 @@ impl ReefCommitment {
         let commit_running_v =
             <G1 as Group>::CE::commit(&self.single_gens, &[running_v.clone()], &decommit_running_v);
 
-        let (decommit_v_prime, commit_v_prime, v_prime) = if !hybrid {
-            (None, None, None)
-        } else {
-            let mut v_prime = <G1 as Group>::Scalar::from(0);
-            for i in 0..self.mle_doc.len() {
-                // right order? TODO
-                v_prime += &self.mle_doc[i].clone() * running_q[i].clone();
-            }
-
-            let decommit_v_prime = <G1 as Group>::Scalar::random(&mut OsRng);
-            let commit_v_prime =
-                <G1 as Group>::CE::commit(&self.single_gens, &[v_prime.clone()], &decommit_v_prime);
-
-            (Some(decommit_v_prime), Some(commit_v_prime), Some(v_prime))
-        };
-
         // prove
-        let (ipi, ipw) = if !hybrid {
-            let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
-                &self.doc_commit.decompress().unwrap(),
-                &running_q,
-                &commit_running_v,
-            );
-            let ipw = InnerProductWitness::new(
-                &self.mle_doc,
-                &self.doc_decommit,
-                &running_v,
-                &decommit_running_v,
-            );
-
-            (ipi, ipw)
-        } else {
-            let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
-                &self.doc_commit.decompress().unwrap(),
-                &running_q,
-                &commit_v_prime.unwrap(),
-            );
-            let ipw = InnerProductWitness::new(
-                &self.mle_doc,
-                &self.doc_decommit,
-                &v_prime.unwrap(),
-                &decommit_v_prime.unwrap(),
-            );
-            (ipi, ipw)
-        };
-
+        let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
+            &self.doc_commit.decompress().unwrap(),
+            &running_q,
+            &commit_running_v,
+        );
+        let ipw = InnerProductWitness::new(
+            &self.mle_doc,
+            &self.doc_decommit,
+            &running_v,
+            &decommit_running_v,
+        );
         let ipa = InnerProductArgument::prove(
             &self.vector_gens,
             &self.single_gens,
@@ -286,32 +237,24 @@ impl ReefCommitment {
             &mut p_transcript,
         )
         .unwrap();
+        /*
+                // sanity - TODO DEL
+                let mut sum = <G1 as Group>::Scalar::from(0);
+                for i in 0..self.mle_doc.len() {
+                    sum += self.mle_doc[i].clone() * running_q[i].clone();
+                }
+                // this passes
+                assert_eq!(sum, running_v); // <MLE_scalars * running_q> = running_v
 
-        (
-            ipi,
-            ipa,
-            commit_running_v,
-            decommit_running_v,
-            commit_v_prime,
-            decommit_v_prime,
-            v_prime,
-        )
+        */
+        (ipi, ipa, commit_running_v, decommit_running_v)
     }
 
-    pub fn verify_consistency(
-        &self,
-        proof: ConsistencyProof,
-        t: Option<<G1 as Group>::Scalar>,
-        q_0: Option<<G1 as Group>::Scalar>,
-    ) {
+    pub fn verify_consistency(&self, proof: ConsistencyProof) {
         assert!(self.proof_dot_prod_verify(&proof.ipi, proof.ipa).is_ok());
 
         // cap verify
-        let z_0 = if t.is_none() || q_0.is_none() {
-            vec![proof.hash_d]
-        } else {
-            vec![proof.hash_d, t.unwrap(), q_0.unwrap()]
-        };
+        let z_0 = vec![proof.hash_d];
         let z_out = proof.circuit.output(&z_0);
         let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
         let res = proof
@@ -365,7 +308,7 @@ pub fn final_clear_checks(
     final_v: Option<<G1 as Group>::Scalar>,
     final_hybrid_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_hybrid_hash: Option<<G1 as Group>::Scalar>,
-) -> (Option<<G1 as Group>::Scalar>, Option<<G1 as Group>::Scalar>) {
+) {
     // stack ptr is 0 (stack is empty)
     assert_eq!(stack_ptr, <G1 as Group>::Scalar::from(0));
 
@@ -381,8 +324,6 @@ pub fn final_clear_checks(
                 (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
             );
 
-            (None, None)
-
             // document
             // TODO MOVE THIS
             // assert_eq!(d, hash);
@@ -390,17 +331,15 @@ pub fn final_clear_checks(
 
         // hybrid
         (None, None, Some(q), Some(d)) => {
-            let q0 = q[0].clone();
             let mut q_i = vec![];
             for f in q {
                 q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
             }
 
-            let q_prime = &q_i[1..];
+            let q0 = q.first();
+            let q_prime = &q[1..];
 
-            let t = verifier_mle_eval(table, q_prime);
-
-            (Some(int_to_ff(t)), Some(q0))
+            let t = verifier_mle_eval(table, &q_prime);
         }
 
         // bad combo
@@ -483,20 +422,11 @@ pub struct ConsistencyCircuit<F: PrimeField> {
     v: F,
     s: F,
     hybrid: bool,
-    v_prime: Option<F>,
+    v_prime: F,
 }
 
 impl<F: PrimeField> ConsistencyCircuit<F> {
-    pub fn new(
-        pc: &PoseidonConstants<F, typenum::U4>,
-        d: F,
-        v: F,
-        s: F,
-        hybrid: bool,
-        v_prime: Option<F>,
-    ) -> Self {
-        assert!((hybrid && v_prime.is_some()) || (!hybrid && v_prime.is_none()));
-
+    pub fn new(pc: &PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F, hybrid, v_prime) -> Self {
         ConsistencyCircuit {
             pc: pc.clone(),
             d,
@@ -514,10 +444,8 @@ where
 {
     fn arity(&self) -> usize {
         if self.hybrid {
-            3
-        } else {
-            1
-        }
+            3 } else {
+        1}
     }
 
     fn output(&self, z: &[F]) -> Vec<F> {
@@ -555,7 +483,7 @@ where
             SpongeAPI::absorb(
                 &mut sponge,
                 2,
-                &[Elt::Allocated(alloc_v.clone()), Elt::Allocated(alloc_s)],
+                &[Elt::Allocated(alloc_v), Elt::Allocated(alloc_s)],
                 acc,
             );
 
@@ -585,7 +513,7 @@ where
 
             // v = t + v_prime * q[0]
             let alloc_v_prime =
-                AllocatedNum::alloc(cs.namespace(|| "v_prime"), || Ok(self.v_prime.unwrap()))?;
+                AllocatedNum::alloc(cs.namespace(|| "v_prime"), || Ok(self.v_prime))?;
 
             cs.enforce(
                 || "v_prime * q[0] = v - t",

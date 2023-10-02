@@ -58,7 +58,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     // proj
     doc_subset: Option<(usize, usize)>,
     // hybrid
-    hybrid: bool,
+    pub hybrid: bool,
     hybrid_len: usize,
 }
 
@@ -396,6 +396,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 println!("USING PROJECTION {:#?}", ((start, end)));
                 Some((start, end)) // handle doc extension TODO?
             }
+        // TODO proj vs hybrid calc
         } else {
             None
         };

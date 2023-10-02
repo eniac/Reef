@@ -45,6 +45,7 @@ struct ProofInfo {
     doc_len: usize,
     proj_doc_len: usize,
     num_states: usize,
+    hybrid: bool,
 }
 
 #[cfg(feature = "metrics")]
@@ -56,6 +57,7 @@ pub fn run_backend(
     doc: Vec<char>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
     projections: bool,
+    hybrid: bool,
 ) {
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
@@ -118,7 +120,7 @@ pub fn run_backend(
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
         let proj = if projections { safa.projection() } else { None };
-        let mut r1cs_converter = R1CS::new(&safa, &doc, batch_size, proj, false, sc.clone());
+        let mut r1cs_converter = R1CS::new(&safa, &doc, batch_size, proj, hybrid, sc.clone());
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "R1CS", "R1CS precomputations");
@@ -156,6 +158,7 @@ pub fn run_backend(
                 doc_len: r1cs_converter.udoc.len(),     // real
                 proj_doc_len: r1cs_converter.doc_len(), // projected
                 num_states: r1cs_converter.num_states,
+                hybrid: r1cs_converter.hybrid,
             })
             .unwrap();
 
@@ -583,9 +586,13 @@ fn prove_and_verify(
     let (q, v) = recv_qv.recv().unwrap();
 
     //Doc dot prod and consistency
-    let consist_proof = proof_info
-        .commit
-        .prove_consistency(proof_info.proj_doc_len, q, v);
+    let consist_proof = proof_info.commit.prove_consistency(
+        &proof_info.table,
+        proof_info.proj_doc_len,
+        q,
+        v,
+        proof_info.hybrid,
+    );
 
     #[cfg(feature = "metrics")]
     log::space(
@@ -647,24 +654,21 @@ fn verify(
     #[cfg(feature = "metrics")]
     log::tic(Component::Verifier, "Verification", "Final Clear Checks");
 
-    //CAP verify
-    let cap_d = consist_proof.hash_d.clone();
-    reef_commit.verify_consistency(consist_proof);
-
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
     let zn = res.unwrap().0;
 
-    final_verifier_checks(
+    let (t, q_0) = final_clear_checks(
+        zn[(q_len + qd_len + 3)], // stack ptr
         &table,
-        doc_len,
-        zn[(q_len + qd_len + 3)],          // stack ptr
         Some(zn[1..(q_len + 1)].to_vec()), // eval q
         Some(zn[q_len + 1]),               // eval v
-        Some(zn[2 + q_len + qd_len]),      // doc hash
         None,                              // hybrid q
         None,                              // hybrid hash
-        Some(cap_d),
     );
+
+    //CAP verify
+    let cap_d = consist_proof.hash_d.clone(); // TODO
+    reef_commit.verify_consistency(consist_proof, t, q_0);
 
     // final accepting
     assert_eq!(zn[0], <G1 as Group>::Scalar::from(num_states as u64));
@@ -704,7 +708,6 @@ mod tests {
             0,
             true,
         );
-        panic!();
     }
 
     #[test]

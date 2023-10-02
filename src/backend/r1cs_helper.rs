@@ -553,7 +553,7 @@ pub(crate) fn gen_eq_table(
 // x = eval_at, prods = coeffs of table/eq(), e's = e/q's
 pub(crate) fn prover_mle_partial_eval(
     prods: &[Integer],
-    x: &Vec<Integer>,
+    x: &[Integer],
     es: &Vec<usize>,
     for_t: bool,
     last_q: Option<&Vec<Integer>>, // only q that isn't in {0,1}, inelegant but whatever
@@ -640,7 +640,7 @@ pub(crate) fn prover_mle_partial_eval(
 }
 
 // external full "partial" eval for table check
-pub fn verifier_mle_eval(table: &[Integer], q: &Vec<Integer>) -> Integer {
+pub fn verifier_mle_eval(table: &[Integer], q: &[Integer]) -> Integer {
     let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
 
     con
