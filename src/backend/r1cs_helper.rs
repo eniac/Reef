@@ -383,11 +383,11 @@ pub fn normal_add_table<'a>(
 
                 // TODO we have to make sure the multipliers are big enough
 
-                println!("ADDITIONAL FOR ACCEPTING");
-                println!(
-                    "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
-                    in_state, out_state, c, lower_offset, upper_offset, rel,
-                );
+                // println!("ADDITIONAL FOR ACCEPTING");
+                // println!(
+                //     "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
+                //     in_state, out_state, c, lower_offset, upper_offset, rel,
+                // );
 
                 set_table.insert(
                     Integer::from(

@@ -334,10 +334,10 @@ pub fn final_clear_checks(
                     let num_chunks = doc_ext_len / chunk_size;
                     let mut start_idx = start / chunk_size;
 
-                    println!(
-                        "chunk size {}, num chunks {}, s = {}",
-                        chunk_size, num_chunks, start_idx
-                    );
+                    // println!(
+                    //     "chunk size {}, num chunks {}, s = {}",
+                    //     chunk_size, num_chunks, start_idx
+                    // );
 
                     let mut q_add = vec![];
                     for i in 0..logmn(num_chunks) {
@@ -353,7 +353,7 @@ pub fn final_clear_checks(
             // right form for inner product
             let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
             let q_ext = q_to_mle_q(&q_rev, doc_ext_len);
-            println!("Q EXT {:#?}", q_ext);
+            // println!("Q EXT {:#?}", q_ext);
 
             // Doc is commited to in this case
             assert!(proof_dot_prod_verify(reef_commitment, q_ext, ipi, ipa).is_ok());
