@@ -2523,23 +2523,29 @@ mod tests {
             let doc_len = r1cs_converter.udoc.len();
             let proj_len = r1cs_converter.doc_len();
 
-            let consist_proof =
-                reef_commit.prove_consistency(proj_len, int_drq.unwrap(), int_drv.unwrap());
+            let consist_proof = reef_commit.prove_consistency(
+                &r1cs_converter.table,
+                proj_len,
+                int_drq.unwrap(),
+                int_drv.unwrap(),
+                r1cs_converter.hybrid,
+            );
 
             let cap_d = consist_proof.hash_d.clone();
-            reef_commit.verify_consistency(consist_proof);
 
-            final_verifier_checks(
-                &r1cs_converter.table,
-                doc_len,
+            let (t, q_0) = final_clear_checks(
                 <G1 as Group>::Scalar::from(r1cs_converter.stack_ptr as u64),
+                &r1cs_converter.table,
                 rq,
                 rv,
-                Some(cap_d), // fake check
                 None,
                 None,
-                Some(cap_d),
             );
+
+            reef_commit.verify_consistency(consist_proof, t, q_0);
+
+            // final accepting
+            assert_eq!(next_state, r1cs_converter.num_states);
 
             println!("actual cost: {:#?}", pd.r1cs.constraints.len());
             println!("\n\n\n");

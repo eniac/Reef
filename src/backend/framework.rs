@@ -691,12 +691,13 @@ mod tests {
         doc: Vec<char>,
         batch_size: usize,
         projections: bool,
+        hybrid: bool,
     ) {
         let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
 
         init();
-        run_backend(safa.clone(), doc.clone(), batch_size, projections);
+        run_backend(safa.clone(), doc.clone(), batch_size, projections, hybrid);
     }
 
     #[test]
@@ -707,6 +708,7 @@ mod tests {
             ("aabbcc".to_string()).chars().collect(),
             0,
             true,
+            false,
         );
     }
 
@@ -720,6 +722,7 @@ mod tests {
                 .collect(),
             33,
             false,
+            false,
         );
     }
 
@@ -731,6 +734,7 @@ mod tests {
             ("aaabbbaaa".to_string()).chars().collect(),
             2,
             false,
+            false,
         );
     }
 
@@ -741,6 +745,7 @@ mod tests {
             "^(?=a)ab(?=c)cd$".to_string(),
             ("abcd".to_string()).chars().collect(),
             0,
+            false,
             false,
         );
     }
@@ -755,6 +760,7 @@ mod tests {
                 //.map(|c| c.to_string())
                 .collect(),
             0,
+            false,
             false,
         );
         /* backend_test(
