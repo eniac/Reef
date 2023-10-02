@@ -27,8 +27,7 @@ fn setup_circ() {
         // set up CirC library
         let mut circ: CircOpt = Default::default();
         circ.field.custom_modulus =
-            "28948022309329048855892746252171976963363056481941647379679742748393362948097".into(); // vesta (fuck???)
-                                                                                                    //"28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); // pallas curve (i think?)
+            "28948022309329048855892746252171976963363056481941647379679742748393362948097".into(); // vesta
         cfg::set(&circ);
     }
 }

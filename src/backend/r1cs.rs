@@ -2044,7 +2044,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let sc_l = logmn(table.len()); // sum check rounds
-        println!("WITNESS SC ROUNDS {}", sc_l);
+                                       //println!("WITNESS SC ROUNDS {}", sc_l);
 
         let num_vs = v.len();
         assert_eq!(num_vs, q.len());
@@ -2080,13 +2080,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let q_name = format!("{}_eq_{}", id, i);
                 for j in 0..sc_l {
                     let qj = (q[i] >> j) & 1;
-                    println!(
+                    /*println!(
                         "{}_q_{} = {:#?} from {:#?}",
                         q_name,
                         (sc_l - 1 - j),
                         qj.clone(),
                         q[i].clone()
-                    );
+                    );*/
                     wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
                     qjs.push(qj);
                 }
@@ -2267,20 +2267,18 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         );
 
         // sanity check - TODO eliminate
-        /*
-                let (_, eq_term) = prover_mle_partial_eval(
-                    &rs,
-                    &sc_rs, //.into_iter().rev().collect(),
-                    &q,
-                    false,
-                    Some(&prev_running_q),
-                );
-                println!("EQ TERM {:#?}", eq_term);
-                assert_eq!(
-                    last_claim,
-                    (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
-                );
-        */
+        let (_, eq_term) = prover_mle_partial_eval(
+            &rs,
+            &sc_rs, //.into_iter().rev().collect(),
+            &q,
+            false,
+            Some(&prev_running_q),
+        );
+        println!("EQ TERM {:#?}", eq_term);
+        assert_eq!(
+            last_claim,
+            (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
+        );
         (wits, next_running_q, next_running_v)
     }
 }

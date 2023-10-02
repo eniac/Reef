@@ -89,11 +89,12 @@ impl ReefCommitment {
         let salt = <G1 as Group>::Scalar::random(&mut OsRng);
 
         // commitment to document
-        let doc_ext_len = doc.len().next_power_of_two();
+        let doc_ext_len = doc.len().next_power_of_two() * 2;
 
         let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
         doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
 
+        println!("DOC COMMITMENT {:#?}", doc_ext.clone());
         let mle = mle_from_pts(doc_ext);
 
         //let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
@@ -142,17 +143,18 @@ impl ReefCommitment {
     ) -> ConsistencyProof {
         let cap_d = calc_d_clear(&self.pc, self.hash_salt, v.clone());
 
-        let cap_z = if !hybrid {
-            vec![cap_d]
-        } else {
-            // calculate t
-            let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
-            let t = verifier_mle_eval(table, q_prime);
-            println!("t = {:#?}, q0 = {:#?}", t.clone(), q[0].clone());
+        /*let cap_z = if !hybrid {
+                                                                          vec![cap_d]
+                                                                      } else {
+        */
+        // calculate t
+        let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
+        let t = verifier_mle_eval(table, q_prime);
+        println!("t = {:#?}, q0 = {:#?}", t.clone(), q[0].clone());
 
-            vec![cap_d, int_to_ff(t), int_to_ff(q[0].clone())]
-        };
-
+        println!("TABLE COMMITMENT {:#?}", table);
+        let cap_z = vec![cap_d, int_to_ff(t), int_to_ff(q[0].clone())];
+        //                                                     };*/
         let v_ff = int_to_ff(v);
         let q_ff = q.into_iter().map(|x| int_to_ff(x)).collect();
 
@@ -216,14 +218,15 @@ impl ReefCommitment {
 
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
         println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
-        let new_q = if self.doc_len != proj_doc_len {
+        let new_q = q_hybrid;
+        /*if self.doc_len != proj_doc_len {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q_hybrid);
             //println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
             q_add
         } else {
             q_hybrid
-        };
+        };*/
 
         let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
         let running_q = q_to_mle_q(&q_rev, self.doc_len);
@@ -239,7 +242,6 @@ impl ReefCommitment {
         } else {
             let mut v_prime = <G1 as Group>::Scalar::from(0);
             for i in 0..self.mle_doc.len() {
-                // right order? TODO
                 v_prime += &self.mle_doc[i].clone() * running_q[i].clone();
             }
             println!("V PRIME {:#?}", v_prime);
@@ -310,17 +312,20 @@ impl ReefCommitment {
         assert!(self.proof_dot_prod_verify(&proof.ipi, proof.ipa).is_ok());
 
         // cap verify
-        let z_0 = if t.is_none() || q_0.is_none() {
-            vec![proof.hash_d]
-        } else {
-            vec![proof.hash_d, t.unwrap(), q_0.unwrap()]
-        };
+        let z_0 = vec![proof.hash_d, t.unwrap(), q_0.unwrap()]; /* if t.is_none() || q_0.is_none() {
+                                                                    vec![proof.hash_d]
+                                                                } else {
+                                                                    vec![proof.hash_d, t.unwrap(), q_0.unwrap()]
+                                                                };*/
         let z_out = proof.circuit.output(&z_0);
         let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
+        println!("IO {:#?}", io.clone());
         let res = proof
             .snark
             .cap_verify(&self.cap_vk, &io, &proof.v_commit.compress());
         // TODO compress()
+        println!("RES {:#?}", res);
+
         assert!(res.is_ok());
     }
 
@@ -481,7 +486,7 @@ fn q_to_mle_q<F: PrimeField>(q: &Vec<F>, mle_len: usize) -> Vec<F> {
 
 #[derive(Clone)]
 pub struct ConsistencyCircuit<F: PrimeField> {
-    pc: PoseidonConstants<F, typenum::U4>, // arity of PC can be changed as desired
+    pc: PoseidonConstants<F, typenum::U4>,
     d: F,
     v: F,
     s: F,
@@ -516,11 +521,12 @@ where
     F: PrimeField,
 {
     fn arity(&self) -> usize {
-        if self.hybrid {
+        /*if self.hybrid {
             3
         } else {
             1
-        }
+        }*/
+        3
     }
 
     fn output(&self, z: &[F]) -> Vec<F> {
@@ -570,19 +576,19 @@ where
         };
 
         // sanity
-        if d_calc.get_value().is_some() {
+        /*        if d_calc.get_value().is_some() {
             assert_eq!(d_in.get_value().unwrap(), d_calc.get_value().unwrap());
         }
 
-        cs.enforce(
-            || "d == d",
-            |z| z + d_in.get_variable(),
-            |z| z + CS::one(),
-            |z| z + d_calc.get_variable(),
-        );
-
+                cs.enforce(
+                    || "d == d",
+                    |z| z + d_in.get_variable(),
+                    |z| z + CS::one(),
+                    |z| z + d_calc.get_variable(),
+                );
+        */
         // for hybrid only
-        if self.hybrid {
+        /* if self.hybrid {
             let t = z[1].clone();
             let q_0 = z[2].clone();
             /*
@@ -600,7 +606,9 @@ where
             Ok(vec![d_calc, t, q_0]) // doesn't hugely matter
         } else {
             Ok(vec![d_calc])
-        }
+        }*/
+
+        Ok(vec![d_calc])
     }
 
     fn get_counter_type(&self) -> StepCounterType {
@@ -777,5 +785,90 @@ mod tests {
         assert_eq!(sum, sum_sub);
 
         //    println!("SUM {:#?}", sum.clone());
+    }
+
+    #[test]
+    fn hybrid() {
+        init();
+        let uni: Vec<Integer> = vec![
+            Integer::from(60), // 000
+            Integer::from(80), // 001
+            Integer::from(9),  // 010
+            Integer::from(4),  // 011
+            Integer::from(77), // 100
+            Integer::from(18), // 101
+            Integer::from(24), // 110
+            Integer::from(10), // 111
+        ];
+        let mle = mle_from_pts(uni.clone());
+        let mut mle_f: Vec<<G1 as Group>::Scalar> = vec![];
+        for m in &mle {
+            mle_f.push(int_to_ff(m.clone()));
+        }
+
+        let uni_sub: Vec<Integer> = vec![
+            Integer::from(77), // 100
+            Integer::from(18), // 101
+            Integer::from(24), // 110
+            Integer::from(10), // 111
+        ];
+        let mle_sub = mle_from_pts(uni_sub.clone());
+        let mut mle_sub_f: Vec<<G1 as Group>::Scalar> = vec![];
+        for m in &mle_sub {
+            mle_sub_f.push(int_to_ff(m.clone()));
+        }
+
+        // 011 = 6
+        //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
+        let q = vec![
+            <G1 as Group>::Scalar::from(2),
+            <G1 as Group>::Scalar::from(3),
+            <G1 as Group>::Scalar::from(5), // selector
+        ];
+
+        let q_ext = q_to_mle_q(&q, mle_f.len());
+        assert_eq!(mle_f.len(), q_ext.len());
+        // inner product
+        let mut v = <G1 as Group>::Scalar::from(0);
+        for i in 0..mle.len() {
+            v += mle_f[i].clone() * q_ext[i].clone();
+        }
+
+        let q_sub = vec![
+            <G1 as Group>::Scalar::from(2),
+            <G1 as Group>::Scalar::from(3),
+        ];
+        let q_ext_sub = q_to_mle_q(&q_sub, mle_sub_f.len());
+        assert_eq!(mle_sub_f.len(), q_ext_sub.len());
+
+        // inner product
+        let mut v_sub = <G1 as Group>::Scalar::from(0);
+        for i in 0..mle_sub.len() {
+            v_sub += mle_sub_f[i].clone() * q_ext_sub[i].clone();
+        }
+
+        let table: Vec<Integer> = vec![
+            Integer::from(60), // 000
+            Integer::from(80), // 001
+            Integer::from(9),  // 010
+            Integer::from(4),  // 011
+        ];
+        let mle_table = mle_from_pts(table.clone());
+        let mut mle_table_f: Vec<<G1 as Group>::Scalar> = vec![];
+        for m in &mle_table {
+            mle_table_f.push(int_to_ff(m.clone()));
+        }
+
+        let mut t = <G1 as Group>::Scalar::from(0);
+        for i in 0..mle_sub.len() {
+            t += mle_table_f[i].clone() * q_ext_sub[i].clone();
+        }
+
+        println!("t {:#?}, v' {:#?}, v {:#?}", t, v_sub, v);
+
+        assert_eq!(
+            v,
+            t * (<G1 as Group>::Scalar::from(1) - q[2]) + v_sub * q[2]
+        );
     }
 }
