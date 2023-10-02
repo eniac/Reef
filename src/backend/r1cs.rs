@@ -120,14 +120,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut set_table: HashSet<Integer> = HashSet::default();
 
         //safa.write_pdf("safa1").unwrap();
-
-        println!(
-            "STATES {:#?}",
-            safa.g
-                .node_indices()
-                .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-        );
-
+        /*
+                println!(
+                    "STATES {:#?}",
+                    safa.g
+                        .node_indices()
+                        .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
+                );
+        */
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
@@ -1359,7 +1359,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // TODO ordering circuit
 
         pub_lookups.append(&mut priv_lookups);
-        self.nlookup_gadget(pub_lookups, self.hybrid_len, "hybrid");
+        self.nlookup_gadget(pub_lookups, self.hybrid_len, "nlhybrid");
     }
 
     fn nlookup_doc_commit(&mut self, priv_lookups: Vec<Term>) {
@@ -1388,7 +1388,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // size of table (T -> mle)
         let sc_l = logmn(t_size);
-        // println!("size of table {}", sc_l);
+        println!("lookup rounds CIRC {}", sc_l);
 
         self.sum_check_circuit(lhs, sc_l, id);
 
@@ -1970,7 +1970,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 hybrid_v,
                 hybrid_running_q,
                 hybrid_running_v,
-                "hybrid",
+                "nlhybrid",
             );
             wits = w;
             next_hybrid_running_q = Some(rq);
@@ -2025,6 +2025,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let sc_l = logmn(table.len()); // sum check rounds
+        println!("WITNESS SC ROUNDS {}", sc_l);
+
         let num_vs = v.len();
         assert_eq!(num_vs, q.len());
 
@@ -2113,6 +2115,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 SpongeOp::Absorb((num_vs + sc_l + 2 + num_cqs) as u32), // doc commit, vs, combined_q, running q,v
                 SpongeOp::Squeeze(1),
             ],
+            "nlhybrid" => vec![
+                SpongeOp::Absorb((num_vs + sc_l + 2 + num_cqs) as u32), // doc commit, vs, combined_q, running q,v
+                SpongeOp::Squeeze(1),
+            ],
             _ => panic!("weird tag"),
         };
 
@@ -2125,6 +2131,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut query: Vec<F> = match id {
             "nl" => vec![],
             "nldoc" => vec![self.doc_hash.unwrap()],
+            "nlhybrid" => vec![self.doc_hash.unwrap()],
             _ => panic!("weird tag"),
         };
         for cq in combined_qs {
@@ -2167,6 +2174,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 sct.extend(vec![Integer::from(0); len]); // ep num = self.nfa.nchars()
                 sct
             }
+            "nlhybrid" => {
+                // TODO i think this is not needed
+                let base: usize = 2;
+                let len = base.pow(logmn(table.len()) as u32) - table.len();
+
+                let mut sct = table.to_vec();
+                sct.extend(vec![Integer::from(0); len]); // ep num = self.nfa.nchars()
+                sct
+            }
+
             _ => panic!("weird tag"),
         };
 
@@ -2435,6 +2452,7 @@ mod tests {
         batch_sizes: Vec<usize>,
         expected_match: bool,
         proj: Option<usize>,
+        hybrid: bool,
     ) {
         let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
@@ -2444,7 +2462,7 @@ mod tests {
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
         for b in batch_sizes {
-            let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, false, sc.clone());
+            let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, sc.clone());
             // TODO hybrid
 
             let mut reef_commit = ReefCommitment::new(r1cs_converter.udoc.clone(), &sc);
@@ -2564,6 +2582,36 @@ mod tests {
         }
     }
 
+    // TODO
+    fn proj_hybrid() {
+        init();
+
+        test_func_no_hash(
+            "abcd".to_string(),
+            "^.....c$".to_string(),
+            "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
+            vec![2],              // 2],
+            true,
+            Some(5), // (4,8)
+            true,
+        );
+    }
+
+    #[test]
+    fn hybrid() {
+        init();
+
+        test_func_no_hash(
+            "abcd".to_string(),
+            "^aabbccdd$".to_string(),
+            "aabbccdd".to_string(), // really [ aabbcc, EOF, epsilon ]
+            vec![4],                // 2],
+            true,
+            None,
+            true,
+        );
+    }
+
     #[test]
     fn projections() {
         init();
@@ -2576,6 +2624,7 @@ mod tests {
             vec![2],              // 2],
             true,
             Some(5), // (4,8)
+            false,
         );
     }
 
@@ -2589,6 +2638,7 @@ mod tests {
             vec![2], // 2],
             true,
             None,
+            false,
         );
     }
 
@@ -2602,6 +2652,7 @@ mod tests {
             vec![2], // 2],
             true,
             None,
+            false,
         );
     }
 
@@ -2615,6 +2666,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
         );
         /*    test_func_no_hash(
             "abc".to_string(),
@@ -2642,6 +2694,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
         );
         test_func_no_hash(
             "ab".to_string(),
@@ -2650,6 +2703,7 @@ mod tests {
             vec![2, 4],
             true,
             None,
+            false,
         );
         test_func_no_hash(
             "ab".to_string(),
@@ -2658,6 +2712,7 @@ mod tests {
             vec![2, 4],
             true,
             None,
+            false,
         );
     }
 
@@ -2672,6 +2727,7 @@ mod tests {
             vec![2],
             false,
             None,
+            false,
         );
     }
 
@@ -2698,6 +2754,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
         );
         /*
               test_func_no_hash(
@@ -2720,6 +2777,7 @@ mod tests {
             vec![2, 3, 4, 6, 7],
             true,
             None,
+            false,
         );
 
         /*    test_func_no_hash(
@@ -2742,6 +2800,7 @@ mod tests {
             vec![33],
             true,
             None,
+            false,
         );
 
         test_func_no_hash(
@@ -2751,6 +2810,7 @@ mod tests {
             vec![33],
             true,
             None,
+            false,
         );
     }
 
@@ -2766,6 +2826,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
         );
     }
 }
