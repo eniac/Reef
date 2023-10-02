@@ -466,7 +466,6 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     ell: usize,
     i: usize,
     sponge: &mut Sponge<F, typenum::U4>,
-    //    last_q: Vec<Integer>,
 ) -> (Integer, Integer, Integer, Integer) {
     let base: usize = 2;
     let pow: usize = base.pow((ell - i) as u32);

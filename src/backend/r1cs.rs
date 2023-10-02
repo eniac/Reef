@@ -56,10 +56,9 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub pc: PoseidonConstants<F, typenum::U4>,
     pub doc_rc_v: Option<Integer>,
     // proj
-    doc_subset: Option<(usize, usize)>,
+    pub doc_subset: Option<(usize, usize)>,
     // hybrid
-    pub hybrid: bool,
-    hybrid_len: usize,
+    pub hybrid_len: Option<usize>,
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F, char> {
@@ -408,13 +407,17 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 start -= jump;
                 jump *= 2;
             }
+
+            // proj vs hybrid calc
+            if (end < table.len()) && hybrid {
+                println!("ALERT: you are using projections and the hybrid table, and projecting a document that is already smaller than the public table and must be padded anyway. This is probably an inefficient use of either projections or the hybrid table");
+            }
             if start == 0 {
                 None
             } else {
                 println!("USING PROJECTION {:#?}", ((start, end)));
                 Some((start, end)) // handle doc extension TODO?
             }
-        // TODO proj vs hybrid calc
         } else {
             None
         };
@@ -427,7 +430,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             usize_doc.len()
         };
 
-        let hybrid_len = max(pub_len, priv_len).next_power_of_two() * 2;
+        let hybrid_len = if hybrid {
+            Some(max(pub_len, priv_len).next_power_of_two() * 2)
+        } else {
+            None
+        };
 
         assert!(batch_size > 1);
 
@@ -454,7 +461,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             pc: pcs,
             doc_rc_v: Some(Integer::from(1)), // Convert back to none later
             doc_subset,
-            hybrid,
             hybrid_len,
         }
     }
@@ -1363,7 +1369,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.cursor_circuit();
         self.last_state_accepting_circuit();
 
-        if self.hybrid {
+        if self.hybrid_len.is_some() {
             self.nlookup_hybrid(lookups, char_lookups);
         } else {
             self.nlookup_gadget(lookups, self.table.len(), "nl");
@@ -1377,7 +1383,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // TODO ordering circuit
 
         pub_lookups.append(&mut priv_lookups);
-        self.nlookup_gadget(pub_lookups, self.hybrid_len, "nlhybrid");
+        self.nlookup_gadget(pub_lookups, self.hybrid_len.unwrap(), "nlhybrid");
     }
 
     fn nlookup_doc_commit(&mut self, priv_lookups: Vec<Term>) {
@@ -1961,9 +1967,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut next_hybrid_running_q = None;
         let mut next_hybrid_running_v = None;
 
-        if self.hybrid {
+        if self.hybrid_len.is_some() {
             // pub T first, then priv D
-            let half_len = self.hybrid_len / 2;
+            let half_len = self.hybrid_len.unwrap() / 2;
 
             let mut hybrid_table = self.table.clone();
             hybrid_table.append(&mut vec![Integer::from(0); half_len - self.table.len()]);
@@ -2384,8 +2390,7 @@ mod tests {
                 None,
             );
 
-            // sanity check - TODO eliminate
-            /*
+            // sanity check
             let (_, eq_term) = prover_mle_partial_eval(
                 &claims,
                 &sc_rs, //.into_iter().rev().collect(),
@@ -2396,7 +2401,7 @@ mod tests {
             assert_eq!(
                 claim, // last claim
                 (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
-            );*/
+            );
 
             sponge.finish(acc).unwrap();
         }
@@ -2479,7 +2484,8 @@ mod tests {
             let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, sc.clone());
             // TODO hybrid
 
-            let mut reef_commit = ReefCommitment::new(r1cs_converter.udoc.clone(), &sc);
+            let mut reef_commit =
+                ReefCommitment::new(r1cs_converter.udoc.clone(), r1cs_converter.hybrid_len, &sc);
             r1cs_converter.doc_hash = Some(reef_commit.doc_commit_hash);
 
             let mut running_q: Option<Vec<Integer>> = None;
@@ -2569,7 +2575,8 @@ mod tests {
                 proj_len,
                 priv_rq,
                 priv_rv,
-                r1cs_converter.hybrid,
+                r1cs_converter.doc_subset.is_some(),
+                r1cs_converter.hybrid_len.is_some(),
             );
 
             let cap_d = consist_proof.hash_d.clone();

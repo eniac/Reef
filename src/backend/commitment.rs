@@ -62,7 +62,11 @@ pub struct ConsistencyProof {
 }
 
 impl ReefCommitment {
-    pub fn new(doc: Vec<usize>, pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>) -> Self
+    pub fn new(
+        doc: Vec<usize>,
+        hybrid_len: Option<usize>,
+        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    ) -> Self
     where
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,
@@ -90,8 +94,11 @@ impl ReefCommitment {
         let salt = <G1 as Group>::Scalar::random(&mut OsRng);
 
         // commitment to document
-        let doc_ext_len = doc.len().next_power_of_two() * 2;
-        // TODO BAD
+        let doc_ext_len = if hybrid_len.is_some() {
+            hybrid_len.unwrap() / 2
+        } else {
+            doc.len().next_power_of_two()
+        };
 
         let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
         doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
@@ -140,6 +147,7 @@ impl ReefCommitment {
         proj_doc_len: usize,
         q: Vec<Integer>, //<G1 as Group>::Scalar>,
         v: Integer,      //<G1 as Group>::Scalar,
+        proj: bool,
         hybrid: bool,
     ) -> ConsistencyProof {
         let cap_d = calc_d_clear(&self.pc, self.hash_salt, v.clone());
@@ -165,7 +173,7 @@ impl ReefCommitment {
         let q_ff = q.into_iter().map(|x| int_to_ff(x)).collect();
 
         let (ipi, ipa, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
-            self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len, hybrid);
+            self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len, proj, hybrid);
 
         // CAP circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
@@ -199,6 +207,7 @@ impl ReefCommitment {
         q: Vec<<G1 as Group>::Scalar>,
         running_v: <G1 as Group>::Scalar,
         proj_doc_len: usize,
+        proj: bool,
         hybrid: bool,
     ) -> (
         InnerProductInstance<G1>,
@@ -224,7 +233,7 @@ impl ReefCommitment {
 
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
         println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
-        let new_q = if self.doc_len != proj_doc_len {
+        let new_q = if proj {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q_hybrid);
             //println!("PROJECTIONS NEW Q {:#?}", q_add.clone());

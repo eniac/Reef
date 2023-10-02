@@ -45,6 +45,7 @@ struct ProofInfo {
     doc_len: usize,
     proj_doc_len: usize,
     num_states: usize,
+    projections: bool,
     hybrid: bool,
 }
 
@@ -127,7 +128,8 @@ pub fn run_backend(
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Commitment Generations");
-        let reef_commit = ReefCommitment::new(r1cs_converter.udoc.clone(), &sc);
+        let reef_commit =
+            ReefCommitment::new(r1cs_converter.udoc.clone(), r1cs_converter.hybrid_len, &sc);
         r1cs_converter.doc_hash = Some(reef_commit.doc_commit_hash);
         let hash_salt = reef_commit.hash_salt.clone();
 
@@ -158,7 +160,8 @@ pub fn run_backend(
                 doc_len: r1cs_converter.udoc.len(),     // real
                 proj_doc_len: r1cs_converter.doc_len(), // projected
                 num_states: r1cs_converter.num_states,
-                hybrid: r1cs_converter.hybrid,
+                projections: r1cs_converter.doc_subset.is_some(),
+                hybrid: r1cs_converter.hybrid_len.is_some(),
             })
             .unwrap();
 
@@ -591,6 +594,7 @@ fn prove_and_verify(
         proof_info.proj_doc_len,
         q,
         v,
+        proof_info.projections,
         proof_info.hybrid,
     );
 
