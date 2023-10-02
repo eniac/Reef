@@ -74,8 +74,9 @@ impl ReefCommitment {
             <G1 as Group>::Scalar::from(0),
             <G1 as Group>::Scalar::from(0),
             <G1 as Group>::Scalar::from(0),
-            false,
-            None,
+            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::from(0),
         );
 
         // produce CAP keys
@@ -90,6 +91,7 @@ impl ReefCommitment {
 
         // commitment to document
         let doc_ext_len = doc.len().next_power_of_two() * 2;
+        // TODO BAD
 
         let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
         doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
@@ -142,19 +144,24 @@ impl ReefCommitment {
         hybrid: bool,
     ) -> ConsistencyProof {
         let cap_d = calc_d_clear(&self.pc, self.hash_salt, v.clone());
+        let cap_z = vec![cap_d];
 
-        /*let cap_z = if !hybrid {
-                                                                          vec![cap_d]
-                                                                      } else {
-        */
-        // calculate t
-        let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
-        let t = verifier_mle_eval(table, q_prime);
-        println!("t = {:#?}, q0 = {:#?}", t.clone(), q[0].clone());
+        let (t, q0) = if !hybrid {
+            (
+                <G1 as Group>::Scalar::from(0),
+                <G1 as Group>::Scalar::from(1),
+            )
+        } else {
+            // calculate t
+            let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
+            let t = verifier_mle_eval(table, q_prime);
 
-        println!("TABLE COMMITMENT {:#?}", table);
-        let cap_z = vec![cap_d, int_to_ff(t), int_to_ff(q[0].clone())];
-        //                                                     };*/
+            println!("t = {:#?}, q0 = {:#?}", t.clone(), q[0].clone());
+            println!("TABLE COMMITMENT {:#?}", table);
+
+            (int_to_ff(t), int_to_ff(q[0].clone()))
+        };
+
         let v_ff = int_to_ff(v);
         let q_ff = q.into_iter().map(|x| int_to_ff(x)).collect();
 
@@ -163,7 +170,7 @@ impl ReefCommitment {
 
         // CAP circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
-            ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt, hybrid, v_prime);
+            ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt, v_prime, t, q0);
 
         let cap_res = SpartanSNARK::cap_prove(
             &self.cap_pk,
@@ -201,7 +208,7 @@ impl ReefCommitment {
         <G1 as Group>::Scalar,
         Option<Commitment<G1>>,
         Option<<G1 as Group>::Scalar>,
-        Option<<G1 as Group>::Scalar>,
+        <G1 as Group>::Scalar,
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
@@ -238,7 +245,8 @@ impl ReefCommitment {
         println!("V = {:#?}", running_v.clone());
 
         let (decommit_v_prime, commit_v_prime, v_prime) = if !hybrid {
-            (None, None, None)
+            // v' == v when not hybrid
+            (None, None, running_v.clone())
         } else {
             let mut v_prime = <G1 as Group>::Scalar::from(0);
             for i in 0..self.mle_doc.len() {
@@ -250,7 +258,7 @@ impl ReefCommitment {
             let commit_v_prime =
                 <G1 as Group>::CE::commit(&self.single_gens, &[v_prime.clone()], &decommit_v_prime);
 
-            (Some(decommit_v_prime), Some(commit_v_prime), Some(v_prime))
+            (Some(decommit_v_prime), Some(commit_v_prime), v_prime)
         };
 
         // prove
@@ -277,7 +285,7 @@ impl ReefCommitment {
             let ipw = InnerProductWitness::new(
                 &self.mle_doc,
                 &self.doc_decommit,
-                &v_prime.unwrap(),
+                &v_prime,
                 &decommit_v_prime.unwrap(),
             );
             (ipi, ipw)
@@ -312,11 +320,7 @@ impl ReefCommitment {
         assert!(self.proof_dot_prod_verify(&proof.ipi, proof.ipa).is_ok());
 
         // cap verify
-        let z_0 = vec![proof.hash_d, t.unwrap(), q_0.unwrap()]; /* if t.is_none() || q_0.is_none() {
-                                                                    vec![proof.hash_d]
-                                                                } else {
-                                                                    vec![proof.hash_d, t.unwrap(), q_0.unwrap()]
-                                                                };*/
+        let z_0 = vec![proof.hash_d];
         let z_out = proof.circuit.output(&z_0);
         let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
         println!("IO {:#?}", io.clone());
@@ -490,8 +494,9 @@ pub struct ConsistencyCircuit<F: PrimeField> {
     d: F,
     v: F,
     s: F,
-    hybrid: bool,
-    v_prime: Option<F>,
+    v_prime: F,
+    t: F,
+    q0: F,
 }
 
 impl<F: PrimeField> ConsistencyCircuit<F> {
@@ -500,18 +505,18 @@ impl<F: PrimeField> ConsistencyCircuit<F> {
         d: F,
         v: F,
         s: F,
-        hybrid: bool,
-        v_prime: Option<F>,
+        v_prime: F,
+        t: F,
+        q0: F,
     ) -> Self {
-        assert!((hybrid && v_prime.is_some()) || (!hybrid && v_prime.is_none()));
-
         ConsistencyCircuit {
             pc: pc.clone(),
             d,
             v,
             s,
-            hybrid,
             v_prime,
+            t,
+            q0,
         }
     }
 }
@@ -521,12 +526,7 @@ where
     F: PrimeField,
 {
     fn arity(&self) -> usize {
-        /*if self.hybrid {
-            3
-        } else {
-            1
-        }*/
-        3
+        1
     }
 
     fn output(&self, z: &[F]) -> Vec<F> {
@@ -576,39 +576,42 @@ where
         };
 
         // sanity
-        /*        if d_calc.get_value().is_some() {
+        if d_calc.get_value().is_some() {
             assert_eq!(d_in.get_value().unwrap(), d_calc.get_value().unwrap());
         }
 
-                cs.enforce(
-                    || "d == d",
-                    |z| z + d_in.get_variable(),
-                    |z| z + CS::one(),
-                    |z| z + d_calc.get_variable(),
-                );
-        */
-        // for hybrid only
-        /* if self.hybrid {
-            let t = z[1].clone();
-            let q_0 = z[2].clone();
-            /*
-                // v = t + v_prime * q[0]
-                let alloc_v_prime =
-                    AllocatedNum::alloc(cs.namespace(|| "v_prime"), || Ok(self.v_prime.unwrap()))?;
+        cs.enforce(
+            || "d == d",
+            |z| z + d_in.get_variable(),
+            |z| z + CS::one(),
+            |z| z + d_calc.get_variable(),
+        );
 
-                cs.enforce(
-                    || "v_prime * q[0] = v - t",
-                    |z| z + alloc_v_prime.get_variable(),
-                    |z| z + q_0.get_variable(),
-                    |z| z + alloc_v.get_variable() - t.get_variable(),
-                );
-            */
-            Ok(vec![d_calc, t, q_0]) // doesn't hugely matter
-        } else {
-            Ok(vec![d_calc])
-        }*/
+        // for hybrid
 
-        Ok(vec![d_calc])
+        let alloc_v_prime = AllocatedNum::alloc(cs.namespace(|| "v_prime"), || Ok(self.v_prime))?;
+        let alloc_t = AllocatedNum::alloc(cs.namespace(|| "table eval"), || Ok(self.t))?;
+        let alloc_q0 = AllocatedNum::alloc(cs.namespace(|| "q[0]"), || Ok(self.q0))?;
+
+        let alloc_tq = AllocatedNum::alloc(cs.namespace(|| "t * (1-q0)"), || {
+            Ok(self.t * (F::from(1) - self.q0))
+        })?;
+
+        cs.enforce(
+            || "t * (1-q[0]) = tq",
+            |z| z + alloc_t.get_variable(),
+            |z| z + CS::one() - alloc_q0.get_variable(),
+            |z| z + alloc_tq.get_variable(),
+        );
+
+        cs.enforce(
+            || "v' * q[0] = v - tq",
+            |z| z + alloc_v_prime.get_variable(),
+            |z| z + alloc_q0.get_variable(),
+            |z| z + alloc_v.get_variable() - alloc_tq.get_variable(),
+        );
+
+        Ok(vec![d_calc]) // doesn't hugely matter
     }
 
     fn get_counter_type(&self) -> StepCounterType {
