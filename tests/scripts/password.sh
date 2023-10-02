@@ -1,6 +1,7 @@
 #reef
 cargo clean 
 cargo build --release --features 'metrics,reef'
+echo 'reef'
 ./target/release/reef --input "B6u$r@s#R5mE" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
 ./target/release/reef --input "!73!v3JAhZP%" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
 ./target/release/reef --input "ZH&74d5#AqJ7" --output ./tests/results/good_pass.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
@@ -26,6 +27,7 @@ cargo build --release --features 'metrics,reef'
 #nwr
 cargo clean 
 cargo build --release --features 'metrics,nwr'
+echo 'nwr'
 ./target/release/reef --input "B6u$r@s#R5mE" --output ./tests/results/good_pass_nwr.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
 ./target/release/reef --input "!73!v3JAhZP%" --output ./tests/results/good_pass_nwr.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
 ./target/release/reef --input "ZH&74d5#AqJ7" --output ./tests/results/good_pass_nwr.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
@@ -51,6 +53,7 @@ cargo build --release --features 'metrics,nwr'
 #naive
 cargo clean 
 cargo build --release --features 'metrics,naive'
+echo 'naive'
 ./target/release/reef --input "B6u$r@s#R5mE" --output ./tests/results/good_pass_naive.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
 ./target/release/reef --input "!73!v3JAhZP%" --output ./tests/results/good_pass_naive.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii
 ./target/release/reef --input "ZH&74d5#AqJ7" --output ./tests/results/good_pass_naive.txt --re "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$" ascii

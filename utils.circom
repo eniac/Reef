@@ -116,10 +116,10 @@ template IsZero() {
     in*out === 0;
 }
 function rootsTrans(i) {
-	var roots[12] = [407,402,411,414,392,423,396,435,389,419,426,431];
+	var roots[24] = [870,801,885,777,816,958,843,832,810,924,784,910,934,966,900,919,852,948,792,825,942,876,894,862];
 	return roots[i];
     }
 function rootsMatch(i) {
-	var roots[3] = [2,1,3];
+	var roots[5] = [7,3,6,5,4];
 	return roots[i];
     }

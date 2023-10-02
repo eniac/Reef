@@ -54,6 +54,7 @@ pub fn get_folded_cost(circuit_size: usize, n_foldings: usize) -> usize {
 }
 
 pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
+    println!("nwr");
     println!("doc len: {}",doc.len());
     println!("{}",r);
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();
@@ -137,13 +138,9 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         gen_hash(vec![F::<G1>::from(prover_states[0] as u64)], &pc),
     ];
 
-    println!("pub inputs: {:#?}",start_public_input);
-    print!("cur_state: {:#?}",F::<G1>::from(prover_states[0] as u64));
-
     let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
 
-    for i in 0..1{
-    //doc_len {
+    for i in 0..doc_len {
         let mut private_input = HashMap::new();
         private_input.insert("cur_state".to_string(), json!(prover_states[i]));
         private_input.insert("next_state".to_string(), json!(prover_states[i+1]));
@@ -197,11 +194,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let z0_secondary = [<G2 as Group>::Scalar::zero()];
 
-    // // verify the recursive SNARK
-    // println!("Verifying a RecursiveSNARK...");
-    // let res = recursive_snark.verify(&pp, doc_len, start_public_input.to_vec(), z0_secondary.to_vec());
-    // assert!(res.is_ok());
-
     // produce a compressed SNARK
     println!("Generating a CompressedSNARK using Spartan with IPA-PC...");
     type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
@@ -211,10 +203,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::tic(Component::Prover, "Prove","Prove Compressed");
 
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
-    println!(
-        "CompressedSNARK::prove: {:?}",
-        res.is_ok(),
-    );
+
     #[cfg(feature = "metrics")]
     log::stop(Component::Prover, "Prove","Prove Compressed");
 
@@ -239,7 +228,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!(
         "CompressedSNARK::verify: {:?}",
-        res.is_ok(),
+        res,
     );
     assert!(res.is_ok());
 
@@ -289,11 +278,11 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
 #[test]
 fn test_1() {
-    let r  = "a";
+    let r  = "abc";
     //"Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text\/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00".to_string();
     //let abvec: Vec<char> = (0..256).filter_map(std::char::from_u32).collect();
     let ab: String = "abc".to_string();
     //let ab = abvec.iter().collect();
-    let doc = "a".to_owned();
+    let doc = "abc".to_owned();
     naive_bench(r.to_string(),ab, doc, PathBuf::from("out_test"));
 }

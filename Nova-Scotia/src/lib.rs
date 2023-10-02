@@ -196,6 +196,7 @@ where
 
     for i in 0..iteration_count {
         log::tic(Component::Solver, "Witness", format!("Compute_{}",i).as_str());
+        
         let witness = compute_witness::<G1, G2>(
             current_public_input.clone(),
             private_inputs[i].clone(),
@@ -210,6 +211,7 @@ where
         };
 
         let current_public_output = circuit.get_public_outputs();
+
         current_public_input = current_public_output
             .iter()
             .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())

@@ -45,6 +45,7 @@ use std::{collections::HashMap};
 use metrics::metrics::{log, log::Component};
 
 pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
+    println!("naive");
     println!("doc len: {}",doc.len());
     println!("{}",r);
     let doc_vec: Vec<u32> = doc.chars().map(|x| x as u32).collect();

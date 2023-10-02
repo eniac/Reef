@@ -1,6 +1,7 @@
 #reef
 cargo clean
 cargo build --release --features 'metrics, reef'
+echo 'reef'
 ./target/release/reef --input ./tests/docs/date_100B --output ./tests/results/zombie.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
 ./target/release/reef --input ./tests/docs/date_2000B --output ./tests/results/zombie.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
 ./target/release/reef --input ./tests/docs/DLP_100B --output ./tests/results/zombie.txt --re "(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))" ascii
@@ -15,6 +16,7 @@ cargo build --release --features 'metrics, reef'
 #nwr
 cargo clean
 cargo build --release --features 'metrics, nwr'
+echo 'nwr'
 ./target/release/reef --input ./tests/docs/date_100B --output ./tests/results/zombie_nwr.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
 ./target/release/reef --input ./tests/docs/date_2000B --output ./tests/results/zombie_nwr.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
 ./target/release/reef --input ./tests/docs/DLP_100B --output ./tests/results/zombie_nwr.txt --re "(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))" ascii
@@ -29,6 +31,7 @@ cargo build --release --features 'metrics, nwr'
 #naive
 cargo clean
 cargo build --release --features 'metrics, naive'
+echo 'naive'
 ./target/release/reef --input ./tests/docs/date_100B --output ./tests/results/zombie_naive.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
 ./target/release/reef --input ./tests/docs/date_2000B --output ./tests/results/zombie_naive.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
 ./target/release/reef --input ./tests/docs/DLP_100B --output ./tests/results/zombie_naive.txt --re "(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))" ascii

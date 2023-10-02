@@ -7,9 +7,9 @@ pragma circom 2.0.3;
         signal input curIndex;
         signal output out;
     
-        component runningProduct = MultiplierN(12);
+        component runningProduct = MultiplierN(24);
 
-        for (var i = 0; i < 12; i++) {
+        for (var i = 0; i < 24; i++) {
             runningProduct.in[i] <== rootsTrans(i) - curIndex;
         }
         out <== runningProduct.out;
@@ -21,9 +21,9 @@ pragma circom 2.0.3;
         
         component isZero = IsZero();
 
-        component runningProduct = MultiplierN(3);
+        component runningProduct = MultiplierN(5);
     
-        for (var i = 0; i < 3; i++) {
+        for (var i = 0; i < 5; i++) {
             runningProduct.in[i] <== rootsMatch(i) - in;
         }
         isZero.in <== runningProduct.out;
@@ -61,7 +61,7 @@ pragma circom 2.0.3;
         component valid_state;
         
         valid_state = IsValidTrans();
-        valid_state.curIndex <== cur_state*4*3 + char*4 + next_state;
+        valid_state.curIndex <== cur_state*8*3 + char*8 + next_state;
         valid_state.out === 0;
 
         cur_state*indexIsZero.out === 0;
