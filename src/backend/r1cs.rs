@@ -2200,16 +2200,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 sct.extend(vec![Integer::from(0); len]); // ep num = self.nfa.nchars()
                 sct
             }
-            "nlhybrid" => {
-                // TODO i think this is not needed
-                let base: usize = 2;
-                let len = base.pow(logmn(table.len()) as u32) - table.len();
-
-                let mut sct = table.to_vec();
-                sct.extend(vec![Integer::from(0); len]); // ep num = self.nfa.nchars()
-                sct
-            }
-
+            "nlhybrid" => table.to_vec(),
             _ => panic!("weird tag"),
         };
 

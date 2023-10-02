@@ -99,7 +99,6 @@ impl ReefCommitment {
         println!("DOC COMMITMENT {:#?}", doc_ext.clone());
         let mle = mle_from_pts(doc_ext);
 
-        //let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", mle.len()); // n is dimension
         let single_gen = cap_pk.pk.gens.get_scalar_gen();
         let vector_gen = CommitmentGens::<G1>::new_with_blinding_gen(
             b"vector_gen_doc",
@@ -225,15 +224,14 @@ impl ReefCommitment {
 
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
         println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
-        let new_q = q_hybrid;
-        /*if self.doc_len != proj_doc_len {
+        let new_q = if self.doc_len != proj_doc_len {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q_hybrid);
             //println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
             q_add
         } else {
             q_hybrid
-        };*/
+        };
 
         let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
         let running_q = q_to_mle_q(&q_rev, self.doc_len);
