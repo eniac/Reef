@@ -123,6 +123,7 @@ pub fn run_backend(
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
         let proj = if projections { safa.projection() } else { None };
+        println!("hybrid: {}",hybrid);
         let mut r1cs_converter = R1CS::new(&safa, &doc, batch_size, proj, hybrid, sc.clone());
 
         #[cfg(feature = "metrics")]

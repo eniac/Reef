@@ -54,7 +54,7 @@ fn main() {
         
         let r = re::simpl(re::new(&opt.re));
         println!("make r");
-        //    println!("REGEX: {:#?}", r));
+        println!("REGEX: {:#?}", r);
 
         // Compile regex to SAFA
         let safa = if opt.negate {

@@ -110,7 +110,7 @@ impl ReefCommitment {
         let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
         doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
 
-        println!("DOC COMMITMENT {:#?}", doc_ext.clone());
+        // println!("DOC COMMITMENT {:#?}", doc_ext.clone());
         let mle = mle_from_pts(doc_ext);
 
         let single_gen = cap_pk.pk.gens.get_scalar_gen();
