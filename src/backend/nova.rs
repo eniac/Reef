@@ -82,12 +82,13 @@ pub enum GlueOpts<F: PrimeField> {
 pub struct NFAStepCircuit<F: PrimeField> {
     r1cs: R1csFinal, // TODO later ref
     values: Option<Vec<Value>>,
+    pub pc: PoseidonConstants<F, typenum::U4>,
+    states: Vec<F>,
+    cursors: Vec<F>,
+    glue: Vec<GlueOpts<F>>,
     batch_size: usize,
     max_branches: usize,
-    states: Vec<F>,
-    glue: Vec<GlueOpts<F>>,
     pub commit_blind: F,
-    pub pc: PoseidonConstants<F, typenum::U4>,
     pub claim_blind: F,
 }
 
@@ -97,15 +98,17 @@ impl<F: PrimeField> NFAStepCircuit<F> {
     pub fn new(
         r1cs: R1csFinal,
         values: Option<Vec<Value>>,
+        pc: PoseidonConstants<F, typenum::U4>,
         states: Vec<F>,
+        cursors: Vec<F>,
         glue: Vec<GlueOpts<F>>,
-        commit_blind: F,
         batch_size: usize,
         max_branches: usize,
-        pcs: PoseidonConstants<F, typenum::U4>,
+        commit_blind: F,
         claim_blind: F,
     ) -> Self {
         assert_eq!(states.len(), 2);
+        assert_eq!(cursors.len(), 2);
         assert_eq!(glue.len(), 2);
 
         // todo blind, first checking here
@@ -117,16 +120,19 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             }
         }
 
+        println!("wits {:#?}", values);
+
         NFAStepCircuit {
-            r1cs: r1cs,
-            values: values,
-            batch_size: batch_size,
-            max_branches: max_branches,
-            states: states,
-            glue: glue,
-            commit_blind: commit_blind,
-            pc: pcs,
-            claim_blind: claim_blind,
+            r1cs,
+            values,
+            pc,
+            states,
+            cursors,
+            glue,
+            batch_size,
+            max_branches,
+            commit_blind,
+            claim_blind,
         }
     }
 
@@ -202,6 +208,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         var: Var,
         stack_in: &Vec<AllocatedNum<F>>,
         stack_ptr_0: &AllocatedNum<F>,
+        cursor_0: &AllocatedNum<F>,
         max_stack: usize,
     ) -> Result<bool, SynthesisError> {
         if s.starts_with(&format!("stack_ptr_{}_{}", 0, max_stack - 1)) {
@@ -215,6 +222,10 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             vars.insert(var, stack_in[j].get_variable());
 
             return Ok(true);
+        } else if s.starts_with(&format!("cursor_0")) {
+            vars.insert(var, cursor_0.get_variable());
+
+            return Ok(true);
         }
         return Ok(false);
     }
@@ -225,6 +236,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         alloc_v: &AllocatedNum<F>,
         alloc_stack_ptr_popped: &mut Option<AllocatedNum<F>>,
         alloc_stack_out: &mut Vec<Option<AllocatedNum<F>>>,
+        last_cursor: &mut Option<AllocatedNum<F>>,
     ) -> Result<bool, SynthesisError>
 where {
         if s.starts_with(&format!("stack_ptr_popped")) {
@@ -235,6 +247,11 @@ where {
             let j: usize = s_sub[2].parse().unwrap();
             alloc_stack_out[j] = Some(alloc_v.clone());
 
+            return Ok(true);
+        } else if s.starts_with(&format!("cursor_")) {
+            //, self.batch_size)) {
+            println!("CURSOR {:#?}", s);
+            *last_cursor = Some(alloc_v.clone());
             return Ok(true);
         }
         Ok(false)
@@ -248,6 +265,7 @@ where {
     ) -> Result<(), SynthesisError>
 where {
         if s.starts_with(&format!("state_{}", self.batch_size)) {
+            println!("LAST STATE");
             *last_state = Some(alloc_v.clone()); //.get_variable();
         }
         Ok(())
@@ -560,7 +578,7 @@ where
         // [state, optional<q,v for eval claim>, optional<q,"v"(hash), for doc claim>,
         // optional<q, "v"(hash) for hybrid claim>, stack_ptr, <stack>]
 
-        let mut arity = 1;
+        let mut arity = 2;
         match &self.glue[0] {
             GlueOpts::Split((q, _, dq, _, _, stack)) => {
                 arity += q.len() + 1 + dq.len() + 1;
@@ -619,6 +637,7 @@ where
                 }
             }
         }
+        assert_eq!(z[i], self.cursors[0]);
 
         let mut out = vec![
             self.states[1], // "next state"
@@ -639,6 +658,7 @@ where
                 out.extend(stack.clone());
             }
         }
+        out.push(self.cursors[1]);
         out
     }
 
@@ -662,6 +682,7 @@ where
 
         // ouputs
         let mut last_state = None;
+        let mut last_cursor = None;
         let mut out = vec![];
 
         // convert
@@ -705,6 +726,7 @@ where
 
                 let stack_ptr_0 = z[sc_l + doc_l + 3].clone();
                 let stack_in = z[(sc_l + doc_l + 4)..(sc_l + doc_l + 4 + stack_len)].to_vec();
+                let cursor_0 = z[sc_l + doc_l + 4 + stack_len].clone();
 
                 let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
                 let mut alloc_qs = vec![None; num_cqs];
@@ -716,6 +738,7 @@ where
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
+                    //println!("S {:#?}", s);
 
                     let val_f = || {
                         Ok({
@@ -773,6 +796,7 @@ where
                                 var,
                                 &stack_in,
                                 &stack_ptr_0,
+                                &cursor_0,
                                 stack_len,
                             )
                             .unwrap();
@@ -788,6 +812,7 @@ where
                                 &alloc_v,
                                 &mut alloc_stack_ptr_popped,
                                 &mut alloc_stack_out,
+                                &mut last_cursor,
                             )
                             .unwrap();
                         if !matched {
@@ -877,7 +902,7 @@ where
                     self.hiding_running_claim(cs, &alloc_doc_rc[doc_l].clone().unwrap())?;
                 alloc_doc_rc[doc_l] = Some(hidden_rc);
 
-                out.push(last_state.clone().unwrap());
+                out.push(last_state.unwrap());
                 for qv in alloc_rc {
                     out.push(qv.unwrap());
                 }
@@ -888,6 +913,7 @@ where
                 for si in alloc_stack_out {
                     out.push(si.unwrap());
                 }
+                out.push(last_cursor.unwrap());
             }
             GlueOpts::Hybrid((hq, hv, sp, stack)) => {
                 let hyb_l = hq.len();
@@ -907,6 +933,7 @@ where
 
                 let stack_ptr_0 = z[hyb_l + 2].clone();
                 let stack_in = z[(hyb_l + 3)..(hyb_l + 3 + stack_len)].to_vec();
+                let cursor_0 = z[hyb_l + 3 + stack_len].clone();
 
                 let num_cqs = ((self.batch_size * 2 * hyb_l) as f64 / 254.0).ceil() as usize;
                 let mut alloc_qs = vec![None; num_cqs];
@@ -956,6 +983,7 @@ where
                                 var,
                                 &stack_in,
                                 &stack_ptr_0,
+                                &cursor_0,
                                 stack_len,
                             )
                             .unwrap();
@@ -971,6 +999,7 @@ where
                                 &alloc_v,
                                 &mut alloc_stack_ptr_popped,
                                 &mut alloc_stack_out,
+                                &mut last_cursor,
                             )
                             .unwrap();
                         if !matched {
@@ -1021,7 +1050,7 @@ where
                 let hidden_rc = self.hiding_running_claim(cs, &alloc_rc[hyb_l].clone().unwrap())?;
                 alloc_rc[hyb_l] = Some(hidden_rc);
 
-                out.push(last_state.clone().unwrap());
+                out.push(last_state.unwrap());
                 for qv in alloc_rc {
                     out.push(qv.unwrap());
                 }
@@ -1029,6 +1058,7 @@ where
                 for si in alloc_stack_out {
                     out.push(si.unwrap());
                 }
+                out.push(last_cursor.unwrap());
             }
         }
 

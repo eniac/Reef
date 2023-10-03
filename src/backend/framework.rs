@@ -252,16 +252,20 @@ fn setup<'a>(
 
     z.push(<G1 as Group>::Scalar::from(0 as u64));
     z.append(&mut vec![<G1 as Group>::Scalar::from(0); stack_len]);
+    z.push(<G1 as Group>::Scalar::from(0 as u64));
+
+    println!("Z LEN {:#?}", z.len());
 
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
         circ_data.r1cs.clone(),
         None,
+        r1cs_converter.pc.clone(),
+        vec![<G1 as Group>::Scalar::from(0); 2],
         vec![<G1 as Group>::Scalar::from(0); 2],
         empty_glue,
-        <G1 as Group>::Scalar::from(0),
         r1cs_converter.batch_size,
         r1cs_converter.max_branches,
-        r1cs_converter.pc.clone(),
+        <G1 as Group>::Scalar::from(0),
         <G1 as Group>::Scalar::from(0),
     );
 
@@ -336,8 +340,8 @@ fn solve<'a>(
     let mut next_hybrid_running_q: Option<Vec<Integer>>;
     let mut next_hybrid_running_v: Option<Integer>;
 
-    let mut prev_cursor_0 = 0;
-    let mut next_cursor_0;
+    let mut prev_cursor = 0;
+    let mut next_cursor;
     let mut stack_ptr_0 = 0;
     let mut stack_ptr_popped;
     let mut stack_in = vec![0; r1cs_converter.max_stack];
@@ -371,7 +375,7 @@ fn solve<'a>(
             next_doc_running_v,
             next_hybrid_running_q,
             next_hybrid_running_v,
-            next_cursor_0,
+            next_cursor,
         ) = r1cs_converter.gen_wit_i(
             &mut sols,
             i,
@@ -382,7 +386,7 @@ fn solve<'a>(
             doc_running_v.clone(),
             hybrid_running_q.clone(),
             hybrid_running_v.clone(),
-            prev_cursor_0.clone(),
+            prev_cursor.clone(),
         );
         stack_ptr_popped = r1cs_converter.stack_ptr;
         stack_out = vec![];
@@ -500,15 +504,19 @@ fn solve<'a>(
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             circ_data.r1cs.clone(),
             values,
+            r1cs_converter.pc.clone(),
             vec![
                 <G1 as Group>::Scalar::from(current_state as u64),
                 <G1 as Group>::Scalar::from(next_state as u64),
             ],
+            vec![
+                <G1 as Group>::Scalar::from(prev_cursor as u64),
+                <G1 as Group>::Scalar::from(next_cursor as u64),
+            ],
             glue,
-            commit_blind,
             r1cs_converter.batch_size,
             r1cs_converter.max_branches,
-            r1cs_converter.pc.clone(),
+            commit_blind,
             claim_blind,
         );
 
@@ -525,7 +533,7 @@ fn solve<'a>(
         doc_running_v = next_doc_running_v;
         hybrid_running_q = next_hybrid_running_q;
         hybrid_running_v = next_hybrid_running_v;
-        prev_cursor_0 = next_cursor_0;
+        prev_cursor = next_cursor;
         stack_ptr_0 = stack_ptr_popped;
         stack_in = stack_out;
         i += 1

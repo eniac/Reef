@@ -946,6 +946,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
             self.assertions.push(cursor_plus);
+            self.pub_inputs.push(new_var(format!("cursor_{}", j)));
 
             let bit_limit = logmn(self.udoc.len());
             let cur_overflow = term(
@@ -1082,6 +1083,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 self.assertions.push(branch_or_not);
             */
         }
+        self.pub_inputs
+            .push(new_var(format!("cursor_{}", self.batch_size)));
     }
 
     // for use at the end of sum check
