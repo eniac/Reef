@@ -2644,7 +2644,7 @@ mod tests {
         }
     }
 
-    // #[test]
+    #[test]
     fn proj_hybrid() {
         init();
 
