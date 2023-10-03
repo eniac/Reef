@@ -83,42 +83,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // generate T
         let num_states = safa.g.node_count();
         let num_chars = num_ab.len();
-        let mut max_offsets = 1;
-        let mut max_branches = 1;
-        for (in_state, edge, _) in safa.deltas() {
-            match edge {
-                Either(Err(openset)) => {
-                    if openset.is_single().is_none() && !openset.is_full() {
-                        // ranges
-                        let mut num_offsets = 0;
-                        let mut iter = openset.0.iter();
-                        if let Some(r) = iter.next() {
-                            if r.end.is_some() {
-                                num_offsets += r.end.unwrap() - r.start;
-                            }
-                        }
-                        max_offsets = max(max_offsets, num_offsets);
-                    }
-                }
-                _ => {}
-            }
-
-            if in_state.is_and() {
-                let and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
-                    .g
-                    .edges(in_state.inner)
-                    .filter(|e| e.source() != e.target())
-                    .collect();
-
-                if and_edges.len() > max_branches {
-                    max_branches = and_edges.len();
-                }
-            }
-        }
-
+        let max_offsets = safa.max_skip_offset();
+        let max_branches = safa.max_forall_fanout().max(1);
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        //safa.write_pdf("safa1").unwrap();
+        // safa.write_pdf("safa1").unwrap();
         /*
                 println!(
                     "STATES {:#?}",
@@ -135,22 +104,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut max_rel = 1;
         let mut path_len = 0;
         let mut paths = vec![];
-        let deltas = safa
-            .g
-            .node_indices()
-            .flat_map(|n| {
-                safa.g.edges(n).filter_map(|e| {
-                    // Filter out sink state transitions
-                    if safa.is_sink(e.source()) || safa.is_sink(e.target()) {
-                        None
-                    } else if safa.g[e.source()].is_and() {
-                        Some((e.source(), e.weight().clone(), e.target()))
-                    } else {
-                        Some((e.source(), e.weight().clone(), e.target()))
-                    }
-                })
-            })
-            .collect();
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             //println!("PROCESS STATE {:#?}", all_state);
@@ -286,7 +239,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 let sub_max_rel = normal_add_table(
                     &safa,
-                    &deltas,
                     &mut num_ab,
                     &mut set_table,
                     num_states,
@@ -312,7 +264,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let sub_max_rel = normal_add_table(
             &safa,
-            &deltas,
             &mut num_ab,
             &mut set_table,
             num_states,

@@ -155,7 +155,7 @@ pub fn naive_cost_model_nohash<'a>(
     commit_type: JCommit,
 ) -> usize {
     // vanishing poly - m * n multiplications + 2 for lookup
-    let mut cost = nfa.deltas().len() - 1;
+    let mut cost = nfa.num_edges() - 1;
     cost *= batch_size;
 
     cost += accepting_circuit(nfa, is_match);
@@ -172,7 +172,7 @@ pub fn nlookup_cost_model_nohash<'a>(
     doc_len: usize,
     commit_type: JCommit,
 ) -> usize {
-    let mn: usize = nfa.deltas().len();
+    let mn: usize = nfa.num_edges();
     let log_mn: usize = logmn(mn);
     let mut cost: usize = 0;
 
@@ -216,7 +216,7 @@ pub fn nlookup_cost_model_hash<'a>(
     doc_len: usize,
     commit_type: JCommit,
 ) -> usize {
-    let mn: usize = nfa.deltas().len();
+    let mn: usize = nfa.num_edges();
     let log_mn: usize = logmn(mn);
     let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
     let mut cost = nlookup_cost_model_nohash(nfa, batch_size, is_match, doc_len, commit_type);
