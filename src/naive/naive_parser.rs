@@ -3,12 +3,15 @@
 use regex_syntax::hir::Hir;
 use regex_syntax::hir::HirKind::{Alternation, Class, Concat, Group, Literal, Repetition};
 use regex_syntax::hir::Literal::Unicode;
-use regex_syntax::hir::RepetitionKind::{OneOrMore, ZeroOrMore};
+use regex_syntax::hir::RepetitionKind::{OneOrMore, ZeroOrMore,ZeroOrOne,Range};
+use regex_syntax::hir::RepetitionRange::{Exactly,Bounded, AtLeast};
 use regex_syntax::Parser;
-
+use crate::openset::*;
 
 pub mod re {
     use hashconsing::{consign, HConsed, HashConsign};
+    use crate::openset::{OpenSet, OpenRange};
+    use crate::regex::re as ReefRE;
 
     pub type Regex = HConsed<RegexF>;
 
@@ -29,7 +32,7 @@ pub mod re {
         let G = consign(10) for RegexF ;
     }
 
-    use core::fmt;
+    use core::{fmt, panic};
     use core::fmt::Formatter;
 
     impl fmt::Display for RegexF {
@@ -102,41 +105,46 @@ pub mod re {
             _ => G.mk(RegexF::Not(a)),
         }
     }
-}
 
-use re::Regex;
-
-/// Parser based on crate regex-syntax
-fn to_regex<'a>(h: &'a Hir, ab: &'a str) -> Regex {
-    match h.kind() {
-        Concat(l) => l
-            .iter()
-            .map(|a| to_regex(&a, ab))
-            .reduce(re::app)
-            .unwrap_or(re::nil()),
-        Alternation(l) => l
-            .iter()
-            .map(|a| to_regex(&a, ab))
-            .reduce(re::alt)
-            .unwrap_or(re::empty()),
-        Repetition(r) => {
-            let inner = to_regex(&r.hir, ab);
-            match r.kind {
-                OneOrMore => re::app(inner.clone(), re::star(inner)),
-                ZeroOrMore => re::star(inner),
-                _ => panic!("Supported repetition operators [+,*]: {:?}", r),
-            }
+    pub fn repeat(a:Regex, i: usize) -> Regex {
+        if i == 0 {
+            nil()
+        } else {
+            app(a.clone(),repeat(a.clone(),i-1))
         }
-        Group(g) => to_regex(&g.hir, ab),
-        Class(_) => re::dot(),
-        Literal(Unicode(c)) => re::character(*c),
-        _ => panic!("Unsupported regex {:?}", h),
     }
-}
 
-pub fn regex_parser<'a>(r: &'a str, ab: &'a str) -> Regex {
-    match Parser::new().parse(r) {
-        Ok(hir) => to_regex(&hir, &ab),
-        Err(e) => panic!("Error parsing regexp {}", e),
+    pub fn range(a:Regex, i: usize, j:usize) -> Regex {
+        if i == j {
+            repeat(a, i)
+        } else if i < j {
+            alt(repeat(a.clone(), i),range(a.clone(), i+1, j))
+        } else {
+            panic!("bad bounds")
+        }
+    }
+
+    pub fn translate(r: &ReefRE::Regex, ab: &str)-> Regex {
+        match r.get() {
+            ReefRE::RegexF::Nil => nil(),
+            ReefRE::RegexF::Dot => dot(),
+            ReefRE::RegexF::CharClass(c) => {
+                let mut acc = empty();
+                let mut alphaAsOR = OpenSet::empty();
+                for c in ab.chars() { 
+                    alphaAsOR.insert(&OpenRange::closed(c,c));
+                }
+                
+                for ch in alphaAsOR.intersection(c) {
+                    acc = alt(acc, character(ch));
+                } 
+               acc
+            },
+            ReefRE::RegexF::App(x, y) => app(translate(&x, ab), translate(&y, ab)),
+            ReefRE::RegexF::Alt(x, y) => alt(translate(&x, ab), translate(&y, ab)),
+            ReefRE::RegexF::Star(a) => star(translate(&a,ab)),
+            ReefRE::RegexF::Range(a, i, j) => range(translate(&a, ab),*i,*j),
+            ReefRE::RegexF::And(a, b) => panic!("no and"),
+        }
     }
 }

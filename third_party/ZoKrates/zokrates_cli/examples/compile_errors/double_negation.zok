@@ -1,4 +1,0 @@
-def main() {
-    field a = - - 1;
-    return;
-}

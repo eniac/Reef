@@ -333,7 +333,7 @@ impl Encoder<char, char> for BasicEnglishEncoder {
         let numbers = '0'..='9';
         let mut whitespace = vec![' ', '\n'];
         let mut symbols = vec![
-            ',', '.', '!', '?', ';', ':', '-', '\'', '"', '$', '&', '*', '+', '@',
+            ',', '.', '!', '?', ';', ':', '-', '\'', '"', '$', '&', '*', '+', '@','\\'
         ];
         let mut v: Vec<char> = (lower.chain(upper).chain(numbers)).collect();
         v.append(&mut symbols);

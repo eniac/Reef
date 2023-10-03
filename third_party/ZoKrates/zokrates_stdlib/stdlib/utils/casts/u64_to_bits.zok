@@ -1,5 +1,0 @@
-from "EMBED" import u64_to_bits;
-
-def main(u64 a) -> bool[64] {
-    return u64_to_bits(a);
-}

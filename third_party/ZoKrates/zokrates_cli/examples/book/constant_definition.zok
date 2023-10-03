@@ -1,5 +1,0 @@
-const field PRIME = 31;
-
-def main() -> field {
-    return PRIME;
-}

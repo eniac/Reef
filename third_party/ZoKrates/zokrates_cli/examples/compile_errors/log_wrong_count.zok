@@ -1,4 +1,0 @@
-def main() {
-    log("{} {}", 1f);
-    return;
-}

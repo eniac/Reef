@@ -1,5 +1,0 @@
-// `a < b` should be flattened a single time, even if 1000 elements are assigned conditionally
-
-def main(field a, field b) -> field[1000] {
-    return a < b ? [0f; 1000] : [1; 1000];
-}

@@ -1,4 +1,0 @@
-def main(field x) {
-    field y = 1 / x;
-    return;
-}

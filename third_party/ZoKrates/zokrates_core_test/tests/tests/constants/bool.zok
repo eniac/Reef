@@ -1,5 +1,0 @@
-const bool BOOLEAN = true;
-
-def main() -> bool {
-    return BOOLEAN;
-}

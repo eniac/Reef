@@ -1,9 +1,0 @@
-def foo() -> field {
-    return 1;
-}
-
-def main() {
-    assert(foo() + (1 + 44*3) == 134);
-    return;
-}
-

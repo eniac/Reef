@@ -1,8 +1,0 @@
-#[test]
-#[allow(non_snake_case)]
-fn {test_name}() {{
-    use zokrates_test::test_inner;
-
-    test_inner("{test_path}")
-}}
-

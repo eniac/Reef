@@ -1,4 +1,0 @@
-def main(field x) {
-    assert(x < 2);
-    return;
-}

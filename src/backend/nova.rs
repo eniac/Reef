@@ -39,7 +39,7 @@ pub fn int_to_ff<F: PrimeField>(i: Integer) -> F {
 
 /// Convert one our our linear combinations to a bellman linear combination.
 /// Takes a zero linear combination. We could build it locally, but bellman provides one, so...
-fn lc_to_bellman<F: PrimeField, CS: ConstraintSystem<F>>(
+pub fn lc_to_bellman<F: PrimeField, CS: ConstraintSystem<F>>(
     vars: &HashMap<Var, Variable>,
     lc: &Lc,
     zero_lc: LinearCombination<F>,

@@ -1,8 +1,0 @@
-struct A {
-    field a;
-    bool b;
-}
-
-def main(A a) -> A {
-    return a;
-}

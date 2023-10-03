@@ -7,7 +7,7 @@ edition = "2021"
 gmp-mpfr-sys = { version = "1.4" }
 hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch = "phash"}
 clap = "4.1.8"
-circ = { git = "https://github.com/jkwoods/circ", branch = "r1cs_pub", features = ["r1cs", "bellman"] }
+circ = { git = "https://github.com/jkwoods/circ", branch = "r1cs_pub", features = ["r1cs", "bellman", "smt", "zok"] }
 itertools = "0.10"
 nova-snark ={ git = "https://github.com/jkwoods/Nova", branch = "pub_pk"}
 bellperson = { version = "0.24", default-features = false }
@@ -34,6 +34,11 @@ fancy-regex = "0.11.0"
 regex-syntax = "0.6.0"
 arbitrary = { version = "1.3.0", features = ["derive"] }
 backtrace-on-stack-overflow = "0.3.0"
+memory-stats = "1.1.0"
+nova-scotia = {path="./Nova-Scotia"}
+execute = "0.2.12"
+num-bigint = "0.4.3"
+metrics = {path="./metrics"}
 
 [target.'cfg(all(not(windows), not(target_env = "musl")))'.dependencies]
 jemallocator = "0.3.0"
@@ -46,6 +51,9 @@ criterion = { version = "0.4", features = [ "html_reports" ] }
 default = []
 metrics = ["dep:dashmap"]
 plot = []
+nwr = []
+reef = []
+naive = []
 
 [[bench]]
 name = "bench"

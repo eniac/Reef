@@ -1,8 +1,0 @@
-struct Bar {}
-
-const field ONE = 1;
-const field BAR = 21 * ONE;
-
-def main() -> field {
-    return BAR;
-}

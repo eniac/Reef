@@ -1,4 +1,0 @@
-def main(u8 x) {
-    u8 y = 0x01 / x;
-    return;
-}

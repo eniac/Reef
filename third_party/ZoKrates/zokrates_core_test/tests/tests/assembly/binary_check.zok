@@ -1,5 +1,0 @@
-def main(field x) {
-    asm {
-        x * (x - 1) === 0;
-    }
-}

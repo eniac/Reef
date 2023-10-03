@@ -1,4 +1,0 @@
-def main(u32 a, u32 c) -> u32 {
-	u32 b = 0x12345678;
-	return (a & b) ^ (a & c) ^ (b & c);
-}

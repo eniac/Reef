@@ -1,6 +1,0 @@
-def main() {
-    field[2] mut a = [0; 2];
-    asm {
-        a <== [1, 2];
-    }
-}

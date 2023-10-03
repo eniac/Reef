@@ -1,3 +1,0 @@
-def main(field[3] array, u32 index) -> field {
-    return array[index];
-}

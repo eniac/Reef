@@ -1,8 +1,0 @@
-// example using ternary with &&
-
-def main(field a, field b) -> field {
-    field y = a + 2 == 3 && a * 2 == 2 ? 1 : 0;
-    field z = y == 1 && 1 - y == 0 ? y : 1;
-    assert(b == 1);
-    return a;
-}

@@ -1,4 +1,0 @@
-def main(field[2] a) {
-    assert(a == [1, 2]);
-    return;
-}

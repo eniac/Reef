@@ -1,3 +1,0 @@
-def main(field e) -> bool {
-    return e <= 42;
-}

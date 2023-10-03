@@ -1,4 +1,0 @@
-def main(field[2][2] mut a) -> field[2][2] {
-	a[1][1] = 42;
-	return a;
-}
