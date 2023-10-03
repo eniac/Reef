@@ -222,7 +222,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             vars.insert(var, stack_in[j].get_variable());
 
             return Ok(true);
-        } else if s.starts_with(&format!("cursor_0")) {
+        } else if s.starts_with(&format!("cursor_in")) {
             vars.insert(var, cursor_0.get_variable());
 
             return Ok(true);
@@ -248,9 +248,9 @@ where {
             alloc_stack_out[j] = Some(alloc_v.clone());
 
             return Ok(true);
-        } else if s.starts_with(&format!("cursor_")) {
+        } else if s.starts_with(&format!("cursor_{}", self.batch_size)) {
             //, self.batch_size)) {
-            println!("CURSOR {:#?}", s);
+            //println!("CURSOR {:#?}", s);
             *last_cursor = Some(alloc_v.clone());
             return Ok(true);
         }

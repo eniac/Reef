@@ -736,6 +736,18 @@ mod tests {
     }
 
     #[test]
+    fn e2e_hybrid() {
+        backend_test(
+            "abc".to_string(),
+            "$a*bbbc*d*^".to_string(),
+            ("aaabbbcccddd".to_string()).chars().collect(),
+            0,
+            false,
+            true,
+        );
+    }
+
+    #[test]
     fn e2e_projections() {
         backend_test(
             "abc".to_string(),

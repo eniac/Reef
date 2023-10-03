@@ -863,7 +863,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn pop_stack_circuit(&mut self) -> Term {
-        let cursor_var = new_var(format!("cursor_0"));
+        let cursor_var = new_var(format!("cursor_popped"));
 
         // pop
         let to_pop = term(
@@ -1055,6 +1055,30 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     ],
                 );
                 self.assertions.push(do_what);
+
+                // cursor_0
+                let pop_condition = term(Op::Eq, vec![new_const(3), new_var(format!("rel_{}", 0))]);
+                let c0 = term(
+                    Op::Ite,
+                    vec![
+                        term(
+                            Op::BoolNaryOp(BoolNaryOp::And),
+                            vec![term(Op::Not, vec![self.not_forall_circ(0)]), pop_condition],
+                        ),
+                        term(
+                            Op::Eq,
+                            vec![
+                                new_var(format!("cursor_0")),
+                                new_var(format!("cursor_popped")),
+                            ],
+                        ),
+                        term(
+                            Op::Eq,
+                            vec![new_var(format!("cursor_0")), new_var(format!("cursor_in"))],
+                        ),
+                    ],
+                );
+                self.assertions.push(c0);
             } else {
                 // assert not forall
 
@@ -1450,7 +1474,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.stack_ptr -= 1;
         let popped_elt = self.stack[self.stack_ptr];
 
-        wits.insert(format!("cursor_{}", 0), new_wit(popped_elt.0));
+        wits.insert(format!("cursor_popped"), new_wit(popped_elt.0));
+        wits.insert(format!("cursor_0"), new_wit(popped_elt.0));
         //wits.insert(format!("state_{}", self.batch_size), new_wit(popped_elt.1));
 
         // after pop
@@ -1747,7 +1772,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut cursor_i = cursor_0;
         let mut cursor_access = vec![];
 
-        wits.insert(format!("cursor_0"), new_wit(cursor_i));
+        wits.insert(format!("cursor_in"), new_wit(cursor_i));
 
         while i < self.batch_size {
             let mut add_normal = true;
@@ -1777,7 +1802,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     // fill stack vars with padding
                     self.push_wit(&mut wits, None, cursor_i);
                     // pad out "popped" vars, since there's no pop
-                    wits.insert(format!("cursor_{}", self.batch_size), new_wit(cursor_i));
+                    wits.insert(format!("cursor_popped"), new_wit(cursor_i));
+                    wits.insert(format!("cursor_0"), new_wit(cursor_i));
                     wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                 }
                 char_num = self.num_ab[&None];
@@ -1841,7 +1867,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             // pushed
                             self.push_wit(&mut wits, Some(te_peek.from_node), cursor_i);
                             // pad pop
-                            wits.insert(format!("cursor_{}", self.batch_size), new_wit(cursor_i));
+                            wits.insert(format!("cursor_popped"), new_wit(cursor_i));
+                            wits.insert(format!("cursor_0"), new_wit(cursor_i));
                             wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                         } else {
                             // pad push
@@ -1874,7 +1901,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         // fill stack vars with padding
                         self.push_wit(&mut wits, None, cursor_i);
                         // pad out "popped" vars, since there's no pop
-                        wits.insert(format!("cursor_{}", self.batch_size), new_wit(cursor_i));
+                        wits.insert(format!("cursor_popped"), new_wit(cursor_i));
+                        wits.insert(format!("cursor_0"), new_wit(cursor_i));
                         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                     }
                 }
