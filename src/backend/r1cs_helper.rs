@@ -27,8 +27,7 @@ fn setup_circ() {
         // set up CirC library
         let mut circ: CircOpt = Default::default();
         circ.field.custom_modulus =
-            "28948022309329048855892746252171976963363056481941647379679742748393362948097".into(); // vesta (fuck???)
-                                                                                                    //"28948022309329048855892746252171976963363056481941560715954676764349967630337".into(); // pallas curve (i think?)
+            "28948022309329048855892746252171976963363056481941647379679742748393362948097".into(); // vesta
         cfg::set(&circ);
     }
 }
@@ -158,6 +157,7 @@ pub(crate) fn trace_preprocessing(
 
 pub fn normal_add_table<'a>(
     safa: &'a SAFA<char>,
+    deltas: &HashSet<(NodeIndex<u32>, Either<char, Skip>, NodeIndex<u32>)>,
     num_ab: &mut FxHashMap<Option<char>, usize>,
     set_table: &mut HashSet<Integer>,
     num_states: usize,
@@ -182,103 +182,21 @@ pub fn normal_add_table<'a>(
 
         if !final_exists_pass || !safa.g[state].is_and() {
             for edge in safa.g.edges(state) {
-                let out_state = edge.target().index();
+                // filter extra edges - TODO see if helps
+                if deltas.contains(&(edge.source(), edge.weight().clone(), edge.target())) {
+                    // !(safa.is_sink(edge.source()) || safa.is_sink(edge.target())) {
+                    let out_state = edge.target().index();
 
-                match edge.weight().clone() {
-                    Either(Err(openset)) => {
-                        let single = openset.is_single(); // single offset/epsilon
-                        if single.is_some() {
-                            // is single
-                            let lower_offset = single.unwrap();
-                            let upper_offset = single.unwrap();
+                    match edge.weight().clone() {
+                        Either(Err(openset)) => {
+                            let single = openset.is_single(); // single offset/epsilon
+                            if single.is_some() {
+                                // is single
+                                let lower_offset = single.unwrap();
+                                let upper_offset = single.unwrap();
 
-                            // if offset == 0 { -> doesn't matter, always use epsilon for actual
-                            // epsilon and for jumps
-                            let rel = calc_rel(
-                                state.index(),
-                                out_state,
-                                &and_states,
-                                kid_padding,
-                                max_branches,
-                                safa,
-                                num_states,
-                                false,
-                            );
-                            if rel > sub_max_rel {
-                                sub_max_rel = rel;
-                            }
-
-                            let c = num_ab[&None]; //EPSILON
-
-                            set_table.insert(
-                                Integer::from(
-                                    (rel * num_states
-                                        * num_states
-                                        * num_chars
-                                        * max_offsets
-                                        * max_offsets)
-                                        + (in_state
-                                            * num_states
-                                            * num_chars
-                                            * max_offsets
-                                            * max_offsets)
-                                        + (out_state * num_chars * max_offsets * max_offsets)
-                                        + (c * max_offsets * max_offsets)
-                                        + (lower_offset * max_offsets)
-                                        + upper_offset,
-                                )
-                                .rem_floor(cfg().field().modulus()),
-                            );
-                        } else if openset.is_full() {
-                            // [0,*]
-                            let c = num_ab[&None];
-                            let lower_offset = 0;
-                            let upper_offset = max_offsets; // TODO!!!
-
-                            let rel = calc_rel(
-                                state.index(),
-                                out_state,
-                                &and_states,
-                                kid_padding,
-                                max_branches,
-                                safa,
-                                num_states,
-                                false,
-                            );
-                            if rel > sub_max_rel {
-                                sub_max_rel = rel;
-                            }
-                            set_table.insert(
-                                Integer::from(
-                                    (rel * num_states
-                                        * num_states
-                                        * num_chars
-                                        * max_offsets
-                                        * max_offsets)
-                                        + (in_state
-                                            * num_states
-                                            * num_chars
-                                            * max_offsets
-                                            * max_offsets)
-                                        + (out_state * num_chars * max_offsets * max_offsets)
-                                        + (c * max_offsets * max_offsets)
-                                        + (lower_offset * max_offsets)
-                                        + upper_offset,
-                                )
-                                .rem_floor(cfg().field().modulus()),
-                            );
-                        } else {
-                            // ranges
-                            let mut iter = openset.0.iter();
-                            if let Some(r) = iter.next() {
-                                let lower_offset = r.start;
-                                let upper_offset = if r.end.is_some() {
-                                    r.end.unwrap()
-                                } else {
-                                    max_offsets
-                                };
-
-                                let c = num_ab[&None]; //EPSILON
+                                // if offset == 0 { -> doesn't matter, always use epsilon for actual
+                                // epsilon and for jumps
                                 let rel = calc_rel(
                                     state.index(),
                                     out_state,
@@ -292,6 +210,8 @@ pub fn normal_add_table<'a>(
                                 if rel > sub_max_rel {
                                     sub_max_rel = rel;
                                 }
+
+                                let c = num_ab[&None]; //EPSILON
 
                                 set_table.insert(
                                     Integer::from(
@@ -312,46 +232,133 @@ pub fn normal_add_table<'a>(
                                     )
                                     .rem_floor(cfg().field().modulus()),
                                 );
+                            } else if openset.is_full() {
+                                // [0,*]
+                                let c = num_ab[&None];
+                                let lower_offset = 0;
+                                let upper_offset = max_offsets; // TODO!!!
+
+                                let rel = calc_rel(
+                                    state.index(),
+                                    out_state,
+                                    &and_states,
+                                    kid_padding,
+                                    max_branches,
+                                    safa,
+                                    num_states,
+                                    false,
+                                );
+                                if rel > sub_max_rel {
+                                    sub_max_rel = rel;
+                                }
+                                set_table.insert(
+                                    Integer::from(
+                                        (rel * num_states
+                                            * num_states
+                                            * num_chars
+                                            * max_offsets
+                                            * max_offsets)
+                                            + (in_state
+                                                * num_states
+                                                * num_chars
+                                                * max_offsets
+                                                * max_offsets)
+                                            + (out_state * num_chars * max_offsets * max_offsets)
+                                            + (c * max_offsets * max_offsets)
+                                            + (lower_offset * max_offsets)
+                                            + upper_offset,
+                                    )
+                                    .rem_floor(cfg().field().modulus()),
+                                );
+                            } else {
+                                // ranges
+                                let mut iter = openset.0.iter();
+                                if let Some(r) = iter.next() {
+                                    let lower_offset = r.start;
+                                    let upper_offset = if r.end.is_some() {
+                                        r.end.unwrap()
+                                    } else {
+                                        max_offsets
+                                    };
+
+                                    let c = num_ab[&None]; //EPSILON
+                                    let rel = calc_rel(
+                                        state.index(),
+                                        out_state,
+                                        &and_states,
+                                        kid_padding,
+                                        max_branches,
+                                        safa,
+                                        num_states,
+                                        false,
+                                    );
+                                    if rel > sub_max_rel {
+                                        sub_max_rel = rel;
+                                    }
+
+                                    set_table.insert(
+                                        Integer::from(
+                                            (rel * num_states
+                                                * num_states
+                                                * num_chars
+                                                * max_offsets
+                                                * max_offsets)
+                                                + (in_state
+                                                    * num_states
+                                                    * num_chars
+                                                    * max_offsets
+                                                    * max_offsets)
+                                                + (out_state
+                                                    * num_chars
+                                                    * max_offsets
+                                                    * max_offsets)
+                                                + (c * max_offsets * max_offsets)
+                                                + (lower_offset * max_offsets)
+                                                + upper_offset,
+                                        )
+                                        .rem_floor(cfg().field().modulus()),
+                                    );
+                                }
                             }
                         }
-                    }
-                    Either(Ok(ch)) => {
-                        let c = num_ab[&Some(ch)];
-                        let lower_offset = 1;
-                        let upper_offset = 1;
-                        let rel = calc_rel(
-                            state.index(),
-                            out_state,
-                            &and_states,
-                            kid_padding,
-                            max_branches,
-                            safa,
-                            num_states,
-                            false,
-                        );
-                        if rel > sub_max_rel {
-                            sub_max_rel = rel;
-                        }
+                        Either(Ok(ch)) => {
+                            let c = num_ab[&Some(ch)];
+                            let lower_offset = 1;
+                            let upper_offset = 1;
+                            let rel = calc_rel(
+                                state.index(),
+                                out_state,
+                                &and_states,
+                                kid_padding,
+                                max_branches,
+                                safa,
+                                num_states,
+                                false,
+                            );
+                            if rel > sub_max_rel {
+                                sub_max_rel = rel;
+                            }
 
-                        set_table.insert(
-                            Integer::from(
-                                (rel * num_states
-                                    * num_states
-                                    * num_chars
-                                    * max_offsets
-                                    * max_offsets)
-                                    + (in_state
+                            set_table.insert(
+                                Integer::from(
+                                    (rel * num_states
                                         * num_states
                                         * num_chars
                                         * max_offsets
                                         * max_offsets)
-                                    + (out_state * num_chars * max_offsets * max_offsets)
-                                    + (c * max_offsets * max_offsets)
-                                    + (lower_offset * max_offsets)
-                                    + upper_offset,
-                            )
-                            .rem_floor(cfg().field().modulus()),
-                        );
+                                        + (in_state
+                                            * num_states
+                                            * num_chars
+                                            * max_offsets
+                                            * max_offsets)
+                                        + (out_state * num_chars * max_offsets * max_offsets)
+                                        + (c * max_offsets * max_offsets)
+                                        + (lower_offset * max_offsets)
+                                        + upper_offset,
+                                )
+                                .rem_floor(cfg().field().modulus()),
+                            );
+                        }
                     }
                 }
             }
@@ -383,11 +390,12 @@ pub fn normal_add_table<'a>(
 
                 // TODO we have to make sure the multipliers are big enough
 
-                // println!("ADDITIONAL FOR ACCEPTING");
-                // println!(
-                //     "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
-                //     in_state, out_state, c, lower_offset, upper_offset, rel,
-                // );
+                /*println!("ADDITIONAL FOR ACCEPTING");
+                println!(
+                    "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
+                    in_state, out_state, c, lower_offset, upper_offset, rel,
+                );
+                */
 
                 set_table.insert(
                     Integer::from(
@@ -425,7 +433,7 @@ pub(crate) fn calc_rel<'a>(
     let mut rel = 0;
 
     if trans {
-        print!("in {:#?}, OUT {:#?}", in_state, out_state);
+        //print!("in {:#?}, OUT {:#?}", in_state, out_state);
         assert!(out_state == num_states || safa.g[NodeIndex::new(out_state)].is_and());
         assert!(safa.accepting().contains(&NodeIndex::new(in_state)));
         rel = 1;
@@ -458,7 +466,6 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     ell: usize,
     i: usize,
     sponge: &mut Sponge<F, typenum::U4>,
-    //    last_q: Vec<Integer>,
 ) -> (Integer, Integer, Integer, Integer) {
     let base: usize = 2;
     let pow: usize = base.pow((ell - i) as u32);
@@ -553,7 +560,7 @@ pub(crate) fn gen_eq_table(
 // x = eval_at, prods = coeffs of table/eq(), e's = e/q's
 pub(crate) fn prover_mle_partial_eval(
     prods: &[Integer],
-    x: &Vec<Integer>,
+    x: &[Integer],
     es: &Vec<usize>,
     for_t: bool,
     last_q: Option<&Vec<Integer>>, // only q that isn't in {0,1}, inelegant but whatever
@@ -640,7 +647,7 @@ pub(crate) fn prover_mle_partial_eval(
 }
 
 // external full "partial" eval for table check
-pub fn verifier_mle_eval(table: &[Integer], q: &Vec<Integer>) -> Integer {
+pub fn verifier_mle_eval(table: &[Integer], q: &[Integer]) -> Integer {
     let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
 
     con

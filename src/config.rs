@@ -35,6 +35,14 @@ pub struct Options {
     )]
     pub projections: bool,
     #[arg(
+        short = 'h',
+        long = "hybrid",
+        value_name = "HYBRID?",
+        help = "Use hybrid nlookup",
+        default_value_t = false
+    )]
+    pub hybrid: bool,
+    #[arg(
         short = 'n',
         long = "negate",
         value_name = "NEGATE",

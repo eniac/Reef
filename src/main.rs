@@ -3,10 +3,10 @@ use clap::Parser;
 use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
-use reef::naive::naive_wr;
-use reef::naive::naive;
 use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
+use reef::naive::naive;
+use reef::naive::naive_wr;
 // use reef::naive::*;
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -37,12 +37,12 @@ fn main() {
     };
 
     #[cfg(feature = "nwr")]
-    naive_wr::naive_bench(opt.re,ab,doc.iter().collect::<String>(),opt.output);
+    naive_wr::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output);
 
     #[cfg(feature = "naive")]
-    naive::naive_bench(opt.re,ab,doc.iter().collect::<String>(),opt.output);
+    naive::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output);
 
-    #[cfg(feature = "reef")] 
+    #[cfg(feature = "reef")]
     {
         println!("reef");
         #[cfg(feature = "metrics")]
@@ -61,34 +61,39 @@ fn main() {
             SAFA::new(&ab, &r)
         };
 
-            // Is document well-formed
-            // nfa.well_formed(&doc);
+        // Is document well-formed
+        // nfa.well_formed(&doc);
 
-            #[cfg(feature = "metrics")]
-            log::stop(Component::Compiler, "SAFA", "SAFA");
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Compiler, "SAFA", "SAFA");
 
         #[cfg(feature = "plot")]
         safa.write_pdf("main")
             .expect("Failed to plot NFA to a pdf file");
 
-            #[cfg(feature = "metrics")]
-            log::tic(Component::Solver, "SAFA Solving", "Clear Match");
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Solver, "SAFA Solving", "Clear Match");
 
-            /*
+        /*
             println!(
             "Match: {}",
             nfa.is_match(&doc)
                 .map(|c| format!("{:?}", c))
                 .unwrap_or(String::from("NONE"))
         );*/
-        // TODO solving here, pass result to R1CS
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Solver, "SAFA Solving", "Clear Match");
 
         init();
 
-        run_backend(safa.clone(), doc, opt.batch_size, opt.projections); // auto select batching/commit
+        run_backend(
+            safa.clone(),
+            doc,
+            opt.batch_size,
+            opt.projections,
+            opt.hybrid,
+        );
 
         let file = OpenOptions::new()
             .write(true)
@@ -98,7 +103,7 @@ fn main() {
             .unwrap();
         let mut wtr = Writer::from_writer(file);
         let _ = wtr.write_record(&[
-            format!("{}_{}",&opt.input[..10],opt.input.len()),
+            format!("{}_{}", &opt.input[..10], opt.input.len()),
             opt.re,
             safa.g.edge_count().to_string(), //nedges().to_string(),
             safa.g.node_count().to_string(), //nstates().to_string(),
