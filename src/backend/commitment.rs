@@ -451,9 +451,6 @@ impl ReefCommitment {
         // prove < C(t,v'), [1-q0, q0] > = v
         ipa.verify(t_vp_gens, &self.single_gens, 2, &ipi, &mut v_transcript)?;
 
-        // prove < C(t,v'), [1, 0] > = t
-        // TODO
-
         Ok(())
     }
 }

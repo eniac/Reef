@@ -178,8 +178,6 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             // not for doc v or hybrid
             vars.insert(var, prev_v.get_variable());
 
-            println!("NL INSERT {:#?}", prev_v.clone().get_value());
-
             alloc_prev_rc[sc_l] = Some(prev_v.clone());
             return Ok(true);
         } else if s.starts_with(&format!("{}_eq_{}_q", tag, num_lookups)) {
@@ -194,6 +192,30 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             return Ok(true);
         }
 
+        return Ok(false);
+    }
+
+    fn input_stack_parsing(
+        &self,
+        vars: &mut HashMap<Var, Variable>,
+        s: &String,
+        var: Var,
+        stack_in: &Vec<AllocatedNum<F>>,
+        stack_ptr_0: &AllocatedNum<F>,
+        max_stack: usize,
+    ) -> Result<bool, SynthesisError> {
+        if s.starts_with(&format!("stack_ptr_{}_{}", 0, max_stack - 1)) {
+            vars.insert(var, stack_ptr_0.get_variable());
+
+            return Ok(true);
+        } else if s.starts_with(&format!("stack_{}_", 0)) {
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[2].parse().unwrap();
+
+            vars.insert(var, stack_in[j].get_variable());
+
+            return Ok(true);
+        }
         return Ok(false);
     }
 
@@ -743,6 +765,18 @@ where
                             )
                             .unwrap();
                     }
+                    if !matched {
+                        matched = self
+                            .input_stack_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                &stack_in,
+                                &stack_ptr_0,
+                                stack_len,
+                            )
+                            .unwrap();
+                    }
 
                     if !matched {
                         let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
@@ -911,6 +945,18 @@ where
                                 &prev_v,
                                 &mut alloc_prev_rc,
                                 self.batch_size * 2,
+                            )
+                            .unwrap();
+                    }
+                    if !matched {
+                        matched = self
+                            .input_stack_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                &stack_in,
+                                &stack_ptr_0,
+                                stack_len,
                             )
                             .unwrap();
                     }
