@@ -95,6 +95,7 @@ impl SAFA<char> {
         // Add root
         let mut g: Graph<Quant<Regex>, Either<char, Skip>> = Graph::new();
         let n_init = g.add_node(Quant::or(re.clone()));
+        println!("new state: {:#?}",n_init);
         g.add_edge(n_init, n_init, SAFA::epsilon());
         let mut s = Self {
             ab,
@@ -349,6 +350,7 @@ impl SAFA<char> {
 
     /// Find a non-empty list of continuous matching document strings
     fn solve_rec(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<char>) -> Option<Trace<char>> {
+        println!("solve_rec: {},{}",self.g[n],i);
         // Check accepting condition
         if self.is_accept(n, i, doc) {
             return Some(Trace::empty());
