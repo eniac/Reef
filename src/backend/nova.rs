@@ -1007,7 +1007,7 @@ where
                                 .intm_fs_parsing(
                                     &alloc_v,
                                     &s,
-                                    "hlhybrid",
+                                    "nlhybrid",
                                     &mut alloc_qs,
                                     &mut alloc_vs,
                                     &mut alloc_claim_r,

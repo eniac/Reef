@@ -46,7 +46,7 @@ struct ProofInfo {
     proj_doc_len: usize,
     num_states: usize,
     projections: bool,
-    hybrid: bool,
+    hybrid_len: Option<usize>,
 }
 
 #[cfg(feature = "metrics")]
@@ -161,7 +161,7 @@ pub fn run_backend(
                 proj_doc_len: r1cs_converter.doc_len(), // projected
                 num_states: r1cs_converter.num_states,
                 projections: r1cs_converter.doc_subset.is_some(),
-                hybrid: r1cs_converter.hybrid_len.is_some(),
+                hybrid_len: r1cs_converter.hybrid_len,
             })
             .unwrap();
 
@@ -540,9 +540,16 @@ fn solve<'a>(
     }
 
     sender.send(None).unwrap();
-    sender_qv
-        .send((doc_running_q.unwrap(), doc_running_v.unwrap()))
-        .unwrap();
+
+    if r1cs_converter.hybrid_len.is_none() {
+        sender_qv
+            .send((doc_running_q.unwrap(), doc_running_v.unwrap()))
+            .unwrap();
+    } else {
+        sender_qv
+            .send((hybrid_running_q.unwrap(), hybrid_running_v.unwrap()))
+            .unwrap();
+    }
 }
 
 fn prove_and_verify(
@@ -619,6 +626,8 @@ fn prove_and_verify(
 
     let (q, v) = recv_qv.recv().unwrap();
 
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Prover, "Proof", "Consistency Proofs");
     //Doc dot prod and consistency
     let consist_proof = proof_info.commit.prove_consistency(
         &proof_info.table,
@@ -626,8 +635,10 @@ fn prove_and_verify(
         q,
         v,
         proof_info.projections,
-        proof_info.hybrid,
+        proof_info.hybrid_len.is_some(),
     );
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Proof", "Consistency Proofs");
 
     #[cfg(feature = "metrics")]
     log::space(
@@ -649,6 +660,7 @@ fn prove_and_verify(
         proof_info.num_states,
         proof_info.doc_len,
         proof_info.proj_doc_len,
+        proof_info.hybrid_len,
         consist_proof,
     );
 
@@ -665,11 +677,9 @@ fn verify(
     num_states: usize,
     doc_len: usize,
     proj_doc_len: usize,
+    hybrid_len: Option<usize>,
     consist_proof: ConsistencyProof,
 ) {
-    let q_len = logmn(table.len());
-    let qd_len = logmn(proj_doc_len);
-
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
     #[cfg(feature = "metrics")]
@@ -687,19 +697,39 @@ fn verify(
     assert!(res.is_ok());
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Verifier, "Verification", "Final Clear Checks");
+    log::tic(
+        Component::Verifier,
+        "Verification",
+        "Final Checks, Consistency Verification",
+    );
 
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
     let zn = res.unwrap().0;
 
-    let (t, q_0) = final_clear_checks(
-        zn[(q_len + qd_len + 3)], // stack ptr
-        &table,
-        Some(zn[1..(q_len + 1)].to_vec()), // eval q
-        Some(zn[q_len + 1]),               // eval v
-        None,                              // hybrid q
-        None,                              // hybrid hash
-    );
+    let (stack_ptr, eval_q, eval_v, hybrid_q, hybrid_d) = if hybrid_len.is_none() {
+        let q_len = logmn(table.len());
+        let qd_len = logmn(proj_doc_len);
+
+        (
+            zn[(q_len + qd_len + 3)],
+            Some(zn[1..(q_len + 1)].to_vec()),
+            Some(zn[q_len + 1]),
+            None,
+            None,
+        )
+    } else {
+        let h_len = logmn(hybrid_len.unwrap());
+
+        (
+            zn[(h_len + 2)],
+            None,
+            None,
+            Some(zn[1..(1 + h_len)].to_vec()),
+            Some(zn[1 + h_len]),
+        )
+    };
+
+    let (t, q_0) = final_clear_checks(stack_ptr, &table, eval_q, eval_v, hybrid_q, hybrid_d);
 
     //CAP verify
     let cap_d = consist_proof.hash_d.clone(); // TODO
@@ -709,7 +739,11 @@ fn verify(
     assert_eq!(zn[0], <G1 as Group>::Scalar::from(num_states as u64));
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Verifier, "Verification", "Final Clear Checks");
+    log::stop(
+        Component::Verifier,
+        "Verification",
+        "Final Checks, Consistency Verification",
+    );
 }
 
 #[cfg(test)]
@@ -738,7 +772,7 @@ mod tests {
     #[test]
     fn e2e_hybrid() {
         backend_test(
-            "abc".to_string(),
+            "abcd".to_string(),
             "$a*bbbc*d*^".to_string(),
             ("aaabbbcccddd".to_string()).chars().collect(),
             0,
