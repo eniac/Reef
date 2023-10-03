@@ -21,6 +21,7 @@ use nova_snark::{
     errors::NovaError,
     provider::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
+        pasta::*,
         pedersen::{Commitment, CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
@@ -30,6 +31,12 @@ use nova_snark::{
         Group, ROConstantsTrait, ROTrait,
     },
     StepCounterType,
+};
+use pasta_curves::{
+    self,
+    arithmetic::{CurveAffine, CurveExt, Group as OtherGroup},
+    group::{cofactor::CofactorCurveAffine, Curve, Group as AnotherGroup, GroupEncoding},
+    pallas, vesta, Ep, EpAffine, Eq, EqAffine,
 };
 use rand::rngs::OsRng;
 use rug::{integer::Order, ops::RemRounding, Integer};
@@ -59,6 +66,9 @@ pub struct ConsistencyProof {
     // dot prod verification
     ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
+    t_vp_gens: Option<CommitmentGens<G1>>,
+    hybrid_ipi: Option<InnerProductInstance<G1>>,
+    hybrid_ipa: Option<InnerProductArgument<G1>>,
 }
 
 impl ReefCommitment {
@@ -75,9 +85,6 @@ impl ReefCommitment {
         // need empty circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(
             &pc,
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
             <G1 as Group>::Scalar::from(0),
             <G1 as Group>::Scalar::from(0),
             <G1 as Group>::Scalar::from(0),
@@ -153,31 +160,36 @@ impl ReefCommitment {
         let cap_d = calc_d_clear(&self.pc, self.hash_salt, v.clone());
         let cap_z = vec![cap_d];
 
-        let (t, q0) = if !hybrid {
-            (
-                <G1 as Group>::Scalar::from(0),
-                <G1 as Group>::Scalar::from(1),
-            )
-        } else {
-            // calculate t
-            let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
-            let t = verifier_mle_eval(table, q_prime);
-
-            println!("t = {:#?}, q0 = {:#?}", t.clone(), q[0].clone());
-            println!("TABLE COMMITMENT {:#?}", table);
-
-            (int_to_ff(t), int_to_ff(q[0].clone()))
-        };
-
         let v_ff = int_to_ff(v);
-        let q_ff = q.into_iter().map(|x| int_to_ff(x)).collect();
+        let q_ff = q.clone().into_iter().map(|x| int_to_ff(x)).collect();
 
         let (ipi, ipa, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
             self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len, proj, hybrid);
 
+        let (t_vp_gens, hybrid_ipi, hybrid_ipa) = if !hybrid {
+            (None, None, None)
+        } else {
+            // calculate t
+            let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
+            let t = int_to_ff(verifier_mle_eval(table, q_prime));
+            let q0 = int_to_ff(q[0].clone());
+
+            let (gens, ipi, ipa) = self.proof_hybrid_combo(
+                t,
+                q0,
+                v_ff,
+                v_commit,
+                v_decommit,
+                v_prime,
+                v_prime_commit.unwrap(),
+                v_prime_decommit.unwrap(),
+            );
+            (Some(gens), Some(ipi), Some(ipa))
+        };
+
         // CAP circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
-            ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt, v_prime, t, q0);
+            ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt);
 
         let cap_res = SpartanSNARK::cap_prove(
             &self.cap_pk,
@@ -194,11 +206,14 @@ impl ReefCommitment {
         // set params
         return ConsistencyProof {
             hash_d: cap_d,
-            ipi,
-            ipa,
-            v_commit,
             circuit: cap_circuit,
             snark: cap_snark,
+            v_commit,
+            ipi,
+            ipa,
+            t_vp_gens,
+            hybrid_ipi,
+            hybrid_ipa,
         };
     }
 
@@ -268,7 +283,7 @@ impl ReefCommitment {
             (Some(decommit_v_prime), Some(commit_v_prime), v_prime)
         };
 
-        // prove
+        // D(q) = v/v'
         let (ipi, ipw) = if !hybrid {
             let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
                 &self.doc_commit.decompress().unwrap(),
@@ -318,6 +333,61 @@ impl ReefCommitment {
         )
     }
 
+    fn proof_hybrid_combo(
+        &self,
+        t: <G1 as Group>::Scalar,
+        q0: <G1 as Group>::Scalar,
+        v: <G1 as Group>::Scalar,
+        v_commit: Commitment<G1>,
+        v_decommit: <G1 as Group>::Scalar,
+        v_prime: <G1 as Group>::Scalar,
+        v_prime_commit: Commitment<G1>,
+        v_prime_decommit: <G1 as Group>::Scalar,
+    ) -> (
+        CommitmentGens<G1>,
+        InnerProductInstance<G1>,
+        InnerProductArgument<G1>,
+    ) {
+        let mut p_transcript = Transcript::new(b"dot_prod_proof");
+
+        // new inner prod vectors
+        let q0_vec = vec![(<G1 as Group>::Scalar::from(1) - q0), q0];
+        let t_vp_clear = vec![t, v_prime];
+
+        // make new commitment to [t, v']
+        // C(v') = g_0^v' * h^blind
+        // C([t,v']) = g_1^t * g_0^v * h^blind
+        let mut new_base = <G1 as Group>::from_label(b"new_base", 1);
+
+        let mut bases = new_base.clone();
+        bases.push(v_prime_commit.comm.to_affine());
+        let t_vp_commit = Commitment {
+            comm: <G1 as Group>::vartime_multiscalar_mul(
+                &[t, <G1 as Group>::Scalar::from(1)],
+                &bases,
+            ),
+        };
+        let t_vp_decommit = v_prime_decommit;
+        let mut t_vp_gens = self.single_gens.clone();
+
+        new_base.extend(t_vp_gens.gens);
+        t_vp_gens.gens = new_base;
+
+        let ipi: InnerProductInstance<G1> =
+            InnerProductInstance::new(&t_vp_commit, &q0_vec, &v_commit);
+        let ipw = InnerProductWitness::new(&t_vp_clear, &t_vp_decommit, &v, &v_decommit);
+        let ipa = InnerProductArgument::prove(
+            &t_vp_gens,
+            &self.single_gens,
+            &ipi,
+            &ipw,
+            &mut p_transcript,
+        )
+        .unwrap();
+
+        (t_vp_gens, ipi, ipa)
+    }
+
     pub fn verify_consistency(
         &self,
         proof: ConsistencyProof,
@@ -325,6 +395,17 @@ impl ReefCommitment {
         q_0: Option<<G1 as Group>::Scalar>,
     ) {
         assert!(self.proof_dot_prod_verify(&proof.ipi, proof.ipa).is_ok());
+
+        if proof.hybrid_ipi.is_some() && proof.hybrid_ipa.is_some() && t.is_some() {
+            assert!(self
+                .verify_hybrid_combo(
+                    &proof.t_vp_gens.unwrap(),
+                    &proof.hybrid_ipi.unwrap(),
+                    proof.hybrid_ipa.unwrap(),
+                    t.unwrap(),
+                )
+                .is_ok());
+        }
 
         // cap verify
         let z_0 = vec![proof.hash_d];
@@ -354,6 +435,24 @@ impl ReefCommitment {
             ipi,
             &mut v_transcript,
         )?;
+
+        Ok(())
+    }
+
+    fn verify_hybrid_combo(
+        &self,
+        t_vp_gens: &CommitmentGens<G1>,
+        ipi: &InnerProductInstance<G1>,
+        ipa: InnerProductArgument<G1>,
+        t: <G1 as Group>::Scalar,
+    ) -> Result<(), NovaError> {
+        let mut v_transcript = Transcript::new(b"dot_prod_proof");
+
+        // prove < C(t,v'), [1-q0, q0] > = v
+        ipa.verify(t_vp_gens, &self.single_gens, 2, &ipi, &mut v_transcript)?;
+
+        // prove < C(t,v'), [1, 0] > = t
+        // TODO
 
         Ok(())
     }
@@ -501,29 +600,15 @@ pub struct ConsistencyCircuit<F: PrimeField> {
     d: F,
     v: F,
     s: F,
-    v_prime: F,
-    t: F,
-    q0: F,
 }
 
 impl<F: PrimeField> ConsistencyCircuit<F> {
-    pub fn new(
-        pc: &PoseidonConstants<F, typenum::U4>,
-        d: F,
-        v: F,
-        s: F,
-        v_prime: F,
-        t: F,
-        q0: F,
-    ) -> Self {
+    pub fn new(pc: &PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
         ConsistencyCircuit {
             pc: pc.clone(),
             d,
             v,
             s,
-            v_prime,
-            t,
-            q0,
         }
     }
 }
@@ -538,7 +623,6 @@ where
 
     fn output(&self, z: &[F]) -> Vec<F> {
         assert_eq!(z[0], self.d);
-
         z.to_vec()
     }
 
@@ -555,7 +639,6 @@ where
 
         //v at index 0 (but technically 1 since io is allocated first)
         let alloc_v = AllocatedNum::alloc(cs.namespace(|| "v"), || Ok(self.v))?;
-
         let alloc_s = AllocatedNum::alloc(cs.namespace(|| "s"), || Ok(self.s))?;
 
         //poseidon(v,s) == d
@@ -592,30 +675,6 @@ where
             |z| z + d_in.get_variable(),
             |z| z + CS::one(),
             |z| z + d_calc.get_variable(),
-        );
-
-        // for hybrid
-
-        let alloc_v_prime = AllocatedNum::alloc(cs.namespace(|| "v_prime"), || Ok(self.v_prime))?;
-        let alloc_t = AllocatedNum::alloc(cs.namespace(|| "table eval"), || Ok(self.t))?;
-        let alloc_q0 = AllocatedNum::alloc(cs.namespace(|| "q[0]"), || Ok(self.q0))?;
-
-        let alloc_tq = AllocatedNum::alloc(cs.namespace(|| "t * (1-q0)"), || {
-            Ok(self.t * (F::from(1) - self.q0))
-        })?;
-
-        cs.enforce(
-            || "t * (1-q[0]) = tq",
-            |z| z + alloc_t.get_variable(),
-            |z| z + CS::one() - alloc_q0.get_variable(),
-            |z| z + alloc_tq.get_variable(),
-        );
-
-        cs.enforce(
-            || "v' * q[0] = v - tq",
-            |z| z + alloc_v_prime.get_variable(),
-            |z| z + alloc_q0.get_variable(),
-            |z| z + alloc_v.get_variable() - alloc_tq.get_variable(),
         );
 
         Ok(vec![d_calc]) // doesn't hugely matter
