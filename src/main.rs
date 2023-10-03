@@ -44,11 +44,12 @@ fn main() {
 
     #[cfg(feature = "reef")] 
     {
+        println!("reef");
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "Compiler", "Full");
 
         #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "DFA", "DFA");
+        log::tic(Component::Compiler, "SAFA", "SAFA");
 
         let r = re::simpl(re::new(&opt.re));
         //    println!("REGEX: {:#?}", r));
@@ -64,14 +65,14 @@ fn main() {
             // nfa.well_formed(&doc);
 
             #[cfg(feature = "metrics")]
-            log::stop(Component::Compiler, "DFA", "DFA");
+            log::stop(Component::Compiler, "SAFA", "SAFA");
 
         #[cfg(feature = "plot")]
         safa.write_pdf("main")
             .expect("Failed to plot NFA to a pdf file");
 
             #[cfg(feature = "metrics")]
-            log::tic(Component::Solver, "DFA Solving", "Clear Match");
+            log::tic(Component::Solver, "SAFA Solving", "Clear Match");
 
             /*
             println!(
@@ -83,7 +84,7 @@ fn main() {
         // TODO solving here, pass result to R1CS
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Solver, "DFA Solving", "Clear Match");
+        log::stop(Component::Solver, "SAFA Solving", "Clear Match");
 
         init();
 

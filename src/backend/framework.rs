@@ -537,12 +537,9 @@ fn prove_and_verify(
     let claim_blind = cp_clone.claim_blind;
 
     let mut i = 0;
-    while circuit_primary.is_some() {
-        #[cfg(feature = "metrics")] 
-        let test = format!("step {}", i);
-
+    while circuit_primary.is_some() { 
         #[cfg(feature = "metrics")]
-        log::tic(Component::Prover, &test, "prove step");
+        log::tic(Component::Prover, "prove", format!("prove_{}",i).as_str());
 
         let result = RecursiveSNARK::prove_step(
             &proof_info.pp.lock().unwrap(),
@@ -554,7 +551,7 @@ fn prove_and_verify(
         );
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Prover, &test, "prove step");
+        log::stop(Component::Prover, "prove", format!("prove_{}",i).as_str());
         /*
         // verify recursive - TODO we can get rid of this verify once everything works
         // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
