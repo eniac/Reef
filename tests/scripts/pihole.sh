@@ -1,6 +1,6 @@
 #reef
-cargo clean 
-cargo build --release --features 'metrics,reef,plot'
+#cargo clean 
+cargo build --release --features 'metrics,reef'
 echo 'reef'
 ./target/release/reef --input "ad.stackoverflow.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1234567" --output ./tests/results/pihole.txt --re "^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+\.){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-]" ascii
 ./target/release/reef --input "adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323" --output ./tests/results/pihole.txt --re "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]" ascii
@@ -18,8 +18,8 @@ echo 'reef'
 ./target/release/reef --input "statistics19902.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037" --output ./tests/results/pihole.txt --re "^stat(s|istics)?[0-9]*[_.-]" ascii
 
 #reef hybrid
-cargo clean 
-cargo build --release --features 'metrics,reef'
+#cargo clean 
+#cargo build --release --features 'metrics,reef'
 echo 'reef hybrid'
 ./target/release/reef --input "ad.stackoverflow.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1234567" --output ./tests/results/pihole_hybrid.txt --re "^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+\.){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-]" -h ascii
 ./target/release/reef --input "adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323" --output ./tests/results/pihole_hybrid.txt --re "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]" -h ascii

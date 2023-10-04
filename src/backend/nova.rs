@@ -120,7 +120,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             }
         }
 
-        println!("wits {:#?}", values);
+        // println!("wits {:#?}", values);
 
         NFAStepCircuit {
             r1cs,
@@ -265,7 +265,7 @@ where {
     ) -> Result<(), SynthesisError>
 where {
         if s.starts_with(&format!("state_{}", self.batch_size)) {
-            println!("LAST STATE");
+            //println!("LAST STATE");
             *last_state = Some(alloc_v.clone()); //.get_variable();
         }
         Ok(())
