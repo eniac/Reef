@@ -111,7 +111,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
-    //remove_file("match.circom");
+    remove_file("match.circom");
 
     let circuit_filepath = "match.r1cs";
     let witness_gen_filepath = "match_js/match.wasm";
@@ -267,7 +267,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::write_csv(&out_write.as_path().display().to_string()).unwrap();
 
-    remove_file("match.circom");
     remove_file("match.sym");
     remove_file("match.r1cs");
     remove_file("circom_witness.wtns");
