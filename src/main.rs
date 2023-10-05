@@ -106,8 +106,12 @@ fn main() {
             .open(opt.output.clone())
             .unwrap();
         let mut wtr = Writer::from_writer(file);
+        let mut title = opt.input.clone();
+        if title.len()>10 {
+            title = opt.input[..10].to_string();
+        }
         let _ = wtr.write_record(&[
-            format!("{}_{}", &opt.input[..10], opt.input.len()),
+            format!("{}_{}", &title, opt.input.len()),
             opt.re,
             safa.g.edge_count().to_string(), //nedges().to_string(),
             safa.g.node_count().to_string(), //nstates().to_string(),
