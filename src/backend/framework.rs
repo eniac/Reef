@@ -724,7 +724,7 @@ fn verify(
     log::tic(
         Component::Verifier,
         "Verification",
-        "Final Checks, Consistency Verification",
+        "Final Checks Consistency Verification",
     );
 
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
@@ -765,7 +765,7 @@ fn verify(
     log::stop(
         Component::Verifier,
         "Verification",
-        "Final Checks, Consistency Verification",
+        "Final Checks Consistency Verification",
     );
 }
 

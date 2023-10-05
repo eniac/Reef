@@ -7,9 +7,9 @@ pragma circom 2.0.3;
         signal input curIndex;
         signal output out;
     
-        component runningProduct = MultiplierN(12032);
+        component runningProduct = MultiplierN(55424);
 
-        for (var i = 0; i < 12032; i++) {
+        for (var i = 0; i < 55424; i++) {
             runningProduct.in[i] <== rootsTrans(i) - curIndex;
         }
         out <== runningProduct.out;
@@ -18,46 +18,66 @@ pragma circom 2.0.3;
     template IsValidMatch() {
         signal input in;
         signal output out;
+        
+        component isZero = IsZero();
 
-        component runningProduct = MultiplierN(52);
-    
-        for (var i = 0; i < 52; i++) {
-            runningProduct.in[i] <== rootsMatch(i) - in;
-        }
-        out <== runningProduct.out;
-       
+        isZero.in <== rootsMatch(0) - in;
+        out <== isZero.out;
     }
     
     template Main () {
-        signal input doc[128];
-        signal input prover_states[129];
-        signal input blind;
+        signal input cur_state;
+        signal input next_state; 
+        signal input char;
 
-        signal input step_in[1];
-    
-        signal output hashed;
-    
-        component valid_state[128];
+        signal input step_in[4];
+        signal output step_out[4];
+
+        signal running_hash <== step_in[1];
+        signal index <== step_in[0];
+        signal cur_state_hash_in <== step_in[3];
+
+        component indexIsZero = IsZero();
+        indexIsZero.in <== index;
+
+        component cur_state_hash = Poseidon(1);
+        cur_state_hash.inputs[0] <== cur_state;
+
+        component switcher  = Switcher();
+        switcher.sel <== indexIsZero.out; 
+        switcher.L <== cur_state_hash.out; 
+        switcher.R <== cur_state_hash_in;
+
+        cur_state_hash_in === switcher.outL;
+
+        var temp_hash;
+        temp_hash = cur_state_hash.out;
+
+        component valid_state;
+        
+        valid_state = IsValidTrans();
+        valid_state.curIndex <== cur_state*433*128 + char*433 + next_state;
+        valid_state.out === 0;
+
+        cur_state*indexIsZero.out === 0;
+
         component valid_match;
-    
-        prover_states[0]===0;
-    
-        for (var j=1;j<129;j++) {
-            valid_state[j-1] = IsValidTrans();
-            valid_state[j-1].curIndex <== prover_states[j-1]*94*128 + doc[j-1]*94 +
-            prover_states[j];
-            valid_state[j-1].out === 0;
-        }
         valid_match = IsValidMatch();
-        valid_match.in <== prover_states[128];
-    
-        valid_match.out === 0;
+        valid_match.in <== next_state;
 
-        component hash = PoseidonMulti(128);
-        hash.in <== doc;
-        hash.blind <== blind;
-    
-        hashed<==hash.out;
+        component hash = Poseidon(2);
+        hash.inputs[0] <==running_hash;
+
+        hash.inputs[1] <== char;
+
+        component next_state_hash = Poseidon(1);
+        next_state_hash.inputs[0] <== next_state;
+
+        step_out[0] <== index + 1;
+        step_out[1] <== hash.out;
+        step_out[2] <== valid_match.out;
+        step_out[3] <== next_state_hash.out;
+
     }
     
-    component main {public [step_in]} = Main();
+    component main { public [step_in] }= Main();

@@ -195,6 +195,7 @@ where
     let mut recursive_snark: Option<RecursiveSNARK<G1, G2, _, _>> = None;
 
     for i in 0..iteration_count {
+        println!("step_{}",i);
         log::tic(Component::Solver, "Witness", format!("Compute_{}",i).as_str());
         
         let witness = compute_witness::<G1, G2>(

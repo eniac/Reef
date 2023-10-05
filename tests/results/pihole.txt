@@ -8,7 +8,7 @@ compiler,R1CS,Proof Setup,8259604,μs
 prover,prove,prove_0,279927,μs
 verifier,Verification,Nova Verification,2026875,μs
 compiler,R1CS,R1CS precomputations,64270,μs
-verifier,Verification,"Final Checks, Consistency Verification",159262,μs
+verifier,Verification,Final Checks Consistency Verification,159262,μs
 compiler,R1CS,To Circuit,62156,μs
 solver,Witness Generation,step_0,11463,μs
 compiler,SAFA,SAFA,3388,μs

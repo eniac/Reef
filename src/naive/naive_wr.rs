@@ -113,6 +113,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     remove_file("match.circom");
 
+    println!("post circom");
+
     let circuit_filepath = "match.r1cs";
     let witness_gen_filepath = "match_js/match.wasm";
 
