@@ -44,7 +44,7 @@ struct ProofInfo {
     table: Vec<Integer>,
     doc_len: usize,
     proj_doc_len: usize,
-    num_states: usize,
+    exit_state: usize,
     projections: bool,
     hybrid_len: Option<usize>,
 }
@@ -162,7 +162,7 @@ pub fn run_backend(
                 table: r1cs_converter.table.clone(),
                 doc_len: r1cs_converter.udoc.len(),     // real
                 proj_doc_len: r1cs_converter.doc_len(), // projected
-                num_states: r1cs_converter.num_states,
+                exit_state: r1cs_converter.exit_state,
                 projections: r1cs_converter.doc_subset.is_some(),
                 hybrid_len: r1cs_converter.hybrid_len,
             })
@@ -207,18 +207,18 @@ fn setup<'a>(
     let stack_len = r1cs_converter.max_stack;
 
     // use "empty" (witness-less) circuit to generate nova F
-    let stack_ptr = <G1 as Group>::Scalar::from(0);
-    let stack = vec![<G1 as Group>::Scalar::from(0); stack_len];
+    let stack_ptr = <G1 as Group>::Scalar::zero();
+    let stack = vec![<G1 as Group>::Scalar::zero(); stack_len];
 
     let empty_glue;
     if r1cs_converter.hybrid_len.is_none() {
         let q_len = logmn(r1cs_converter.table.len());
         let qd_len = logmn(r1cs_converter.doc_len());
 
-        let q = vec![<G1 as Group>::Scalar::from(0); q_len];
-        let v = <G1 as Group>::Scalar::from(0);
-        let doc_q = vec![<G1 as Group>::Scalar::from(0); qd_len];
-        let doc_v = <G1 as Group>::Scalar::from(0);
+        let q = vec![<G1 as Group>::Scalar::zero(); q_len];
+        let v = <G1 as Group>::Scalar::zero();
+        let doc_q = vec![<G1 as Group>::Scalar::zero(); qd_len];
+        let doc_v = <G1 as Group>::Scalar::zero();
 
         empty_glue = vec![
             GlueOpts::Split((
@@ -231,9 +231,9 @@ fn setup<'a>(
             )),
             GlueOpts::Split((q, v, doc_q, doc_v, stack_ptr, stack)),
         ];
-        z.append(&mut vec![<G1 as Group>::Scalar::from(0); q_len]);
+        z.append(&mut vec![<G1 as Group>::Scalar::zero(); q_len]);
         z.push(int_to_ff(r1cs_converter.table[0].clone()));
-        z.append(&mut vec![<G1 as Group>::Scalar::from(0); qd_len]);
+        z.append(&mut vec![<G1 as Group>::Scalar::zero(); qd_len]);
         let d = calc_d_clear(
             &r1cs_converter.pc,
             claim_blind,
@@ -242,13 +242,13 @@ fn setup<'a>(
         z.push(d);
     } else {
         let hq_len = logmn(r1cs_converter.hybrid_len.unwrap());
-        let hq = vec![<G1 as Group>::Scalar::from(0); hq_len];
-        let hv = <G1 as Group>::Scalar::from(0);
+        let hq = vec![<G1 as Group>::Scalar::zero(); hq_len];
+        let hv = <G1 as Group>::Scalar::zero();
         empty_glue = vec![
             GlueOpts::Hybrid((hq.clone(), hv.clone(), stack_ptr.clone(), stack.clone())),
             GlueOpts::Hybrid((hq, hv, stack_ptr, stack)),
         ];
-        z.append(&mut vec![<G1 as Group>::Scalar::from(0); hq_len]);
+        z.append(&mut vec![<G1 as Group>::Scalar::zero(); hq_len]);
         let d = calc_d_clear(
             &r1cs_converter.pc,
             claim_blind,
@@ -259,7 +259,12 @@ fn setup<'a>(
     }
 
     z.push(<G1 as Group>::Scalar::from(0 as u64));
-    z.append(&mut vec![<G1 as Group>::Scalar::from(0); stack_len]);
+    z.append(&mut vec![
+        <G1 as Group>::Scalar::from(
+            r1cs_converter.kid_padding as u64
+        );
+        stack_len
+    ]);
     z.push(<G1 as Group>::Scalar::from(0 as u64));
 
     println!("Z LEN {:#?}", z.len());
@@ -268,13 +273,13 @@ fn setup<'a>(
         circ_data.r1cs.clone(),
         None,
         r1cs_converter.pc.clone(),
-        vec![<G1 as Group>::Scalar::from(0); 2],
-        vec![<G1 as Group>::Scalar::from(0); 2],
+        vec![<G1 as Group>::Scalar::zero(); 2],
+        vec![<G1 as Group>::Scalar::zero(); 2],
         empty_glue,
         r1cs_converter.batch_size,
         r1cs_converter.max_branches,
-        <G1 as Group>::Scalar::from(0),
-        <G1 as Group>::Scalar::from(0),
+        <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
     );
 
     // trivial circuit
@@ -352,7 +357,7 @@ fn solve<'a>(
     let mut next_cursor;
     let mut stack_ptr_0 = 0;
     let mut stack_ptr_popped;
-    let mut stack_in = vec![0; r1cs_converter.max_stack];
+    let mut stack_in = vec![r1cs_converter.kid_padding; r1cs_converter.max_stack];
     let mut stack_out;
 
     let mut current_state = r1cs_converter.safa.get_init().index();
@@ -427,7 +432,7 @@ fn solve<'a>(
 
             let q = match running_q {
                 Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                None => vec![<G1 as Group>::Scalar::from(0); q_len],
+                None => vec![<G1 as Group>::Scalar::zero(); q_len],
             };
 
             let v = match running_v {
@@ -445,7 +450,7 @@ fn solve<'a>(
 
             let doc_q = match doc_running_q {
                 Some(rq) => rq.into_iter().map(|x| int_to_ff(x)).collect(),
-                None => vec![<G1 as Group>::Scalar::from(0); qd_len],
+                None => vec![<G1 as Group>::Scalar::zero(); qd_len],
             };
 
             let doc_v = match doc_running_v {
@@ -472,7 +477,7 @@ fn solve<'a>(
 
             let hq = match hybrid_running_q {
                 Some(hq) => hq.into_iter().map(|x| int_to_ff(x)).collect(),
-                None => vec![<G1 as Group>::Scalar::from(0); hq_len],
+                None => vec![<G1 as Group>::Scalar::zero(); hq_len],
             };
 
             let hv = match hybrid_running_v {
@@ -668,7 +673,7 @@ fn prove_and_verify(
         proof_info.pp,
         proof_info.commit,
         proof_info.table,
-        proof_info.num_states,
+        proof_info.exit_state,
         proof_info.doc_len,
         proof_info.proj_doc_len,
         proof_info.hybrid_len,
@@ -685,7 +690,7 @@ fn verify(
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     reef_commit: ReefCommitment,
     table: Vec<Integer>,
-    num_states: usize,
+    exit_state: usize,
     doc_len: usize,
     proj_doc_len: usize,
     hybrid_len: Option<usize>,
@@ -717,37 +722,36 @@ fn verify(
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
     let zn = res.unwrap().0;
 
-    let (stack_ptr, eval_q, eval_v, hybrid_q, hybrid_d) = if hybrid_len.is_none() {
+    let (stack_ptr, eval_q, eval_v, hybrid_q) = if hybrid_len.is_none() {
         let q_len = logmn(table.len());
         let qd_len = logmn(proj_doc_len);
+        assert_eq!(consist_proof.hash_d, zn[2 + q_len + qd_len]);
 
         (
             zn[(q_len + qd_len + 3)],
             Some(zn[1..(q_len + 1)].to_vec()),
             Some(zn[q_len + 1]),
             None,
-            None,
         )
     } else {
         let h_len = logmn(hybrid_len.unwrap());
+        assert_eq!(consist_proof.hash_d, zn[1 + h_len]);
 
         (
             zn[(h_len + 2)],
             None,
             None,
             Some(zn[1..(1 + h_len)].to_vec()),
-            Some(zn[1 + h_len]),
         )
     };
 
-    let (t, q_0) = final_clear_checks(stack_ptr, &table, eval_q, eval_v, hybrid_q, hybrid_d);
+    let (t, q_0) = final_clear_checks(stack_ptr, &table, eval_q, eval_v, hybrid_q);
 
     //CAP verify
-    let cap_d = consist_proof.hash_d.clone(); // TODO
     reef_commit.verify_consistency(consist_proof, t, q_0);
 
     // final accepting
-    assert_eq!(zn[0], <G1 as Group>::Scalar::from(num_states as u64));
+    assert_eq!(zn[0], <G1 as Group>::Scalar::from(exit_state as u64));
 
     #[cfg(feature = "metrics")]
     log::stop(

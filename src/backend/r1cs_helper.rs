@@ -66,7 +66,7 @@ pub(crate) fn trace_preprocessing(
     safa: &SAFA<char>,
 ) -> Vec<LinkedList<TraceElem<char>>> {
     // split
-    let mut sols: Vec<LinkedList<TraceElem<char>>> = Vec::new(); //HashSet<LinkedList<TraceElem<char>>> = HashSet::new();
+    let mut sols: Vec<LinkedList<TraceElem<char>>> = Vec::new();
     let mut sol = trace.clone().unwrap().0;
     let mut i = 0;
     let mut state_i = 0;
@@ -85,72 +85,6 @@ pub(crate) fn trace_preprocessing(
     }
 
     sols.push(sol);
-    //sols.insert(sol);
-
-    // sort
-    /*let mut sorted_sols = vec![];
-
-        if sols.len() == 1 {
-            for s in sols {
-                sorted_sols.push(s);
-            }
-            return sorted_sols;
-        }
-
-            let mut dfs = Dfs::new(&safa.g, safa.get_init());
-
-            while let Some(state) = dfs.next(&safa.g) {
-                if safa.g[state].is_and() {
-                    let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
-                        .g
-                        .edges(state)
-                        .filter(|e| e.source() != e.target())
-                        .collect();
-                    and_edges.sort_by(|a, b| a.target().partial_cmp(&b.target()).unwrap());
-
-                    println!("AND {:#?}, EDGES: {:#?}", state.index(), and_edges);
-
-                    for i in 0..and_edges.len() {
-                        match and_edges[i].weight().clone() {
-                            Either(Err(openset)) => {
-                                let single = openset.is_single(); // single offset/epsilon
-                                if single.is_some() {
-                                    // is single
-                                    let offset = single.unwrap();
-                                    if offset == 0 {
-                                        // epsilon
-
-                                        // find solution in vec
-                                        for e in sols.clone() {
-                                            let front = e.front().unwrap();
-                                            if and_edges[i].source() == front.from_node
-                                                && and_edges[i].target() == front.to_node
-                                            {
-                                                assert_eq!(and_edges[i].weight().clone(), front.edge);
-                                                sorted_sols.push(e);
-                                            }
-                                        }
-                                    } else {
-                                        panic!("a");
-                                    }
-                                } else {
-                                    panic!("b");
-                                }
-                            }
-                            _ => {
-                                panic!("Weird edge coming from ForAll node {:#?}", state);
-                            }
-                        }
-                    }
-                }
-          }
-
-        println!("PREPROCESS {:#?}, OLD {:#?}", sorted_sols, sols);
-        //assert_eq!(sorted_sols.len(), sols.len());
-
-        sorted_sols
-
-    */
 
     sols
 }
@@ -160,10 +94,12 @@ pub fn normal_add_table<'a>(
     num_ab: &mut FxHashMap<Option<char>, usize>,
     set_table: &mut HashSet<Integer>,
     num_states: usize,
+    exit_state: usize,
     num_chars: usize,
     kid_padding: usize,
     max_branches: usize,
     max_offsets: usize,
+    star_offset: usize,
     actual_state: NodeIndex,
     backtrace_state: usize,
     and_states: Vec<usize>,
@@ -206,6 +142,7 @@ pub fn normal_add_table<'a>(
                                     max_branches,
                                     safa,
                                     num_states,
+                                    exit_state,
                                     false,
                                 );
                                 if rel > sub_max_rel {
@@ -237,7 +174,7 @@ pub fn normal_add_table<'a>(
                                 // [0,*]
                                 let c = num_ab[&None];
                                 let lower_offset = 0;
-                                let upper_offset = max_offsets; // TODO!!!
+                                let upper_offset = star_offset;
 
                                 let rel = calc_rel(
                                     state.index(),
@@ -247,6 +184,7 @@ pub fn normal_add_table<'a>(
                                     max_branches,
                                     safa,
                                     num_states,
+                                    exit_state,
                                     false,
                                 );
                                 if rel > sub_max_rel {
@@ -279,7 +217,7 @@ pub fn normal_add_table<'a>(
                                     let upper_offset = if r.end.is_some() {
                                         r.end.unwrap()
                                     } else {
-                                        max_offsets
+                                        star_offset
                                     };
 
                                     let c = num_ab[&None]; //EPSILON
@@ -291,6 +229,7 @@ pub fn normal_add_table<'a>(
                                         max_branches,
                                         safa,
                                         num_states,
+                                        exit_state,
                                         false,
                                     );
                                     if rel > sub_max_rel {
@@ -334,6 +273,7 @@ pub fn normal_add_table<'a>(
                                 max_branches,
                                 safa,
                                 num_states,
+                                exit_state,
                                 false,
                             );
                             if rel > sub_max_rel {
@@ -382,6 +322,7 @@ pub fn normal_add_table<'a>(
                     max_branches,
                     safa,
                     num_states,
+                    exit_state,
                     true,
                 );
                 if rel > sub_max_rel {
@@ -423,6 +364,7 @@ pub(crate) fn calc_rel<'a>(
     max_branches: usize,
     safa: &'a SAFA<char>,
     num_states: usize,
+    exit_state: usize,
     trans: bool,
 ) -> usize {
     // 0 = normal
@@ -435,7 +377,7 @@ pub(crate) fn calc_rel<'a>(
 
     if trans {
         //print!("in {:#?}, OUT {:#?}", in_state, out_state);
-        assert!(out_state == num_states || safa.g[NodeIndex::new(out_state)].is_and());
+        assert!(out_state == exit_state || safa.g[NodeIndex::new(out_state)].is_and());
         assert!(safa.accepting().contains(&NodeIndex::new(in_state)));
         rel = 1;
     } else if safa.accepting().contains(&NodeIndex::new(out_state)) {
@@ -651,7 +593,7 @@ pub(crate) fn prover_mle_partial_eval(
 
 // external full "partial" eval for table check
 pub fn verifier_mle_eval(table: &[Integer], q: &[Integer]) -> Integer {
-    println!("{:#?}",table);
+    println!("{:#?}", table);
     let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
 
     con
