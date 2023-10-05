@@ -1941,7 +1941,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             hybrid_table.append(&mut proj_doc.to_vec());
             hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
 
-            println!("hybrid table {:#?}", hybrid_table.clone());
+            // println!("hybrid table {:#?}", hybrid_table.clone());
 
             let mut hybrid_q = q.clone();
             for qd in doc_q {

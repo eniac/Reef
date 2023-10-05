@@ -109,7 +109,7 @@ impl ReefCommitment {
         let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
         doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
 
-        println!("DOC COMMITMENT {:#?}", doc_ext.clone());
+        // println!("DOC COMMITMENT {:#?}", doc_ext.clone());
         let mle = mle_from_pts(doc_ext);
 
         let single_gen = cap_pk.pk.gens.get_scalar_gen();
@@ -234,7 +234,7 @@ impl ReefCommitment {
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
-        println!("Q IN {:#?}", q.clone());
+        // println!("Q IN {:#?}", q.clone());
 
         // hybrid
         let q_hybrid = if !hybrid {
@@ -247,7 +247,7 @@ impl ReefCommitment {
             q_prime
         };
 
-        println!("HYBRID Q {:#?}", q_hybrid.clone());
+        // println!("HYBRID Q {:#?}", q_hybrid.clone());
 
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
         // println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
@@ -260,7 +260,7 @@ impl ReefCommitment {
             q_hybrid
         };
 
-        println!("PROJECTIONS + HYBRID Q {:#?}", new_q);
+        // println!("PROJECTIONS + HYBRID Q {:#?}", new_q);
 
         let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
         let running_q = q_to_mle_q(&q_rev, self.doc_len);

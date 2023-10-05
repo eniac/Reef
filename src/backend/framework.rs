@@ -627,6 +627,8 @@ fn prove_and_verify(
     assert!(recursive_snark.is_some());
     let recursive_snark = recursive_snark.unwrap();
 
+    println!("post recurisve snark");
+
     // compressed SNARK
     #[cfg(feature = "metrics")]
     log::tic(Component::Prover, "Proof", "Compressed SNARK");
@@ -642,6 +644,8 @@ fn prove_and_verify(
 
     let (q, v) = recv_qv.recv().unwrap();
 
+    println!("post compress");
+
     #[cfg(feature = "metrics")]
     log::tic(Component::Prover, "Proof", "Consistency Proofs");
     //Doc dot prod and consistency
@@ -655,6 +659,8 @@ fn prove_and_verify(
     );
     #[cfg(feature = "metrics")]
     log::stop(Component::Prover, "Proof", "Consistency Proofs");
+
+    println!("post cp");
 
     #[cfg(feature = "metrics")]
     log::space(
@@ -679,6 +685,8 @@ fn prove_and_verify(
         proof_info.hybrid_len,
         consist_proof,
     );
+
+    println!("post verify");
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "Verification", "Full");
