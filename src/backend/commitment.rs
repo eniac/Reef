@@ -165,6 +165,7 @@ impl ReefCommitment {
         let (ipi, ipa, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
             self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len, proj, hybrid);
 
+        println!("post proof dot prod prover");
         let (t_vp_gens, hybrid_ipi, hybrid_ipa) = if !hybrid {
             (None, None, None)
         } else {
@@ -190,6 +191,7 @@ impl ReefCommitment {
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
             ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt);
 
+        println!("post new cap");
         let cap_res = SpartanSNARK::cap_prove(
             &self.cap_pk,
             cap_circuit.clone(),
@@ -198,6 +200,7 @@ impl ReefCommitment {
             &v_ff,
             &v_decommit,
         );
+        println!("post cap prove");
         assert!(cap_res.is_ok());
 
         let cap_snark = cap_res.unwrap();
