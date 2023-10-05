@@ -2213,7 +2213,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         query.push(int_to_ff(prev_running_v.clone()));
         //let query_f: Vec<G1::Scalar> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
-        println!("QUERY {:#?}", query.clone());
+        //println!("QUERY {:#?}", query.clone());
         SpongeAPI::absorb(&mut sponge, query.len() as u32, &query, acc);
 
         // generate claim r
@@ -2303,7 +2303,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             false,
             Some(&prev_running_q),
         );
-        println!("EQ TERM {:#?}", eq_term);
+        //println!("EQ TERM {:#?}", eq_term);
         assert_eq!(
             last_claim,
             (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())

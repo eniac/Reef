@@ -21,7 +21,6 @@ use nova_snark::{
     errors::NovaError,
     provider::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pasta::*,
         pedersen::{Commitment, CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
@@ -235,6 +234,8 @@ impl ReefCommitment {
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
+        println!("Q IN {:#?}", q.clone());
+
         // hybrid
         let q_hybrid = if !hybrid {
             q
@@ -246,6 +247,8 @@ impl ReefCommitment {
             q_prime
         };
 
+        println!("HYBRID Q {:#?}", q_hybrid.clone());
+
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
         println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
         let new_q = if proj {
@@ -256,6 +259,8 @@ impl ReefCommitment {
         } else {
             q_hybrid
         };
+
+        println!("PROJECTIONS + HYBRID Q {:#?}", new_q);
 
         let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
         let running_q = q_to_mle_q(&q_rev, self.doc_len);
