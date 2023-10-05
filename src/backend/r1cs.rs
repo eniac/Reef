@@ -83,84 +83,30 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // generate T
         let num_states = safa.g.node_count();
         let num_chars = num_ab.len();
-        let mut max_offsets = 1;
-        let mut max_branches = 1;
-        for (in_state, edge, _) in safa.deltas() {
-            match edge {
-                Either(Err(openset)) => {
-                    if openset.is_single().is_none() && !openset.is_full() {
-                        // ranges
-                        let mut num_offsets = 0;
-                        let mut iter = openset.0.iter();
-                        if let Some(r) = iter.next() {
-                            if r.end.is_some() {
-                                num_offsets += r.end.unwrap() - r.start;
-                            }
-                        }
-                        max_offsets = max(max_offsets, num_offsets);
-                    }
-                }
-                _ => {}
-            }
-
-            if in_state.is_and() {
-                let and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
-                    .g
-                    .edges(in_state.inner)
-                    .filter(|e| e.source() != e.target())
-                    .collect();
-
-                if and_edges.len() > max_branches {
-                    max_branches = and_edges.len();
-                }
-            }
-        }
+        let max_offsets = safa.max_skip_offset().max(1);
+        let max_branches = safa.max_forall_fanout().max(1);
 
         let mut set_table: HashSet<Integer> = HashSet::default();
 
         //safa.write_pdf("safa1").unwrap();
-        /*
-                println!(
-                    "STATES {:#?}",
-                    safa.g
-                        .node_indices()
-                        .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-                );
-        */
+
+        /*println!(
+            "STATES {:#?}",
+            safa.g
+                .node_indices()
+                .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
+        );*/
+
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
         let kid_padding = 0; // TODO !!
         let mut max_stack = 1;
         let mut max_rel = 1;
-        let mut path_len = 0;
-        let mut paths = vec![];
-        let deltas = safa
-            .g
-            .node_indices()
-            .flat_map(|n| {
-                safa.g.edges(n).filter_map(|e| {
-                    // Filter out sink state transitions
-                    if safa.is_sink(e.source()) || safa.is_sink(e.target()) {
-                        None
-                    } else if safa.g[e.source()].is_and() {
-                        Some((e.source(), e.weight().clone(), e.target()))
-                    } else {
-                        Some((e.source(), e.weight().clone(), e.target()))
-                    }
-                })
-            })
-            .collect();
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             //println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
-                if path_len > 0 {
-                    println!("PUSHING {} @ STATE {:#?}", path_len, all_state);
-                    paths.push(path_len);
-                }
-                path_len = 0;
-
                 let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
                     .edges(all_state)
@@ -286,7 +232,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 let sub_max_rel = normal_add_table(
                     &safa,
-                    &deltas,
                     &mut num_ab,
                     &mut set_table,
                     num_states,
@@ -312,7 +257,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let sub_max_rel = normal_add_table(
             &safa,
-            &deltas,
             &mut num_ab,
             &mut set_table,
             num_states,
@@ -397,6 +341,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         let doc_subset = if projection.is_some() {
+            if (usize_doc.len().next_power_of_two() <= table.len()) && hybrid {
+                panic!(
+                    "Doc len {} <= table size {} already. Projections AND hybrid not useful together, choose one.",
+                usize_doc.len().next_power_of_two(), table.len());
+            }
+
             let real_start = projection.unwrap();
 
             let end = usize_doc.len().next_power_of_two();
@@ -409,8 +359,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             // proj vs hybrid calc
-            if (end < table.len()) && hybrid {
-                println!("ALERT: you are using projections and the hybrid table, and projecting a document that is already smaller than the public table and must be padded anyway. This is probably an inefficient use of either projections or the hybrid table");
+            if (end - start < table.len()) && hybrid {
+                println!("ALERT: using projections with hybrid, optimal (smallest) projection len < table len, so extending projection len to table len");
+                start = end - table.len();
             }
             if start == 0 {
                 None
@@ -2006,6 +1957,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             hybrid_table.append(&mut vec![Integer::from(0); half_len - self.table.len()]);
             hybrid_table.append(&mut proj_doc.to_vec());
             hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
+
             println!("hybrid table {:#?}", hybrid_table.clone());
 
             let mut hybrid_q = q.clone();
@@ -2213,7 +2165,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         query.push(int_to_ff(prev_running_v.clone()));
         //let query_f: Vec<G1::Scalar> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
-        //println!("QUERY {:#?}", query.clone());
         SpongeAPI::absorb(&mut sponge, query.len() as u32, &query, acc);
 
         // generate claim r
@@ -2647,7 +2598,19 @@ mod tests {
     #[test]
     fn proj_hybrid() {
         init();
-
+        test_func_no_hash(
+            "abcd".to_string(),
+            "^.............d$".to_string(),
+            "aabbccddaabbdd".to_string(), // really [ aabbcc, EOF, epsilon ]
+            vec![2],                      // 2],
+            true,
+            Some(5), // (4,8)
+            true,
+        );
+    }
+    #[test]
+    #[should_panic]
+    fn proj_hybrid_panic() {
         test_func_no_hash(
             "abcd".to_string(),
             "^.....c$".to_string(),

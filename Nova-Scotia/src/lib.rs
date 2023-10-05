@@ -226,7 +226,7 @@ where
             start_public_input.clone(),
             z0_secondary.clone(),
         );
-        log::stop(Component::Solver, "Witness", format!("Prove_{}",i).as_str());
+        log::stop(Component::Solver, "Prove", format!("Prove_{}",i).as_str());
 
         assert!(res.is_ok());
         recursive_snark = Some(res.unwrap());

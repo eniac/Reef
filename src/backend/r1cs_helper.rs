@@ -157,7 +157,6 @@ pub(crate) fn trace_preprocessing(
 
 pub fn normal_add_table<'a>(
     safa: &'a SAFA<char>,
-    deltas: &HashSet<(NodeIndex<u32>, Either<char, Skip>, NodeIndex<u32>)>,
     num_ab: &mut FxHashMap<Option<char>, usize>,
     set_table: &mut HashSet<Integer>,
     num_states: usize,
@@ -183,7 +182,9 @@ pub fn normal_add_table<'a>(
         if !final_exists_pass || !safa.g[state].is_and() {
             for edge in safa.g.edges(state) {
                 // filter extra edges - TODO see if helps
-                if deltas.contains(&(edge.source(), edge.weight().clone(), edge.target())) {
+                //println!("From {:?} - {} -> {:?}", edge.source(), edge.weight(), edge.target());
+                if !safa.is_sink(&edge.target()) {
+                    //println!("Found sink {:?}", edge.target());
                     // !(safa.is_sink(edge.source()) || safa.is_sink(edge.target())) {
                     let out_state = edge.target().index();
 
@@ -569,6 +570,8 @@ pub(crate) fn prover_mle_partial_eval(
     let m = x.len();
 
     if for_t {
+        println!("prods len : {}", prods.len());
+        println!("base pow: {}", base.pow(m as u32 - 1));
         assert!(base.pow(m as u32 - 1) <= prods.len());
         assert!(base.pow(m as u32) >= prods.len());
         assert_eq!(es.len(), prods.len()); //todo final q
@@ -648,6 +651,7 @@ pub(crate) fn prover_mle_partial_eval(
 
 // external full "partial" eval for table check
 pub fn verifier_mle_eval(table: &[Integer], q: &[Integer]) -> Integer {
+    println!("{:#?}",table);
     let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
 
     con

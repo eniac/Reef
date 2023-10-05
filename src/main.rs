@@ -51,8 +51,9 @@ fn main() {
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "SAFA", "SAFA");
 
+        
         let r = re::simpl(re::new(&opt.re));
-        //    println!("REGEX: {:#?}", r));
+        println!("make r");
 
         // Compile regex to SAFA
         let safa = if opt.negate {
@@ -60,6 +61,9 @@ fn main() {
         } else {
             SAFA::new(&ab, &r)
         };
+        println!("make safa");
+        println!("safa size: {}",safa.num_edges());
+    
 
         // Is document well-formed
         // nfa.well_formed(&doc);

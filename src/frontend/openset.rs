@@ -377,6 +377,12 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
         acc
     }
 
+    /// Maximum offset (if it exists)
+    pub fn max_offset(&self) -> Option<C> {
+        let r = self.0.last()?;
+        r.end
+    }
+
     /// How many intervals
     pub fn len(&self) -> usize {
         self.0.len()

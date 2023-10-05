@@ -78,7 +78,9 @@ pub fn run_backend(
         // stop gap for cost model - don't need to time >:)
         let mut batch_size = if temp_batch_size == 0 {
             let trace = safa.solve(&doc);
+            println!("post solve");
             let mut sols = trace_preprocessing(&trace, &safa);
+            println!("post trace");
 
             let mut paths = vec![];
             let mut path_len = 1;
@@ -121,6 +123,7 @@ pub fn run_backend(
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
         let proj = if projections { safa.projection() } else { None };
+        println!("hybrid: {}", hybrid);
         let mut r1cs_converter = R1CS::new(&safa, &doc, batch_size, proj, hybrid, sc.clone());
 
         #[cfg(feature = "metrics")]
@@ -357,18 +360,21 @@ fn solve<'a>(
 
     let mut next_state = 0;
 
+    //measure safa solve
     let trace = r1cs_converter.safa.solve(doc);
     let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
+    //end safa solve
 
     let commit_blind = r1cs_converter.doc_hash.unwrap();
 
     let mut i = 0;
     while r1cs_converter.sol_num < sols.len() {
         #[cfg(feature = "metrics")]
-        let test = format!("step {}", i);
-
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Solver, &test, "witness generation");
+        log::tic(
+            Component::Solver,
+            "Witness Generation",
+            format!("step_{}", i).as_str(),
+        );
         // allocate real witnesses for round i
 
         (
@@ -398,9 +404,6 @@ fn solve<'a>(
         for (cur, kid) in &r1cs_converter.stack {
             stack_out.push(cur * r1cs_converter.num_states + kid);
         }
-
-        #[cfg(feature = "metrics")]
-        log::stop(Component::Solver, &test, "witness generation");
 
         // just for debugging :)
         //circ_data.check_all(&wits);
@@ -526,7 +529,11 @@ fn solve<'a>(
         );
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Solver, &test, "witness generation");
+        log::stop(
+            Component::Solver,
+            "Witness Generation",
+            format!("step_{}", i).as_str(),
+        );
 
         sender.send(Some(circuit_primary)).unwrap(); //witness_i).unwrap();
 

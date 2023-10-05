@@ -216,7 +216,7 @@ impl BaseParser<char> for AsciiParser {
         buffer
             .into_iter()
             .map(|i| i as char)
-            .filter(|c| *c != '\n' && *c != '\r')
+            // .filter(|c| *c != '\n' && *c != '\r')
             .collect()
     }
 }
