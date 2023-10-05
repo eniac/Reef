@@ -267,7 +267,7 @@ fn setup<'a>(
     ]);
     z.push(<G1 as Group>::Scalar::from(0 as u64));
 
-    println!("Z LEN {:#?}", z.len());
+    // println!("Z LEN {:#?}", z.len());
 
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
         circ_data.r1cs.clone(),

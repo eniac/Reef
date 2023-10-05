@@ -250,7 +250,7 @@ impl ReefCommitment {
         println!("HYBRID Q {:#?}", q_hybrid.clone());
 
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
-        println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
+        // println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
         let new_q = if proj {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q_hybrid);
@@ -269,7 +269,7 @@ impl ReefCommitment {
         let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
         let commit_running_v =
             <G1 as Group>::CE::commit(&self.single_gens, &[running_v.clone()], &decommit_running_v);
-        println!("V = {:#?}", running_v.clone());
+        // println!("V = {:#?}", running_v.clone());
 
         let (decommit_v_prime, commit_v_prime, v_prime) = if !hybrid {
             // v' == v when not hybrid
@@ -279,7 +279,7 @@ impl ReefCommitment {
             for i in 0..self.mle_doc.len() {
                 v_prime += &self.mle_doc[i].clone() * running_q[i].clone();
             }
-            println!("V PRIME {:#?}", v_prime);
+            // println!("V PRIME {:#?}", v_prime);
 
             let decommit_v_prime = <G1 as Group>::Scalar::random(&mut OsRng);
             let commit_v_prime =
@@ -416,12 +416,12 @@ impl ReefCommitment {
         let z_0 = vec![proof.hash_d];
         let z_out = proof.circuit.output(&z_0);
         let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
-        println!("IO {:#?}", io.clone());
+        // println!("IO {:#?}", io.clone());
         let res = proof
             .snark
             .cap_verify(&self.cap_vk, &io, &proof.v_commit.compress());
         // TODO compress()
-        println!("RES {:#?}", res);
+        // println!("RES {:#?}", res);
 
         assert!(res.is_ok());
     }
@@ -535,10 +535,10 @@ fn proj_prefix(proj_doc_len: usize, doc_ext_len: usize) -> Vec<<G1 as Group>::Sc
 
     let mut start_idx = start / chunk_size;
 
-    println!(
-        "chunk size {}, num chunks {}, s = {}",
-        chunk_size, num_chunks, start_idx
-    );
+    // println!(
+    //     "chunk size {}, num chunks {}, s = {}",
+    //     chunk_size, num_chunks, start_idx
+    // );
 
     let mut q_add = vec![];
     for i in 0..logmn(num_chunks) {
@@ -930,7 +930,7 @@ mod tests {
             t += mle_table_f[i].clone() * q_ext_sub[i].clone();
         }
 
-        println!("t {:#?}, v' {:#?}, v {:#?}", t, v_sub, v);
+        // println!("t {:#?}, v' {:#?}, v {:#?}", t, v_sub, v);
 
         assert_eq!(
             v,
