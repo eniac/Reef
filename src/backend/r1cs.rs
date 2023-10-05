@@ -32,6 +32,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     max_offsets: usize,
+    star_offset: usize,
     pub doc_hash: Option<F>,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
@@ -48,7 +49,8 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub max_branches: usize,
     pub max_stack: usize,
     pub num_states: usize,
-    kid_padding: usize,
+    pub exit_state: usize,
+    pub kid_padding: usize,
     // witness crap
     pub sol_num: usize,
     pub stack: Vec<(usize, usize)>,
@@ -81,39 +83,40 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         num_ab.insert(None, i + 1); // EPSILON
 
         // generate T
-        let num_states = safa.g.node_count();
+        let mut num_states = safa.g.node_count();
+        let kid_padding = num_states;
+        num_states += 1;
+        let exit_state = num_states;
+        num_states += 1;
+
         let num_chars = num_ab.len();
-        let max_offsets = safa.max_skip_offset();
+
+        let mut max_offsets = safa.max_skip_offset().max(1);
+        let star_offset = max_offsets;
+        max_offsets += 1;
+
         let max_branches = safa.max_forall_fanout().max(1);
+
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        // safa.write_pdf("safa1").unwrap();
-        /*
-                println!(
-                    "STATES {:#?}",
-                    safa.g
-                        .node_indices()
-                        .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-                );
-        */
+        //safa.write_pdf("safa1").unwrap();
+
+        /*println!(
+            "STATES {:#?}",
+            safa.g
+                .node_indices()
+                .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
+        );*/
+
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
-        let kid_padding = 0; // TODO !!
         let mut max_stack = 1;
         let mut max_rel = 1;
-        let mut path_len = 0;
-        let mut paths = vec![];
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             //println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
-                if path_len > 0 {
-                    println!("PUSHING {} @ STATE {:#?}", path_len, all_state);
-                    paths.push(path_len);
-                }
-                path_len = 0;
-
                 let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
                     .edges(all_state)
@@ -139,6 +142,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     max_branches,
                     &safa,
                     num_states,
+                    exit_state,
                     false,
                 );
                 if rel > max_rel {
@@ -183,6 +187,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                         max_branches,
                                         &safa,
                                         num_states,
+                                        exit_state,
                                         false,
                                     );
                                     if rel > max_rel {
@@ -232,7 +237,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         for (forall, kids) in &foralls_w_kids {
             for k in 0..kids.len() {
                 let backtrace_state = if k == kids.len() - 1 && fa == foralls_w_kids.len() - 1 {
-                    num_states
+                    exit_state
                 } else {
                     *forall
                 };
@@ -242,10 +247,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     &mut num_ab,
                     &mut set_table,
                     num_states,
+                    exit_state,
                     num_chars,
                     kid_padding,
                     max_branches,
                     max_offsets,
+                    star_offset,
                     NodeIndex::new(kids[k]),
                     backtrace_state,
                     kids.clone(),
@@ -267,12 +274,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             &mut num_ab,
             &mut set_table,
             num_states,
+            exit_state,
             num_chars,
             kid_padding,
             max_branches,
             max_offsets,
+            star_offset,
             safa.get_init(), //exists_state,
-            num_states,      // backtrace state
+            exit_state,      // backtrace state
             vec![],
             true,
         );
@@ -281,8 +290,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // add "last" loop
-        let in_state = num_states;
-        let out_state = num_states;
+        let in_state = exit_state;
+        let out_state = exit_state;
         let lower_offset = 0;
         let upper_offset = 0;
         let c = num_ab[&None]; //EPSILON
@@ -344,10 +353,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut stack = vec![];
         for _i in 0..max_stack {
-            stack.push((0, 0)); // TODO CHANGE THIS TO THE PADDING
+            stack.push((0, kid_padding));
         }
 
         let doc_subset = if projection.is_some() {
+            if (usize_doc.len().next_power_of_two() <= table.len()) && hybrid {
+                panic!(
+                    "Doc len {} <= table size {} already. Projections AND hybrid not useful together, choose one.",
+                usize_doc.len().next_power_of_two(), table.len());
+            }
+
             let real_start = projection.unwrap();
 
             let end = usize_doc.len().next_power_of_two();
@@ -360,8 +375,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             // proj vs hybrid calc
-            if (end < table.len()) && hybrid {
-                println!("ALERT: you are using projections and the hybrid table, and projecting a document that is already smaller than the public table and must be padded anyway. This is probably an inefficient use of either projections or the hybrid table");
+            if (end - start < table.len()) && hybrid {
+                println!("ALERT: using projections with hybrid, optimal (smallest) projection len < table len, so extending projection len to table len");
+                start = end - table.len();
             }
             if start == 0 {
                 None
@@ -395,6 +411,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_ab,
             table, // TODO fix else
             max_offsets,
+            star_offset,
             doc_hash: None,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
@@ -405,6 +422,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             max_branches,
             max_stack,
             num_states,
+            exit_state,
             kid_padding,
             sol_num: 0,
             stack,
@@ -950,7 +968,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     term(
                         Op::Eq,
                         vec![
-                            new_const(self.max_offsets),
+                            new_const(self.star_offset),
                             new_var(format!("upper_offset_{}", j)),
                         ],
                     ),
@@ -1427,7 +1445,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("cursor_popped"), new_wit(popped_elt.0));
         wits.insert(format!("cursor_0"), new_wit(popped_elt.0));
-        //wits.insert(format!("state_{}", self.batch_size), new_wit(popped_elt.1));
 
         // after pop
         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
@@ -1511,6 +1528,26 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
+    fn wit_rel(
+        &self,
+        state_i: usize,
+        next_state: usize,
+        children: &Vec<usize>,
+        trans: bool,
+    ) -> usize {
+        calc_rel(
+            state_i,
+            next_state,
+            children,
+            self.kid_padding,
+            self.max_branches,
+            &self.safa,
+            self.num_states,
+            self.exit_state,
+            trans,
+        )
+    }
+
     fn padding_v(
         &self,
         wits: &mut FxHashMap<String, Value>,
@@ -1528,30 +1565,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let lower_offset_i = 0;
         let upper_offset_i = 0;
 
-        let rel_i = if state_i == self.num_states {
+        let rel_i = if state_i == self.exit_state {
             0
         } else if self.safa.g[NodeIndex::new(state_i)].is_and() {
-            calc_rel(
-                state_i,
-                next_state,
-                &self.foralls_w_kids[&state_i],
-                self.kid_padding,
-                self.max_branches,
-                &self.safa,
-                self.num_states,
-                false,
-            )
+            self.wit_rel(state_i, next_state, &self.foralls_w_kids[&state_i], false)
         } else {
-            calc_rel(
-                state_i,
-                next_state,
-                &vec![],
-                self.kid_padding,
-                self.max_branches,
-                &self.safa,
-                self.num_states,
-                false,
-            )
+            self.wit_rel(state_i, next_state, &vec![], false)
         };
 
         wits.insert(format!("char_{}", i), new_wit(char_num));
@@ -1620,7 +1639,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             upper_offset_i = single.unwrap();
                         } else if openset.is_full() {
                             lower_offset_i = 0;
-                            upper_offset_i = self.max_offsets;
+                            upper_offset_i = self.star_offset;
                         } else {
                             let mut iter = openset.0.iter();
                             if let Some(r) = iter.next() {
@@ -1629,7 +1648,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 upper_offset_i = if r.end.is_some() {
                                     r.end.unwrap()
                                 } else {
-                                    self.max_offsets
+                                    self.star_offset
                                 };
                             } else {
                                 panic!("found edge with bad range");
@@ -1676,6 +1695,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        );
+
+        println!(
+            "Upper Lower offset {:#?} {:#?}",
+            upper_offset_i, lower_offset_i
         );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
@@ -1763,34 +1787,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 offset_i = 0;
                 if self.sol_num + 1 == sols.len() {
                     // very last
-                    next_state = self.num_states; // TODO
+                    next_state = self.exit_state;
                 } else {
                     next_state = sols[self.sol_num + 1].front().unwrap().from_node.index();
                 }
 
                 // transition
                 rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
-                    calc_rel(
-                        state_i,
-                        next_state,
-                        &self.foralls_w_kids[&state_i],
-                        self.kid_padding,
-                        self.max_branches,
-                        &self.safa,
-                        self.num_states,
-                        true,
-                    )
+                    self.wit_rel(state_i, next_state, &self.foralls_w_kids[&state_i], true)
                 } else {
-                    calc_rel(
-                        state_i,
-                        next_state,
-                        &vec![],
-                        self.kid_padding,
-                        self.max_branches,
-                        &self.safa,
-                        self.num_states,
-                        true,
-                    )
+                    self.wit_rel(state_i, next_state, &vec![], true)
                 };
 
                 v.push(self.edge_v(
@@ -1876,27 +1882,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     cursor_i += offset_i;
 
                     rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
-                        calc_rel(
-                            state_i,
-                            next_state,
-                            &self.foralls_w_kids[&state_i],
-                            self.kid_padding,
-                            self.max_branches,
-                            &self.safa,
-                            self.num_states,
-                            false,
-                        )
+                        self.wit_rel(state_i, next_state, &self.foralls_w_kids[&state_i], false)
                     } else {
-                        calc_rel(
-                            state_i,
-                            next_state,
-                            &vec![],
-                            self.kid_padding,
-                            self.max_branches,
-                            &self.safa,
-                            self.num_states,
-                            false,
-                        )
+                        self.wit_rel(state_i, next_state, &vec![], false)
                     };
                     v.push(self.edge_v(
                         &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i,
@@ -1957,7 +1945,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             hybrid_table.append(&mut vec![Integer::from(0); half_len - self.table.len()]);
             hybrid_table.append(&mut proj_doc.to_vec());
             hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
-            // println!("hybrid table {:#?}", hybrid_table.clone());
+
+            println!("hybrid table {:#?}", hybrid_table.clone());
 
             let mut hybrid_q = q.clone();
             for qd in doc_q {
@@ -2164,7 +2153,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         query.push(int_to_ff(prev_running_v.clone()));
         //let query_f: Vec<G1::Scalar> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
-        // println!("QUERY {:#?}", query.clone());
         SpongeAPI::absorb(&mut sponge, query.len() as u32, &query, acc);
 
         // generate claim r
@@ -2543,12 +2531,8 @@ mod tests {
                 Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
                 None => None,
             };
-            let hrv = match hybrid_running_v {
-                Some(x) => Some(int_to_ff(x)),
-                None => None,
-            };
 
-            assert_eq!(next_state, r1cs_converter.num_states);
+            assert_eq!(next_state, r1cs_converter.exit_state);
 
             let doc_len = r1cs_converter.udoc.len();
             let proj_len = r1cs_converter.doc_len();
@@ -2570,13 +2554,12 @@ mod tests {
                 rq,
                 rv,
                 hrq,
-                hrv,
             );
 
             reef_commit.verify_consistency(consist_proof, t, q_0);
 
             // final accepting
-            assert_eq!(next_state, r1cs_converter.num_states);
+            assert_eq!(next_state, r1cs_converter.exit_state);
 
             println!("actual cost: {:#?}", pd.r1cs.constraints.len());
             println!("\n\n\n");
@@ -2595,10 +2578,22 @@ mod tests {
         }
     }
 
-    // #[test]
+    #[test]
     fn proj_hybrid() {
         init();
-
+        test_func_no_hash(
+            "abcd".to_string(),
+            "^.............d$".to_string(),
+            "aabbccddaabbdd".to_string(), // really [ aabbcc, EOF, epsilon ]
+            vec![2],                      // 2],
+            true,
+            Some(5), // (4,8)
+            true,
+        );
+    }
+    #[test]
+    #[should_panic]
+    fn proj_hybrid_panic() {
         test_func_no_hash(
             "abcd".to_string(),
             "^.....c$".to_string(),

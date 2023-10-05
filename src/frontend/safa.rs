@@ -2,10 +2,10 @@ use itertools::Itertools;
 use std::collections::BTreeSet;
 use std::process::Command;
 
+use petgraph::algo::isomorphism::*;
 use petgraph::dot::Dot;
 use petgraph::graph::{EdgeReference, NodeIndex};
 use petgraph::visit::*;
-use petgraph::algo::isomorphism::*;
 use petgraph::Graph;
 
 use std::result::Result;
@@ -18,9 +18,9 @@ use rayon::iter::*;
 
 use core::fmt;
 use core::fmt::{Display, Formatter};
+use lazy_static::lazy_static;
 use std::fmt::Debug;
 use std::hash::Hash;
-use lazy_static::lazy_static;
 
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Either<A, B>(pub Result<A, B>);
@@ -85,7 +85,7 @@ pub struct SAFA<C: Clone> {
     pub sink: Option<NodeIndex<u32>>,
 
     /// Forks
-    pub forks: BTreeSet<NodeIndex<u32>>
+    pub forks: BTreeSet<NodeIndex<u32>>,
 }
 
 impl PartialEq for SAFA<char> {
@@ -113,7 +113,7 @@ impl SAFA<char> {
             g,
             accepting: BTreeSet::new(),
             sink: None,
-            forks: BTreeSet::new()
+            forks: BTreeSet::new(),
         };
         // Recursively build graph
         s.add(n_init);
@@ -307,14 +307,20 @@ impl SAFA<char> {
 
     /// And nodes in the SAFA
     pub fn forall_nodes(&self) -> BTreeSet<NodeIndex<u32>> {
-        self.forks.clone().into_iter()
-            .filter(|i| self.g[*i].is_and()).collect()
+        self.forks
+            .clone()
+            .into_iter()
+            .filter(|i| self.g[*i].is_and())
+            .collect()
     }
 
     /// Or nodes in the SAFA
     pub fn exist_nodes(&self) -> BTreeSet<NodeIndex<u32>> {
-        self.forks.clone().into_iter()
-            .filter(|i| self.g[*i].is_or()).collect()
+        self.forks
+            .clone()
+            .into_iter()
+            .filter(|i| self.g[*i].is_or())
+            .collect()
     }
 
     /// Number of edges in the graph
@@ -329,7 +335,7 @@ impl SAFA<char> {
         let mut dfs = Dfs::new(&self.g, self.get_init());
         while let Some(nx) = dfs.next(&self.g) {
             // we can access `graph` mutably here still
-            for skip in self.g.edges(nx).filter_map(|e|e.weight().0.clone().err()) {
+            for skip in self.g.edges(nx).filter_map(|e| e.weight().0.clone().err()) {
                 if let Some(off) = skip.max_offset() {
                     if offset <= off {
                         offset = off;
@@ -344,10 +350,14 @@ impl SAFA<char> {
     pub fn max_forall_fanout(&self) -> usize {
         self.forall_nodes()
             .iter()
-            .map(|n|
-                self.g.edges(*n).filter(|e| e.source() != e.target()).count()
-            )
-            .max().unwrap_or(0)
+            .map(|n| {
+                self.g
+                    .edges(*n)
+                    .filter(|e| e.source() != e.target())
+                    .count()
+            })
+            .max()
+            .unwrap_or(0)
     }
 
     /// Accepting states
@@ -493,11 +503,13 @@ impl SAFA<char> {
     pub fn write_pdf(&self, filename: &str) -> std::io::Result<()> {
         // Graph [g]
         let strg = self.g.map(
-            |n, b| if self.accepting.contains(&n) {
-                        format!("{} ✓", b)
+            |n, b| {
+                if self.accepting.contains(&n) {
+                    format!("{} ✓", b)
                 } else {
-                        b.to_string()
-                },
+                    b.to_string()
+                }
+            },
             |_, e| Either(e.clone().0.map(|c| c.to_string())),
         );
 
@@ -815,7 +827,13 @@ mod tests {
         let doc: Vec<_> = "aaaa".chars().collect();
         equiv_upto_epsilon(
             &safa.solve(&doc),
-            &Trace::new(&[TraceElem::new(0, &Either(Err(Skip::open(4).union(&Skip::nil()))), 2, 0, 4)]),
+            &Trace::new(&[TraceElem::new(
+                0,
+                &Either(Err(Skip::open(4).union(&Skip::nil()))),
+                2,
+                0,
+                4,
+            )]),
         )
     }
 

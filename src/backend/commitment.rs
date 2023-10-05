@@ -21,7 +21,6 @@ use nova_snark::{
     errors::NovaError,
     provider::{
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pasta::*,
         pedersen::{Commitment, CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
@@ -85,9 +84,9 @@ impl ReefCommitment {
         // need empty circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(
             &pc,
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
-            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::zero(),
+            <G1 as Group>::Scalar::zero(),
+            <G1 as Group>::Scalar::zero(),
         );
 
         // produce CAP keys
@@ -110,7 +109,7 @@ impl ReefCommitment {
         let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
         doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
 
-        // println!("DOC COMMITMENT {:#?}", doc_ext.clone());
+        println!("DOC COMMITMENT {:#?}", doc_ext.clone());
         let mle = mle_from_pts(doc_ext);
 
         let single_gen = cap_pk.pk.gens.get_scalar_gen();
@@ -235,6 +234,8 @@ impl ReefCommitment {
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
+        println!("Q IN {:#?}", q.clone());
+
         // hybrid
         let q_hybrid = if !hybrid {
             q
@@ -246,6 +247,8 @@ impl ReefCommitment {
             q_prime
         };
 
+        println!("HYBRID Q {:#?}", q_hybrid.clone());
+
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
         println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
         let new_q = if proj {
@@ -256,6 +259,8 @@ impl ReefCommitment {
         } else {
             q_hybrid
         };
+
+        println!("PROJECTIONS + HYBRID Q {:#?}", new_q);
 
         let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
         let running_q = q_to_mle_q(&q_rev, self.doc_len);
@@ -270,7 +275,7 @@ impl ReefCommitment {
             // v' == v when not hybrid
             (None, None, running_v.clone())
         } else {
-            let mut v_prime = <G1 as Group>::Scalar::from(0);
+            let mut v_prime = <G1 as Group>::Scalar::zero();
             for i in 0..self.mle_doc.len() {
                 v_prime += &self.mle_doc[i].clone() * running_q[i].clone();
             }
@@ -479,14 +484,13 @@ pub fn final_clear_checks(
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
     final_hybrid_q: Option<Vec<<G1 as Group>::Scalar>>,
-    final_hybrid_hash: Option<<G1 as Group>::Scalar>,
 ) -> (Option<<G1 as Group>::Scalar>, Option<<G1 as Group>::Scalar>) {
     // stack ptr is 0 (stack is empty)
-    assert_eq!(stack_ptr, <G1 as Group>::Scalar::from(0));
+    assert_eq!(stack_ptr, <G1 as Group>::Scalar::zero());
 
-    match (final_q, final_v, final_hybrid_q, final_hybrid_hash) {
+    match (final_q, final_v, final_hybrid_q) {
         // split
-        (Some(q), Some(v), None, None) => {
+        (Some(q), Some(v), None) => {
             let mut q_i = vec![];
             for f in q {
                 q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
@@ -497,14 +501,10 @@ pub fn final_clear_checks(
             );
 
             (None, None)
-
-            // document
-            // TODO MOVE THIS
-            // assert_eq!(d, hash);
         }
 
         // hybrid
-        (None, None, Some(q), Some(d)) => {
+        (None, None, Some(q)) => {
             let q0 = q[0].clone();
             let mut q_i = vec![];
             for f in q {
@@ -715,7 +715,7 @@ mod tests {
         let running_v = <<G1 as Group>::Scalar>::from(10);
 
         // sanity
-        let mut sum = <G1 as Group>::Scalar::from(0);
+        let mut sum = <G1 as Group>::Scalar::zero();
         for i in 0..scalars.len() {
             sum += scalars[i].clone() * running_q[i].clone();
         }
@@ -783,7 +783,7 @@ mod tests {
 
         assert_eq!(mle_f.len(), q_ext.len());
         // inner product
-        let mut sum = <G1 as Group>::Scalar::from(0);
+        let mut sum = <G1 as Group>::Scalar::zero();
         for i in 0..mle.len() {
             sum += mle_f[i].clone() * q_ext[i].clone();
         }
@@ -824,27 +824,27 @@ mod tests {
         // 011 = 6
         //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
         let q = vec![
-            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::zero(),
             <G1 as Group>::Scalar::from(1),
             <G1 as Group>::Scalar::from(1), // selector
         ];
         let q_ext = q_to_mle_q(&q, mle_f.len());
         assert_eq!(mle_f.len(), q_ext.len());
         // inner product
-        let mut sum = <G1 as Group>::Scalar::from(0);
+        let mut sum = <G1 as Group>::Scalar::zero();
         for i in 0..mle.len() {
             sum += mle_f[i].clone() * q_ext[i].clone();
         }
 
         let q_sub = vec![
-            <G1 as Group>::Scalar::from(0),
+            <G1 as Group>::Scalar::zero(),
             <G1 as Group>::Scalar::from(1),
         ];
         let q_ext_sub = q_to_mle_q(&q_sub, mle_sub_f.len());
         assert_eq!(mle_sub_f.len(), q_ext_sub.len());
 
         // inner product
-        let mut sum_sub = <G1 as Group>::Scalar::from(0);
+        let mut sum_sub = <G1 as Group>::Scalar::zero();
         for i in 0..mle_sub.len() {
             sum_sub += mle_sub_f[i].clone() * q_ext_sub[i].clone();
         }
@@ -895,7 +895,7 @@ mod tests {
         let q_ext = q_to_mle_q(&q, mle_f.len());
         assert_eq!(mle_f.len(), q_ext.len());
         // inner product
-        let mut v = <G1 as Group>::Scalar::from(0);
+        let mut v = <G1 as Group>::Scalar::zero();
         for i in 0..mle.len() {
             v += mle_f[i].clone() * q_ext[i].clone();
         }
@@ -908,7 +908,7 @@ mod tests {
         assert_eq!(mle_sub_f.len(), q_ext_sub.len());
 
         // inner product
-        let mut v_sub = <G1 as Group>::Scalar::from(0);
+        let mut v_sub = <G1 as Group>::Scalar::zero();
         for i in 0..mle_sub.len() {
             v_sub += mle_sub_f[i].clone() * q_ext_sub[i].clone();
         }
@@ -925,7 +925,7 @@ mod tests {
             mle_table_f.push(int_to_ff(m.clone()));
         }
 
-        let mut t = <G1 as Group>::Scalar::from(0);
+        let mut t = <G1 as Group>::Scalar::zero();
         for i in 0..mle_sub.len() {
             t += mle_table_f[i].clone() * q_ext_sub[i].clone();
         }
