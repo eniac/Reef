@@ -35,7 +35,7 @@ pub struct Options {
     )]
     pub projections: bool,
     #[arg(
-        short = 'h',
+        short = 'y',
         long = "hybrid",
         value_name = "HYBRID?",
         help = "Use hybrid nlookup",
