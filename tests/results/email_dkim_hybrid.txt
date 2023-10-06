@@ -1,1280 +1,1280 @@
-./tests/do_24,"^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$",42318,331
+./tests/do_415,"^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$",42318,331
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-solver,Witness Generation,step_92,30999,μs
-prover,prove,prove_17,308295,μs
-prover,prove,prove_121,304402,μs
-solver,Witness Generation,step_1,27382,μs
-prover,prove,prove_129,304991,μs
-prover,prove,prove_66,304530,μs
-prover,prove,prove_7,317963,μs
-solver,Witness Generation,step_83,36952,μs
-solver,Witness Generation,step_154,40689,μs
-solver,Witness Generation,step_39,34758,μs
-prover,prove,prove_106,317225,μs
-prover,prove,prove_111,302853,μs
-solver,Witness Generation,step_65,26850,μs
-prover,prove,prove_30,301652,μs
-solver,Witness Generation,step_56,26752,μs
-prover,prove,prove_29,304305,μs
-solver,Witness Generation,step_5,28242,μs
-prover,prove,prove_157,337935,μs
-prover,prove,prove_57,376227,μs
-prover,prove,prove_10,319006,μs
-prover,prove,prove_34,307149,μs
-solver,Witness Generation,step_127,43812,μs
-solver,Witness Generation,step_131,41635,μs
-solver,Witness Generation,step_140,28892,μs
-prover,prove,prove_24,489588,μs
-prover,prove,prove_119,300952,μs
-prover,prove,prove_103,359931,μs
-prover,prove,prove_158,305740,μs
-solver,Witness Generation,step_102,37627,μs
-prover,prove,prove_89,308903,μs
-solver,Witness Generation,step_85,30209,μs
-prover,prove,prove_73,326496,μs
-solver,Witness Generation,step_119,27084,μs
-prover,prove,prove_80,296672,μs
-prover,prove,prove_140,307518,μs
-prover,prove,prove_117,302278,μs
-solver,Witness Generation,step_112,34876,μs
-prover,prove,prove_35,366731,μs
-prover,prove,prove_127,349685,μs
-prover,prove,prove_153,370512,μs
-prover,prove,prove_160,322155,μs
-prover,prove,prove_124,297598,μs
-verifier,Verification,Full,2130220,μs
-prover,prove,prove_45,305041,μs
-prover,prove,prove_23,349217,μs
-solver,Witness Generation,step_122,42000,μs
-prover,prove,prove_94,407210,μs
-solver,Witness Generation,step_108,27010,μs
-solver,Witness Generation,step_23,33498,μs
-solver,Witness Generation,step_32,26757,μs
-prover,prove,prove_69,309291,μs
-prover,prove,prove_3,314693,μs
-solver,Witness Generation,step_6,26848,μs
-solver,Witness Generation,step_128,51634,μs
-prover,prove,prove_60,509843,μs
-prover,prove,prove_61,404592,μs
-prover,prove,prove_79,338275,μs
-prover,prove,prove_135,395789,μs
-prover,prove,prove_15,326691,μs
-solver,Witness Generation,step_120,26909,μs
-prover,prove,prove_91,312529,μs
-prover,prove,prove_122,482995,μs
-prover,prove,prove_38,360711,μs
-prover,prove,prove_107,310698,μs
-prover,prove,prove_133,333817,μs
-prover,Proof,Compressed SNARK,2800181,μs
-prover,prove,prove_52,311768,μs
-prover,prove,prove_0,196799,μs
-prover,prove,prove_22,301248,μs
-solver,Witness Generation,step_133,45441,μs
-prover,prove,prove_84,322419,μs
-prover,prove,prove_126,321877,μs
-prover,prove,prove_27,315991,μs
-prover,prove,prove_105,346505,μs
-prover,prove,prove_163,501893,μs
-prover,prove,prove_109,380976,μs
-solver,Witness Generation,step_136,33400,μs
-solver,SAFA Solving,Clear Match,80,μs
-solver,Witness Generation,step_155,33298,μs
-prover,prove,prove_137,412963,μs
-solver,Witness Generation,step_103,35535,μs
-solver,Witness Generation,step_28,36631,μs
-prover,prove,prove_54,321042,μs
-prover,prove,prove_25,305295,μs
-solver,Witness Generation,step_90,27010,μs
-prover,prove,prove_88,296637,μs
-prover,prove,prove_104,367233,μs
-prover,prove,prove_113,297656,μs
-solver,Witness Generation,step_126,46261,μs
-solver,Witness Generation,step_116,37187,μs
-prover,prove,prove_39,308185,μs
-solver,Witness Generation,step_124,29039,μs
-solver,Witness Generation,step_118,27130,μs
-prover,prove,prove_62,323706,μs
-verifier,Verification,Final Checks Consistency Verification,162576,μs
-solver,Witness Generation,step_21,26887,μs
-solver,Witness Generation,step_142,28736,μs
-solver,Witness Generation,step_111,34978,μs
-solver,Witness Generation,step_74,35604,μs
-solver,Witness Generation,step_52,27222,μs
-solver,Witness Generation,step_41,26744,μs
-solver,Witness Generation,step_160,28979,μs
-prover,prove,prove_53,372229,μs
-prover,prove,prove_148,313628,μs
-solver,Witness Generation,step_98,27140,μs
-solver,Witness Generation,step_27,26821,μs
-prover,prove,prove_151,299506,μs
-prover,prove,prove_110,314780,μs
-solver,Witness Generation,step_86,29782,μs
-prover,prove,prove_77,371462,μs
-solver,Witness Generation,step_20,26758,μs
-solver,Witness Generation,step_165,29589,μs
-solver,Witness Generation,step_81,41760,μs
-solver,Witness Generation,step_43,26849,μs
-prover,prove,prove_44,306525,μs
-prover,prove,prove_67,294968,μs
-prover,prove,prove_93,312045,μs
-solver,Witness Generation,step_42,26971,μs
-solver,Witness Generation,step_72,34076,μs
-solver,Witness Generation,step_159,28918,μs
-prover,prove,prove_20,297284,μs
-prover,prove,prove_33,304218,μs
-prover,prove,prove_143,332416,μs
-prover,prove,prove_16,301669,μs
-prover,prove,prove_123,306659,μs
-prover,prove,prove_141,307400,μs
-solver,Witness Generation,step_8,32410,μs
-prover,prove,prove_101,365467,μs
-solver,Witness Generation,step_58,27036,μs
-prover,prove,prove_40,310628,μs
-solver,Witness Generation,step_30,27126,μs
-prover,prove,prove_100,352402,μs
-solver,Witness Generation,step_164,35924,μs
-solver,Witness Generation,step_33,37745,μs
-prover,prove,prove_134,305877,μs
-solver,Witness Generation,step_16,29582,μs
-solver,Witness Generation,step_22,26755,μs
-solver,Witness Generation,step_101,32499,μs
-compiler,R1CS,Proof Setup,6798136,μs
-prover,prove,prove_42,309023,μs
-prover,prove,prove_120,305482,μs
-solver,Witness Generation,step_29,32944,μs
-solver,Witness Generation,step_35,31707,μs
-solver,Witness Generation,step_47,27755,μs
-solver,Witness Generation,step_107,33006,μs
-solver,Witness Generation,step_88,27033,μs
-prover,prove,prove_165,449108,μs
-solver,Witness Generation,step_153,33238,μs
-prover,prove,prove_92,298094,μs
-solver,Witness Generation,step_12,31119,μs
-solver,Witness Generation,step_95,28184,μs
-prover,prove,prove_76,309764,μs
-prover,prove,prove_156,446480,μs
-prover,prove,prove_86,302860,μs
-prover,prove,prove_87,302086,μs
-solver,Witness Generation,step_40,27344,μs
-solver,Witness Generation,step_36,32739,μs
-solver,Witness Generation,step_148,30862,μs
-solver,Witness Generation,step_104,31445,μs
-solver,Witness Generation,step_151,29045,μs
-solver,Witness Generation,step_110,26902,μs
-solver,Witness Generation,step_24,33838,μs
-solver,Witness Generation,step_2,26958,μs
-prover,prove,prove_116,301340,μs
-prover,prove,prove_154,652564,μs
-solver,Witness Generation,step_96,33498,μs
-solver,Witness Generation,step_49,38094,μs
-solver,Witness Generation,step_150,28858,μs
-solver,Witness Generation,step_69,27069,μs
-solver,Witness Generation,step_79,26816,μs
-prover,prove,prove_50,366657,μs
-prover,prove,prove_74,315546,μs
-prover,prove,prove_149,317641,μs
-prover,prove,prove_114,306417,μs
-solver,Witness Generation,step_54,34795,μs
-solver,Witness Generation,step_0,13403,μs
-prover,prove,prove_26,311584,μs
-prover,prove,prove_64,314553,μs
-solver,Witness Generation,step_13,38152,μs
-prover,prove,prove_146,363529,μs
-prover,prove,prove_145,316211,μs
-solver,Witness Generation,step_70,26864,μs
-prover,prove,prove_6,321788,μs
-compiler,R1CS,R1CS precomputations,34891,μs
-solver,Witness Generation,step_145,28977,μs
-prover,prove,prove_130,319295,μs
-prover,prove,prove_162,329299,μs
-solver,Witness Generation,step_14,27239,μs
-solver,Witness Generation,step_19,33103,μs
-solver,Witness Generation,step_38,33151,μs
-prover,prove,prove_28,329168,μs
-prover,prove,prove_75,305049,μs
-verifier,Verification,Nova Verification,1967107,μs
-solver,Witness Generation,step_17,27792,μs
-solver,Witness Generation,step_46,26980,μs
-prover,prove,prove_5,384300,μs
-solver,Witness Generation,step_68,26840,μs
-prover,prove,prove_4,449011,μs
-solver,Witness Generation,step_143,33860,μs
-solver,Witness Generation,step_63,38116,μs
-solver,Witness Generation,step_34,31673,μs
-solver,Witness Generation,step_31,26873,μs
-prover,prove,prove_32,301796,μs
-prover,prove,prove_48,317596,μs
-solver,Witness Generation,step_61,42644,μs
-prover,prove,prove_159,308772,μs
-solver,Witness Generation,step_106,37881,μs
-prover,prove,prove_152,308351,μs
-solver,Witness Generation,step_137,29418,μs
-solver,Witness Generation,step_44,26737,μs
-solver,Witness Generation,step_163,28232,μs
-solver,Witness Generation,step_75,27077,μs
-solver,Witness Generation,step_71,35390,μs
-prover,prove,prove_95,352213,μs
-prover,prove,prove_142,300681,μs
-prover,prove,prove_49,313147,μs
-solver,Witness Generation,step_76,42872,μs
-prover,prove,prove_46,317675,μs
-solver,Witness Generation,step_134,29456,μs
-prover,prove,prove_108,316667,μs
-prover,prove,prove_99,308240,μs
-prover,prove,prove_96,342503,μs
-prover,prove,prove_115,299013,μs
-solver,Witness Generation,step_7,31364,μs
-compiler,Compiler,Full,11533483,μs
-solver,Witness Generation,step_25,36664,μs
-prover,prove,prove_8,320808,μs
-prover,prove,prove_18,347017,μs
-solver,Witness Generation,step_4,27125,μs
-prover,prove,prove_11,325118,μs
-prover,prove,prove_164,496108,μs
-solver,Witness Generation,step_9,28370,μs
-solver,Witness Generation,step_147,30987,μs
-prover,prove,prove_2,303229,μs
-prover,prove,prove_132,299664,μs
-solver,Witness Generation,step_113,27676,μs
-prover,prove,prove_102,348277,μs
-solver,Witness Generation,step_105,27196,μs
-solver,Witness Generation,step_135,38135,μs
-solver,Witness Generation,step_3,27122,μs
-solver,Witness Generation,step_158,30641,μs
-compiler,SAFA,SAFA,4079184,μs
-prover,prove,prove_63,340819,μs
-solver,Witness Generation,step_99,26898,μs
-solver,Witness Generation,step_45,41224,μs
-prover,Proof,Consistency Proofs,301696,μs
-prover,prove,prove_47,307485,μs
-prover,prove,prove_43,315825,μs
-prover,prove,prove_58,442509,μs
-prover,prove,prove_59,590873,μs
-prover,prove,prove_161,332421,μs
-prover,prove,prove_65,348038,μs
-prover,prove,prove_83,306001,μs
-solver,Witness Generation,step_144,40390,μs
-solver,Witness Generation,step_97,33120,μs
-prover,prove,prove_36,322388,μs
-solver,Witness Generation,step_157,31159,μs
-prover,prove,prove_1,326167,μs
-prover,prove,prove_90,335207,μs
-solver,Witness Generation,step_156,32890,μs
-prover,prove,prove_19,303231,μs
-solver,Witness Generation,step_15,34514,μs
-compiler,R1CS,To Circuit,12116,μs
-prover,prove,prove_13,357613,μs
-solver,Witness Generation,step_100,26945,μs
-prover,prove,prove_85,299168,μs
-prover,prove,prove_71,304210,μs
-solver,Witness Generation,step_18,36727,μs
-prover,prove,prove_70,301268,μs
-prover,prove,prove_97,307119,μs
-prover,prove,prove_138,312773,μs
-prover,prove,prove_144,355209,μs
-solver,Witness Generation,step_60,26707,μs
-solver,Witness Generation,step_152,38974,μs
-prover,prove,prove_68,328227,μs
-prover,prove,prove_72,312036,μs
-prover,prove,prove_82,344544,μs
-prover,prove,prove_155,509683,μs
-solver,Witness Generation,step_114,37830,μs
-solver,Witness Generation,step_149,28958,μs
-prover,prove,prove_128,317678,μs
-prover,prove,prove_55,392565,μs
-solver,Witness Generation,step_11,26749,μs
-solver,Witness Generation,step_55,29598,μs
-solver,Witness Generation,step_146,32693,μs
-solver,Witness Generation,step_84,27744,μs
-prover,prove,prove_78,335378,μs
-solver,Witness Generation,step_129,45389,μs
-solver,Witness Generation,step_161,28966,μs
-prover,prove,prove_21,294633,μs
-solver,Witness Generation,step_117,35594,μs
-solver,Solve,Framework Solve,5275534,μs
-solver,Witness Generation,step_64,27357,μs
-prover,prove,prove_81,312337,μs
-solver,Witness Generation,step_67,34906,μs
-solver,Witness Generation,step_59,27396,μs
-prover,prove,prove_139,309478,μs
-solver,Witness Generation,step_121,29044,μs
-solver,Witness Generation,step_93,30306,μs
-prover,prove,prove_150,507112,μs
-solver,Witness Generation,step_73,43035,μs
-solver,Witness Generation,step_162,36445,μs
-solver,Witness Generation,step_94,41916,μs
-solver,Witness Generation,step_123,53109,μs
-prover,prove,prove_14,333857,μs
-prover,prove,prove_41,319056,μs
-solver,Witness Generation,step_51,26842,μs
-prover,prove,prove_37,319346,μs
-prover,prove,prove_131,299433,μs
-solver,Witness Generation,step_89,26970,μs
-prover,prove,prove_31,318995,μs
-prover,prove,prove_56,302599,μs
-solver,Witness Generation,step_138,28960,μs
-solver,Witness Generation,step_77,27946,μs
-solver,Witness Generation,step_80,26910,μs
-prover,prove,prove_147,300920,μs
-solver,Witness Generation,step_10,27188,μs
-solver,Witness Generation,step_50,27297,μs
-solver,Witness Generation,step_141,42367,μs
-solver,Witness Generation,step_57,26799,μs
-solver,Witness Generation,step_87,34780,μs
-solver,Witness Generation,step_130,28434,μs
-solver,Witness Generation,step_26,27904,μs
-solver,Witness Generation,step_66,33445,μs
-solver,Witness Generation,step_78,26709,μs
-solver,Witness Generation,step_82,34405,μs
-solver,Witness Generation,step_62,27563,μs
-compiler,R1CS,Commitment Generations,586840,μs
-prover,prove,prove_12,372388,μs
-solver,Witness Generation,step_139,28830,μs
-solver,Witness Generation,step_37,26882,μs
-solver,Witness Generation,step_48,33330,μs
-solver,Witness Generation,step_109,27324,μs
-prover,prove,prove_112,315833,μs
-prover,prove,prove_125,300126,μs
-solver,Witness Generation,step_115,27002,μs
-prover,prove,prove_136,641047,μs
-solver,Witness Generation,step_53,35745,μs
-prover,prove,prove_9,311198,μs
-prover,prove,prove_98,337296,μs
-solver,Witness Generation,step_125,27013,μs
-solver,Witness Generation,step_132,27824,μs
-prover,prove,prove_51,298674,μs
-prover,prove,prove_118,304106,μs
-solver,Witness Generation,step_91,33449,μs
+solver,Witness Generation,step_142,28027,μs
+prover,prove,prove_2,326352,μs
+solver,Witness Generation,step_149,35300,μs
+solver,Witness Generation,step_39,34910,μs
+prover,prove,prove_95,545046,μs
+solver,Witness Generation,step_34,27026,μs
+solver,Witness Generation,step_14,30547,μs
+solver,Witness Generation,step_157,27362,μs
+prover,prove,prove_12,338826,μs
+solver,Witness Generation,step_91,26508,μs
+prover,prove,prove_55,535046,μs
+solver,Witness Generation,step_147,27402,μs
+prover,prove,prove_71,539032,μs
+prover,prove,prove_77,529630,μs
+solver,Witness Generation,step_74,27473,μs
+prover,prove,prove_57,548038,μs
+prover,prove,prove_94,548456,μs
+solver,Witness Generation,step_6,60472,μs
+solver,Witness Generation,step_31,50434,μs
+solver,Witness Generation,step_161,27234,μs
+solver,Witness Generation,step_8,52796,μs
+solver,Witness Generation,step_18,32180,μs
+solver,Witness Generation,step_100,27189,μs
+solver,Witness Generation,step_90,36684,μs
+prover,prove,prove_3,382788,μs
+prover,prove,prove_43,534409,μs
+prover,prove,prove_45,528389,μs
+prover,prove,prove_151,534060,μs
+solver,Witness Generation,step_128,26645,μs
+prover,prove,prove_68,544666,μs
+prover,prove,prove_50,541096,μs
+prover,prove,prove_74,544100,μs
+compiler,R1CS,To Circuit,11270,μs
+prover,prove,prove_136,534124,μs
+solver,Witness Generation,step_75,40989,μs
+solver,Witness Generation,step_24,27025,μs
+prover,prove,prove_61,537897,μs
+solver,Witness Generation,step_72,26630,μs
+prover,prove,prove_19,543187,μs
+solver,Witness Generation,step_139,26706,μs
+prover,prove,prove_104,534294,μs
+prover,prove,prove_62,538213,μs
+solver,Witness Generation,step_12,56030,μs
+solver,Witness Generation,step_115,26926,μs
+solver,Witness Generation,step_126,27422,μs
+solver,Witness Generation,step_163,30494,μs
+prover,prove,prove_42,535464,μs
+prover,prove,prove_129,541683,μs
+solver,Witness Generation,step_114,32450,μs
+prover,prove,prove_67,535067,μs
+prover,prove,prove_56,533786,μs
+solver,Witness Generation,step_65,35257,μs
+solver,Witness Generation,step_118,26795,μs
+solver,Witness Generation,step_54,41429,μs
+prover,prove,prove_150,539373,μs
+solver,Witness Generation,step_38,33637,μs
+solver,Witness Generation,step_56,42651,μs
+solver,Witness Generation,step_112,26845,μs
+solver,Witness Generation,step_92,33619,μs
+solver,Witness Generation,step_80,26641,μs
+prover,prove,prove_82,545230,μs
+verifier,Verification,Full,2335492,μs
+prover,prove,prove_11,336383,μs
+prover,prove,prove_124,562962,μs
+prover,prove,prove_60,545010,μs
+solver,Witness Generation,step_13,79809,μs
+prover,prove,prove_101,535450,μs
+prover,prove,prove_105,545605,μs
+solver,Witness Generation,step_44,34675,μs
+prover,prove,prove_35,538373,μs
+prover,prove,prove_125,548682,μs
+prover,prove,prove_159,533961,μs
+prover,prove,prove_20,538172,μs
+solver,Witness Generation,step_57,26977,μs
+solver,Witness Generation,step_106,26456,μs
+prover,prove,prove_16,309374,μs
+prover,prove,prove_112,539204,μs
+prover,prove,prove_9,380651,μs
+prover,prove,prove_32,545753,μs
+prover,prove,prove_23,545809,μs
+prover,prove,prove_140,534996,μs
+prover,prove,prove_44,532241,μs
+solver,Witness Generation,step_127,26922,μs
+prover,prove,prove_69,545309,μs
+solver,Witness Generation,step_109,28509,μs
+prover,prove,prove_21,535310,μs
+solver,Witness Generation,step_76,27334,μs
+solver,Witness Generation,step_158,32879,μs
+prover,prove,prove_26,538684,μs
+solver,Witness Generation,step_153,40023,μs
+prover,prove,prove_46,535431,μs
+prover,prove,prove_78,546666,μs
+prover,prove,prove_84,544712,μs
+solver,Witness Generation,step_70,34578,μs
+solver,Witness Generation,step_85,50207,μs
+solver,Witness Generation,step_103,32576,μs
+prover,prove,prove_88,540851,μs
+solver,Witness Generation,step_47,26494,μs
+prover,prove,prove_28,529899,μs
+prover,prove,prove_41,534442,μs
+solver,Witness Generation,step_61,26518,μs
+solver,Witness Generation,step_51,26429,μs
+solver,Witness Generation,step_36,30616,μs
+solver,Witness Generation,step_21,26415,μs
+prover,prove,prove_87,533386,μs
+solver,Witness Generation,step_93,32199,μs
+prover,prove,prove_113,536975,μs
+prover,prove,prove_24,535832,μs
+solver,Witness Generation,step_83,40903,μs
+prover,prove,prove_52,536202,μs
+solver,Witness Generation,step_123,26635,μs
+solver,Witness Generation,step_125,32707,μs
+prover,prove,prove_138,536147,μs
+prover,prove,prove_153,545986,μs
+prover,prove,prove_8,406845,μs
+solver,Witness Generation,step_48,33526,μs
+prover,prove,prove_13,373889,μs
+prover,prove,prove_96,545220,μs
+prover,prove,prove_110,533102,μs
+prover,prove,prove_70,548677,μs
+prover,prove,prove_102,545343,μs
+solver,Witness Generation,step_152,27327,μs
+solver,Witness Generation,step_55,28273,μs
+prover,prove,prove_53,532546,μs
+prover,prove,prove_103,545326,μs
+prover,prove,prove_54,542911,μs
+solver,Witness Generation,step_66,34118,μs
+solver,Witness Generation,step_89,34698,μs
+prover,prove,prove_59,534659,μs
+solver,Witness Generation,step_15,26438,μs
+prover,prove,prove_154,533360,μs
+prover,prove,prove_115,536497,μs
+solver,Witness Generation,step_59,34487,μs
+solver,Witness Generation,step_141,40776,μs
+solver,Witness Generation,step_119,41891,μs
+solver,Witness Generation,step_73,27134,μs
+solver,Witness Generation,step_77,26453,μs
+solver,Witness Generation,step_116,26622,μs
+solver,Witness Generation,step_84,50622,μs
+solver,Witness Generation,step_101,26500,μs
+solver,Witness Generation,step_137,27480,μs
+solver,Witness Generation,step_7,58915,μs
+solver,Witness Generation,step_162,27326,μs
+prover,prove,prove_25,535949,μs
+prover,prove,prove_114,536625,μs
+solver,Witness Generation,step_164,37958,μs
+solver,Witness Generation,step_3,50489,μs
+solver,Witness Generation,step_58,26474,μs
+prover,prove,prove_81,533779,μs
+solver,Witness Generation,step_105,26477,μs
+solver,Witness Generation,step_136,33625,μs
+prover,prove,prove_148,535647,μs
+prover,prove,prove_4,312407,μs
+solver,Witness Generation,step_144,30488,μs
+prover,prove,prove_80,537553,μs
+prover,prove,prove_85,532468,μs
+prover,prove,prove_145,533728,μs
+prover,prove,prove_31,548589,μs
+solver,Witness Generation,step_26,27022,μs
+solver,Witness Generation,step_27,26512,μs
+solver,Witness Generation,step_104,26708,μs
+solver,Witness Generation,step_146,27307,μs
+solver,Witness Generation,step_68,26753,μs
+solver,Witness Generation,step_97,50379,μs
+prover,prove,prove_137,537550,μs
+solver,Witness Generation,step_62,26520,μs
+solver,Witness Generation,step_43,34594,μs
+prover,prove,prove_165,543984,μs
+solver,Witness Generation,step_121,32361,μs
+solver,Witness Generation,step_41,26564,μs
+prover,prove,prove_0,281426,μs
+solver,Witness Generation,step_129,26876,μs
+prover,prove,prove_97,546638,μs
+solver,Witness Generation,step_82,31799,μs
+prover,prove,prove_93,556141,μs
+solver,Witness Generation,step_16,26772,μs
+solver,Witness Generation,step_155,36536,μs
+solver,Witness Generation,step_135,31395,μs
+prover,prove,prove_39,543953,μs
+prover,prove,prove_162,576549,μs
+prover,prove,prove_49,543216,μs
+prover,prove,prove_14,337078,μs
+solver,Witness Generation,step_96,50470,μs
+solver,Witness Generation,step_1,50404,μs
+prover,prove,prove_135,564916,μs
+prover,Proof,Compressed SNARK,2614149,μs
+prover,prove,prove_27,533777,μs
+solver,Witness Generation,step_151,27215,μs
+prover,prove,prove_37,535729,μs
+solver,Witness Generation,step_5,27385,μs
+prover,prove,prove_30,545802,μs
+compiler,SAFA,SAFA,3915129,μs
+prover,prove,prove_108,546583,μs
+prover,prove,prove_98,535825,μs
+solver,Witness Generation,step_140,26632,μs
+solver,Witness Generation,step_33,34806,μs
+solver,Witness Generation,step_130,42468,μs
+prover,prove,prove_146,532090,μs
+prover,prove,prove_120,586877,μs
+prover,prove,prove_122,575141,μs
+prover,prove,prove_128,536290,μs
+solver,Witness Generation,step_25,41740,μs
+solver,Witness Generation,step_86,51795,μs
+prover,prove,prove_106,544610,μs
+solver,Witness Generation,step_19,27039,μs
+prover,prove,prove_36,535975,μs
+solver,Witness Generation,step_63,26937,μs
+solver,Witness Generation,step_35,39789,μs
+prover,prove,prove_7,365135,μs
+solver,Witness Generation,step_67,35507,μs
+solver,Witness Generation,step_49,33678,μs
+prover,prove,prove_86,534375,μs
+solver,Witness Generation,step_143,35210,μs
+solver,Witness Generation,step_150,27244,μs
+solver,SAFA Solving,Clear Match,28,μs
+prover,prove,prove_99,537888,μs
+prover,prove,prove_58,536058,μs
+solver,Witness Generation,step_40,26545,μs
+prover,prove,prove_89,532659,μs
+prover,prove,prove_127,536699,μs
+solver,Witness Generation,step_22,29626,μs
+prover,prove,prove_47,532560,μs
+compiler,R1CS,R1CS precomputations,33700,μs
+solver,Witness Generation,step_20,26524,μs
+prover,prove,prove_79,537589,μs
+solver,Witness Generation,step_132,33139,μs
+solver,Witness Generation,step_60,33855,μs
+solver,Witness Generation,step_10,52897,μs
+solver,Witness Generation,step_113,31519,μs
+prover,prove,prove_134,584429,μs
+verifier,Verification,Nova Verification,2077110,μs
+prover,prove,prove_163,540251,μs
+solver,Witness Generation,step_30,51132,μs
+solver,Witness Generation,step_53,27849,μs
+solver,Witness Generation,step_159,36148,μs
+prover,prove,prove_107,555104,μs
+prover,prove,prove_155,546363,μs
+solver,Witness Generation,step_9,52719,μs
+prover,prove,prove_38,535469,μs
+solver,Witness Generation,step_108,33265,μs
+prover,prove,prove_34,534986,μs
+solver,Witness Generation,step_23,39196,μs
+solver,Witness Generation,step_120,27406,μs
+compiler,R1CS,Proof Setup,7719716,μs
+prover,prove,prove_15,313287,μs
+solver,Witness Generation,step_165,31359,μs
+prover,prove,prove_73,547701,μs
+prover,prove,prove_100,534530,μs
+prover,prove,prove_121,576596,μs
+solver,Witness Generation,step_145,27185,μs
+solver,Witness Generation,step_117,26528,μs
+solver,Witness Generation,step_133,36534,μs
+compiler,Compiler,Full,12529314,μs
+solver,Witness Generation,step_29,36791,μs
+prover,prove,prove_22,532797,μs
+prover,prove,prove_75,537814,μs
+prover,prove,prove_51,533709,μs
+prover,prove,prove_63,536116,μs
+solver,Witness Generation,step_154,28697,μs
+prover,prove,prove_161,536696,μs
+prover,Proof,Consistency Proofs,256711,μs
+prover,prove,prove_130,560787,μs
+solver,Witness Generation,step_124,32230,μs
+prover,prove,prove_29,545832,μs
+prover,prove,prove_126,565565,μs
+prover,prove,prove_149,535085,μs
+prover,prove,prove_48,546133,μs
+prover,prove,prove_111,545054,μs
+prover,prove,prove_10,344643,μs
+solver,Witness Generation,step_81,33785,μs
+solver,Witness Generation,step_102,33243,μs
+prover,prove,prove_64,536797,μs
+prover,prove,prove_83,545643,μs
+prover,prove,prove_92,547363,μs
+solver,Solve,Framework Solve,5648289,μs
+solver,Witness Generation,step_45,36012,μs
+prover,prove,prove_6,326336,μs
+solver,Witness Generation,step_98,27547,μs
+prover,prove,prove_91,537773,μs
+prover,prove,prove_123,576799,μs
+prover,prove,prove_139,536010,μs
+prover,prove,prove_133,554559,μs
+prover,prove,prove_157,546279,μs
+solver,Witness Generation,step_160,29663,μs
+prover,prove,prove_1,540426,μs
+solver,Witness Generation,step_87,30788,μs
+prover,prove,prove_160,546008,μs
+solver,Witness Generation,step_11,79588,μs
+prover,prove,prove_156,533498,μs
+prover,prove,prove_65,533521,μs
+solver,Witness Generation,step_95,50625,μs
+solver,Witness Generation,step_64,33844,μs
+solver,Witness Generation,step_37,26648,μs
+prover,prove,prove_147,549807,μs
+solver,Witness Generation,step_28,31721,μs
+prover,prove,prove_143,549277,μs
+prover,prove,prove_158,535814,μs
+prover,prove,prove_152,543895,μs
+prover,prove,prove_18,532525,μs
+prover,prove,prove_5,337273,μs
+solver,Witness Generation,step_134,26601,μs
+prover,prove,prove_164,531335,μs
+solver,Witness Generation,step_46,33563,μs
+solver,Witness Generation,step_0,13111,μs
+prover,prove,prove_119,536693,μs
+prover,prove,prove_109,536056,μs
+solver,Witness Generation,step_111,27294,μs
+prover,prove,prove_144,537179,μs
+solver,Witness Generation,step_88,26632,μs
+solver,Witness Generation,step_138,26549,μs
+prover,prove,prove_117,539097,μs
+prover,prove,prove_72,532939,μs
+solver,Witness Generation,step_78,33917,μs
+prover,prove,prove_142,546732,μs
+prover,prove,prove_132,538794,μs
+solver,Witness Generation,step_32,49794,μs
+prover,prove,prove_17,398895,μs
+compiler,R1CS,Commitment Generations,835677,μs
+solver,Witness Generation,step_148,34964,μs
+prover,prove,prove_116,546923,μs
+prover,prove,prove_118,535340,μs
+solver,Witness Generation,step_42,26736,μs
+solver,Witness Generation,step_4,38857,μs
+prover,prove,prove_33,547545,μs
+solver,Witness Generation,step_107,33445,μs
+solver,Witness Generation,step_99,37010,μs
+solver,Witness Generation,step_156,36165,μs
+solver,Witness Generation,step_17,33930,μs
+solver,Witness Generation,step_110,37322,μs
+solver,Witness Generation,step_79,36276,μs
+solver,Witness Generation,step_122,37980,μs
+prover,prove,prove_66,548563,μs
+solver,Witness Generation,step_71,26960,μs
+solver,Witness Generation,step_94,46727,μs
+prover,prove,prove_76,533541,μs
+solver,Witness Generation,step_2,50332,μs
+solver,Witness Generation,step_50,27119,μs
+verifier,Verification,Final Checks Consistency Verification,257368,μs
+solver,Witness Generation,step_131,27606,μs
+prover,prove,prove_141,535064,μs
+solver,Witness Generation,step_52,26687,μs
+prover,prove,prove_131,550094,μs
+prover,prove,prove_40,535303,μs
+prover,prove,prove_90,533471,μs
+solver,Witness Generation,step_69,35978,μs
 prover,add test,Secondary Circuit,10347,constraints
 prover,add test,Primary Circuit,18265,constraints
-prover,Proof Size,Compressed SNARK size,73639,bytes
-./tests/do_22,"^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$",116751,908
+prover,Proof Size,Compressed SNARK size,73588,bytes
+./tests/do_1000,"^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$",116751,908
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-solver,Witness Generation,step_361,76112,μs
-prover,prove,prove_163,309303,μs
-prover,prove,prove_387,308329,μs
-solver,Witness Generation,step_205,68640,μs
-solver,Witness Generation,step_273,72573,μs
-prover,Proof,Consistency Proofs,317150,μs
-prover,prove,prove_253,553136,μs
-solver,Witness Generation,step_423,58763,μs
-prover,prove,prove_399,328202,μs
-prover,prove,prove_411,313225,μs
-solver,Witness Generation,step_28,67608,μs
-prover,prove,prove_188,312847,μs
-solver,Witness Generation,step_438,74150,μs
-solver,Witness Generation,step_211,80356,μs
-solver,Witness Generation,step_89,73331,μs
-solver,Witness Generation,step_381,58682,μs
-solver,Witness Generation,step_387,61457,μs
-prover,prove,prove_280,479513,μs
-prover,prove,prove_100,447628,μs
-prover,prove,prove_44,315953,μs
-prover,prove,prove_20,339224,μs
-solver,Witness Generation,step_434,71688,μs
-prover,prove,prove_156,320430,μs
-solver,Witness Generation,step_223,61765,μs
-solver,Witness Generation,step_270,73612,μs
-prover,prove,prove_194,328852,μs
-prover,prove,prove_216,310981,μs
-prover,prove,prove_398,316642,μs
-solver,Witness Generation,step_330,68419,μs
-solver,Witness Generation,step_160,59946,μs
-prover,prove,prove_324,302099,μs
-solver,Witness Generation,step_192,69243,μs
-solver,Witness Generation,step_304,60742,μs
-prover,prove,prove_6,315670,μs
-solver,Witness Generation,step_281,58502,μs
-solver,Witness Generation,step_359,61474,μs
-prover,prove,prove_27,317902,μs
-prover,prove,prove_19,331118,μs
-solver,Witness Generation,step_79,66243,μs
-prover,prove,prove_50,313946,μs
-prover,prove,prove_48,317104,μs
-solver,Witness Generation,step_59,70375,μs
-prover,prove,prove_249,485586,μs
-solver,Witness Generation,step_336,66859,μs
-prover,prove,prove_270,543553,μs
-prover,prove,prove_379,299626,μs
-solver,Witness Generation,step_453,58618,μs
-solver,Witness Generation,step_294,69239,μs
-prover,prove,prove_113,315406,μs
-solver,Witness Generation,step_82,74066,μs
-solver,Witness Generation,step_18,72010,μs
-solver,Witness Generation,step_41,74483,μs
-prover,prove,prove_224,390166,μs
-solver,Witness Generation,step_66,71568,μs
-solver,Witness Generation,step_33,65953,μs
-prover,prove,prove_187,313960,μs
-solver,Witness Generation,step_196,67189,μs
-solver,Witness Generation,step_230,76530,μs
-solver,Witness Generation,step_136,67149,μs
-solver,Witness Generation,step_258,67131,μs
-prover,prove,prove_52,324449,μs
-prover,prove,prove_157,305530,μs
-solver,Witness Generation,step_8,66111,μs
-prover,prove,prove_46,446741,μs
-solver,Witness Generation,step_234,68645,μs
-solver,Witness Generation,step_402,72889,μs
-prover,prove,prove_181,305340,μs
-prover,prove,prove_414,310693,μs
-prover,prove,prove_55,327383,μs
-prover,prove,prove_145,305692,μs
-prover,prove,prove_56,307771,μs
-prover,prove,prove_88,324806,μs
-prover,prove,prove_452,399606,μs
-solver,Witness Generation,step_241,64044,μs
-solver,Witness Generation,step_403,70209,μs
-solver,Witness Generation,step_259,81468,μs
-solver,Witness Generation,step_356,75459,μs
-prover,prove,prove_101,320159,μs
-prover,prove,prove_394,337159,μs
-solver,Witness Generation,step_25,74238,μs
-solver,Witness Generation,step_1,60250,μs
-solver,Witness Generation,step_412,98389,μs
-prover,prove,prove_66,312555,μs
-prover,prove,prove_429,306208,μs
-prover,prove,prove_267,514723,μs
-solver,Witness Generation,step_340,65702,μs
-solver,Witness Generation,step_261,66661,μs
-solver,Witness Generation,step_355,73780,μs
-prover,prove,prove_206,310345,μs
-solver,Witness Generation,step_414,60512,μs
-prover,prove,prove_112,311608,μs
-prover,prove,prove_316,315415,μs
-solver,Witness Generation,step_43,58613,μs
-solver,Witness Generation,step_288,61211,μs
-prover,prove,prove_191,307354,μs
-prover,prove,prove_265,488566,μs
-prover,prove,prove_397,312101,μs
-prover,prove,prove_422,307874,μs
-solver,Witness Generation,step_0,25440,μs
-solver,Witness Generation,step_268,71872,μs
-solver,Witness Generation,step_427,65046,μs
-solver,Solve,Framework Solve,31844894,μs
-prover,prove,prove_171,306099,μs
-prover,prove,prove_250,534021,μs
-prover,prove,prove_23,327450,μs
-prover,prove,prove_93,471334,μs
-solver,Witness Generation,step_103,63093,μs
-solver,Witness Generation,step_153,175843,μs
-prover,prove,prove_340,399980,μs
-prover,prove,prove_40,333721,μs
-solver,Witness Generation,step_328,62851,μs
-solver,Witness Generation,step_121,69456,μs
-prover,prove,prove_42,317941,μs
-solver,Witness Generation,step_52,65000,μs
-prover,prove,prove_16,315641,μs
-prover,prove,prove_442,310398,μs
-solver,Witness Generation,step_231,67663,μs
-prover,prove,prove_43,327646,μs
-solver,Witness Generation,step_54,81453,μs
-prover,prove,prove_214,303024,μs
-solver,Witness Generation,step_246,72100,μs
-prover,prove,prove_286,530288,μs
-prover,prove,prove_319,309456,μs
-prover,prove,prove_437,388258,μs
-prover,prove,prove_287,530432,μs
-solver,Witness Generation,step_324,68015,μs
-compiler,Compiler,Full,99722964,μs
-solver,Witness Generation,step_409,60639,μs
-prover,prove,prove_405,308026,μs
-prover,prove,prove_417,337619,μs
-prover,prove,prove_317,306737,μs
-solver,Witness Generation,step_303,71478,μs
-prover,prove,prove_391,355531,μs
-solver,Witness Generation,step_74,76100,μs
-solver,Witness Generation,step_217,58128,μs
-solver,Witness Generation,step_388,65876,μs
-prover,prove,prove_306,314351,μs
-solver,Witness Generation,step_322,63743,μs
-solver,Witness Generation,step_168,66805,μs
-prover,prove,prove_318,370689,μs
-prover,prove,prove_444,309370,μs
-solver,Witness Generation,step_269,75822,μs
-solver,Witness Generation,step_436,74981,μs
-solver,Witness Generation,step_320,71904,μs
-solver,Witness Generation,step_39,58066,μs
-solver,Witness Generation,step_11,70360,μs
-prover,prove,prove_17,315575,μs
-solver,Witness Generation,step_159,69778,μs
-prover,prove,prove_432,316378,μs
-solver,Witness Generation,step_190,76170,μs
-prover,prove,prove_385,326797,μs
-prover,prove,prove_393,385003,μs
-solver,Witness Generation,step_138,70294,μs
-solver,Witness Generation,step_406,73692,μs
-solver,Witness Generation,step_13,73144,μs
-prover,prove,prove_223,380562,μs
-solver,Witness Generation,step_172,75551,μs
-solver,Witness Generation,step_49,66427,μs
-prover,prove,prove_362,363510,μs
-prover,prove,prove_173,303907,μs
-prover,prove,prove_76,312765,μs
-prover,prove,prove_198,308855,μs
-solver,Witness Generation,step_84,70719,μs
-prover,prove,prove_67,310667,μs
-solver,Witness Generation,step_214,70313,μs
-solver,Witness Generation,step_219,75394,μs
-prover,prove,prove_272,523675,μs
-solver,Witness Generation,step_124,57514,μs
-prover,prove,prove_386,318732,μs
-prover,prove,prove_325,327811,μs
-solver,Witness Generation,step_182,66591,μs
-solver,Witness Generation,step_228,60756,μs
-prover,prove,prove_22,342918,μs
-solver,Witness Generation,step_134,74679,μs
-solver,Witness Generation,step_424,70834,μs
-solver,Witness Generation,step_333,74005,μs
-prover,prove,prove_118,377048,μs
-prover,prove,prove_294,312912,μs
-solver,Witness Generation,step_78,78872,μs
-solver,Witness Generation,step_151,123943,μs
-solver,Witness Generation,step_262,59125,μs
-prover,prove,prove_109,300169,μs
-prover,prove,prove_361,389054,μs
-solver,Witness Generation,step_368,60739,μs
-solver,Witness Generation,step_5,59932,μs
-prover,prove,prove_344,328347,μs
-prover,prove,prove_357,309934,μs
-solver,Witness Generation,step_114,59104,μs
-solver,Witness Generation,step_279,69110,μs
-solver,Witness Generation,step_30,66058,μs
-solver,Witness Generation,step_311,75011,μs
-prover,prove,prove_244,435963,μs
-solver,Witness Generation,step_204,69968,μs
-prover,prove,prove_203,307134,μs
-prover,prove,prove_241,528254,μs
-solver,Witness Generation,step_421,58467,μs
-solver,Witness Generation,step_437,60509,μs
-solver,Witness Generation,step_289,68949,μs
-solver,Witness Generation,step_201,65244,μs
-solver,Witness Generation,step_70,65298,μs
-solver,Witness Generation,step_105,60116,μs
-solver,Witness Generation,step_145,71504,μs
-solver,Witness Generation,step_372,61072,μs
-prover,prove,prove_115,351069,μs
-prover,prove,prove_196,325753,μs
-solver,Witness Generation,step_198,59303,μs
-prover,prove,prove_320,308497,μs
-prover,prove,prove_183,308881,μs
-solver,Witness Generation,step_19,59606,μs
-solver,Witness Generation,step_178,75794,μs
-solver,Witness Generation,step_45,62407,μs
-solver,Witness Generation,step_149,60835,μs
-solver,Witness Generation,step_382,61185,μs
-prover,prove,prove_98,330903,μs
-prover,prove,prove_314,494169,μs
-prover,prove,prove_87,309839,μs
-prover,prove,prove_322,315792,μs
-prover,prove,prove_0,207695,μs
-prover,prove,prove_233,466778,μs
-solver,Witness Generation,step_21,66986,μs
-prover,prove,prove_106,307294,μs
-solver,Witness Generation,step_96,69512,μs
-solver,Witness Generation,step_132,70983,μs
-solver,Witness Generation,step_247,59430,μs
-solver,Witness Generation,step_371,78365,μs
-solver,Witness Generation,step_227,73027,μs
-prover,prove,prove_167,305321,μs
-prover,prove,prove_309,322062,μs
-solver,Witness Generation,step_93,67590,μs
-prover,prove,prove_94,310591,μs
-prover,prove,prove_80,391006,μs
-prover,prove,prove_124,304959,μs
-solver,Witness Generation,step_127,78067,μs
-prover,prove,prove_215,307776,μs
-prover,prove,prove_58,311574,μs
-solver,Witness Generation,step_35,68016,μs
-prover,prove,prove_105,311878,μs
-prover,prove,prove_185,309647,μs
-solver,Witness Generation,step_415,75828,μs
-solver,Witness Generation,step_116,98633,μs
-prover,prove,prove_117,548800,μs
-prover,prove,prove_281,515249,μs
-prover,prove,prove_334,310463,μs
-solver,Witness Generation,step_137,101169,μs
-solver,Witness Generation,step_411,81652,μs
-prover,prove,prove_207,380649,μs
-solver,Witness Generation,step_133,60292,μs
-prover,prove,prove_264,434578,μs
-prover,prove,prove_305,309120,μs
-solver,Witness Generation,step_90,60574,μs
-solver,Witness Generation,step_63,73649,μs
-prover,prove,prove_190,310222,μs
-prover,prove,prove_271,531821,μs
-solver,Witness Generation,step_385,76251,μs
-solver,Witness Generation,step_37,68150,μs
-solver,Witness Generation,step_317,79581,μs
-solver,Witness Generation,step_40,67652,μs
-prover,prove,prove_97,319345,μs
-prover,prove,prove_431,310246,μs
-solver,Witness Generation,step_108,98899,μs
-prover,prove,prove_351,305764,μs
-solver,Witness Generation,step_286,66768,μs
-prover,prove,prove_61,316015,μs
-solver,Witness Generation,step_349,58535,μs
-solver,Witness Generation,step_171,87002,μs
-solver,Witness Generation,step_308,65628,μs
-solver,Witness Generation,step_210,69515,μs
-prover,prove,prove_289,485991,μs
-solver,Witness Generation,step_101,66975,μs
-solver,Witness Generation,step_298,68613,μs
-solver,Witness Generation,step_131,61573,μs
-prover,prove,prove_218,310630,μs
-verifier,Verification,Nova Verification,2156920,μs
-prover,prove,prove_30,313885,μs
-prover,prove,prove_170,308716,μs
-solver,Witness Generation,step_235,69909,μs
-solver,Witness Generation,step_283,69848,μs
-prover,prove,prove_447,347924,μs
-solver,Witness Generation,step_439,77780,μs
-solver,Witness Generation,step_167,58267,μs
-solver,Witness Generation,step_27,64342,μs
-solver,Witness Generation,step_225,76462,μs
-prover,prove,prove_217,326099,μs
-prover,prove,prove_227,331515,μs
-prover,prove,prove_424,380417,μs
-solver,Witness Generation,step_398,69012,μs
-prover,prove,prove_197,308669,μs
-prover,prove,prove_441,326934,μs
-solver,Witness Generation,step_404,72017,μs
-solver,Witness Generation,step_416,75108,μs
-prover,prove,prove_446,307982,μs
-prover,prove,prove_78,335184,μs
-prover,prove,prove_440,311090,μs
-solver,Witness Generation,step_242,66115,μs
-solver,Witness Generation,step_376,70966,μs
-prover,prove,prove_330,307192,μs
-prover,prove,prove_34,502447,μs
-prover,prove,prove_79,329931,μs
-solver,Witness Generation,step_310,69939,μs
-solver,Witness Generation,step_399,60507,μs
-solver,Witness Generation,step_240,67650,μs
-solver,Witness Generation,step_446,58039,μs
-solver,Witness Generation,step_354,60865,μs
-verifier,Verification,Full,2357612,μs
-solver,Witness Generation,step_397,66564,μs
-prover,prove,prove_32,670518,μs
-prover,prove,prove_403,300257,μs
-solver,Witness Generation,step_24,56609,μs
-prover,prove,prove_420,313810,μs
-solver,Witness Generation,step_274,63838,μs
-prover,prove,prove_73,356453,μs
-prover,prove,prove_49,321121,μs
-solver,Witness Generation,step_97,102444,μs
-solver,Witness Generation,step_187,73054,μs
-prover,prove,prove_279,533260,μs
-solver,Witness Generation,step_144,77250,μs
-prover,prove,prove_252,552894,μs
-prover,prove,prove_110,370650,μs
-prover,prove,prove_166,318390,μs
-prover,prove,prove_211,305032,μs
-solver,Witness Generation,step_139,71011,μs
-solver,Witness Generation,step_32,64875,μs
-solver,Witness Generation,step_9,69426,μs
-solver,Witness Generation,step_12,74336,μs
-prover,prove,prove_132,306078,μs
-prover,prove,prove_121,308608,μs
-prover,prove,prove_83,325904,μs
-prover,prove,prove_33,557809,μs
-prover,prove,prove_162,308894,μs
-prover,prove,prove_275,524709,μs
-prover,prove,prove_193,307265,μs
-prover,prove,prove_199,308194,μs
-prover,prove,prove_35,369606,μs
-prover,prove,prove_128,385102,μs
-solver,Witness Generation,step_3,71013,μs
-prover,prove,prove_445,305531,μs
-prover,prove,prove_228,467022,μs
-solver,Witness Generation,step_410,76707,μs
-prover,prove,prove_371,308505,μs
-prover,prove,prove_220,312412,μs
-prover,prove,prove_328,363004,μs
-prover,prove,prove_266,526386,μs
-solver,Witness Generation,step_208,65683,μs
-prover,prove,prove_315,334850,μs
-prover,prove,prove_174,383781,μs
-prover,prove,prove_401,307116,μs
-solver,Witness Generation,step_111,82200,μs
-prover,prove,prove_136,310956,μs
-solver,Witness Generation,step_58,68873,μs
-solver,Witness Generation,step_15,60429,μs
-solver,Witness Generation,step_432,58650,μs
-solver,Witness Generation,step_148,73376,μs
-prover,prove,prove_96,365735,μs
-prover,prove,prove_160,324389,μs
-prover,prove,prove_392,361699,μs
-prover,prove,prove_126,670439,μs
-prover,prove,prove_161,367810,μs
-solver,Witness Generation,step_38,65486,μs
-solver,Witness Generation,step_309,58785,μs
-solver,Witness Generation,step_318,59248,μs
-solver,Witness Generation,step_360,68888,μs
-solver,Witness Generation,step_378,76477,μs
-solver,Witness Generation,step_440,67189,μs
-prover,prove,prove_274,518883,μs
-compiler,R1CS,Proof Setup,6905404,μs
-solver,Witness Generation,step_212,58443,μs
-solver,Witness Generation,step_86,58989,μs
-prover,prove,prove_390,361042,μs
-solver,Witness Generation,step_170,84434,μs
-solver,Witness Generation,step_391,76491,μs
-prover,prove,prove_57,308390,μs
-solver,Witness Generation,step_347,58596,μs
-prover,prove,prove_142,301559,μs
-prover,prove,prove_304,313706,μs
-solver,Witness Generation,step_36,67408,μs
-solver,Witness Generation,step_341,61914,μs
-prover,prove,prove_290,700545,μs
-solver,Witness Generation,step_209,68298,μs
-solver,Witness Generation,step_120,67185,μs
-solver,Witness Generation,step_165,74412,μs
-solver,Witness Generation,step_238,58417,μs
-solver,Witness Generation,step_429,68836,μs
-solver,Witness Generation,step_60,67090,μs
-solver,Witness Generation,step_326,79194,μs
-solver,Witness Generation,step_157,114007,μs
-prover,prove,prove_254,528349,μs
-prover,prove,prove_370,315514,μs
-prover,prove,prove_74,331388,μs
-prover,prove,prove_409,319274,μs
-solver,Witness Generation,step_61,82746,μs
-solver,Witness Generation,step_174,60148,μs
-solver,Witness Generation,step_420,71243,μs
-prover,prove,prove_155,314388,μs
-solver,Witness Generation,step_441,67334,μs
-solver,Witness Generation,step_47,72011,μs
-prover,prove,prove_295,466183,μs
-solver,Witness Generation,step_46,67464,μs
-solver,Witness Generation,step_365,69899,μs
-prover,prove,prove_291,517265,μs
-solver,Witness Generation,step_181,96169,μs
-solver,Witness Generation,step_191,63644,μs
-solver,Witness Generation,step_451,78183,μs
-prover,prove,prove_41,334911,μs
-prover,prove,prove_331,306054,μs
-solver,Witness Generation,step_146,73759,μs
-solver,Witness Generation,step_177,58878,μs
-solver,Witness Generation,step_254,77716,μs
-solver,Witness Generation,step_179,61320,μs
-solver,Witness Generation,step_244,68303,μs
-prover,prove,prove_333,311475,μs
-solver,Witness Generation,step_350,79276,μs
-solver,Witness Generation,step_229,60563,μs
-prover,prove,prove_277,527142,μs
-solver,Witness Generation,step_392,61588,μs
-solver,Witness Generation,step_245,76490,μs
-prover,prove,prove_53,343482,μs
-solver,Witness Generation,step_267,58146,μs
-solver,Witness Generation,step_285,58509,μs
-prover,prove,prove_186,315681,μs
-prover,prove,prove_232,332132,μs
-prover,prove,prove_299,494835,μs
-prover,prove,prove_435,327886,μs
-solver,Witness Generation,step_23,70989,μs
-prover,prove,prove_86,332551,μs
-solver,Witness Generation,step_17,69912,μs
-solver,Witness Generation,step_180,73060,μs
-solver,Witness Generation,step_293,65065,μs
-prover,prove,prove_184,312053,μs
-solver,Witness Generation,step_55,71751,μs
-solver,Witness Generation,step_128,60952,μs
-solver,Witness Generation,step_4,67744,μs
-solver,Witness Generation,step_166,77127,μs
-solver,Witness Generation,step_193,61295,μs
-solver,Witness Generation,step_249,89290,μs
-solver,Witness Generation,step_248,59004,μs
-prover,prove,prove_201,317041,μs
-prover,prove,prove_26,312263,μs
-prover,prove,prove_396,360251,μs
-solver,Witness Generation,step_81,60013,μs
-solver,Witness Generation,step_44,62305,μs
-solver,Witness Generation,step_161,80948,μs
-prover,prove,prove_297,487932,μs
-solver,Witness Generation,step_346,59415,μs
-prover,prove,prove_369,306856,μs
-solver,Witness Generation,step_155,143505,μs
-solver,Witness Generation,step_156,122388,μs
-solver,Witness Generation,step_16,70006,μs
-prover,prove,prove_262,517411,μs
-prover,prove,prove_273,385338,μs
-solver,Witness Generation,step_173,82283,μs
-solver,Witness Generation,step_339,69327,μs
-solver,Witness Generation,step_302,64297,μs
-prover,prove,prove_146,324445,μs
-prover,prove,prove_1,307747,μs
-solver,Witness Generation,step_315,75590,μs
-solver,Witness Generation,step_26,74680,μs
-solver,Witness Generation,step_383,80221,μs
-solver,Witness Generation,step_396,62507,μs
-prover,prove,prove_413,310977,μs
-prover,prove,prove_418,305156,μs
-prover,prove,prove_389,346650,μs
-prover,prove,prove_25,329715,μs
-solver,Witness Generation,step_118,65989,μs
-prover,prove,prove_375,310284,μs
-prover,prove,prove_231,340194,μs
-solver,Witness Generation,step_100,58190,μs
-solver,Witness Generation,step_332,60351,μs
-prover,prove,prove_154,310479,μs
-solver,Witness Generation,step_401,58435,μs
-solver,Witness Generation,step_300,59902,μs
-solver,Witness Generation,step_236,60286,μs
-prover,prove,prove_242,532497,μs
-prover,prove,prove_293,475046,μs
-prover,prove,prove_90,317090,μs
-prover,prove,prove_368,305127,μs
-solver,Witness Generation,step_435,73942,μs
-prover,prove,prove_376,307815,μs
-prover,prove,prove_416,306169,μs
-prover,prove,prove_169,303751,μs
-prover,prove,prove_208,307454,μs
-prover,prove,prove_13,372101,μs
-prover,prove,prove_139,309226,μs
-solver,Witness Generation,step_56,77442,μs
-prover,prove,prove_352,305078,μs
-solver,Witness Generation,step_265,71243,μs
-prover,prove,prove_89,313565,μs
-prover,prove,prove_450,327671,μs
-prover,prove,prove_205,304180,μs
-solver,Witness Generation,step_110,67694,μs
-prover,prove,prove_11,311817,μs
-prover,prove,prove_159,315741,μs
-prover,prove,prove_323,318502,μs
-solver,Witness Generation,step_92,70819,μs
-solver,Witness Generation,step_226,58544,μs
-solver,Witness Generation,step_445,72505,μs
-prover,prove,prove_434,316669,μs
-solver,Witness Generation,step_163,58501,μs
-solver,Witness Generation,step_389,68895,μs
-prover,prove,prove_131,305303,μs
-solver,Witness Generation,step_51,97504,μs
-prover,prove,prove_165,317101,μs
-prover,prove,prove_382,509122,μs
-prover,prove,prove_130,336362,μs
-solver,Witness Generation,step_351,58865,μs
-solver,Witness Generation,step_419,69737,μs
-solver,Witness Generation,step_323,58494,μs
-compiler,SAFA,SAFA,91869097,μs
-prover,prove,prove_236,531423,μs
-solver,Witness Generation,step_252,58807,μs
-prover,prove,prove_39,315466,μs
-solver,Witness Generation,step_345,69755,μs
-prover,prove,prove_336,308411,μs
-solver,Witness Generation,step_154,152861,μs
-prover,prove,prove_77,346211,μs
-prover,prove,prove_104,314754,μs
-prover,prove,prove_449,317843,μs
-solver,Witness Generation,step_256,63921,μs
-prover,prove,prove_7,322340,μs
-solver,Witness Generation,step_57,60047,μs
-solver,Witness Generation,step_143,57872,μs
-solver,Witness Generation,step_73,73887,μs
-solver,Witness Generation,step_367,75167,μs
-prover,prove,prove_125,455445,μs
-solver,Witness Generation,step_31,69359,μs
-solver,Witness Generation,step_327,59974,μs
-prover,prove,prove_47,334163,μs
-prover,prove,prove_168,307711,μs
-solver,Witness Generation,step_428,58568,μs
-prover,prove,prove_260,401419,μs
-prover,prove,prove_408,415768,μs
-solver,Witness Generation,step_175,68666,μs
-solver,Witness Generation,step_342,59471,μs
-prover,prove,prove_84,337459,μs
-prover,prove,prove_149,332073,μs
-prover,prove,prove_259,428480,μs
-solver,Witness Generation,step_29,56924,μs
-prover,prove,prove_278,519824,μs
-prover,prove,prove_288,527080,μs
-prover,prove,prove_335,308087,μs
-prover,prove,prove_300,392182,μs
-prover,prove,prove_332,303515,μs
-prover,prove,prove_329,460031,μs
-prover,prove,prove_122,352620,μs
-prover,prove,prove_313,318251,μs
-solver,Witness Generation,step_405,60259,μs
-prover,prove,prove_141,307161,μs
-prover,prove,prove_438,310298,μs
-prover,prove,prove_9,321058,μs
-prover,prove,prove_406,323672,μs
-prover,prove,prove_95,306045,μs
-prover,prove,prove_451,434600,μs
-solver,Witness Generation,step_83,77143,μs
-solver,Witness Generation,step_140,75849,μs
-solver,Witness Generation,step_65,58757,μs
-solver,Witness Generation,step_200,77163,μs
-prover,prove,prove_261,455482,μs
-solver,Witness Generation,step_284,70960,μs
-prover,prove,prove_303,320787,μs
-prover,prove,prove_285,559647,μs
-solver,Witness Generation,step_186,71115,μs
-prover,prove,prove_388,310162,μs
-solver,Witness Generation,step_85,60932,μs
-solver,Witness Generation,step_334,70499,μs
-prover,prove,prove_153,370441,μs
-solver,Witness Generation,step_117,64136,μs
-solver,Witness Generation,step_395,72017,μs
-solver,Witness Generation,step_422,71282,μs
-solver,Witness Generation,step_418,60487,μs
-solver,Witness Generation,step_22,58883,μs
-solver,Witness Generation,step_433,58865,μs
-prover,prove,prove_433,308272,μs
-solver,Witness Generation,step_48,98790,μs
-solver,Witness Generation,step_206,77908,μs
-prover,prove,prove_150,344145,μs
-solver,Witness Generation,step_449,76286,μs
-prover,prove,prove_423,304485,μs
-prover,prove,prove_378,305461,μs
-solver,Witness Generation,step_312,66347,μs
-solver,Witness Generation,step_115,67240,μs
-solver,Witness Generation,step_142,62911,μs
-solver,Witness Generation,step_152,148459,μs
-prover,prove,prove_240,528055,μs
-prover,Proof,Compressed SNARK,2767784,μs
-prover,prove,prove_45,315222,μs
-solver,Witness Generation,step_91,64952,μs
-solver,Witness Generation,step_102,69311,μs
-solver,Witness Generation,step_296,68313,μs
-prover,prove,prove_428,363395,μs
-prover,prove,prove_70,319478,μs
-solver,Witness Generation,step_278,72364,μs
-prover,prove,prove_219,303882,μs
-prover,prove,prove_195,330031,μs
-solver,Witness Generation,step_183,92930,μs
-solver,Witness Generation,step_68,72614,μs
-prover,prove,prove_75,320713,μs
-prover,prove,prove_258,406736,μs
-solver,Witness Generation,step_221,58862,μs
-solver,Witness Generation,step_162,57889,μs
-solver,Witness Generation,step_42,73510,μs
-solver,Witness Generation,step_122,68970,μs
-solver,Witness Generation,step_271,58618,μs
-solver,Witness Generation,step_316,74807,μs
-solver,Witness Generation,step_364,68139,μs
-prover,prove,prove_430,312639,μs
-prover,prove,prove_147,321785,μs
-prover,prove,prove_15,320546,μs
-prover,prove,prove_72,476569,μs
-solver,Witness Generation,step_62,60226,μs
-solver,Witness Generation,step_141,67419,μs
-solver,Witness Generation,step_233,59046,μs
-prover,prove,prove_349,311126,μs
-prover,prove,prove_339,475421,μs
-solver,Witness Generation,step_184,60391,μs
-prover,prove,prove_60,310013,μs
-prover,prove,prove_229,323572,μs
-solver,Witness Generation,step_264,70426,μs
-solver,Witness Generation,step_251,72232,μs
-prover,prove,prove_177,310529,μs
-prover,prove,prove_400,314988,μs
-solver,Witness Generation,step_195,83214,μs
-solver,Witness Generation,step_325,69837,μs
-prover,prove,prove_360,321367,μs
-solver,Witness Generation,step_275,69694,μs
-solver,Witness Generation,step_213,72203,μs
-prover,prove,prove_402,310916,μs
-prover,prove,prove_343,330801,μs
-solver,Witness Generation,step_386,60544,μs
-solver,Witness Generation,step_80,67083,μs
-solver,Witness Generation,step_299,58584,μs
-prover,prove,prove_129,411446,μs
-prover,prove,prove_238,535209,μs
-prover,prove,prove_341,323733,μs
-solver,Witness Generation,step_343,68108,μs
-solver,Witness Generation,step_375,91880,μs
-solver,Witness Generation,step_14,64159,μs
-prover,prove,prove_234,523179,μs
-prover,prove,prove_255,526780,μs
-prover,prove,prove_307,328305,μs
-prover,prove,prove_312,317426,μs
-prover,prove,prove_178,305704,μs
-solver,Witness Generation,step_7,68541,μs
-prover,prove,prove_453,317528,μs
-prover,prove,prove_91,313052,μs
-solver,Witness Generation,step_276,59105,μs
-solver,Witness Generation,step_257,59840,μs
-prover,prove,prove_296,490292,μs
-prover,prove,prove_37,335610,μs
-solver,Witness Generation,step_358,90125,μs
-solver,Witness Generation,step_292,70102,μs
-solver,Witness Generation,step_390,61033,μs
-prover,prove,prove_298,527176,μs
-prover,prove,prove_202,332891,μs
-prover,prove,prove_29,380194,μs
-solver,Witness Generation,step_106,76170,μs
-prover,prove,prove_24,329878,μs
-solver,Witness Generation,step_255,64582,μs
-prover,prove,prove_189,308534,μs
-solver,Witness Generation,step_95,60184,μs
-prover,prove,prove_134,325393,μs
-prover,prove,prove_213,305550,μs
-solver,Witness Generation,step_64,100877,μs
-prover,prove,prove_410,351582,μs
-prover,prove,prove_425,313428,μs
-solver,Witness Generation,step_321,65472,μs
-prover,prove,prove_454,345324,μs
-prover,prove,prove_381,503450,μs
-prover,prove,prove_257,529394,μs
-prover,prove,prove_21,330709,μs
-solver,Witness Generation,step_393,64611,μs
-prover,prove,prove_245,521654,μs
-solver,Witness Generation,step_76,58604,μs
-solver,Witness Generation,step_222,59852,μs
-solver,Witness Generation,step_150,83411,μs
-solver,Witness Generation,step_215,64194,μs
-prover,prove,prove_363,310871,μs
-solver,Witness Generation,step_266,67212,μs
-solver,Witness Generation,step_50,67423,μs
-prover,prove,prove_137,303947,μs
-prover,prove,prove_348,298853,μs
-solver,Witness Generation,step_380,71166,μs
-prover,prove,prove_18,320885,μs
-prover,prove,prove_439,311644,μs
-prover,prove,prove_359,330988,μs
-solver,Witness Generation,step_447,58262,μs
-solver,Witness Generation,step_6,74951,μs
-prover,prove,prove_85,317522,μs
-prover,prove,prove_148,313389,μs
-prover,prove,prove_350,337060,μs
-prover,prove,prove_448,322336,μs
-solver,Witness Generation,step_253,73471,μs
-prover,prove,prove_59,312995,μs
-solver,Witness Generation,step_335,65420,μs
-solver,Witness Generation,step_352,72574,μs
-solver,Witness Generation,step_98,62574,μs
-prover,prove,prove_226,331910,μs
-prover,prove,prove_175,311693,μs
-solver,Witness Generation,step_431,70442,μs
-prover,prove,prove_426,310237,μs
-solver,Witness Generation,step_130,73667,μs
-prover,prove,prove_353,309070,μs
-solver,Witness Generation,step_20,67790,μs
-solver,Witness Generation,step_197,64070,μs
-prover,prove,prove_107,305618,μs
-prover,prove,prove_103,310701,μs
-solver,Witness Generation,step_188,60308,μs
-prover,prove,prove_180,312841,μs
-prover,prove,prove_374,334112,μs
-prover,prove,prove_421,308108,μs
-prover,prove,prove_355,306488,μs
-prover,prove,prove_384,446356,μs
-solver,Witness Generation,step_260,65713,μs
-solver,Witness Generation,step_119,60378,μs
-solver,Witness Generation,step_2,62648,μs
-prover,prove,prove_311,313853,μs
-prover,prove,prove_443,316655,μs
-prover,prove,prove_54,322109,μs
-prover,prove,prove_133,356837,μs
-solver,Witness Generation,step_331,70668,μs
-solver,Witness Generation,step_373,76006,μs
-prover,prove,prove_38,335054,μs
-solver,Witness Generation,step_67,59560,μs
-prover,prove,prove_116,443865,μs
-prover,prove,prove_308,311616,μs
-verifier,Verification,Final Checks Consistency Verification,198981,μs
-solver,Witness Generation,step_263,73270,μs
-prover,prove,prove_127,609430,μs
-prover,prove,prove_230,384418,μs
-solver,Witness Generation,step_413,61481,μs
-compiler,R1CS,R1CS precomputations,47828,μs
-solver,Witness Generation,step_88,69589,μs
-solver,Witness Generation,step_158,139224,μs
-solver,Witness Generation,step_216,71427,μs
-prover,prove,prove_222,407796,μs
-solver,Witness Generation,step_313,65480,μs
-solver,Witness Generation,step_379,74536,μs
-prover,prove,prove_412,313703,μs
-solver,Witness Generation,step_442,58259,μs
-prover,prove,prove_4,320495,μs
-solver,Witness Generation,step_452,58785,μs
-solver,Witness Generation,step_425,75149,μs
-prover,prove,prove_182,304718,μs
-solver,Witness Generation,step_291,72920,μs
-prover,prove,prove_237,535756,μs
-solver,Witness Generation,step_448,67691,μs
-solver,Witness Generation,step_337,58378,μs
-prover,prove,prove_239,511372,μs
-prover,prove,prove_321,499676,μs
-prover,prove,prove_338,331960,μs
-solver,Witness Generation,step_77,68179,μs
-prover,prove,prove_365,315446,μs
-prover,prove,prove_204,308655,μs
-solver,Witness Generation,step_272,67423,μs
-solver,Witness Generation,step_319,75167,μs
-solver,Witness Generation,step_169,92113,μs
-prover,prove,prove_407,366448,μs
-prover,prove,prove_36,342444,μs
-prover,prove,prove_152,306883,μs
-prover,prove,prove_5,311612,μs
-solver,Witness Generation,step_218,74796,μs
-solver,Witness Generation,step_407,68802,μs
-prover,prove,prove_221,564343,μs
-solver,Witness Generation,step_72,60145,μs
-prover,prove,prove_120,318513,μs
-solver,Witness Generation,step_348,73408,μs
-solver,Witness Generation,step_280,64141,μs
-prover,prove,prove_3,316293,μs
-solver,Witness Generation,step_370,81020,μs
-prover,prove,prove_256,531373,μs
-prover,prove,prove_326,303320,μs
-solver,Witness Generation,step_374,90353,μs
-prover,prove,prove_415,302676,μs
-solver,Witness Generation,step_164,58997,μs
-prover,prove,prove_92,376298,μs
-solver,Witness Generation,step_75,80227,μs
-prover,prove,prove_210,312993,μs
-prover,prove,prove_337,302140,μs
-prover,prove,prove_28,314854,μs
-prover,prove,prove_235,511421,μs
-solver,Witness Generation,step_417,76304,μs
-solver,Witness Generation,step_277,68872,μs
-prover,prove,prove_243,536811,μs
-prover,prove,prove_200,317882,μs
-solver,Witness Generation,step_426,66136,μs
-prover,prove,prove_395,348124,μs
-prover,prove,prove_248,403934,μs
-prover,prove,prove_8,314147,μs
-solver,Witness Generation,step_366,70631,μs
-prover,prove,prove_347,335834,μs
-solver,Witness Generation,step_243,58974,μs
-solver,Witness Generation,step_357,65134,μs
-solver,Witness Generation,step_443,66884,μs
-solver,Witness Generation,step_329,76030,μs
-solver,Witness Generation,step_377,59064,μs
-solver,Witness Generation,step_107,90138,μs
-prover,prove,prove_404,303340,μs
-solver,Witness Generation,step_239,73265,μs
-prover,prove,prove_2,325757,μs
-solver,Witness Generation,step_400,76268,μs
-prover,prove,prove_140,301969,μs
-prover,prove,prove_164,306996,μs
-solver,Witness Generation,step_203,58988,μs
-prover,prove,prove_102,311525,μs
-prover,prove,prove_302,306291,μs
-prover,prove,prove_108,312148,μs
-prover,prove,prove_71,314502,μs
-prover,prove,prove_99,401676,μs
-solver,Witness Generation,step_113,69470,μs
-solver,Witness Generation,step_199,73912,μs
-prover,prove,prove_143,316545,μs
-prover,prove,prove_366,309102,μs
-solver,Witness Generation,step_94,72472,μs
-solver,Witness Generation,step_362,75487,μs
-solver,Witness Generation,step_444,74849,μs
-prover,prove,prove_356,320409,μs
-prover,prove,prove_342,330051,μs
-compiler,R1CS,Commitment Generations,846576,μs
-prover,prove,prove_282,529597,μs
-prover,prove,prove_151,388365,μs
-prover,prove,prove_372,311432,μs
-prover,prove,prove_345,350007,μs
-prover,prove,prove_346,464213,μs
-solver,Witness Generation,step_363,60765,μs
-prover,prove,prove_367,318069,μs
-prover,prove,prove_62,310655,μs
-solver,Witness Generation,step_430,77583,μs
-prover,prove,prove_51,310609,μs
-solver,Witness Generation,step_53,57356,μs
-prover,prove,prove_138,343365,μs
-prover,prove,prove_172,365663,μs
-solver,Witness Generation,step_287,74872,μs
-prover,prove,prove_292,535356,μs
-prover,prove,prove_263,508344,μs
-solver,Witness Generation,step_147,58113,μs
-solver,Witness Generation,step_353,70348,μs
-prover,prove,prove_158,324778,μs
-prover,prove,prove_225,319953,μs
-solver,Witness Generation,step_176,68292,μs
-prover,prove,prove_81,442935,μs
-solver,Witness Generation,step_290,59167,μs
-prover,prove,prove_212,304089,μs
-prover,prove,prove_283,498421,μs
-solver,Witness Generation,step_301,70435,μs
-prover,prove,prove_419,310019,μs
-solver,Witness Generation,step_129,65671,μs
-prover,prove,prove_427,469765,μs
-solver,Witness Generation,step_71,65478,μs
-solver,Witness Generation,step_295,58597,μs
-solver,Witness Generation,step_450,59158,μs
-prover,prove,prove_268,519422,μs
-compiler,R1CS,To Circuit,13790,μs
-prover,prove,prove_14,309708,μs
-solver,Witness Generation,step_454,59132,μs
-solver,Witness Generation,step_220,70981,μs
-prover,prove,prove_269,520860,μs
-prover,prove,prove_276,395640,μs
-solver,Witness Generation,step_123,62922,μs
-solver,Witness Generation,step_344,70651,μs
-prover,prove,prove_327,310615,μs
-prover,prove,prove_354,354065,μs
-prover,prove,prove_64,312080,μs
-solver,Witness Generation,step_408,74083,μs
-solver,Witness Generation,step_394,66980,μs
-prover,prove,prove_247,558438,μs
-prover,prove,prove_380,319992,μs
-solver,Witness Generation,step_224,71057,μs
-solver,SAFA Solving,Clear Match,239,μs
-prover,prove,prove_123,496297,μs
-prover,prove,prove_192,322818,μs
-solver,Witness Generation,step_306,68426,μs
-solver,Witness Generation,step_87,67352,μs
-solver,Witness Generation,step_125,67370,μs
-solver,Witness Generation,step_34,59611,μs
-solver,Witness Generation,step_307,64517,μs
-solver,Witness Generation,step_189,69140,μs
-prover,prove,prove_301,334849,μs
-prover,prove,prove_69,319294,μs
-prover,prove,prove_179,314646,μs
-solver,Witness Generation,step_126,69347,μs
-solver,Witness Generation,step_314,59202,μs
-solver,Witness Generation,step_384,64909,μs
-prover,prove,prove_377,336602,μs
-solver,Witness Generation,step_207,58236,μs
-prover,prove,prove_144,365256,μs
-solver,Witness Generation,step_338,74935,μs
-solver,Witness Generation,step_369,78023,μs
-solver,Witness Generation,step_202,64101,μs
-prover,prove,prove_111,303440,μs
-solver,Witness Generation,step_194,75991,μs
-solver,Witness Generation,step_104,67832,μs
-solver,Witness Generation,step_282,68321,μs
-solver,Witness Generation,step_185,68345,μs
-prover,prove,prove_176,315223,μs
-prover,prove,prove_135,304760,μs
-prover,prove,prove_373,308586,μs
-solver,Witness Generation,step_237,71949,μs
-prover,prove,prove_358,319088,μs
-solver,Witness Generation,step_99,72002,μs
-prover,prove,prove_12,338969,μs
-prover,prove,prove_251,548259,μs
-solver,Witness Generation,step_109,60462,μs
-solver,Witness Generation,step_297,75243,μs
-solver,Witness Generation,step_250,69683,μs
-solver,Witness Generation,step_69,75728,μs
-prover,prove,prove_364,310248,μs
-prover,prove,prove_31,356257,μs
-prover,prove,prove_310,344428,μs
-prover,prove,prove_119,301420,μs
-prover,prove,prove_383,403672,μs
-prover,prove,prove_436,395869,μs
-prover,prove,prove_209,302803,μs
-solver,Witness Generation,step_232,76374,μs
-solver,Witness Generation,step_10,60232,μs
-prover,prove,prove_284,543625,μs
-solver,Witness Generation,step_112,62210,μs
-prover,prove,prove_114,307316,μs
-prover,prove,prove_82,382045,μs
-solver,Witness Generation,step_305,67964,μs
-prover,prove,prove_246,527677,μs
-solver,Witness Generation,step_135,76314,μs
-prover,prove,prove_68,315564,μs
-prover,prove,prove_10,364536,μs
-prover,prove,prove_63,312382,μs
-prover,prove,prove_65,314879,μs
+solver,Witness Generation,step_375,98849,μs
+prover,prove,prove_222,540885,μs
+prover,prove,prove_333,538860,μs
+prover,prove,prove_139,550711,μs
+prover,prove,prove_103,538604,μs
+solver,Witness Generation,step_225,73873,μs
+solver,Witness Generation,step_118,56139,μs
+prover,prove,prove_104,548182,μs
+prover,prove,prove_84,553123,μs
+prover,prove,prove_203,538860,μs
+prover,prove,prove_172,540390,μs
+prover,prove,prove_133,538793,μs
+prover,prove,prove_127,538624,μs
+solver,Witness Generation,step_309,56830,μs
+prover,prove,prove_122,537331,μs
+prover,prove,prove_328,561475,μs
+solver,Witness Generation,step_244,60746,μs
+prover,prove,prove_249,540564,μs
+prover,prove,prove_262,551003,μs
+prover,prove,prove_280,542611,μs
+compiler,R1CS,Proof Setup,8253785,μs
+solver,Witness Generation,step_365,74665,μs
+solver,Witness Generation,step_266,56726,μs
+prover,prove,prove_190,540813,μs
+prover,prove,prove_123,539094,μs
+prover,prove,prove_135,540335,μs
+prover,prove,prove_35,406077,μs
+solver,Witness Generation,step_286,56027,μs
+prover,prove,prove_72,403099,μs
+prover,prove,prove_143,540288,μs
+solver,Witness Generation,step_139,55662,μs
+prover,prove,prove_41,475791,μs
+prover,prove,prove_285,570044,μs
+prover,prove,prove_435,581472,μs
+prover,prove,prove_39,540508,μs
+prover,prove,prove_51,354494,μs
+prover,prove,prove_88,555143,μs
+prover,prove,prove_111,535045,μs
+solver,Witness Generation,step_17,73963,μs
+prover,prove,prove_18,524757,μs
+solver,Witness Generation,step_260,63028,μs
+prover,prove,prove_238,553777,μs
+solver,Witness Generation,step_306,111609,μs
+prover,prove,prove_208,544548,μs
+solver,Witness Generation,step_230,60769,μs
+solver,Witness Generation,step_285,56203,μs
+solver,Witness Generation,step_361,66929,μs
+solver,Witness Generation,step_8,65160,μs
+prover,prove,prove_155,540217,μs
+solver,Witness Generation,step_342,56339,μs
+solver,Witness Generation,step_294,56312,μs
+prover,prove,prove_386,540527,μs
+prover,prove,prove_279,538590,μs
+prover,prove,prove_124,539906,μs
+solver,Witness Generation,step_122,56129,μs
+prover,prove,prove_303,541670,μs
+prover,prove,prove_22,520620,μs
+prover,prove,prove_355,540048,μs
+solver,Witness Generation,step_447,56916,μs
+prover,prove,prove_44,389032,μs
+prover,prove,prove_366,540872,μs
+solver,Witness Generation,step_211,70752,μs
+prover,prove,prove_343,549704,μs
+prover,prove,prove_42,433012,μs
+solver,Witness Generation,step_326,74833,μs
+solver,Witness Generation,step_200,74534,μs
+prover,prove,prove_247,537861,μs
+prover,prove,prove_189,538190,μs
+prover,prove,prove_116,536496,μs
+solver,Witness Generation,step_440,66561,μs
+prover,prove,prove_228,537661,μs
+prover,prove,prove_244,538687,μs
+prover,prove,prove_313,541825,μs
+prover,prove,prove_125,538408,μs
+solver,Witness Generation,step_70,55754,μs
+prover,prove,prove_192,555735,μs
+prover,prove,prove_274,549825,μs
+prover,prove,prove_315,541557,μs
+prover,prove,prove_411,544907,μs
+prover,prove,prove_444,535910,μs
+prover,prove,prove_58,326460,μs
+prover,prove,prove_53,426044,μs
+prover,prove,prove_169,550964,μs
+solver,Witness Generation,step_142,76298,μs
+solver,Witness Generation,step_257,56319,μs
+solver,Witness Generation,step_198,70357,μs
+solver,Witness Generation,step_330,72875,μs
+prover,prove,prove_295,571499,μs
+solver,Witness Generation,step_298,56787,μs
+prover,prove,prove_422,540767,μs
+solver,Witness Generation,step_111,70316,μs
+solver,Witness Generation,step_145,61900,μs
+solver,Witness Generation,step_411,68170,μs
+solver,Witness Generation,step_180,64939,μs
+prover,prove,prove_20,526218,μs
+prover,prove,prove_357,541778,μs
+solver,Witness Generation,step_233,63376,μs
+prover,prove,prove_219,540104,μs
+prover,prove,prove_237,540398,μs
+solver,Witness Generation,step_262,56570,μs
+solver,Witness Generation,step_79,59522,μs
+prover,prove,prove_232,541334,μs
+prover,prove,prove_121,541653,μs
+solver,Witness Generation,step_302,73094,μs
+solver,Witness Generation,step_369,70704,μs
+solver,Witness Generation,step_186,56491,μs
+solver,Witness Generation,step_307,142676,μs
+prover,prove,prove_54,476334,μs
+solver,Witness Generation,step_358,73746,μs
+prover,prove,prove_335,544014,μs
+prover,prove,prove_145,558040,μs
+solver,Witness Generation,step_6,116929,μs
+solver,Witness Generation,step_288,56515,μs
+prover,prove,prove_49,434225,μs
+prover,prove,prove_258,540541,μs
+prover,prove,prove_25,371709,μs
+solver,Witness Generation,step_281,74351,μs
+solver,Witness Generation,step_137,66940,μs
+prover,prove,prove_170,567394,μs
+solver,Witness Generation,step_443,69829,μs
+prover,prove,prove_261,552344,μs
+solver,Witness Generation,step_33,63372,μs
+solver,Witness Generation,step_15,107013,μs
+prover,prove,prove_250,538038,μs
+prover,prove,prove_363,552835,μs
+prover,prove,prove_14,360838,μs
+prover,prove,prove_144,540518,μs
+solver,Witness Generation,step_172,72537,μs
+prover,prove,prove_126,551331,μs
+solver,Witness Generation,step_22,72924,μs
+prover,prove,prove_352,543513,μs
+prover,prove,prove_299,542160,μs
+solver,Witness Generation,step_104,63350,μs
+prover,prove,prove_263,543574,μs
+solver,Witness Generation,step_331,57672,μs
+prover,prove,prove_300,550749,μs
+prover,prove,prove_304,544157,μs
+solver,Witness Generation,step_429,75292,μs
+solver,Witness Generation,step_399,56449,μs
+prover,prove,prove_107,541106,μs
+solver,Witness Generation,step_235,71867,μs
+prover,prove,prove_214,551523,μs
+solver,Witness Generation,step_417,56524,μs
+solver,Witness Generation,step_380,56706,μs
+prover,prove,prove_401,551502,μs
+prover,prove,prove_319,564424,μs
+prover,prove,prove_371,539631,μs
+prover,prove,prove_236,540934,μs
+prover,prove,prove_282,541496,μs
+solver,Witness Generation,step_385,56151,μs
+prover,prove,prove_29,338501,μs
+solver,Witness Generation,step_420,55980,μs
+prover,prove,prove_4,328952,μs
+solver,Witness Generation,step_267,64890,μs
+prover,prove,prove_376,538155,μs
+prover,prove,prove_128,540751,μs
+solver,Witness Generation,step_75,66938,μs
+prover,prove,prove_378,539346,μs
+prover,prove,prove_136,534515,μs
+solver,Witness Generation,step_11,64816,μs
+solver,Witness Generation,step_14,77681,μs
+prover,prove,prove_12,371933,μs
+solver,Witness Generation,step_168,62668,μs
+solver,Witness Generation,step_236,81571,μs
+prover,prove,prove_414,541240,μs
+prover,prove,prove_63,464071,μs
+prover,prove,prove_173,538611,μs
+prover,prove,prove_269,541976,μs
+solver,Witness Generation,step_254,61190,μs
+prover,prove,prove_193,542983,μs
+solver,Witness Generation,step_90,55481,μs
+prover,prove,prove_24,371952,μs
+prover,prove,prove_404,544734,μs
+prover,prove,prove_233,541603,μs
+prover,prove,prove_439,551507,μs
+prover,prove,prove_206,541184,μs
+solver,Witness Generation,step_299,65617,μs
+solver,Witness Generation,step_297,79596,μs
+solver,Witness Generation,step_313,72911,μs
+solver,Witness Generation,step_280,56295,μs
+prover,prove,prove_52,371912,μs
+prover,prove,prove_37,371060,μs
+solver,Witness Generation,step_124,55565,μs
+solver,Witness Generation,step_130,66292,μs
+prover,prove,prove_302,540657,μs
+prover,prove,prove_8,366929,μs
+solver,Witness Generation,step_218,56365,μs
+solver,Witness Generation,step_363,56379,μs
+solver,Witness Generation,step_379,100848,μs
+solver,Witness Generation,step_2,118799,μs
+solver,Witness Generation,step_434,73483,μs
+solver,Witness Generation,step_207,65970,μs
+solver,Witness Generation,step_219,67014,μs
+solver,Witness Generation,step_240,105601,μs
+solver,Witness Generation,step_69,62058,μs
+prover,prove,prove_453,538505,μs
+prover,prove,prove_344,549613,μs
+solver,Witness Generation,step_18,58483,μs
+prover,prove,prove_418,540767,μs
+prover,prove,prove_117,558929,μs
+compiler,SAFA,SAFA,91320885,μs
+prover,prove,prove_434,568012,μs
+solver,Witness Generation,step_125,58666,μs
+prover,prove,prove_156,562466,μs
+solver,Witness Generation,step_351,73787,μs
+solver,Witness Generation,step_372,93755,μs
+solver,Witness Generation,step_291,64755,μs
+solver,Witness Generation,step_41,56225,μs
+prover,prove,prove_242,537516,μs
+solver,Witness Generation,step_283,62766,μs
+solver,Witness Generation,step_282,61246,μs
+solver,Witness Generation,step_173,61126,μs
+prover,prove,prove_112,542932,μs
+prover,prove,prove_149,541325,μs
+prover,prove,prove_158,538910,μs
+prover,prove,prove_212,545731,μs
+solver,Witness Generation,step_113,66374,μs
+prover,prove,prove_365,542442,μs
+compiler,R1CS,To Circuit,22529,μs
+solver,Witness Generation,step_57,62779,μs
+solver,Witness Generation,step_264,58882,μs
+solver,Witness Generation,step_88,56075,μs
+solver,Witness Generation,step_444,65496,μs
+solver,Witness Generation,step_324,60553,μs
+solver,Witness Generation,step_93,71263,μs
+prover,prove,prove_291,549680,μs
+prover,prove,prove_184,540516,μs
+solver,Witness Generation,step_293,56126,μs
+solver,Witness Generation,step_268,61508,μs
+prover,prove,prove_177,537722,μs
+solver,Witness Generation,step_117,70251,μs
+solver,Witness Generation,step_377,112008,μs
+prover,prove,prove_82,542905,μs
+prover,prove,prove_50,422035,μs
+prover,prove,prove_224,537766,μs
+prover,prove,prove_375,540110,μs
+prover,prove,prove_151,538282,μs
+prover,prove,prove_209,540732,μs
+solver,Witness Generation,step_176,69726,μs
+prover,prove,prove_179,551804,μs
+prover,prove,prove_433,570707,μs
+prover,prove,prove_161,551385,μs
+prover,prove,prove_134,551726,μs
+prover,prove,prove_32,428141,μs
+prover,prove,prove_245,553916,μs
+prover,prove,prove_292,575580,μs
+solver,Witness Generation,step_72,55862,μs
+prover,prove,prove_102,539720,μs
+solver,Witness Generation,step_148,65846,μs
+solver,Witness Generation,step_381,60573,μs
+solver,Witness Generation,step_26,71227,μs
+solver,Witness Generation,step_4,122340,μs
+prover,prove,prove_70,338352,μs
+prover,prove,prove_338,541163,μs
+prover,prove,prove_368,550335,μs
+solver,Witness Generation,step_348,65103,μs
+solver,Witness Generation,step_81,98424,μs
+prover,prove,prove_288,537734,μs
+solver,Witness Generation,step_259,73880,μs
+solver,Witness Generation,step_435,61339,μs
+prover,prove,prove_348,552255,μs
+prover,prove,prove_259,541602,μs
+prover,prove,prove_227,636151,μs
+solver,Witness Generation,step_322,70422,μs
+solver,Witness Generation,step_45,62118,μs
+solver,Witness Generation,step_320,69133,μs
+prover,prove,prove_221,556776,μs
+prover,prove,prove_223,540356,μs
+solver,Witness Generation,step_147,56886,μs
+prover,prove,prove_452,538666,μs
+solver,Witness Generation,step_231,73954,μs
+solver,Witness Generation,step_274,74274,μs
+solver,Witness Generation,step_423,70460,μs
+solver,Witness Generation,step_205,70875,μs
+prover,prove,prove_402,541574,μs
+solver,Witness Generation,step_165,66118,μs
+solver,Witness Generation,step_95,60084,μs
+solver,Witness Generation,step_356,56131,μs
+prover,prove,prove_215,541542,μs
+solver,Witness Generation,step_248,56217,μs
+solver,Witness Generation,step_1,110877,μs
+solver,Witness Generation,step_295,71463,μs
+solver,Witness Generation,step_346,60681,μs
+prover,prove,prove_346,540287,μs
+prover,prove,prove_372,541015,μs
+prover,prove,prove_416,551723,μs
+prover,prove,prove_191,540029,μs
+prover,prove,prove_201,553593,μs
+prover,prove,prove_326,540872,μs
+prover,prove,prove_383,539396,μs
+prover,prove,prove_321,546997,μs
+solver,Witness Generation,step_46,78132,μs
+solver,Witness Generation,step_213,73159,μs
+prover,prove,prove_354,538491,μs
+solver,Witness Generation,step_304,102202,μs
+solver,Witness Generation,step_441,69602,μs
+solver,Witness Generation,step_187,71818,μs
+solver,Witness Generation,step_135,78607,μs
+solver,Witness Generation,step_188,69510,μs
+prover,prove,prove_273,541452,μs
+solver,Witness Generation,step_332,72820,μs
+prover,prove,prove_339,542045,μs
+prover,prove,prove_254,540714,μs
+solver,Witness Generation,step_255,56136,μs
+prover,prove,prove_243,551208,μs
+prover,prove,prove_451,541684,μs
+solver,Witness Generation,step_100,67509,μs
+prover,prove,prove_241,540665,μs
+solver,Witness Generation,step_315,67460,μs
+solver,Witness Generation,step_38,66315,μs
+prover,prove,prove_251,543582,μs
+prover,prove,prove_327,552378,μs
+prover,prove,prove_181,565168,μs
+prover,prove,prove_83,551509,μs
+solver,Witness Generation,step_203,63349,μs
+solver,Witness Generation,step_54,74429,μs
+prover,prove,prove_256,535856,μs
+solver,Witness Generation,step_284,56168,μs
+solver,Witness Generation,step_35,56294,μs
+solver,Witness Generation,step_132,55649,μs
+prover,prove,prove_176,532434,μs
+prover,prove,prove_202,560271,μs
+prover,prove,prove_394,548980,μs
+solver,Witness Generation,step_312,107924,μs
+solver,Witness Generation,step_167,61872,μs
+solver,SAFA Solving,Clear Match,212,μs
+prover,prove,prove_380,547459,μs
+solver,Witness Generation,step_65,71996,μs
+solver,Witness Generation,step_177,57556,μs
+solver,Witness Generation,step_394,73521,μs
+prover,prove,prove_100,549283,μs
+solver,Witness Generation,step_416,67540,μs
+prover,prove,prove_62,388839,μs
+prover,prove,prove_131,551513,μs
+solver,Witness Generation,step_71,69966,μs
+prover,prove,prove_101,540615,μs
+prover,prove,prove_337,587900,μs
+prover,prove,prove_307,544318,μs
+solver,Witness Generation,step_311,72292,μs
+prover,prove,prove_64,463835,μs
+prover,prove,prove_19,511239,μs
+solver,Witness Generation,step_170,65077,μs
+prover,prove,prove_341,541458,μs
+prover,prove,prove_329,542202,μs
+prover,prove,prove_150,540125,μs
+solver,Witness Generation,step_445,66955,μs
+prover,prove,prove_186,552942,μs
+prover,prove,prove_340,551476,μs
+prover,prove,prove_436,574206,μs
+solver,Witness Generation,step_181,56677,μs
+solver,Witness Generation,step_232,61228,μs
+solver,Witness Generation,step_61,67006,μs
+prover,prove,prove_308,540799,μs
+prover,prove,prove_395,544727,μs
+solver,Witness Generation,step_5,110665,μs
+solver,Witness Generation,step_317,77970,μs
+prover,prove,prove_93,550503,μs
+prover,prove,prove_252,540660,μs
+prover,prove,prove_437,548425,μs
+prover,prove,prove_204,538494,μs
+solver,Witness Generation,step_400,71012,μs
+prover,prove,prove_81,542576,μs
+solver,Witness Generation,step_36,57469,μs
+solver,Witness Generation,step_432,56431,μs
+solver,Witness Generation,step_337,60803,μs
+prover,prove,prove_217,535071,μs
+solver,Witness Generation,step_226,57076,μs
+solver,Witness Generation,step_397,56416,μs
+prover,prove,prove_10,418798,μs
+solver,Witness Generation,step_407,56233,μs
+solver,Witness Generation,step_210,56401,μs
+prover,prove,prove_109,546848,μs
+prover,prove,prove_413,555633,μs
+solver,Witness Generation,step_323,56846,μs
+prover,prove,prove_389,552017,μs
+solver,Witness Generation,step_3,115947,μs
+solver,Witness Generation,step_214,62523,μs
+solver,Witness Generation,step_105,61923,μs
+solver,Witness Generation,step_98,55635,μs
+prover,prove,prove_286,577057,μs
+prover,prove,prove_276,540505,μs
+prover,prove,prove_336,544294,μs
+solver,Witness Generation,step_265,72961,μs
+solver,Witness Generation,step_327,62927,μs
+prover,prove,prove_430,537850,μs
+solver,Witness Generation,step_161,77928,μs
+prover,prove,prove_218,536845,μs
+prover,prove,prove_385,531481,μs
+prover,prove,prove_360,538474,μs
+prover,prove,prove_331,551145,μs
+prover,prove,prove_323,550276,μs
+solver,Witness Generation,step_382,63430,μs
+solver,Witness Generation,step_384,56145,μs
+prover,prove,prove_90,557511,μs
+solver,Witness Generation,step_115,55558,μs
+prover,prove,prove_91,535206,μs
+prover,prove,prove_311,558886,μs
+prover,prove,prove_34,391791,μs
+prover,prove,prove_175,549216,μs
+prover,prove,prove_361,542872,μs
+prover,prove,prove_66,436908,μs
+solver,Witness Generation,step_171,61834,μs
+prover,Proof,Compressed SNARK,2649152,μs
+solver,Witness Generation,step_308,98686,μs
+solver,Witness Generation,step_140,55778,μs
+solver,Witness Generation,step_409,71836,μs
+solver,Witness Generation,step_216,56222,μs
+solver,Witness Generation,step_153,55796,μs
+prover,prove,prove_351,549986,μs
+prover,prove,prove_290,578768,μs
+prover,prove,prove_314,539507,μs
+prover,prove,prove_281,553196,μs
+solver,Witness Generation,step_271,56273,μs
+prover,prove,prove_178,541544,μs
+solver,Witness Generation,step_239,112021,μs
+solver,Witness Generation,step_414,56122,μs
+prover,prove,prove_318,547942,μs
+solver,Witness Generation,step_398,56227,μs
+solver,Witness Generation,step_228,56897,μs
+solver,Witness Generation,step_431,63734,μs
+prover,prove,prove_396,542130,μs
+prover,prove,prove_349,541284,μs
+prover,prove,prove_388,549939,μs
+prover,prove,prove_392,541214,μs
+solver,Witness Generation,step_261,64879,μs
+solver,Witness Generation,step_335,56395,μs
+solver,Witness Generation,step_367,59705,μs
+prover,prove,prove_159,543207,μs
+prover,prove,prove_105,539991,μs
+prover,prove,prove_294,570858,μs
+solver,Witness Generation,step_21,72030,μs
+prover,prove,prove_89,551203,μs
+solver,Witness Generation,step_13,60867,μs
+prover,prove,prove_235,543272,μs
+prover,prove,prove_46,544581,μs
+prover,prove,prove_447,543689,μs
+prover,prove,prove_446,602871,μs
+prover,prove,prove_1,448535,μs
+solver,Witness Generation,step_47,107451,μs
+solver,Witness Generation,step_49,56062,μs
+solver,Witness Generation,step_48,67153,μs
+solver,Witness Generation,step_391,56309,μs
+solver,Witness Generation,step_243,56093,μs
+solver,Witness Generation,step_421,56032,μs
+prover,prove,prove_95,543637,μs
+prover,prove,prove_415,551754,μs
+prover,prove,prove_353,565269,μs
+solver,Witness Generation,step_278,56149,μs
+solver,Witness Generation,step_202,62410,μs
+solver,Witness Generation,step_143,79865,μs
+solver,Witness Generation,step_40,70113,μs
+solver,Witness Generation,step_82,109076,μs
+solver,Witness Generation,step_241,56204,μs
+solver,Witness Generation,step_92,59040,μs
+prover,prove,prove_147,537969,μs
+solver,Witness Generation,step_344,66716,μs
+solver,Witness Generation,step_448,56232,μs
+solver,Witness Generation,step_191,56815,μs
+solver,Witness Generation,step_134,77644,μs
+solver,Witness Generation,step_199,58756,μs
+prover,prove,prove_325,554572,μs
+prover,prove,prove_7,366642,μs
+solver,Witness Generation,step_223,56208,μs
+solver,Witness Generation,step_73,74163,μs
+solver,Witness Generation,step_449,106192,μs
+prover,prove,prove_94,540608,μs
+prover,prove,prove_69,340386,μs
+prover,prove,prove_275,541933,μs
+solver,Witness Generation,step_410,59797,μs
+prover,prove,prove_373,538541,μs
+prover,prove,prove_141,544781,μs
+prover,prove,prove_399,539174,μs
+prover,prove,prove_370,577788,μs
+prover,prove,prove_180,550245,μs
+solver,Witness Generation,step_242,74214,μs
+prover,prove,prove_405,541045,μs
+prover,prove,prove_264,541677,μs
+solver,Witness Generation,step_353,66992,μs
+prover,prove,prove_265,552307,μs
+prover,prove,prove_297,553205,μs
+solver,Witness Generation,step_96,63839,μs
+prover,prove,prove_36,376618,μs
+solver,Witness Generation,step_437,56402,μs
+solver,Witness Generation,step_269,56421,μs
+solver,Witness Generation,step_352,56319,μs
+solver,Witness Generation,step_103,55807,μs
+prover,prove,prove_441,534591,μs
+prover,prove,prove_119,551737,μs
+solver,Witness Generation,step_108,55489,μs
+solver,Witness Generation,step_149,67565,μs
+solver,Witness Generation,step_152,71980,μs
+solver,Witness Generation,step_355,56301,μs
+prover,prove,prove_55,363504,μs
+solver,Witness Generation,step_387,67367,μs
+prover,prove,prove_132,534019,μs
+solver,Witness Generation,step_107,55433,μs
+prover,prove,prove_379,544374,μs
+solver,Witness Generation,step_325,67797,μs
+solver,Witness Generation,step_349,56347,μs
+prover,prove,prove_183,544218,μs
+solver,Witness Generation,step_160,75301,μs
+solver,Witness Generation,step_97,56072,μs
+solver,Witness Generation,step_201,56833,μs
+prover,prove,prove_146,540418,μs
+prover,prove,prove_362,539812,μs
+solver,Witness Generation,step_44,74501,μs
+solver,Witness Generation,step_276,67513,μs
+solver,Witness Generation,step_127,74470,μs
+solver,Witness Generation,step_370,74680,μs
+solver,Witness Generation,step_179,67833,μs
+prover,prove,prove_312,550290,μs
+prover,prove,prove_334,543742,μs
+solver,Witness Generation,step_364,71227,μs
+solver,Witness Generation,step_450,61493,μs
+prover,prove,prove_113,540363,μs
+prover,prove,prove_253,538476,μs
+solver,Witness Generation,step_52,85255,μs
+solver,Witness Generation,step_350,71167,μs
+prover,prove,prove_165,541678,μs
+prover,prove,prove_374,541433,μs
+solver,Witness Generation,step_418,65056,μs
+prover,prove,prove_26,344690,μs
+compiler,R1CS,R1CS precomputations,35821,μs
+solver,Witness Generation,step_404,64088,μs
+prover,prove,prove_74,549432,μs
+prover,prove,prove_30,352014,μs
+prover,prove,prove_185,536468,μs
+solver,Witness Generation,step_194,73210,μs
+prover,prove,prove_2,327337,μs
+solver,Witness Generation,step_30,55980,μs
+solver,Witness Generation,step_251,72046,μs
+prover,prove,prove_305,541692,μs
+solver,Witness Generation,step_430,61700,μs
+prover,prove,prove_309,551192,μs
+prover,prove,prove_225,541483,μs
+prover,prove,prove_157,572909,μs
+prover,prove,prove_417,547226,μs
+prover,prove,prove_207,538360,μs
+solver,Witness Generation,step_227,68541,μs
+solver,Witness Generation,step_68,61281,μs
+prover,prove,prove_246,552777,μs
+prover,prove,prove_21,509932,μs
+solver,Witness Generation,step_31,69586,μs
+solver,Witness Generation,step_386,70388,μs
+prover,prove,prove_364,538786,μs
+prover,prove,prove_391,541414,μs
+compiler,Compiler,Full,100501184,μs
+solver,Witness Generation,step_247,56091,μs
+prover,prove,prove_68,329984,μs
+prover,prove,prove_110,540399,μs
+prover,prove,prove_6,336770,μs
+solver,Witness Generation,step_383,56128,μs
+prover,prove,prove_129,545666,μs
+solver,Witness Generation,step_300,61900,μs
+prover,prove,prove_332,541047,μs
+prover,prove,prove_438,541975,μs
+solver,Witness Generation,step_275,56333,μs
+solver,Witness Generation,step_53,107520,μs
+solver,Witness Generation,step_185,63855,μs
+prover,prove,prove_59,448048,μs
+prover,prove,prove_322,539805,μs
+solver,Witness Generation,step_67,73893,μs
+solver,Witness Generation,step_357,56172,μs
+prover,prove,prove_356,541957,μs
+solver,Witness Generation,step_12,73522,μs
+solver,Witness Generation,step_43,63154,μs
+solver,Witness Generation,step_359,72905,μs
+prover,prove,prove_213,538767,μs
+solver,Witness Generation,step_94,57785,μs
+prover,prove,prove_397,540027,μs
+solver,Witness Generation,step_333,66815,μs
+solver,Witness Generation,step_85,56079,μs
+solver,Witness Generation,step_10,55574,μs
+prover,prove,prove_267,556748,μs
+solver,Witness Generation,step_318,107936,μs
+prover,prove,prove_260,541392,μs
+solver,Witness Generation,step_215,64082,μs
+solver,Witness Generation,step_120,55986,μs
+solver,Witness Generation,step_138,66165,μs
+solver,Witness Generation,step_319,74485,μs
+prover,prove,prove_57,331459,μs
+prover,prove,prove_106,538474,μs
+solver,Witness Generation,step_164,55823,μs
+solver,Witness Generation,step_263,70376,μs
+prover,prove,prove_257,567918,μs
+solver,Witness Generation,step_37,70815,μs
+solver,Witness Generation,step_27,65557,μs
+solver,Witness Generation,step_405,56580,μs
+solver,Witness Generation,step_39,56298,μs
+prover,prove,prove_71,335842,μs
+prover,prove,prove_298,539355,μs
+prover,prove,prove_377,534993,μs
+solver,Witness Generation,step_234,56230,μs
+solver,Witness Generation,step_345,73914,μs
+solver,Witness Generation,step_32,67096,μs
+prover,prove,prove_168,551741,μs
+prover,prove,prove_347,537355,μs
+solver,Witness Generation,step_114,55899,μs
+solver,Witness Generation,step_84,72271,μs
+solver,Witness Generation,step_238,134808,μs
+prover,prove,prove_255,538813,μs
+solver,Witness Generation,step_159,56577,μs
+prover,prove,prove_268,541001,μs
+solver,Witness Generation,step_229,66012,μs
+prover,prove,prove_162,540516,μs
+solver,Witness Generation,step_422,56023,μs
+solver,Witness Generation,step_169,57515,μs
+solver,Witness Generation,step_249,70278,μs
+verifier,Verification,Final Checks Consistency Verification,208639,μs
+prover,prove,prove_118,548956,μs
+solver,Witness Generation,step_157,67088,μs
+solver,Witness Generation,step_287,72209,μs
+prover,prove,prove_0,373232,μs
+prover,prove,prove_442,532870,μs
+prover,prove,prove_317,552298,μs
+prover,prove,prove_278,548666,μs
+prover,prove,prove_283,551540,μs
+prover,prove,prove_450,551501,μs
+solver,Witness Generation,step_126,77667,μs
+solver,Witness Generation,step_253,62792,μs
+prover,prove,prove_400,535251,μs
+prover,prove,prove_406,561896,μs
+prover,prove,prove_412,548076,μs
+solver,Witness Generation,step_305,135459,μs
+solver,Witness Generation,step_42,64731,μs
+solver,Witness Generation,step_123,56086,μs
+prover,prove,prove_174,540030,μs
+prover,prove,prove_277,541127,μs
+prover,prove,prove_284,570686,μs
+prover,prove,prove_114,543352,μs
+prover,prove,prove_98,546509,μs
+prover,prove,prove_194,552053,μs
+solver,Witness Generation,step_212,56230,μs
+solver,Witness Generation,step_119,74043,μs
+prover,prove,prove_45,516506,μs
+solver,Witness Generation,step_106,55720,μs
+verifier,Verification,Nova Verification,2036634,μs
+prover,prove,prove_198,539229,μs
+prover,prove,prove_408,538412,μs
+solver,Witness Generation,step_374,66832,μs
+solver,Witness Generation,step_328,64408,μs
+prover,prove,prove_410,537309,μs
+prover,prove,prove_449,542437,μs
+solver,Witness Generation,step_246,56382,μs
+solver,Witness Generation,step_131,55946,μs
+solver,Witness Generation,step_388,56624,μs
+prover,prove,prove_16,547195,μs
+prover,prove,prove_239,541839,μs
+solver,Witness Generation,step_453,78738,μs
+prover,prove,prove_164,541000,μs
+prover,prove,prove_266,540427,μs
+solver,Witness Generation,step_7,73547,μs
+prover,prove,prove_3,393918,μs
+solver,Witness Generation,step_224,72487,μs
+solver,Witness Generation,step_250,58152,μs
+prover,prove,prove_17,510933,μs
+prover,prove,prove_108,545799,μs
+solver,Witness Generation,step_78,70520,μs
+prover,prove,prove_47,417969,μs
+solver,Witness Generation,step_50,67054,μs
+prover,prove,prove_196,550338,μs
+solver,Witness Generation,step_451,87466,μs
+prover,prove,prove_445,540867,μs
+prover,prove,prove_216,537900,μs
+prover,prove,prove_79,561624,μs
+prover,prove,prove_166,537986,μs
+prover,prove,prove_182,554005,μs
+solver,Witness Generation,step_290,60624,μs
+solver,Witness Generation,step_0,47305,μs
+prover,prove,prove_9,429676,μs
+prover,prove,prove_43,523831,μs
+solver,Witness Generation,step_454,74130,μs
+prover,prove,prove_240,552297,μs
+prover,prove,prove_320,578370,μs
+solver,Witness Generation,step_162,57999,μs
+solver,Witness Generation,step_334,57891,μs
+prover,prove,prove_293,550274,μs
+prover,prove,prove_367,551232,μs
+solver,Witness Generation,step_392,70370,μs
+solver,Witness Generation,step_23,56126,μs
+prover,prove,prove_359,547058,μs
+solver,Witness Generation,step_270,56499,μs
+solver,Witness Generation,step_336,70283,μs
+solver,Witness Generation,step_178,73380,μs
+prover,prove,prove_142,546535,μs
+prover,prove,prove_226,536205,μs
+prover,prove,prove_270,544459,μs
+prover,prove,prove_271,564834,μs
+prover,prove,prove_220,538106,μs
+prover,prove,prove_27,385370,μs
+prover,prove,prove_342,552089,μs
+solver,Witness Generation,step_24,68170,μs
+prover,prove,prove_310,552280,μs
+prover,prove,prove_387,540641,μs
+prover,prove,prove_316,545667,μs
+prover,prove,prove_76,541413,μs
+solver,Witness Generation,step_395,57502,μs
+prover,prove,prove_296,541153,μs
+solver,Witness Generation,step_303,56225,μs
+prover,prove,prove_97,543722,μs
+solver,Witness Generation,step_371,62755,μs
+prover,prove,prove_171,533044,μs
+solver,Witness Generation,step_136,56221,μs
+solver,Witness Generation,step_86,60062,μs
+solver,Witness Generation,step_109,69888,μs
+solver,Witness Generation,step_439,64434,μs
+prover,prove,prove_96,537398,μs
+solver,Witness Generation,step_182,82779,μs
+prover,prove,prove_120,539218,μs
+prover,prove,prove_130,541629,μs
+prover,prove,prove_31,379086,μs
+solver,Witness Generation,step_329,56420,μs
+solver,Witness Generation,step_197,56523,μs
+prover,prove,prove_137,537721,μs
+solver,Witness Generation,step_66,56404,μs
+solver,Witness Generation,step_64,55757,μs
+prover,prove,prove_419,547918,μs
+prover,prove,prove_426,551156,μs
+solver,Witness Generation,step_129,64675,μs
+prover,prove,prove_289,543202,μs
+prover,prove,prove_403,541559,μs
+prover,prove,prove_407,559643,μs
+prover,prove,prove_5,324921,μs
+solver,Witness Generation,step_273,56266,μs
+solver,Witness Generation,step_19,66455,μs
+prover,prove,prove_200,542227,μs
+prover,prove,prove_78,546524,μs
+prover,prove,prove_140,547680,μs
+solver,Witness Generation,step_116,55858,μs
+solver,Witness Generation,step_408,74106,μs
+prover,prove,prove_13,370233,μs
+solver,Witness Generation,step_133,55663,μs
+prover,prove,prove_61,480193,μs
+prover,prove,prove_409,549489,μs
+prover,prove,prove_56,493919,μs
+prover,prove,prove_421,539524,μs
+solver,Witness Generation,step_442,56452,μs
+solver,Witness Generation,step_321,61441,μs
+prover,prove,prove_229,538368,μs
+solver,Witness Generation,step_347,62672,μs
+prover,prove,prove_152,551354,μs
+prover,prove,prove_188,553216,μs
+prover,prove,prove_211,553189,μs
+prover,prove,prove_86,538962,μs
+solver,Witness Generation,step_378,138053,μs
+prover,prove,prove_115,539901,μs
+solver,Witness Generation,step_256,56333,μs
+prover,prove,prove_99,552243,μs
+solver,Witness Generation,step_258,71675,μs
+solver,Witness Generation,step_146,71196,μs
+prover,prove,prove_163,551510,μs
+solver,Witness Generation,step_296,57623,μs
+solver,Witness Generation,step_401,67922,μs
+solver,Witness Generation,step_393,57398,μs
+prover,prove,prove_393,541179,μs
+prover,prove,prove_424,538629,μs
+prover,prove,prove_427,537831,μs
+prover,prove,prove_432,569123,μs
+solver,Witness Generation,step_316,63573,μs
+solver,Witness Generation,step_217,71772,μs
+prover,prove,prove_306,537044,μs
+prover,prove,prove_73,492225,μs
+solver,Witness Generation,step_9,62297,μs
+solver,Witness Generation,step_58,56283,μs
+solver,Witness Generation,step_163,73756,μs
+prover,prove,prove_205,541101,μs
+solver,Witness Generation,step_76,55508,μs
+prover,prove,prove_382,552880,μs
+prover,prove,prove_390,541411,μs
+prover,prove,prove_87,541223,μs
+prover,prove,prove_153,569610,μs
+prover,prove,prove_381,538455,μs
+solver,Witness Generation,step_89,55678,μs
+solver,Witness Generation,step_101,58711,μs
+solver,Witness Generation,step_91,66676,μs
+solver,Witness Generation,step_184,63314,μs
+solver,Witness Generation,step_34,68290,μs
+prover,prove,prove_38,440371,μs
+prover,prove,prove_423,535554,μs
+prover,prove,prove_330,541476,μs
+solver,Witness Generation,step_158,62253,μs
+prover,prove,prove_358,560897,μs
+prover,prove,prove_23,407596,μs
+solver,Witness Generation,step_156,74707,μs
+solver,Witness Generation,step_425,61999,μs
+solver,Witness Generation,step_402,56239,μs
+solver,Witness Generation,step_279,69024,μs
+solver,Witness Generation,step_206,56285,μs
+prover,prove,prove_154,581158,μs
+solver,Witness Generation,step_166,103394,μs
+prover,prove,prove_80,543247,μs
+solver,Witness Generation,step_427,56457,μs
+solver,Witness Generation,step_415,70911,μs
+solver,Witness Generation,step_436,64838,μs
+solver,Witness Generation,step_208,61260,μs
+solver,Witness Generation,step_362,58339,μs
+prover,prove,prove_11,376967,μs
+solver,Witness Generation,step_419,63351,μs
+solver,Witness Generation,step_63,62946,μs
+solver,Witness Generation,step_406,56133,μs
+prover,prove,prove_384,537419,μs
+prover,Proof,Consistency Proofs,294639,μs
+prover,prove,prove_324,540750,μs
+solver,Witness Generation,step_310,63305,μs
+prover,prove,prove_85,542460,μs
+verifier,Verification,Full,2246602,μs
+solver,Witness Generation,step_196,62457,μs
+solver,Witness Generation,step_192,64926,μs
+solver,Solve,Framework Solve,30667826,μs
+solver,Witness Generation,step_209,62726,μs
+solver,Witness Generation,step_314,56589,μs
+solver,Witness Generation,step_87,65369,μs
+solver,Witness Generation,step_373,109008,μs
+prover,prove,prove_428,562127,μs
+solver,Witness Generation,step_56,63743,μs
+solver,Witness Generation,step_62,62801,μs
+solver,Witness Generation,step_272,70473,μs
+prover,prove,prove_92,553613,μs
+prover,prove,prove_443,551521,μs
+prover,prove,prove_67,343260,μs
+solver,Witness Generation,step_183,75662,μs
+prover,prove,prove_369,538362,μs
+solver,Witness Generation,step_438,70418,μs
+prover,prove,prove_454,546799,μs
+solver,Witness Generation,step_413,56300,μs
+compiler,R1CS,Commitment Generations,831839,μs
+solver,Witness Generation,step_403,63814,μs
+prover,prove,prove_77,533756,μs
+prover,prove,prove_398,537153,μs
+prover,prove,prove_272,541551,μs
+solver,Witness Generation,step_55,74754,μs
+solver,Witness Generation,step_366,66122,μs
+solver,Witness Generation,step_102,72286,μs
+prover,prove,prove_187,545161,μs
+solver,Witness Generation,step_112,59919,μs
+solver,Witness Generation,step_195,61512,μs
+solver,Witness Generation,step_83,56401,μs
+solver,Witness Generation,step_452,107818,μs
+solver,Witness Generation,step_220,56924,μs
+prover,prove,prove_234,536350,μs
+prover,prove,prove_60,544375,μs
+prover,prove,prove_167,542202,μs
+prover,prove,prove_429,538631,μs
+solver,Witness Generation,step_292,56435,μs
+solver,Witness Generation,step_25,55676,μs
+prover,prove,prove_210,542501,μs
+prover,prove,prove_431,574553,μs
+prover,prove,prove_33,358317,μs
+solver,Witness Generation,step_77,70169,μs
+solver,Witness Generation,step_190,66550,μs
+solver,Witness Generation,step_354,59796,μs
+solver,Witness Generation,step_433,72828,μs
+prover,prove,prove_195,550604,μs
+prover,prove,prove_287,557292,μs
+prover,prove,prove_420,540535,μs
+solver,Witness Generation,step_155,70142,μs
+solver,Witness Generation,step_59,71275,μs
+solver,Witness Generation,step_51,61205,μs
+prover,prove,prove_301,540500,μs
+prover,prove,prove_197,538016,μs
+solver,Witness Generation,step_74,62597,μs
+solver,Witness Generation,step_428,71939,μs
+solver,Witness Generation,step_20,55664,μs
+solver,Witness Generation,step_141,55901,μs
+prover,prove,prove_230,538231,μs
+solver,Witness Generation,step_154,69016,μs
+prover,prove,prove_248,561848,μs
+solver,Witness Generation,step_193,63783,μs
+prover,prove,prove_350,546050,μs
+solver,Witness Generation,step_128,55866,μs
+solver,Witness Generation,step_237,138382,μs
+solver,Witness Generation,step_204,56189,μs
+solver,Witness Generation,step_80,67486,μs
+solver,Witness Generation,step_426,64129,μs
+solver,Witness Generation,step_301,56087,μs
+solver,Witness Generation,step_252,56261,μs
+solver,Witness Generation,step_110,63719,μs
+solver,Witness Generation,step_389,60585,μs
+prover,prove,prove_160,547783,μs
+solver,Witness Generation,step_189,61740,μs
+prover,prove,prove_138,541673,μs
+solver,Witness Generation,step_412,56302,μs
+solver,Witness Generation,step_99,55751,μs
+solver,Witness Generation,step_222,57027,μs
+solver,Witness Generation,step_368,56303,μs
+prover,prove,prove_448,538248,μs
+solver,Witness Generation,step_29,76894,μs
+solver,Witness Generation,step_60,56403,μs
+prover,prove,prove_48,545697,μs
+solver,Witness Generation,step_277,56791,μs
+prover,prove,prove_345,547791,μs
+solver,Witness Generation,step_16,66881,μs
+solver,Witness Generation,step_446,68649,μs
+solver,Witness Generation,step_28,63069,μs
+solver,Witness Generation,step_144,56413,μs
+solver,Witness Generation,step_396,68958,μs
+prover,prove,prove_15,507648,μs
+solver,Witness Generation,step_121,75501,μs
+solver,Witness Generation,step_390,65118,μs
+solver,Witness Generation,step_340,68784,μs
+solver,Witness Generation,step_174,66300,μs
+solver,Witness Generation,step_221,65524,μs
+prover,prove,prove_199,536663,μs
+solver,Witness Generation,step_339,56133,μs
+prover,prove,prove_440,540146,μs
+solver,Witness Generation,step_289,72971,μs
+solver,Witness Generation,step_341,56516,μs
+prover,prove,prove_148,544307,μs
+solver,Witness Generation,step_175,56323,μs
+solver,Witness Generation,step_376,130443,μs
+prover,prove,prove_231,538779,μs
+prover,prove,prove_425,541428,μs
+prover,prove,prove_40,541566,μs
+solver,Witness Generation,step_343,56270,μs
+solver,Witness Generation,step_245,63948,μs
+prover,prove,prove_65,472509,μs
+solver,Witness Generation,step_151,60529,μs
+prover,prove,prove_75,550484,μs
+solver,Witness Generation,step_150,75772,μs
+solver,Witness Generation,step_360,56281,μs
+solver,Witness Generation,step_338,68566,μs
+solver,Witness Generation,step_424,79383,μs
+prover,prove,prove_28,368314,μs
 prover,add test,Primary Circuit,18588,constraints
 prover,add test,Secondary Circuit,10347,constraints
-prover,Proof Size,Compressed SNARK size,73648,bytes
+prover,Proof Size,Compressed SNARK size,73681,bytes
