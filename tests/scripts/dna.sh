@@ -1,6 +1,6 @@
 #REEF
-cargo clean 
-cargo build ---release --features 'metrics,reef'
+# cargo clean 
+# cargo build ---release --features 'metrics,reef'
 echo 'reef'
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch1 --re "^.{43052505}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG" dna
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch2 --re "^.{43050136}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG
@@ -27,8 +27,6 @@ GATGGATCATATGGAAACTGGCAGCTATGGAATGTGCCTTTCCTAAGGAATTTGCTAATAGATGCCTAAGCCCAGAAAGG
 CAG" dna
 
 #REEF hybrid
-cargo clean 
-cargo build ---release --features 'metrics,reef'
 echo 'reef hybrid'
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch1_full --re "^.{43052505}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG" -n -h -p dna
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch2_full --re "^.{43050136}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG
@@ -55,8 +53,8 @@ GATGGATCATATGGAAACTGGCAGCTATGGAATGTGCCTTTCCTAAGGAATTTGCTAATAGATGCCTAAGCCCAGAAAGG
 CAG" -h -p dna
 
 #NWR
-cargo clean 
-cargo build ---release --features 'metrics,nwr'
+# cargo clean 
+cargo build --release --features 'metrics,nwr'
 echo 'nwr'
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch1_nwr --re "^.{43052505}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG" dna
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch2_nwr --re "^.{43050136}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG
@@ -83,8 +81,8 @@ GATGGATCATATGGAAACTGGCAGCTATGGAATGTGCCTTTCCTAAGGAATTTGCTAATAGATGCCTAAGCCCAGAAAGG
 CAG" dna
 
 #Naive
-cargo clean 
-cargo build ---release --features 'metrics,naive'
+# cargo clean 
+cargo build --release --features 'metrics,naive'
 echo 'naive'
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch1_naive --re "^.{43052505}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG" dna
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch2_naive --re "^.{43050136}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG
