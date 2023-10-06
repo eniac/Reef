@@ -917,7 +917,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.assertions.push(cursor_plus);
             self.pub_inputs.push(new_var(format!("cursor_{}", j)));
 
-            let bit_limit = logmn(self.udoc.len());
+            let bit_limit = logmn(max(self.udoc.len(), self.max_offsets));
+            println!("bIT LIMIT {:#?}", bit_limit);
             let cur_overflow = term(
                 Op::BvBinPred(BvBinPred::Uge),
                 vec![
@@ -1663,6 +1664,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 break;
             }
         }
+
+        println!("WIT UPPER OFFSET {:#?}", upper_offset_i);
 
         wits.insert(format!("char_{}", i), new_wit(char_num));
         wits.insert(format!("state_{}", i), new_wit(state_i));
