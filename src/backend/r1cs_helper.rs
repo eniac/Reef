@@ -506,8 +506,8 @@ pub(crate) fn prover_mle_partial_eval(
     let m = x.len();
 
     if for_t {
-        println!("prods len : {}", prods.len());
-        println!("base pow: {}", base.pow(m as u32 - 1));
+        //println!("prods len : {}", prods.len());
+        //println!("base pow: {}", base.pow(m as u32 - 1));
         assert!(base.pow(m as u32 - 1) <= prods.len());
         assert!(base.pow(m as u32) >= prods.len());
         assert_eq!(es.len(), prods.len()); //todo final q
