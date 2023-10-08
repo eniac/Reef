@@ -410,6 +410,7 @@ fn solve<'a>(
             stack_out.push(cur * r1cs_converter.num_states + kid);
         }
 
+        // TODO
         // just for debugging :)
         //circ_data.check_all(&wits);
 

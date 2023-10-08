@@ -309,8 +309,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             .rem_floor(cfg().field().modulus()),
         );
 
-        // TODO we have to make sure the multipliers are big enough
-
         let mut table: Vec<Integer> = set_table.into_iter().collect();
 
         // need to round out table size ?
@@ -325,7 +323,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         );
 
         assert!(calc_fill < cfg().field().modulus().clone());
-        let calc_fill = calc_fill.rem_floor(cfg().field().modulus());
         while table.len() < base.pow(logmn(table.len()) as u32) {
             table.push(calc_fill.clone());
         }
@@ -398,7 +395,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         };
 
         let hybrid_len = if hybrid {
-            Some(max(pub_len, priv_len).next_power_of_two() * 2)
+            let half_len = max(pub_len, priv_len).next_power_of_two();
+
+            table.append(&mut vec![calc_fill; half_len - table.len()]);
+
+            Some(half_len * 2)
         } else {
             None
         };
@@ -409,7 +410,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             safa,
             foralls_w_kids,
             num_ab,
-            table, // TODO fix else
+            table,
             max_offsets,
             star_offset,
             doc_hash: None,
@@ -463,9 +464,27 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // check if we need vs as vars
     fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
         let num_chars = self.num_ab.len();
+        let bit_limit = logmn(self.num_states);
 
         let mut v = vec![];
         for i in 1..(self.batch_size + 1) {
+            // range checks
+            // char checked by doc q,v
+            // offsets in cursor circ
+
+            // in state < num states
+            let in_overflow = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(Op::PfToBv(bit_limit), vec![new_const(self.num_states)]),
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("state_{}", i - 1))],
+                    ),
+                ],
+            );
+            self.assertions.push(in_overflow);
+
             let v_i = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
@@ -559,6 +578,19 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 self.pub_inputs.push(new_var(format!("v_{}", i - 1)));
             }
         }
+
+        // out state < num states
+        let out_overflow = term(
+            Op::BvBinPred(BvBinPred::Uge),
+            vec![
+                term(Op::PfToBv(bit_limit), vec![new_const(self.num_states)]),
+                term(
+                    Op::PfToBv(bit_limit),
+                    vec![new_var(format!("state_{}", self.batch_size))],
+                ),
+            ],
+        );
+
         self.pub_inputs
             .push(new_var(format!("state_{}", self.batch_size)));
 
@@ -917,7 +949,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.assertions.push(cursor_plus);
             self.pub_inputs.push(new_var(format!("cursor_{}", j)));
 
-            let bit_limit = logmn(self.udoc.len());
+            let bit_limit = logmn(max(self.udoc.len(), self.max_offsets));
             let cur_overflow = term(
                 Op::BvBinPred(BvBinPred::Uge),
                 vec![
@@ -962,6 +994,29 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
 
+            // upper off < max off
+            let upper_overflow = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(Op::PfToBv(bit_limit), vec![new_const(self.max_offsets)]),
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("upper_offset_{}", j))],
+                    ),
+                ],
+            );
+            // if no upper off, lower off < max off
+            let lower_overflow = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(Op::PfToBv(bit_limit), vec![new_const(self.max_offsets)]),
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("lower_offset_{}", j))],
+                    ),
+                ],
+            );
+
             let ite_upper_off = term(
                 Op::Ite,
                 vec![
@@ -972,8 +1027,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             new_var(format!("upper_offset_{}", j)),
                         ],
                     ),
-                    new_bool_const(true),
-                    max_offset_geq,
+                    lower_overflow,
+                    term(
+                        Op::BoolNaryOp(BoolNaryOp::And),
+                        vec![max_offset_geq, upper_overflow],
+                    ),
                 ],
             );
             self.assertions.push(ite_upper_off);
@@ -1601,12 +1659,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-        /*
-                println!(
-                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-                );
-        */
+
+        /*println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        );*/
+
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -1692,10 +1750,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        // println!(
-        //     "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-        //     i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        // );
+        /*println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        );*/
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1937,11 +1995,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let half_len = self.hybrid_len.unwrap() / 2;
 
             let mut hybrid_table = self.table.clone();
-            hybrid_table.append(&mut vec![Integer::from(0); half_len - self.table.len()]);
             hybrid_table.append(&mut proj_doc.to_vec());
             hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
 
-            // println!("hybrid table {:#?}", hybrid_table.clone());
+            //println!("hybrid table {:#?}", hybrid_table.clone());
 
             let mut hybrid_q = q.clone();
             for qd in doc_q {
