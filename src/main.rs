@@ -93,7 +93,7 @@ fn main() {
 
         run_backend(
             safa.clone(),
-            doc,
+            doc.clone(),
             opt.batch_size,
             opt.projections,
             opt.hybrid,
@@ -111,7 +111,7 @@ fn main() {
             title = opt.input[..10].to_string();
         }
         let _ = wtr.write_record(&[
-            format!("{}_{}", &title, opt.input.len()),
+            format!("{}_{}", &title, doc.len()),
             opt.re,
             safa.g.edge_count().to_string(), //nedges().to_string(),
             safa.g.node_count().to_string(), //nstates().to_string(),

@@ -1,15 +1,24 @@
- echo "start email"
- ./tests/scripts/email_dkim.sh > email_out
- echo "end email"
+cargo clean 
+# cargo build --release --features 'metrics,reef'
+#  echo "reef"
+# ./tests/scripts/reef.sh &> out_reef
+#  echo "end reef"
 
- echo "pihole"
- ./tests/scripts/pihole.sh > pihole_out
- echo "end pihole"
+#  echo "reef h"
+# ./tests/scripts/reef_h.sh &> out_rh 
+#  echo "reef h"
 
- echo "zombie"
- ./tests/scripts/zombie.sh > zombie_out 
- echo "end zombie"
+cargo build --release --features 'metrics,nwr'
+ echo "nwr"
+./tests/scripts/nwr.sh &> out_nwr 
+ echo "nwr"
 
- echo "password"
- ./tests/scripts/password.sh > password_out
- echo "end password" 
+cargo build --release --features 'metrics,naive'
+ echo "naive"
+./tests/scripts/naive.sh &> out_naive 
+ echo "naive" 
+
+cargo build --release --features 'metrics,reef'
+ echo "dna"
+./tests/scripts/dna.sh &> out_dna 
+ echo "naive" 
