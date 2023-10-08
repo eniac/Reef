@@ -464,9 +464,27 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // check if we need vs as vars
     fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
         let num_chars = self.num_ab.len();
+        let bit_limit = logmn(self.num_states);
 
         let mut v = vec![];
         for i in 1..(self.batch_size + 1) {
+            // range checks
+            // char checked by doc q,v
+            // offsets in cursor circ
+
+            // in state < num states
+            let in_overflow = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(Op::PfToBv(bit_limit), vec![new_const(self.num_states)]),
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("state_{}", i - 1))],
+                    ),
+                ],
+            );
+            self.assertions.push(in_overflow);
+
             let v_i = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
@@ -560,6 +578,19 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 self.pub_inputs.push(new_var(format!("v_{}", i - 1)));
             }
         }
+
+        // out state < num states
+        let out_overflow = term(
+            Op::BvBinPred(BvBinPred::Uge),
+            vec![
+                term(Op::PfToBv(bit_limit), vec![new_const(self.num_states)]),
+                term(
+                    Op::PfToBv(bit_limit),
+                    vec![new_var(format!("state_{}", self.batch_size))],
+                ),
+            ],
+        );
+
         self.pub_inputs
             .push(new_var(format!("state_{}", self.batch_size)));
 
@@ -963,6 +994,29 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
 
+            // upper off < max off
+            let upper_overflow = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(Op::PfToBv(bit_limit), vec![new_const(self.max_offsets)]),
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("upper_offset_{}", j))],
+                    ),
+                ],
+            );
+            // if no upper off, lower off < max off
+            let lower_overflow = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(Op::PfToBv(bit_limit), vec![new_const(self.max_offsets)]),
+                    term(
+                        Op::PfToBv(bit_limit),
+                        vec![new_var(format!("lower_offset_{}", j))],
+                    ),
+                ],
+            );
+
             let ite_upper_off = term(
                 Op::Ite,
                 vec![
@@ -973,8 +1027,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             new_var(format!("upper_offset_{}", j)),
                         ],
                     ),
-                    new_bool_const(true),
-                    max_offset_geq,
+                    lower_overflow,
+                    term(
+                        Op::BoolNaryOp(BoolNaryOp::And),
+                        vec![max_offset_geq, upper_overflow],
+                    ),
                 ],
             );
             self.assertions.push(ite_upper_off);
