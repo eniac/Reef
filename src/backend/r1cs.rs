@@ -1660,10 +1660,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        println!(
+        /*println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );
+        );*/
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1750,10 +1750,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        println!(
+        /*println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );
+        );*/
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1998,7 +1998,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             hybrid_table.append(&mut proj_doc.to_vec());
             hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
 
-            println!("hybrid table {:#?}", hybrid_table.clone());
+            //println!("hybrid table {:#?}", hybrid_table.clone());
 
             let mut hybrid_q = q.clone();
             for qd in doc_q {

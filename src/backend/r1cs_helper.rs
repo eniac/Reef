@@ -113,15 +113,10 @@ pub fn normal_add_table<'a>(
     // this could probably be more efficient tho
     while let Some(state) = dfs_small.next(&safa.g) {
         let in_state = state.index();
-        //println!("SMALL DFA STATE {:#?}", state);
 
         if !final_exists_pass || !safa.g[state].is_and() {
             for edge in safa.g.edges(state) {
-                // filter extra edges - TODO see if helps
-                //println!("From {:?} - {} -> {:?}", edge.source(), edge.weight(), edge.target());
                 if !safa.is_sink(&edge.target()) {
-                    //println!("Found sink {:?}", edge.target());
-                    // !(safa.is_sink(edge.source()) || safa.is_sink(edge.target())) {
                     let out_state = edge.target().index();
 
                     match edge.weight().clone() {
@@ -376,7 +371,6 @@ pub(crate) fn calc_rel<'a>(
     let mut rel = 0;
 
     if trans {
-        //print!("in {:#?}, OUT {:#?}", in_state, out_state);
         assert!(out_state == exit_state || safa.g[NodeIndex::new(out_state)].is_and());
         assert!(safa.accepting().contains(&NodeIndex::new(in_state)));
         rel = 1;
@@ -593,8 +587,6 @@ pub(crate) fn prover_mle_partial_eval(
 
 // external full "partial" eval for table check
 pub fn verifier_mle_eval(table: &[Integer], q: &[Integer]) -> Integer {
-    println!("table {:#?}", table);
-
     let (_, con) = prover_mle_partial_eval(table, q, &(0..table.len()).collect(), true, None);
 
     con
