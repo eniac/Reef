@@ -779,31 +779,14 @@ mod tests {
     use crate::frontend::safa::SAFA;
 
     fn backend_test(
-        ab_in: String,
+        ab: String,
         rstr: String,
-        doc_in: Vec<char>,
+        doc: Vec<char>,
         batch_size: usize,
         projections: bool,
         hybrid: bool,
     ) {
-        let mut ab = ab_in.clone();
-        ab.push(26u8 as char); // EOF
-        let mut doc = doc_in.clone();
-        doc.push(26u8 as char);
-
-        let mut re = rstr.to_string();
-        let mut re_chars = rstr.chars();
-        let last = re_chars.next_back().unwrap();
-        if last == '$' {
-            re = re_chars.into_iter().collect();
-            re.push(26u8 as char);
-            re.push('$');
-        } else {
-            re.push(last);
-            re.push(26u8 as char)
-        }
-
-        let r = re::simpl(re::new(&re));
+        let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
 
         init();

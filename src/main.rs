@@ -23,11 +23,10 @@ fn main() {
     let opt = Options::parse();
 
     // Alphabet
-    let mut ab = String::from_iter(opt.config.alphabet());
-    ab.push(26u8 as char); // EOF
+    let ab = String::from_iter(opt.config.alphabet());
 
     // Input document
-    let mut doc: Vec<char> = if Path::exists(Path::new(&opt.input)) {
+    let doc: Vec<char> = if Path::exists(Path::new(&opt.input)) {
         opt.config
             .read_file(&PathBuf::from(&opt.input))
             .iter()
@@ -36,21 +35,6 @@ fn main() {
     } else {
         opt.input.chars().collect()
     };
-    // EOF
-    doc.push(26u8 as char);
-
-    let mut re = opt.re.to_string();
-    // EOF
-    let mut re_chars = re.chars();
-    let last = re_chars.next_back().unwrap();
-    if last == '$' {
-        re = re_chars.into_iter().collect();
-        re.push(26u8 as char);
-        re.push('$');
-    } else {
-        re.push(last);
-        re.push(26u8 as char);
-    }
 
     #[cfg(feature = "nwr")]
     naive_wr::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output);

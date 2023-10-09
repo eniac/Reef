@@ -303,7 +303,6 @@ pub fn normal_add_table<'a>(
                 // add check entries to table
                 let base: i32 = 2; // an explicit type is required
 
-                let c = num_ab[&None]; //EPSILON
                 let lower_offset = 0;
                 let upper_offset = 0;
 
@@ -334,6 +333,8 @@ pub fn normal_add_table<'a>(
                 );
                 */
 
+                let c = num_ab[&Some(26u8 as char)]; // we can only pop after EOF - this constraint
+                                                     // assures it
                 set_table.insert(
                     Integer::from(
                         (rel * num_states * num_states * num_chars * max_offsets * max_offsets)
