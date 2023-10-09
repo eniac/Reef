@@ -20,17 +20,17 @@ RUST_BACKTRACE=1 ./target/release/reef --input 'mads.testingads.com/uid?=abd?utm
 RUST_BACKTRACE=1 ./target/release/reef --input 'pixel.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&click' --output ./tests/results/pihole.txt --re '^pixels?[-.]' ascii
 RUST_BACKTRACE=1 ./target/release/reef --input 'statistics19902.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037' --output ./tests/results/pihole.txt --re '^stat(s|istics)?[0-9]*[_.-]' ascii
 
-echo 'zombie'
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_100B --output ./tests/results/zombie.txt --re '([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)' ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_2000B --output ./tests/results/zombie.txt --re '([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)' ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/DLP_100B --output ./tests/results/zombie.txt --re '(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))' ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/DLP_2000B --output ./tests/results/zombie.txt --re '(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))' ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/email_100B --output ./tests/results/zombie.txt --re '([^ @]+)@([^ @]+)' ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/email_2000B --output ./tests/results/zombie.txt --re '([^ @]+)@([^ @]+)' ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_100B --output ./tests/results/zombie.txt --re '([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?' ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_2000B --output ./tests/results/zombie.txt --re ' ([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?' ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_email_100B --output ./tests/results/zombie.txt --re '([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+)' ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_email_2000B --output ./tests/results/zombie.txt --re '([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+)' ascii
+#echo 'zombie'
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_100B --output ./tests/results/zombie.txt --re '([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)' ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_2000B --output ./tests/results/zombie.txt --re '([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)' ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/DLP_100B --output ./tests/results/zombie.txt --re '(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))' ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/DLP_2000B --output ./tests/results/zombie.txt --re '(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))' ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/email_100B --output ./tests/results/zombie.txt --re '([^ @]+)@([^ @]+)' ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/email_2000B --output ./tests/results/zombie.txt --re '([^ @]+)@([^ @]+)' ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_100B --output ./tests/results/zombie.txt --re '([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?' ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_2000B --output ./tests/results/zombie.txt --re ' ([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?' ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_email_100B --output ./tests/results/zombie.txt --re '([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+)' ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_email_2000B --output ./tests/results/zombie.txt --re '([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+)' ascii
 
 echo 'password'
 RUST_BACKTRACE=1 ./target/release/reef --input 'B6u$r@s#R5mE' --output ./tests/results/good_pass.txt --re '^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$' ascii

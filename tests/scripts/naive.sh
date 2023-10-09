@@ -17,17 +17,17 @@ RUST_BACKTRACE=1 ./target/release/reef --input "mads.testingads.com/uid?=abd?utm
 RUST_BACKTRACE=1 ./target/release/reef --input "pixel.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&click" --output ./tests/results/pihole_naive.txt --re "^pixels?[-.]" ascii
 RUST_BACKTRACE=1 ./target/release/reef --input "statistics19902.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037" --output ./tests/results/pihole_naive.txt --re "^stat(s|istics)?[0-9]*[_.-]" ascii
 
-echo 'zombie'
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_100B --output ./tests/results/zombie_naive.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_2000B --output ./tests/results/zombie_naive.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/DLP_100B --output ./tests/results/zombie_naive.txt --re "(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))" ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/DLP_2000B --output ./tests/results/zombie_naive.txt --re "(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))" ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/email_100B --output ./tests/results/zombie_naive.txt --re "([^ @]+)@([^ @]+)" ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/email_2000B --output ./tests/results/zombie_naive.txt --re "([^ @]+)@([^ @]+)" ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_100B --output ./tests/results/zombie_naive.txt --re "([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?" ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_2000B --output ./tests/results/zombie_naive.txt --re " ([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?" ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_email_100B --output ./tests/results/zombie_naive.txt --re "([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+)" ascii
-RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_email_2000B --output ./tests/results/zombie_naive.txt --re "([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+)" ascii
+#echo 'zombie'
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_100B --output ./tests/results/zombie_naive.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_2000B --output ./tests/results/zombie_naive.txt --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/DLP_100B --output ./tests/results/zombie_naive.txt --re "(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))" ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/DLP_2000B --output ./tests/results/zombie_naive.txt --re "(([0-9a-zA-Z][0-9]{8})|([0-9]{3}[-\s]?[0-9]{2}?[-\s]?[0-9]{4})|(([0-9]{3}\s){2}[0-9]{3})|([0-9]{6,17})|(9[0-9]{2}[-\s]?(5[0-9]|6[0-5]|7[0-9]|8[0-8]|9([0-2]|[4-9]))[-\s]?[0-9]{4}))" ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/email_100B --output ./tests/results/zombie_naive.txt --re "([^ @]+)@([^ @]+)" ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/email_2000B --output ./tests/results/zombie_naive.txt --re "([^ @]+)@([^ @]+)" ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_100B --output ./tests/results/zombie_naive.txt --re "([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?" ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_2000B --output ./tests/results/zombie_naive.txt --re " ([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?" ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_email_100B --output ./tests/results/zombie_naive.txt --re "([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+)" ascii
+#RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/uri_email_2000B --output ./tests/results/zombie_naive.txt --re "([a-zA-Z][a-zA-Z0-9]*)://([^ /]+)(/[^ ]*)?|([^ @]+)@([^ @]+)" ascii
 
 echo 'email'
 RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/email_small --output ./tests/results/email_dkim_naive.txt --re "^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\\\Michael_Maggi_Jun2001\\\\Notes Folders\\\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$" ascii

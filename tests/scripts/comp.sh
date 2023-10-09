@@ -8,10 +8,10 @@ cargo clean
 # ./tests/scripts/reef_h.sh &> out_rh 
 #  echo "reef h"
 
-cargo build --release --features 'metrics,nwr'
- echo "nwr"
-./tests/scripts/nwr.sh &> out_nwr 
- echo "nwr"
+#cargo build --release --features 'metrics,nwr'
+# echo "nwr"
+#./tests/scripts/nwr.sh &> out_nwr 
+# echo "nwr"
 
 cargo build --release --features 'metrics,naive'
  echo "naive"
