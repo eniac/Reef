@@ -303,7 +303,6 @@ pub fn normal_add_table<'a>(
                 // add check entries to table
                 let base: i32 = 2; // an explicit type is required
 
-                let c = num_ab[&None]; //EPSILON
                 let lower_offset = 0;
                 let upper_offset = 0;
 
@@ -334,6 +333,8 @@ pub fn normal_add_table<'a>(
                 );
                 */
 
+                let c = num_ab[&Some(26u8 as char)]; // we can only pop after EOF - this constraint
+                                                     // assures it
                 set_table.insert(
                     Integer::from(
                         (rel * num_states * num_states * num_chars * max_offsets * max_offsets)
@@ -378,14 +379,16 @@ pub(crate) fn calc_rel<'a>(
         rel = 2;
     } else if safa.g[NodeIndex::new(in_state)].is_and() {
         if children[0] == out_state {
+            let base: usize = num_states;
+
             // push only for the "first branch"
 
             rel = 4;
             for k in 1..children.len() {
-                rel += children[k] * num_states; //TODO
+                rel += children[k] * base.pow(k as u32);
             }
-            for k in 0..(max_branches - children.len() + 1) {
-                rel += kid_padding * num_states;
+            for k in children.len()..(max_branches + 1) {
+                rel += kid_padding * base.pow(k as u32);
             }
         } else {
             // others are pops

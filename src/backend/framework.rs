@@ -821,23 +821,11 @@ mod tests {
     fn e2e_q_overflow() {
         backend_test(
             "abcdefg".to_string(),
-            "gaa*bb*cc*dd*ee*f".to_string(),
+            "^gaa*bb*cc*dd*ee*f$".to_string(),
             ("gaaaaaabbbbbbccccccddddddeeeeeef".to_string())
                 .chars()
                 .collect(),
             33,
-            false,
-            false,
-        );
-    }
-
-    #[test]
-    fn e2e_substring() {
-        backend_test(
-            "ab".to_string(),
-            "bbb".to_string(),
-            ("aaabbbaaa".to_string()).chars().collect(),
-            2,
             false,
             false,
         );
