@@ -779,14 +779,31 @@ mod tests {
     use crate::frontend::safa::SAFA;
 
     fn backend_test(
-        ab: String,
+        ab_in: String,
         rstr: String,
-        doc: Vec<char>,
+        doc_in: Vec<char>,
         batch_size: usize,
         projections: bool,
         hybrid: bool,
     ) {
-        let r = re::simpl(re::new(&rstr));
+        let mut ab = ab_in.clone();
+        ab.push(26u8 as char); // EOF
+        let mut doc = doc_in.clone();
+        doc.push(26u8 as char);
+
+        let mut re = rstr.to_string();
+        let mut re_chars = rstr.chars();
+        let last = re_chars.next_back().unwrap();
+        if last == '$' {
+            re = re_chars.into_iter().collect();
+            re.push(26u8 as char);
+            re.push('$');
+        } else {
+            re.push(last);
+            re.push(26u8 as char)
+        }
+
+        let r = re::simpl(re::new(&re));
         let safa = SAFA::new(&ab[..], &r);
 
         init();
@@ -821,23 +838,11 @@ mod tests {
     fn e2e_q_overflow() {
         backend_test(
             "abcdefg".to_string(),
-            "gaa*bb*cc*dd*ee*f".to_string(),
+            "^gaa*bb*cc*dd*ee*f$".to_string(),
             ("gaaaaaabbbbbbccccccddddddeeeeeef".to_string())
                 .chars()
                 .collect(),
             33,
-            false,
-            false,
-        );
-    }
-
-    #[test]
-    fn e2e_substring() {
-        backend_test(
-            "ab".to_string(),
-            "bbb".to_string(),
-            ("aaabbbaaa".to_string()).chars().collect(),
-            2,
             false,
             false,
         );

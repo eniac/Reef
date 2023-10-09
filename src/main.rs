@@ -23,10 +23,11 @@ fn main() {
     let opt = Options::parse();
 
     // Alphabet
-    let ab = String::from_iter(opt.config.alphabet());
+    let mut ab = String::from_iter(opt.config.alphabet());
+    ab.push(26u8 as char); // EOF
 
     // Input document
-    let doc: Vec<char> = if Path::exists(Path::new(&opt.input)) {
+    let mut doc: Vec<char> = if Path::exists(Path::new(&opt.input)) {
         opt.config
             .read_file(&PathBuf::from(&opt.input))
             .iter()
@@ -35,6 +36,21 @@ fn main() {
     } else {
         opt.input.chars().collect()
     };
+    // EOF
+    doc.push(26u8 as char);
+
+    let mut re = opt.re.to_string();
+    // EOF
+    let mut re_chars = re.chars();
+    let last = re_chars.next_back().unwrap();
+    if last == '$' {
+        re = re_chars.into_iter().collect();
+        re.push(26u8 as char);
+        re.push('$');
+    } else {
+        re.push(last);
+        re.push(26u8 as char);
+    }
 
     #[cfg(feature = "nwr")]
     naive_wr::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output);
@@ -51,7 +67,6 @@ fn main() {
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "SAFA", "SAFA");
 
-        
         let r = re::simpl(re::new(&opt.re));
         println!("make r");
 
@@ -62,8 +77,7 @@ fn main() {
             SAFA::new(&ab, &r)
         };
         println!("make safa");
-        println!("safa size: {}",safa.num_edges());
-    
+        println!("safa size: {}", safa.num_edges());
 
         // Is document well-formed
         // nfa.well_formed(&doc);
@@ -107,7 +121,7 @@ fn main() {
             .unwrap();
         let mut wtr = Writer::from_writer(file);
         let mut title = opt.input.clone();
-        if title.len()>10 {
+        if title.len() > 10 {
             title = opt.input[..10].to_string();
         }
         let _ = wtr.write_record(&[

@@ -378,14 +378,16 @@ pub(crate) fn calc_rel<'a>(
         rel = 2;
     } else if safa.g[NodeIndex::new(in_state)].is_and() {
         if children[0] == out_state {
+            let base: usize = num_states;
+
             // push only for the "first branch"
 
             rel = 4;
             for k in 1..children.len() {
-                rel += children[k] * num_states; //TODO
+                rel += children[k] * base.pow(k as u32);
             }
-            for k in 0..(max_branches - children.len() + 1) {
-                rel += kid_padding * num_states;
+            for k in children.len()..(max_branches + 1) {
+                rel += kid_padding * base.pow(k as u32);
             }
         } else {
             // others are pops

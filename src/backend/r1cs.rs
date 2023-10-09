@@ -79,7 +79,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_ab.insert(Some(c), i);
             i += 1;
         }
-        num_ab.insert(Some('$'), i); // EOF TODO
         num_ab.insert(None, i + 1); // EPSILON
 
         // generate T
@@ -343,10 +342,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         usize_doc.push(u);
         int_doc.push(Integer::from(u));
 
-        let eof_num = usize_doc.len();
-        let u = num_ab[&Some('$')];
-        usize_doc.push(u);
-        int_doc.push(Integer::from(u));
+        //let eof_num = usize_doc.len();
 
         let mut stack = vec![];
         for _i in 0..max_stack {
@@ -727,15 +723,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         )
     }
 
-    // stack for cursors
-    fn push_stack_circuit(&mut self) -> Term {
-        let mut forall_kids = vec![];
-        for k in 0..self.max_branches {
-            forall_kids.push(new_var(format!("forall_0_kid_{}", k)));
-        }
-
-        // get kids from rel_i hash
+    fn hashed_push_rel(&mut self) -> Term {
         let mut hashed_state_var = new_const(4);
+        let states_bit_limit = logmn(self.num_states);
         for k in 0..self.max_branches {
             hashed_state_var = term(
                 Op::PfNaryOp(PfNaryOp::Add),
@@ -744,15 +734,43 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         Op::PfNaryOp(PfNaryOp::Mul),
                         vec![
                             new_var(format!("forall_0_kid_{}", k)),
-                            new_const(self.num_states),
+                            new_const(self.num_states.pow((k + 1) as u32)),
                         ],
                     ),
                     hashed_state_var,
                 ],
             );
 
+            let kid_overflow = term(
+                Op::BvBinPred(BvBinPred::Uge),
+                vec![
+                    term(
+                        Op::PfToBv(states_bit_limit),
+                        vec![new_const(self.num_states)],
+                    ),
+                    term(
+                        Op::PfToBv(states_bit_limit),
+                        vec![new_var(format!("forall_0_kid_{}", k))],
+                    ),
+                ],
+            );
+            self.assertions.push(kid_overflow);
+
             self.pub_inputs.push(new_var(format!("forall_0_kid_{}", k)));
         }
+
+        hashed_state_var
+    }
+
+    // stack for cursors
+    fn push_stack_circuit(&mut self) -> Term {
+        let mut forall_kids = vec![];
+        for k in 0..self.max_branches {
+            forall_kids.push(new_var(format!("forall_0_kid_{}", k)));
+        }
+
+        // get kids from rel_i hash
+        let mut hashed_state_var = self.hashed_push_rel();
 
         let hashed_kids_eq = term(Op::Eq, vec![hashed_state_var, new_var(format!("rel_0"))]);
         let lmtd_push_cond = term(
@@ -762,12 +780,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 vec![new_const(3), new_var(format!("rel_{}", 0))],
             )],
         );
-        /*
-        let hashed_not_pop = term(
-            Op::Ite,
-            vec![lmtd_push_cond, hashed_kids_eq, new_bool_const(true)],
-        );*/
-        //self.assertions.push(hashed_not_pop);
 
         // "padding" included in encoding
         assert!(forall_kids.len() == self.max_branches);
@@ -887,6 +899,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
         }
 
+        // if pop, check new_cursor < prev
+        let cur_bit_limit = logmn(self.udoc.len());
+        let cursor_overflow = term(
+            Op::BvBinPred(BvBinPred::Uge),
+            vec![
+                term(
+                    Op::PfToBv(cur_bit_limit),
+                    vec![new_var(format!("cursor_in"))],
+                ),
+                term(
+                    Op::PfToBv(cur_bit_limit),
+                    vec![new_var(format!("cursor_popped"))],
+                ),
+            ],
+        );
+
         let pop_condition = term(Op::Eq, vec![new_const(3), new_var(format!("rel_{}", 0))]);
 
         let stack_ptr_same = term(
@@ -901,7 +929,17 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             ],
         );
 
-        term(Op::Ite, vec![pop_condition, inside_ite, stack_ptr_same])
+        term(
+            Op::Ite,
+            vec![
+                pop_condition,
+                term(
+                    Op::BoolNaryOp(BoolNaryOp::And),
+                    vec![cursor_overflow, inside_ite],
+                ),
+                stack_ptr_same,
+            ],
+        )
     }
 
     fn not_forall_circ(&self, j: usize) -> Term {
@@ -2630,13 +2668,28 @@ mod tests {
         }
     }
 
+    fn reg(s: &str) -> String {
+        let mut d = s.to_string();
+        d.push(26u8 as char);
+        d.push('$');
+
+        d
+    }
+
+    fn ab(s: &str) -> String {
+        let mut a = s.to_string();
+        a.push(26u8 as char);
+
+        a
+    }
+
     #[test]
     fn proj_hybrid() {
         init();
         test_func_no_hash(
-            "abcd".to_string(),
-            "^.............d$".to_string(),
-            "aabbccddaabbdd".to_string(), // really [ aabbcc, EOF, epsilon ]
+            ab("abcd"),
+            reg("^.....................d"),
+            ab("bbbbbbbbaabbccddaabbdd"), // really [ aabbcc, EOF, epsilon ]
             vec![2],                      // 2],
             true,
             Some(5), // (4,8)
@@ -2647,10 +2700,10 @@ mod tests {
     #[should_panic]
     fn proj_hybrid_panic() {
         test_func_no_hash(
-            "abcd".to_string(),
-            "^.....c$".to_string(),
-            "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
-            vec![2],              // 2],
+            ab("abcd"),
+            reg("^.....c"),
+            ab("aabbcc"),
+            vec![2], // 2],
             true,
             Some(5), // (4,8)
             true,
@@ -2662,10 +2715,10 @@ mod tests {
         init();
 
         test_func_no_hash(
-            "ab".to_string(),
-            "^ab$".to_string(),
-            "ab".to_string(), // really [ aabbcc, EOF, epsilon ]
-            vec![2],          // 2],
+            ab("ab"),
+            reg("^ab"),
+            ab("ab"), // really [ aabbcc, EOF, epsilon ]
+            vec![2],  // 2],
             true,
             None,
             true,
@@ -2678,10 +2731,10 @@ mod tests {
 
         // proj upper
         test_func_no_hash(
-            "abcd".to_string(),
-            "^.....c$".to_string(),
-            "aabbcc".to_string(), // really [ aabbcc, EOF, epsilon ]
-            vec![2],              // 2],
+            ab("abcd"),
+            reg("^.....c"),
+            ab("aabbcc"),
+            vec![2], // 2],
             true,
             Some(5), // (4,8)
             false,
@@ -2692,9 +2745,9 @@ mod tests {
     fn naive_1() {
         init();
         test_func_no_hash(
-            "abcd".to_string(),
-            "^(?=a)ab(?=c)cd$".to_string(),
-            "abcd".to_string(),
+            ab("abcd"),
+            reg("^(?=a)ab(?=c)cd"),
+            ab("abcd"),
             vec![2], // 2],
             true,
             None,
@@ -2706,9 +2759,9 @@ mod tests {
     fn naive_2() {
         init();
         test_func_no_hash(
-            "abcd".to_string(),
-            "(?=a)ab(?=c)cd".to_string(),
-            "abcd".to_string(),
+            ab("abcd"),
+            reg("^(?=a)ab(?=c)cd"),
+            ab("abcd"),
             vec![2], // 2],
             true,
             None,
@@ -2719,15 +2772,7 @@ mod tests {
     #[test]
     fn nfa_2() {
         init();
-        test_func_no_hash(
-            "ab".to_string(),
-            "^ab$".to_string(),
-            "ab".to_string(),
-            vec![2],
-            true,
-            None,
-            false,
-        );
+        test_func_no_hash(ab("ab"), reg("^ab"), ab("ab"), vec![2], true, None, false);
         /*    test_func_no_hash(
             "abc".to_string(),
             "^ab$".to_string(),
@@ -2748,27 +2793,27 @@ mod tests {
     fn nfa_star() {
         init();
         test_func_no_hash(
-            "ab".to_string(),
-            "^a*b*$".to_string(),
-            "aaab".to_string(),
+            ab("ab"),
+            reg("^a*b*"),
+            ab("aaab"),
             vec![2],
             true,
             None,
             false,
         );
         test_func_no_hash(
-            "ab".to_string(),
-            "^a*b*$".to_string(),
-            "aaaaaabbbbbbbbbbbbbb".to_string(),
+            ab("ab"),
+            reg("^a*b*"),
+            ab("aaaaaabbbbbbbbbbbbbb"),
             vec![2, 4],
             true,
             None,
             false,
         );
         test_func_no_hash(
-            "ab".to_string(),
-            "^a*b*$".to_string(),
-            "aaaaaaaaaaab".to_string(),
+            ab("ab"),
+            reg("^a*b*"),
+            ab("aaaaaaaaaaab"),
             vec![2, 4],
             true,
             None,
@@ -2780,37 +2825,16 @@ mod tests {
     #[should_panic]
     fn nfa_bad_1() {
         init();
-        test_func_no_hash(
-            "ab".to_string(),
-            "^a$".to_string(),
-            "c".to_string(),
-            vec![2],
-            false,
-            None,
-            false,
-        );
+        test_func_no_hash(ab("ab"), reg("^a"), ab("c"), vec![2], false, None, false);
     }
-
-    /*#[test]
-    #[should_panic]
-    fn nfa_bad_substring() {
-        init();
-        test_func_no_hash(
-            "helowrd".to_string(),
-            "hello".to_string(),
-            "helloworld".to_string(),
-            vec![1],
-            true,
-        );
-    }*/
 
     #[test]
     fn nfa_ok_substring() {
         init();
         test_func_no_hash(
-            "helowrd".to_string(),
-            "^hello.*$".to_string(),
-            "helloworld".to_string(),
+            ab("helowrd"),
+            reg("^hello.*"),
+            ab("helloworld"),
             vec![2],
             true,
             None,
@@ -2831,9 +2855,9 @@ mod tests {
     fn weird_batch_size() {
         init();
         test_func_no_hash(
-            "helowrd".to_string(),
-            "^hello.*$".to_string(),
-            "helloworld".to_string(),
+            ab("helowrd"),
+            reg("^hello.*"),
+            ab("helloworld"),
             vec![2, 3, 4, 6, 7],
             true,
             None,
@@ -2854,9 +2878,9 @@ mod tests {
     fn r1cs_q_overflow() {
         init();
         test_func_no_hash(
-            "abcdefg".to_string(),
-            "^gaa*bb*cc*dd*ee*f$".to_string(),
-            "gaaaaaabbbbbbccccccddddddeeeeeef".to_string(),
+            ab("abcdefg"),
+            reg("^gaa*bb*cc*dd*ee*f"),
+            ab("gaaaaaabbbbbbccccccddddddeeeeeef"),
             vec![33],
             true,
             None,
@@ -2864,26 +2888,10 @@ mod tests {
         );
 
         test_func_no_hash(
-            "abcdefg".to_string(),
-            "^gaaaaaabbbbbbccccccddddddeeeeeef$".to_string(),
-            "gaaaaaabbbbbbccccccddddddeeeeeef".to_string(),
+            ab("abcdefg"),
+            reg("^gaaaaaabbbbbbccccccddddddeeeeeef"),
+            ab("gaaaaaabbbbbbccccccddddddeeeeeef"),
             vec![33],
-            true,
-            None,
-            false,
-        );
-    }
-
-    fn big() {
-        use std::fs;
-
-        init();
-        let ascii_chars: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
-        test_func_no_hash(
-            ascii_chars.into_iter().collect::<String>(),
-            "^.*our technology.*$".to_string(),
-            fs::read_to_string("gov_text.txt").unwrap(),
-            vec![2],
             true,
             None,
             false,
