@@ -410,7 +410,7 @@ impl SAFA<char> {
         // Check accepting condition
         if self.is_accept(n, i, doc) {
             return Some(Trace::empty());
-        } else if i >= doc.len() {
+        } else if i >= doc.len() || self.is_sink(&n) {
             return None;
         }
         if self.g[n].is_and() {

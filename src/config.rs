@@ -242,14 +242,12 @@ impl BaseParser<char> for DnaParser {
         vec!['A', 'C', 'G', 'T']
     }
     fn read_file(&self, file: &PathBuf) -> Vec<char> {
-        let mut doc = AsciiParser.read_file(file);
-        doc.retain(|c| *c == 'A' || *c == 'C' || *c == 'G' || *c == 'T' );
-        // println!("{:?}", doc.as_slice());
+        let doc = AsciiParser.read_file(file);
         for c in doc.iter() {
             assert!(
                 self.alphabet().contains(&c),
-                "{} not in the alphabet {:?}",
-                c,
+                "{:#04x} not in the alphabet {:?}",
+                (*c as u32),
                 self.alphabet()
             );
         }
