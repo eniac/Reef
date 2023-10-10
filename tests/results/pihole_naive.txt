@@ -1,0 +1,14 @@
+adimage101_128,^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-],4224,33
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+verifier,Verify,Verify,32313224,μs
+prover,Prover,Prove,38398858,μs
+solver,Witness,Gen,19779562,μs
+compiler,R1CS,Commitment Gen,33903,μs
+compiler,R1CS,Loading,1040567,μs
+compiler,Snark,Setup,33887754,μs
+solver,DFA Solving,Clear Match,99099,μs
+compiler,DFA,DFA,42460,μs
+compiler,R1CS,Circom,49587667,μs
+compiler,R1CS,Size,553295,constraints
+prover,Proof Size,Spartan SNARK size,47368,bytes

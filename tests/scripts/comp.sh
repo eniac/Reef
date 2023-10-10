@@ -13,12 +13,18 @@ cargo clean
 #./tests/scripts/nwr.sh &> out_nwr 
 # echo "nwr"
 
-cargo build --release --features 'metrics,naive'
- echo "naive"
-./tests/scripts/naive.sh &> out_naive 
- echo "naive" 
+#cargo build --release --features 'metrics,naive'
+ #echo "naive"
+#./tests/scripts/naive.sh &> out_naive 
+# echo "naive" 
 
 # cargo build --release --features 'metrics,reef'
  echo "dna"
 ./tests/scripts/dna.sh &> out_dna 
- echo "naive" 
+ echo "dna" 
+
+ # cargo build --release --features 'metrics,reef'
+ echo "email"
+./tests/scripts/email_dkim.sh &> out_email
+ echo "email" 
+
