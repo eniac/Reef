@@ -59,6 +59,8 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub doc_subset: Option<(usize, usize)>,
     // hybrid
     pub hybrid_len: Option<usize>,
+    // merkle
+    pub merkle: bool,
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F, char> {
@@ -68,6 +70,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         batch_size: usize,
         projection: Option<usize>,
         hybrid: bool,
+        merkle: bool,
         pcs: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
         // character conversions
@@ -402,6 +405,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             None
         };
 
+        // merkle does not work with proj/hybrid
+        assert!((merkle && hybrid_len.is_none() && doc_subset.is_none()) || !merkle);
         assert!(batch_size > 1);
 
         Self {
@@ -430,6 +435,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             doc_rc_v: Some(Integer::from(1)), // Convert back to none later
             doc_subset,
             hybrid_len,
+            merkle,
         }
     }
 
