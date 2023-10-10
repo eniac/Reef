@@ -50,6 +50,7 @@ pub fn run_backend(
     projections: bool,
     hybrid: bool,
 ) {
+    println!("hybrid: {}", hybrid);
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
         Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,

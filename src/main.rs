@@ -61,6 +61,7 @@ fn main() {
             SAFA::new(&ab, &r)
         };
         println!("make safa");
+        println!("safa states: {}",safa.num_states());
         println!("safa size: {}", safa.num_edges());
 
         // Is document well-formed
