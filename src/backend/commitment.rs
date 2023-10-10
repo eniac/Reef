@@ -292,6 +292,7 @@ impl ReefCommitment {
         };
 
         // D(q) = v/v'
+        println!("pre IPI");
         let (ipi, ipw) = if !hybrid {
             let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
                 &self.doc_commit.decompress().unwrap(),
@@ -321,6 +322,7 @@ impl ReefCommitment {
             (ipi, ipw)
         };
 
+        println!("pre IPA Prove");
         let ipa = InnerProductArgument::prove(
             &self.vector_gens,
             &self.single_gens,
@@ -329,6 +331,7 @@ impl ReefCommitment {
             &mut p_transcript,
         )
         .unwrap();
+        println!("post IPA Prove");
 
         (
             ipi,
