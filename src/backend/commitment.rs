@@ -396,21 +396,15 @@ impl ReefCommitment {
         (t_vp_gens, ipi, ipa)
     }
 
-    pub fn verify_consistency(
-        &self,
-        proof: ConsistencyProof,
-        t: Option<<G1 as Group>::Scalar>,
-        q_0: Option<<G1 as Group>::Scalar>,
-    ) {
+    pub fn verify_consistency(&self, proof: ConsistencyProof) {
         assert!(self.proof_dot_prod_verify(&proof.ipi, proof.ipa).is_ok());
 
-        if proof.hybrid_ipi.is_some() && proof.hybrid_ipa.is_some() && t.is_some() {
+        if proof.hybrid_ipi.is_some() && proof.hybrid_ipa.is_some() {
             assert!(self
                 .verify_hybrid_combo(
                     &proof.t_vp_gens.unwrap(),
                     &proof.hybrid_ipi.unwrap(),
                     proof.hybrid_ipa.unwrap(),
-                    t.unwrap(),
                 )
                 .is_ok());
         }
@@ -419,12 +413,10 @@ impl ReefCommitment {
         let z_0 = vec![proof.hash_d];
         let z_out = proof.circuit.output(&z_0);
         let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
-        // println!("IO {:#?}", io.clone());
         let res = proof
             .snark
             .cap_verify(&self.cap_vk, &io, &proof.v_commit.compress());
         // TODO compress()
-        // println!("RES {:#?}", res);
 
         assert!(res.is_ok());
     }
@@ -452,7 +444,6 @@ impl ReefCommitment {
         t_vp_gens: &CommitmentGens<G1>,
         ipi: &InnerProductInstance<G1>,
         ipa: InnerProductArgument<G1>,
-        t: <G1 as Group>::Scalar,
     ) -> Result<(), NovaError> {
         let mut v_transcript = Transcript::new(b"dot_prod_proof");
 
@@ -486,45 +477,23 @@ pub fn final_clear_checks(
     table: &Vec<Integer>,
     final_q: Option<Vec<<G1 as Group>::Scalar>>,
     final_v: Option<<G1 as Group>::Scalar>,
-    final_hybrid_q: Option<Vec<<G1 as Group>::Scalar>>,
-) -> (Option<<G1 as Group>::Scalar>, Option<<G1 as Group>::Scalar>) {
+) {
     // stack ptr is 0 (stack is empty)
     assert_eq!(stack_ptr, <G1 as Group>::Scalar::zero());
 
-    match (final_q, final_v, final_hybrid_q) {
+    if final_q.is_some() && final_v.is_some() {
+        let q = final_q.unwrap();
+        let v = final_v.unwrap();
+
         // split
-        (Some(q), Some(v), None) => {
-            let mut q_i = vec![];
-            for f in q {
-                q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
-            }
-            assert_eq!(
-                verifier_mle_eval(table, &q_i),
-                (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
-            );
-
-            (None, None)
+        let mut q_i = vec![];
+        for f in q {
+            q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
         }
-
-        // hybrid
-        (None, None, Some(q)) => {
-            let q0 = q[0].clone();
-            let mut q_i = vec![];
-            for f in q {
-                q_i.push(Integer::from_digits(f.to_repr().as_ref(), Order::Lsf));
-            }
-
-            let q_prime = &q_i[1..];
-
-            let t = verifier_mle_eval(table, q_prime);
-
-            (Some(int_to_ff(t)), Some(q0))
-        }
-
-        // bad combo
-        _ => {
-            panic!("weird combination of parameters to the final verification check");
-        }
+        assert_eq!(
+            verifier_mle_eval(table, &q_i),
+            (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
+        );
     }
 }
 
@@ -544,7 +513,7 @@ fn proj_prefix(proj_doc_len: usize, doc_ext_len: usize) -> Vec<<G1 as Group>::Sc
     // );
 
     let mut q_add = vec![];
-    for i in 0..logmn(num_chunks) {
+    for _i in 0..logmn(num_chunks) {
         q_add.push(<G1 as Group>::Scalar::from((start_idx % 2) as u64));
         start_idx = start_idx >> 1;
     }

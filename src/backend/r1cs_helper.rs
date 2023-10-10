@@ -61,10 +61,7 @@ where
 }
 
 // PROVER WORK
-pub(crate) fn trace_preprocessing(
-    trace: &Option<Trace<char>>,
-    safa: &SAFA<char>,
-) -> Vec<LinkedList<TraceElem<char>>> {
+pub(crate) fn trace_preprocessing(trace: &Option<Trace<char>>) -> Vec<LinkedList<TraceElem<char>>> {
     // split
     let mut sols: Vec<LinkedList<TraceElem<char>>> = Vec::new();
     let mut sol = trace.clone().unwrap().0;
@@ -301,8 +298,6 @@ pub fn normal_add_table<'a>(
 
             if safa.accepting().contains(&state) {
                 // add check entries to table
-                let base: i32 = 2; // an explicit type is required
-
                 let lower_offset = 0;
                 let upper_offset = 0;
 

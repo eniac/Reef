@@ -1,15 +1,14 @@
 use crate::backend::nova::int_to_ff;
-use crate::backend::{commitment::*, costs::*, r1cs_helper::*};
+use crate::backend::{costs::*, r1cs_helper::*};
 use crate::frontend::openset::OpenSet;
 use crate::frontend::safa::{Either, Skip, SAFA};
-use crate::trace::{Trace, TraceElem};
+use crate::trace::TraceElem;
 use circ::cfg::*;
 use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use ff::PrimeField;
 use fxhash::FxHashMap;
 use generic_array::typenum;
-use itertools::Itertools;
 use neptune::{
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -18,8 +17,7 @@ use neptune::{
 use petgraph::{
     graph::{EdgeReference, NodeIndex},
     prelude::Dfs,
-    visit::{EdgeRef, VisitMap},
-    Incoming,
+    visit::EdgeRef,
 };
 use rug::{integer::Order, ops::RemRounding, Integer};
 use std::cmp::max;
@@ -590,6 +588,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ),
             ],
         );
+        self.assertions.push(out_overflow);
 
         self.pub_inputs
             .push(new_var(format!("state_{}", self.batch_size)));
@@ -774,7 +773,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // get kids from rel_i hash
-        let mut hashed_state_var = self.hashed_push_rel();
+        let hashed_state_var = self.hashed_push_rel();
 
         let hashed_kids_eq = term(Op::Eq, vec![hashed_state_var, new_var(format!("rel_0"))]);
         let lmtd_push_cond = term(
@@ -2333,6 +2332,8 @@ pub fn ceil_div(a: usize, b: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use crate::backend::commitment::final_clear_checks;
+    use crate::backend::commitment::ReefCommitment;
     use crate::backend::r1cs::*;
     use crate::frontend::regex::re;
     use crate::frontend::safa::SAFA;
@@ -2551,7 +2552,7 @@ mod tests {
 
             let trace = safa.solve(&chars);
 
-            let mut sols = trace_preprocessing(&trace, &safa);
+            let mut sols = trace_preprocessing(&trace);
 
             let mut i = 0;
             while r1cs_converter.sol_num < sols.len() {
@@ -2603,11 +2604,6 @@ mod tests {
                 )
             };
 
-            let hrq = match hybrid_running_q {
-                Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
-                None => None,
-            };
-
             assert_eq!(next_state, r1cs_converter.exit_state);
 
             let doc_len = r1cs_converter.udoc.len();
@@ -2624,15 +2620,14 @@ mod tests {
 
             let cap_d = consist_proof.hash_d.clone();
 
-            let (t, q_0) = final_clear_checks(
+            final_clear_checks(
                 <G1 as Group>::Scalar::from(r1cs_converter.stack_ptr as u64),
                 &r1cs_converter.table,
                 rq,
                 rv,
-                hrq,
             );
 
-            reef_commit.verify_consistency(consist_proof, t, q_0);
+            reef_commit.verify_consistency(consist_proof);
 
             // final accepting
             assert_eq!(next_state, r1cs_converter.exit_state);

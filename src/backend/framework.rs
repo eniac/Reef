@@ -11,26 +11,16 @@ use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::frontend::safa::SAFA;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
-use circ::target::r1cs::{self, ProverData};
-use ff::Field;
+use circ::target::r1cs::ProverData;
 use generic_array::typenum;
 use neptune::{
     sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
-use nova_snark::provider::ipa_pc::{InnerProductArgument, InnerProductInstance};
-use nova_snark::spartan::direct::*;
 use nova_snark::{
-    provider::pedersen::Commitment,
-    traits::{
-        circuit::TrivialTestCircuit,
-        commitment::{CommitmentEngineTrait, CommitmentTrait},
-        evaluation::GetGeneratorsTrait,
-        Group,
-    },
+    traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
-use rand::rngs::OsRng;
 use rug::Integer;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -79,11 +69,13 @@ pub fn run_backend(
         let mut batch_size = if temp_batch_size == 0 {
             let trace = safa.solve(&doc);
             println!("post solve");
-            let mut sols = trace_preprocessing(&trace, &safa);
+            let sols = trace_preprocessing(&trace);
             println!("post trace");
 
             let mut paths = vec![];
             let mut path_len = 1;
+
+            //println!("SOLS {:#?}", sols);
 
             for sol in sols {
                 for elt in sol {
@@ -101,8 +93,16 @@ pub fn run_backend(
                 }
             }
 
+            println!("PATHS {:#?}", paths);
+
             if paths.len() == 1 {
-                paths.len() / 2
+                let elt = paths[0];
+                if elt > 175 {
+                    let div = (elt as f64 / 100.0).ceil() as usize;
+                    elt / div
+                } else {
+                    elt / 2
+                }
             } else {
                 //average(paths)
                 (paths.iter().sum::<usize>() as f32 / paths.len() as f32).ceil() as usize
@@ -367,7 +367,7 @@ fn solve<'a>(
 
     //measure safa solve
     let trace = r1cs_converter.safa.solve(doc);
-    let mut sols = trace_preprocessing(&trace, &r1cs_converter.safa);
+    let mut sols = trace_preprocessing(&trace);
     //end safa solve
 
     let commit_blind = r1cs_converter.doc_hash.unwrap();
@@ -587,8 +587,6 @@ fn prove_and_verify(
     let mut circuit_primary = recv.recv().unwrap();
 
     let cp_clone = circuit_primary.clone().unwrap();
-    let pc = cp_clone.pc;
-    let claim_blind = cp_clone.claim_blind;
 
     let mut i = 0;
     while circuit_primary.is_some() {
@@ -681,7 +679,6 @@ fn prove_and_verify(
         proof_info.commit,
         proof_info.table,
         proof_info.exit_state,
-        proof_info.doc_len,
         proof_info.proj_doc_len,
         proof_info.hybrid_len,
         consist_proof,
@@ -700,7 +697,6 @@ fn verify(
     reef_commit: ReefCommitment,
     table: Vec<Integer>,
     exit_state: usize,
-    doc_len: usize,
     proj_doc_len: usize,
     hybrid_len: Option<usize>,
     consist_proof: ConsistencyProof,
@@ -737,7 +733,7 @@ fn verify(
         assert_eq!(consist_proof.hash_d, zn[2 + q_len + qd_len]);
 
         (
-            zn[(q_len + qd_len + 3)],
+            zn[q_len + qd_len + 3],
             Some(zn[1..(q_len + 1)].to_vec()),
             Some(zn[q_len + 1]),
             None,
@@ -746,18 +742,13 @@ fn verify(
         let h_len = logmn(hybrid_len.unwrap());
         assert_eq!(consist_proof.hash_d, zn[1 + h_len]);
 
-        (
-            zn[(h_len + 2)],
-            None,
-            None,
-            Some(zn[1..(1 + h_len)].to_vec()),
-        )
+        (zn[h_len + 2], None, None, Some(zn[1..(1 + h_len)].to_vec()))
     };
 
-    let (t, q_0) = final_clear_checks(stack_ptr, &table, eval_q, eval_v, hybrid_q);
+    final_clear_checks(stack_ptr, &table, eval_q, eval_v);
 
     //CAP verify
-    reef_commit.verify_consistency(consist_proof, t, q_0);
+    reef_commit.verify_consistency(consist_proof);
 
     // final accepting
     assert_eq!(zn[0], <G1 as Group>::Scalar::from(exit_state as u64));

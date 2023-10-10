@@ -700,7 +700,7 @@ where
         let glue = &self.glue[0];
 
         match glue {
-            GlueOpts::Split((q, v, dq, dv, sp, stack)) => {
+            GlueOpts::Split((q, _, dq, _, _, stack)) => {
                 let sc_l = q.len();
                 let doc_l = dq.len();
                 let stack_len = stack.len();
@@ -915,7 +915,7 @@ where
                 }
                 out.push(last_cursor.unwrap());
             }
-            GlueOpts::Hybrid((hq, hv, sp, stack)) => {
+            GlueOpts::Hybrid((hq, _, _, stack)) => {
                 let hyb_l = hq.len();
                 let stack_len = stack.len();
 
