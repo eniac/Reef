@@ -1,0 +1,21 @@
+adimage101_128,^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-],4012,36
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+prover,prove,prove_0,237428,μs
+prover,Proof,Compressed SNARK,2541720,μs
+compiler,R1CS,Proof Setup,8701153,μs
+verifier,Verification,Full,2166639,μs
+verifier,Verification,Nova Verification,2007779,μs
+compiler,SAFA,SAFA,21349,μs
+verifier,Verification,Final Checks Consistency Verification,158038,μs
+compiler,R1CS,R1CS precomputations,33422,μs
+compiler,Compiler,Full,9680306,μs
+compiler,R1CS,To Circuit,92082,μs
+compiler,R1CS,Commitment Generations,825515,μs
+solver,Witness Generation,step_0,39358,μs
+solver,Solve,Framework Solve,43538,μs
+prover,Proof,Consistency Proofs,243010,μs
+solver,SAFA Solving,Clear Match,1,μs
+prover,add test,Secondary Circuit,10347,constraints
+prover,add test,Primary Circuit,27318,constraints
+prover,Proof Size,Compressed SNARK size,74295,bytes
