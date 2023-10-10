@@ -14,20 +14,27 @@ use nova_snark::traits::Group;
 pub struct MerkleCommitment {
     commitment: F,
     tree: Vec<Vec<F>>,
+    doc: Vec<F>,
     pc: PoseidonConstants<F, typenum::U4>,
 }
 
 impl MerkleCommitment {
     pub fn new(doc: Vec<usize>, pc: &PoseidonConstants<F, typenum::U4>) -> Self {
         let mut tree = vec![];
+        let mut doc_f = vec![];
 
         // leafs
         let mut i = 0;
         let mut next_level = vec![];
         while i < doc.len() {
-            let left = (Some(F::from(i as u64)), F::from(doc[i] as u64));
+            let char_i = F::from(doc[i] as u64);
+            let char_ip = F::from(doc[i + 1] as u64);
+            doc_f.push(char_i);
+            doc_f.push(char_ip);
+
+            let left = (Some(F::from(i as u64)), char_i);
             let right = if i + 1 < doc.len() {
-                Some((Some(F::from((i + 1) as u64)), F::from(doc[i + 1] as u64)))
+                Some((Some(F::from((i + 1) as u64)), char_ip))
             } else {
                 None
             };
@@ -63,6 +70,7 @@ impl MerkleCommitment {
         Self {
             commitment: next_level[0],
             tree,
+            doc: doc_f,
             pc: pc.clone(),
         }
     }
@@ -101,6 +109,32 @@ impl MerkleCommitment {
         sponge.finish(acc).unwrap();
 
         hash[0]
+    }
+
+    pub fn path_wits(&self, idx: usize) -> Vec<(bool, (Option<F>, F))> {
+        let sel_wit = vec![]; // (l_or_r, opposite F)
+
+        let wit = match idx % 2 {
+            0 => {
+                let opposite = if idx + 1 >= self.doc.len() {
+                    (Some(F::zero()), F::zero()) // TODO potentially make the "padding"
+                                                 // something else
+                } else {
+                    (Some(F::from(idx + 1)), self.doc[idx + 1])
+                };
+
+                (true, opposite)
+            }
+            1 => {
+                let opposite = (Some(F::from(idx - 1)), self.doc[idx - 1]);
+                (false, opposite)
+            }
+        };
+        sel_wit.push(wit);
+
+        let mut quo = idx / 2;
+
+        sel_wit
     }
 }
 
