@@ -1,6 +1,6 @@
 #REEF
-# cargo clean 
-# cargo build ---release --features 'metrics,reef'
+cargo clean 
+cargo build ---release --features 'metrics,reef'
 echo 'reef'
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch1 --re "^.{43052505}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG" dna
 ./target/release/reef --input ../docs/BRCA1_base+primary --output ./tests/results/brca1_primary_nonmatch2 --re "^.{43050136}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG

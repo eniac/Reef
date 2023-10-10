@@ -18,7 +18,7 @@ cargo build --release --features 'metrics,naive'
 ./tests/scripts/naive.sh &> out_naive 
  echo "naive" 
 
-cargo build --release --features 'metrics,reef'
+# cargo build --release --features 'metrics,reef'
  echo "dna"
 ./tests/scripts/dna.sh &> out_dna 
  echo "naive" 
