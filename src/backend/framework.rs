@@ -98,7 +98,7 @@ pub fn run_backend(
             if paths.len() == 1 {
                 let elt = paths[0];
                 if elt > 175 {
-                    let div = (elt as f64 / 100.0).ceil() as usize;
+                    let div = (elt / 100) + 1;
                     elt / div
                 } else {
                     elt / 2
