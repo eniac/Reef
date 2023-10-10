@@ -76,6 +76,7 @@ fn get_modulus<F: Field + PrimeField>() -> Integer {
 pub enum GlueOpts<F: PrimeField> {
     Split((Vec<F>, F, Vec<F>, F, F, Vec<F>)), // q, v, doc q, doc v, stack ptr, stack
     Hybrid((Vec<F>, F, F, Vec<F>)),           // hybrid q, hybrid v, stack ptr, stack
+    Merkle((Vec<F>, F, F, Vec<F>)),           // q, v, stack ptr, stack
 }
 
 #[derive(Clone, Debug)]
@@ -115,6 +116,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         match (&glue[0], &glue[1]) {
             (GlueOpts::Split(_), GlueOpts::Split(_)) => {}
             (GlueOpts::Hybrid(_), GlueOpts::Hybrid(_)) => {}
+            (GlueOpts::Merkle(_), GlueOpts::Merkle(_)) => {}
             (_, _) => {
                 panic!("glue I/O does not match");
             }
@@ -355,6 +357,116 @@ where {
         return Ok(false);
     }
 
+    fn eval_merkle<CS>(
+        &self,
+        cs: &mut CS,
+        tag: &str,
+        alloc_cursors: &Vec<Option<AllocatedNum<F>>>, // already ordered
+        alloc_chars: &Vec<Option<AllocatedNum<F>>>,   // already ordered
+    ) -> Result<(), SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+    {
+        // self.height, self.root
+        let alloc_root =
+            AllocatedNum::alloc(sponge_ns.namespace(|| "root"), || Ok(self.merkle_root))?;
+
+        for i in alloc_cursors.len() {
+            // num lookups
+
+            // leafs
+            let w0 = AllocatedNum::alloc(cs.namespace(|| "filler witness 0"), || Ok(F::zero()))?;
+            let w1 = AllocatedNum::alloc(cs.namespace(|| "filler witness 1"), || Ok(F::zero()))?;
+
+            let query = vec![];
+            if left_of_parent {
+                query.push(Elt::Allocated(alloc_cursors[i].clone().unwrap()));
+                query.push(Elt::Allocated(alloc_chars[i].clone().unwrap()));
+                query.push(Elt::Allocated(w0));
+                query.push(Elt::Allocated(w1));
+            } else {
+                query.push(Elt::Allocated(w0));
+                query.push(Elt::Allocated(w1));
+                query.push(Elt::Allocated(alloc_cursors[i].clone().unwrap()));
+                query.push(Elt::Allocated(alloc_chars[i].clone().unwrap()));
+            }
+
+            let left_hash = self.merkle_circuit(query, &format!("left leaf hash"));
+            let right_hash = self.merkle_circuit(query, &format!("right leaf hash"));
+            let mut hash = select(cs, l_or_r, left_hash, right_hash, &format!("l or r leaf"));
+
+            // non leaf
+            for h in self.merkle_height {
+                let w = AllocatedNum::alloc(
+                    cs.namespace(|| format!("filler witness lvl {}", h)),
+                    || Ok(F::zero()),
+                )?;
+
+                let query = vec![];
+                if left_of_parent {
+                    query.push(Elt::Allocated(hash.clone().unwrap()));
+                    query.push(Elt::Allocated(w));
+                } else {
+                    query.push(Elt::Allocated(w));
+                    query.push(Elt::Allocated(hash.clone().unwrap()));
+                }
+
+                let left_hash = self.merkle_circuit(query, &format!("left hash lvl {}", h));
+                let right_hash = self.merkle_circuit(query, &format!("right hash lvl {}", h));
+                hash = select(
+                    cs,
+                    l_or_r,
+                    left_hash,
+                    right_hash,
+                    &format!("l or r lvl {}" h),
+                );
+            }
+
+            cs.enforce(
+                || format!("eq {}", tag),
+                |z| z + hash.get_variable(),
+                |z| z + CS::one(),
+                |z| z + alloc_root.get_variable(),
+            );
+        }
+    }
+
+    fn merkle_circuit<CS>(
+        &self,
+        query: &[Elt<F>],
+        tag: &str,
+    ) -> Result<(AllocatedNum<F>), SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+    {
+        let inputs = query.len() as u32;
+        assert!(inputs == 2 || inputs == 4);
+
+        let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+        let mut sponge_ns = cs.namespace(|| format!("{} sponge", tag));
+
+        let pattern = vec![SpongeOp::Absorb(inputs), SpongeOp::Squeeze(1)];
+
+        sponge.start(IOPattern(pattern), None, &mut sponge_ns);
+
+        let new_pos = {
+            SpongeAPI::absorb(&mut sponge, inputs, query, &mut sponge_ns);
+
+            let output = SpongeAPI::squeeze(&mut sponge, 1, &mut sponge_ns);
+
+            Elt::ensure_allocated(
+                &output[0],
+                &mut sponge_ns.namespace(|| format!("ensure allocated {}", tag)), // name must be the same
+                // (??)
+                true,
+            )?
+        };
+
+        sponge.finish(&mut sponge_ns).unwrap();
+
+        Ok((new_pos))
+    }
+
     fn fiatshamir_circuit<'b, CS>(
         &self,
         query: &[Elt<F>],
@@ -588,6 +700,10 @@ where
                 arity += hq.len() + 1;
                 arity += stack.len() + 1;
             }
+            GlueOpts::Merkle((q, _, _, stack)) => {
+                arity += q.len() + 1;
+                arity += stack.len() + 1;
+            }
         }
         arity
     }
@@ -636,6 +752,20 @@ where
                     i += 1;
                 }
             }
+            GlueOpts::Merkle((q, v, sp, stack)) => {
+                for qi in q.clone() {
+                    assert_eq!(z[i], qi);
+                    i += 1;
+                }
+                assert_eq!(z[i], *v);
+                i += 1;
+                assert_eq!(z[i], *sp);
+                i += 1;
+                for si in stack.clone() {
+                    assert_eq!(z[i], si);
+                    i += 1;
+                }
+            }
         }
         assert_eq!(z[i], self.cursors[0]);
 
@@ -654,6 +784,12 @@ where
             GlueOpts::Hybrid((hq, hv, sp, stack)) => {
                 out.extend(hq.clone());
                 out.push(*hv);
+                out.push(*sp);
+                out.extend(stack.clone());
+            }
+            GlueOpts::Merkle((q, v, sp, stack)) => {
+                out.extend(q.clone());
+                out.push(*v);
                 out.push(*sp);
                 out.extend(stack.clone());
             }
@@ -1079,4 +1215,35 @@ where
 
         Ok(out)
     }
+}
+
+// HELPER
+
+// ret = if condition, a, else b
+// condition already asserted to be 0 or 1
+fn select<F, CS>(
+    cs: &mut CS,
+    cond: AllocatedNum<F>,
+    a: AllocatedNum<F>,
+    b: AllocatedNum<F>,
+    tag: &String,
+) -> Result<AllocatedNum<F>, SynthesisError>
+where
+    F: PrimeField,
+    CS: ConstraintSystem<F>,
+{
+    let ret = AllocatedNum::alloc(cs.namespace(|| "ret"), || {
+        Ok(b.get_value().unwrap()
+            + cond.get_value().unwrap() * (a.get_value().unwrap() - b.get_value().unwrap()))
+    })?;
+
+    // RET = B + COND * (A - B) <- ite
+    cs.enforce(
+        || format!("ite {}", tag),
+        |lc| lc + a.get_variable() - b.get_variable(),
+        |lc| lc + cond.get_variable(),
+        |lc| lc + ret.get_variable() - b.get_variable(),
+    );
+
+    return Ok(ret);
 }
