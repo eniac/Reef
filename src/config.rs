@@ -43,6 +43,14 @@ pub struct Options {
     )]
     pub hybrid: bool,
     #[arg(
+        short = 'm',
+        long = "merkle",
+        value_name = "MERKLE TREE?",
+        help = "Use merkle tree for document commitment",
+        default_value_t = false
+    )]
+    pub merkle: bool,
+    #[arg(
         short = 'n',
         long = "negate",
         value_name = "NEGATE",
@@ -331,7 +339,7 @@ impl Encoder<char, char> for BasicEnglishEncoder {
         let numbers = '0'..='9';
         let mut whitespace = vec![' ', '\n'];
         let mut symbols = vec![
-            ',', '.', '!', '?', ';', ':', '-', '\'', '"', '$', '&', '*', '+', '@','\\'
+            ',', '.', '!', '?', ';', ':', '-', '\'', '"', '$', '&', '*', '+', '@', '\\',
         ];
         let mut v: Vec<char> = (lower.chain(upper).chain(numbers)).collect();
         v.append(&mut symbols);

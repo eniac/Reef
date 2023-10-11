@@ -1444,6 +1444,32 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
+    fn q_ordering_merkle(&mut self) {
+        for i in 0..self.batch_size {
+            let lookup_q = new_var(format!("merkle_lookup_{}", i));
+            self.pub_inputs.push(lookup_q);
+
+            let q_adjust = term(
+                Op::Ite,
+                vec![
+                    term(
+                        Op::Eq,
+                        vec![
+                            new_var(format!("char_{}", i)),
+                            new_const(self.num_ab[&None]),
+                        ],
+                    ),
+                    new_const(self.ep_num),
+                    new_var(format!("cursor_{}", i)),
+                ],
+            );
+
+            let q_eq = term(Op::Eq, vec![q_adjust, lookup_q]);
+
+            self.assertions.push(q_eq);
+        }
+    }
+
     pub fn to_circuit(&mut self) -> (ProverData, VerifierData) {
         let lookups = self.lookup_idxs(true);
         assert_eq!(lookups.len(), self.batch_size);
@@ -1455,7 +1481,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.cursor_circuit();
         self.last_state_accepting_circuit();
 
-        if self.hybrid_len.is_some() {
+        if self.merkle {
+            self.nlookup_gadget(lookups, self.table.len(), "nl");
+            self.q_ordering_merkle();
+        } else if self.hybrid_len.is_some() {
             self.nlookup_hybrid(lookups, char_lookups);
         } else {
             self.nlookup_gadget(lookups, self.table.len(), "nl");
@@ -2537,6 +2566,7 @@ mod tests {
         expected_match: bool,
         proj: Option<usize>,
         hybrid: bool,
+        merkle: bool,
     ) {
         let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
@@ -2546,7 +2576,8 @@ mod tests {
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
         for b in batch_sizes {
-            let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, sc.clone());
+            let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, merkle, sc.clone());
+
             let mut reef_commit =
                 ReefCommitment::new(r1cs_converter.udoc.clone(), r1cs_converter.hybrid_len, &sc);
             r1cs_converter.doc_hash = Some(reef_commit.doc_commit_hash);

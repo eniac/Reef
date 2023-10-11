@@ -61,7 +61,7 @@ fn main() {
             SAFA::new(&ab, &r)
         };
         println!("make safa");
-        println!("safa states: {}",safa.num_states());
+        println!("safa states: {}", safa.num_states());
         println!("safa size: {}", safa.num_edges());
 
         // Is document well-formed
@@ -96,6 +96,7 @@ fn main() {
             opt.batch_size,
             opt.projections,
             opt.hybrid,
+            opt.merkle,
         );
 
         let file = OpenOptions::new()

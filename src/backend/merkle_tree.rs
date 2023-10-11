@@ -20,9 +20,9 @@ pub struct MerkleCommitment {
 
 #[derive(Debug, Clone)]
 pub struct MerkleWit {
-    l_or_r: bool,
-    opposite_idx: Option<F>,
-    opposite: F,
+    pub l_or_r: bool,
+    pub opposite_idx: Option<F>,
+    pub opposite: F,
 }
 
 impl MerkleCommitment {
@@ -123,7 +123,7 @@ impl MerkleCommitment {
 
         let wit = match idx % 2 {
             0 => {
-                let opposite = if idx + 1 >= self.doc.len() {
+                if idx + 1 >= self.doc.len() {
                     // TODO potentially make the "padding"
                     // something else
 
@@ -135,14 +135,14 @@ impl MerkleCommitment {
                 } else {
                     MerkleWit {
                         l_or_r: true,
-                        opposite_idx: Some(F::from(idx + 1)),
+                        opposite_idx: Some(F::from((idx + 1) as u64)),
                         opposite: self.doc[idx + 1],
                     }
-                };
+                }
             }
             1 => MerkleWit {
                 l_or_r: false,
-                opposite_idx: Some(F::from(idx - 1)),
+                opposite_idx: Some(F::from((idx - 1) as u64)),
                 opposite: self.doc[idx - 1],
             },
         };
@@ -150,10 +150,10 @@ impl MerkleCommitment {
 
         let mut quo = idx / 2;
 
-        for h in 0..tree.len() {
+        for h in 0..self.tree.len() {
             let wit = match quo % 2 {
                 0 => {
-                    let opposite = if idx + 1 >= self.tree[h].len() {
+                    if idx + 1 >= self.tree[h].len() {
                         MerkleWit {
                             l_or_r: true,
                             opposite_idx: None,
@@ -165,9 +165,7 @@ impl MerkleCommitment {
                             opposite_idx: None,
                             opposite: self.tree[h][idx + 1],
                         }
-                    };
-
-                    (true, opposite)
+                    }
                 }
                 1 => MerkleWit {
                     l_or_r: false,
