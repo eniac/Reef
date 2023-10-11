@@ -379,6 +379,8 @@ where {
         for i in alloc_cursors.len() {
             // num lookups
 
+            let tree_wits = mc.path_wits(alloc_cursors[i].clone().unwrap().get_value().unwrap());
+
             // leafs
             let w0 = AllocatedNum::alloc(cs.namespace(|| "filler witness 0"), || Ok(F::zero()))?;
             let w1 = AllocatedNum::alloc(cs.namespace(|| "filler witness 1"), || Ok(F::zero()))?;
