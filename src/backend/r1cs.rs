@@ -2541,8 +2541,6 @@ mod tests {
 
         for b in batch_sizes {
             let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, sc.clone());
-            // TODO hybrid
-
             let mut reef_commit =
                 ReefCommitment::new(r1cs_converter.udoc.clone(), r1cs_converter.hybrid_len, &sc);
             r1cs_converter.doc_hash = Some(reef_commit.doc_commit_hash);

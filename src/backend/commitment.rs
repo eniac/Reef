@@ -118,12 +118,13 @@ impl ReefCommitment {
             <G1 as Group>::Scalar::zero();
             doc_ext_len - doc_ext.len()
         ]);
-        // println!("DOC COMMITMENT {:#?}", doc_ext.clone());
+        let poly = MultilinearPolynomial::new(doc_ext);
 
         let single_gen = cap_pk.pk.gens.get_scalar_gen();
 
         let (_left, right) =
-            EqPolynomial::<<G1 as Group>::Scalar>::compute_factored_lens(doc_ext.len());
+            EqPolynomial::<<G1 as Group>::Scalar>::compute_factored_lens(poly.get_num_vars());
+
         let vector_gen = CommitmentGens::<G1>::new_with_blinding_gen(
             b"vector_gen_doc",
             (2usize).pow(right as u32),
@@ -134,7 +135,7 @@ impl ReefCommitment {
             gens_v: vector_gen.clone(),
             gens_s: single_gen.clone(),
         };
-        let poly = MultilinearPolynomial::new(doc_ext);
+
         let (doc_commit, doc_decommit) = hyrax_gen.commit(&poly);
 
         // for in-circuit fiat shamir
