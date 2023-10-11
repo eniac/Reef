@@ -2,7 +2,9 @@ type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
+use crate::backend::commitment::ReefCommitment::{Merkle, NLDoc};
 use crate::backend::costs::logmn;
+use crate::backend::merkle_tree::MerkleCommitment;
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::verifier_mle_eval;
 use ::bellperson::{gadgets::num::AllocatedNum, ConstraintSystem, SynthesisError};
@@ -40,7 +42,12 @@ use pasta_curves::{
 use rand::rngs::OsRng;
 use rug::{integer::Order, ops::RemRounding, Integer};
 
-pub struct ReefCommitment {
+pub enum ReefCommitment {
+    NLDoc(NLDocCommitment),
+    Merkle(MerkleCommitment),
+}
+
+pub struct NLDocCommitment {
     // commitment to doc
     pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     vector_gens: CommitmentGens<G1>,
@@ -71,6 +78,28 @@ pub struct ConsistencyProof {
 }
 
 impl ReefCommitment {
+    pub fn new(
+        doc: Vec<usize>,
+        hybrid_len: Option<usize>,
+        merkle: bool,
+        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    ) -> Self {
+        if merkle {
+            ReefCommitment::Merkle(MerkleCommitment::new(doc, pc))
+        } else {
+            ReefCommitment::NLDoc(NLDocCommitment::new(doc, hybrid_len, pc))
+        }
+    }
+
+    pub fn calc_d_clear(&self, v: Integer) -> Option<<G1 as Group>::Scalar> {
+        match self {
+            NLDoc(dc) => Some(dc.calc_d(v)),
+            Merkle(_) => None,
+        }
+    }
+}
+
+impl NLDocCommitment {
     pub fn new(
         doc: Vec<usize>,
         hybrid_len: Option<usize>,
@@ -156,7 +185,7 @@ impl ReefCommitment {
         proj: bool,
         hybrid: bool,
     ) -> ConsistencyProof {
-        let cap_d = calc_d_clear(&self.pc, self.hash_salt, v.clone());
+        let cap_d = self.calc_d(v.clone());
         let cap_z = vec![cap_d];
 
         let v_ff = int_to_ff(v);
@@ -452,24 +481,20 @@ impl ReefCommitment {
 
         Ok(())
     }
-}
 
-pub fn calc_d_clear(
-    pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    claim_blind: <G1 as Group>::Scalar,
-    v: Integer,
-) -> <G1 as Group>::Scalar {
-    let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
-    let acc = &mut ();
+    fn calc_d(&self, v: Integer) -> <G1 as Group>::Scalar {
+        let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
+        let acc = &mut ();
 
-    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-    sponge.start(parameter, None, acc);
+        let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+        sponge.start(parameter, None, acc);
 
-    SpongeAPI::absorb(&mut sponge, 2, &[int_to_ff(v.clone()), claim_blind], acc);
-    let d_out_vec = SpongeAPI::squeeze(&mut sponge, 1, acc);
-    sponge.finish(acc).unwrap();
+        SpongeAPI::absorb(&mut sponge, 2, &[int_to_ff(v.clone()), self.hash_salt], acc);
+        let d_out_vec = SpongeAPI::squeeze(&mut sponge, 1, acc);
+        sponge.finish(acc).unwrap();
 
-    d_out_vec[0]
+        d_out_vec[0]
+    }
 }
 
 pub fn final_clear_checks(

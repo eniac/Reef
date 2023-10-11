@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
+use crate::backend::merkle_tree::MerkleCommitment;
 use ::bellperson::{
     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
     Variable,
@@ -295,11 +296,11 @@ where {
             }
 
             return Ok(true);
-        } else if s.starts_with("cursor_") {
+        } else if s.starts_with("merkle_lookup_") {
             let v_j = Some(alloc_v.clone()); //.get_variable();
 
             let s_sub: Vec<&str> = s.split("_").collect();
-            let j: usize = s_sub[1].parse().unwrap();
+            let j: usize = s_sub[2].parse().unwrap();
 
             if j < self.batch_size {
                 alloc_cursors[j] = v_j; // j+1 -> j
@@ -398,7 +399,6 @@ where {
     fn eval_merkle<CS>(
         &self,
         cs: &mut CS,
-        tag: &str,
         alloc_cursors: &Vec<Option<AllocatedNum<F>>>, // already ordered
         alloc_chars: &Vec<Option<AllocatedNum<F>>>,   // already ordered
     ) -> Result<(), SynthesisError>
@@ -410,7 +410,7 @@ where {
         // self.height, self.root
         let alloc_root = AllocatedNum::alloc(sponge_ns.namespace(|| "root"), || Ok(mc.commitment))?;
 
-        for i in alloc_cursors.len() {
+        for i in 0..alloc_cursors.len() {
             // num lookups
 
             let tree_wits = mc.path_wits(alloc_cursors[i].clone().unwrap().get_value().unwrap());
@@ -425,24 +425,24 @@ where {
 
             let query = vec![];
             if tree_wits[0].l_or_r {
-                query.push(Elt::Allocated(alloc_cursors[i].clone().unwrap()));
-                query.push(Elt::Allocated(alloc_chars[i].clone().unwrap()));
+                query.push(Elt::Allocated(alloc_cursors[i].unwrap()));
+                query.push(Elt::Allocated(alloc_chars[i].unwrap()));
                 query.push(Elt::Allocated(w0));
                 query.push(Elt::Allocated(w1));
             } else {
                 query.push(Elt::Allocated(w0));
                 query.push(Elt::Allocated(w1));
-                query.push(Elt::Allocated(alloc_cursors[i].clone().unwrap()));
-                query.push(Elt::Allocated(alloc_chars[i].clone().unwrap()));
+                query.push(Elt::Allocated(alloc_cursors[i].unwrap()));
+                query.push(Elt::Allocated(alloc_chars[i].unwrap()));
             }
 
-            let left_hash = self.merkle_circuit(query, &format!("left leaf hash"));
-            let right_hash = self.merkle_circuit(query, &format!("right leaf hash"));
+            let left_hash = self.merkle_circuit(&query, &format!("left leaf hash"))?;
+            let right_hash = self.merkle_circuit(&query, &format!("right leaf hash"))?;
 
             let lr_var = if tree_wits[0].l_or_r { 1 } else { 0 };
             let lr = AllocatedNum::alloc(cs.namespace(|| "l or r leaf"), || Ok(lr_var))?;
 
-            let mut hash = select(cs, lr, left_hash, right_hash, &format!("l or r leaf"));
+            let mut hash = select(cs, lr, left_hash, right_hash, &format!("l or r leaf"))?;
 
             // non leaf
             for h in 1..tree_wits.len() {
@@ -453,15 +453,15 @@ where {
 
                 let query = vec![];
                 if left_of_parent {
-                    query.push(Elt::Allocated(hash.clone().unwrap()));
+                    query.push(Elt::Allocated(hash));
                     query.push(Elt::Allocated(w));
                 } else {
                     query.push(Elt::Allocated(w));
-                    query.push(Elt::Allocated(hash.clone().unwrap()));
+                    query.push(Elt::Allocated(hash));
                 }
 
-                let left_hash = self.merkle_circuit(query, &format!("left hash lvl {}", h));
-                let right_hash = self.merkle_circuit(query, &format!("right hash lvl {}", h));
+                let left_hash = self.merkle_circuit(&query, &format!("left hash lvl {}", h))?;
+                let right_hash = self.merkle_circuit(&query, &format!("right hash lvl {}", h))?;
 
                 let lr_var = if tree_wits[h].l_or_r { 1 } else { 0 };
                 let lr =
@@ -469,7 +469,7 @@ where {
                         Ok(lr_var)
                     })?;
 
-                hash = select(cs, lr, left_hash, right_hash, &format!("l or r lvl {}" h));
+                hash = select(cs, lr, left_hash, right_hash, &format!("l or r lvl {}", h))?;
             }
 
             cs.enforce(
@@ -479,6 +479,7 @@ where {
                 |z| z + alloc_root.get_variable(),
             );
         }
+        Ok(())
     }
 
     fn merkle_circuit<CS>(
@@ -1262,9 +1263,9 @@ where
                 let prev_q = z[1..(1 + sc_l)].to_vec(); //.clone();
                 let prev_v = z[1 + sc_l].clone();
 
-                let stack_ptr_0 = z[sc_l + doc_l + 3].clone();
-                let stack_in = z[(sc_l + doc_l + 4)..(sc_l + doc_l + 4 + stack_len)].to_vec();
-                let cursor_0 = z[sc_l + doc_l + 4 + stack_len].clone();
+                let stack_ptr_0 = z[sc_l + 2].clone();
+                let stack_in = z[(sc_l + 3)..(sc_l + 3 + stack_len)].to_vec();
+                let cursor_0 = z[sc_l + 3 + stack_len].clone();
 
                 let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
                 let mut alloc_qs = vec![None; num_cqs];
@@ -1386,6 +1387,7 @@ where
                     &alloc_gs,
                     self.commit_blind,
                 )?;
+                self.eval_merkle(cs, &alloc_cursors, &alloc_chars)?;
 
                 out.push(last_state.unwrap());
                 for qv in alloc_rc {
