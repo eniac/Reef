@@ -18,6 +18,13 @@ pub struct MerkleCommitment {
     pc: PoseidonConstants<F, typenum::U4>,
 }
 
+#[derive(Debug, Clone)]
+pub struct MerkleWit {
+    l_or_r: bool,
+    opposite_idx: Option<F>,
+    opposite: F,
+}
+
 impl MerkleCommitment {
     pub fn new(doc: Vec<usize>, pc: &PoseidonConstants<F, typenum::U4>) -> Self {
         let mut tree = vec![];
@@ -111,24 +118,33 @@ impl MerkleCommitment {
         hash[0]
     }
 
-    pub fn path_wits(&self, idx: usize) -> Vec<(bool, (Option<F>, F))> {
+    pub fn path_wits(&self, idx: usize) -> Vec<MerkleWit> {
         let sel_wit = vec![]; // (l_or_r, opposite F)
 
         let wit = match idx % 2 {
             0 => {
                 let opposite = if idx + 1 >= self.doc.len() {
-                    (Some(F::zero()), F::zero()) // TODO potentially make the "padding"
-                                                 // something else
-                } else {
-                    (Some(F::from(idx + 1)), self.doc[idx + 1])
-                };
+                    // TODO potentially make the "padding"
+                    // something else
 
-                (true, opposite)
+                    MerkleWit {
+                        l_or_r: true,
+                        opposite_idx: Some(F::zero()),
+                        opposite: F::zero(),
+                    }
+                } else {
+                    MerkleWit {
+                        l_or_r: true,
+                        opposite_idx: Some(F::from(idx + 1)),
+                        opposite: self.doc[idx + 1],
+                    }
+                };
             }
-            1 => {
-                let opposite = (Some(F::from(idx - 1)), self.doc[idx - 1]);
-                (false, opposite)
-            }
+            1 => MerkleWit {
+                l_or_r: false,
+                opposite_idx: Some(F::from(idx - 1)),
+                opposite: self.doc[idx - 1],
+            },
         };
         sel_wit.push(wit);
 
@@ -138,17 +154,26 @@ impl MerkleCommitment {
             let wit = match quo % 2 {
                 0 => {
                     let opposite = if idx + 1 >= self.tree[h].len() {
-                        (None, F::zero())
+                        MerkleWit {
+                            l_or_r: true,
+                            opposite_idx: None,
+                            opposite: F::zero(),
+                        }
                     } else {
-                        (None, self.tree[h][idx + 1])
+                        MerkleWit {
+                            l_or_r: true,
+                            opposite_idx: None,
+                            opposite: self.tree[h][idx + 1],
+                        }
                     };
 
                     (true, opposite)
                 }
-                1 => {
-                    let opposite = (None, self.tree[h][idx - 1]);
-                    (false, opposite)
-                }
+                1 => MerkleWit {
+                    l_or_r: false,
+                    opposite_idx: None,
+                    opposite: self.tree[h][idx - 1],
+                },
             };
             sel_wit.push(wit);
         }
