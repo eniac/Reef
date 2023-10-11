@@ -134,6 +134,25 @@ impl MerkleCommitment {
 
         let mut quo = idx / 2;
 
+        for h in 0..tree.len() {
+            let wit = match quo % 2 {
+                0 => {
+                    let opposite = if idx + 1 >= self.tree[h].len() {
+                        (None, F::zero())
+                    } else {
+                        (None, self.tree[h][idx + 1])
+                    };
+
+                    (true, opposite)
+                }
+                1 => {
+                    let opposite = (None, self.tree[h][idx - 1]);
+                    (false, opposite)
+                }
+            };
+            sel_wit.push(wit);
+        }
+
         sel_wit
     }
 }
