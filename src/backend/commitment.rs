@@ -271,7 +271,7 @@ impl ReefCommitment {
 
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
         // println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
-        let new_q = if proj {
+        let running_q: Vec<<G1 as Group>::Scalar> = if proj {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q_hybrid);
             //println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
@@ -279,10 +279,6 @@ impl ReefCommitment {
         } else {
             q_hybrid
         };
-
-        // println!("PROJECTIONS + HYBRID Q {:#?}", new_q);
-
-        let running_q: Vec<<G1 as Group>::Scalar> = new_q.into_iter().rev().collect(); // rev??
 
         // set up
         let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
