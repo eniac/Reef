@@ -91,6 +91,7 @@ pub struct NFAStepCircuit<F: PrimeField> {
     max_branches: usize,
     pub commit_blind: F,
     pub claim_blind: F,
+    merkle_commit: Option<MerkleCommitment>,
 }
 
 // note that this will generate a single round, and no witnesses, unlike nova example code
@@ -107,6 +108,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         max_branches: usize,
         commit_blind: F,
         claim_blind: F,
+        merkle_commit: Option<MerkleCommitment>,
     ) -> Self {
         assert_eq!(states.len(), 2);
         assert_eq!(cursors.len(), 2);
@@ -116,7 +118,9 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         match (&glue[0], &glue[1]) {
             (GlueOpts::Split(_), GlueOpts::Split(_)) => {}
             (GlueOpts::Hybrid(_), GlueOpts::Hybrid(_)) => {}
-            (GlueOpts::Merkle(_), GlueOpts::Merkle(_)) => {}
+            (GlueOpts::Merkle(_), GlueOpts::Merkle(_)) => {
+                assert!(merkle_commit.is_some());
+            }
             (_, _) => {
                 panic!("glue I/O does not match");
             }
@@ -367,9 +371,10 @@ where {
     where
         CS: ConstraintSystem<F>,
     {
+        let mc = self.merkle_commit.unwrap();
+
         // self.height, self.root
-        let alloc_root =
-            AllocatedNum::alloc(sponge_ns.namespace(|| "root"), || Ok(self.merkle_root))?;
+        let alloc_root = AllocatedNum::alloc(sponge_ns.namespace(|| "root"), || Ok(mc.commitment))?;
 
         for i in alloc_cursors.len() {
             // num lookups
