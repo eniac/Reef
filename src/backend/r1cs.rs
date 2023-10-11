@@ -631,7 +631,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.pub_inputs.clone(),
         );
 
-        println!("CS {:#?}", cs);
+        // println!("CS {:#?}", cs);
 
         let mut css = Computations::new();
         css.comps.insert("main".to_string(), cs);
