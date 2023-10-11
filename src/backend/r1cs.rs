@@ -346,6 +346,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         usize_doc.push(u);
         int_doc.push(Integer::from(u));
 
+        println!("BEFORE EXT {:#?}", usize_doc.len());
+        // extend doc
+        let base: usize = 2;
+        let ext_len = base.pow(logmn(usize_doc.len()) as u32) - usize_doc.len();
+        usize_doc.extend(vec![0; ext_len]); // ep num = self.nfa.nchars()
+        int_doc.extend(vec![Integer::from(0); ext_len]); // ep num = self.nfa.nchars()
+        println!("EXT LEN {:#?}, AFTER EXT {:#?}", ext_len, usize_doc.len());
+
         let mut stack = vec![];
         for _i in 0..max_stack {
             stack.push((0, kid_padding));
@@ -377,7 +385,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             if start == 0 {
                 None
             } else {
-                // println!("USING PROJECTION {:#?}", ((start, end)));
+                println!("USING PROJECTION {:#?}", ((start, end)));
+                println!("DOC LEN {:#?}", usize_doc.len());
                 Some((start, end)) // handle doc extension TODO?
             }
         } else {
