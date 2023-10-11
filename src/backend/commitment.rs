@@ -20,11 +20,13 @@ use neptune::{
 use nova_snark::{
     errors::NovaError,
     provider::{
+        hyrax_pc::{HyraxPC, PolyCommit, PolyCommitBlinds},
         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
         pedersen::{Commitment, CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
     spartan::direct::{SpartanProverKey, SpartanSNARK, SpartanVerifierKey},
+    spartan::polynomial::{EqPolynomial, MultilinearPolynomial},
     traits::{
         circuit::StepCircuit, commitment::*, evaluation::GetGeneratorsTrait, AbsorbInROTrait,
         Group, ROConstantsTrait, ROTrait,
@@ -45,9 +47,10 @@ pub struct ReefCommitment {
     pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     vector_gens: CommitmentGens<G1>,
     single_gens: CommitmentGens<G1>,
-    mle_doc: Vec<<G1 as Group>::Scalar>,
-    doc_commit: CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
-    doc_decommit: <G1 as Group>::Scalar,
+    hyrax_gen: HyraxPC<G1>,
+    doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,
+    doc_commit: PolyCommit<G1>,
+    doc_decommit: PolyCommitBlinds<G1>,
     pub doc_commit_hash: <G1 as Group>::Scalar,
     pub hash_salt: <G1 as Group>::Scalar,
     // consistency verification
@@ -63,8 +66,8 @@ pub struct ConsistencyProof {
     snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
     v_commit: Commitment<G1>,
     // dot prod verification
-    ipi: InnerProductInstance<G1>,
     ipa: InnerProductArgument<G1>,
+    running_q: Vec<<G1 as Group>::Scalar>,
     t_vp_gens: Option<CommitmentGens<G1>>,
     hybrid_ipi: Option<InnerProductInstance<G1>>,
     hybrid_ipa: Option<InnerProductArgument<G1>>,
@@ -106,39 +109,53 @@ impl ReefCommitment {
             doc.len().next_power_of_two()
         };
 
-        let mut doc_ext: Vec<Integer> = doc.into_iter().map(|x| Integer::from(x)).collect();
-        doc_ext.append(&mut vec![Integer::from(0); doc_ext_len - doc_ext.len()]);
+        let mut doc_ext: Vec<<G1 as Group>::Scalar> = doc
+            .into_iter()
+            .map(|x| <G1 as Group>::Scalar::from(x as u64))
+            .collect();
 
+        doc_ext.append(&mut vec![
+            <G1 as Group>::Scalar::zero();
+            doc_ext_len - doc_ext.len()
+        ]);
         // println!("DOC COMMITMENT {:#?}", doc_ext.clone());
-        let mle = mle_from_pts(doc_ext);
 
         let single_gen = cap_pk.pk.gens.get_scalar_gen();
+
+        let (_left, right) =
+            EqPolynomial::<<G1 as Group>::Scalar>::compute_factored_lens(doc_ext.len());
         let vector_gen = CommitmentGens::<G1>::new_with_blinding_gen(
             b"vector_gen_doc",
-            mle.len(),
+            (2usize).pow(right as u32),
             &single_gen.get_blinding_gen(),
         );
 
-        let blind = <G1 as Group>::Scalar::random(&mut OsRng);
-
-        let scalars: Vec<<G1 as Group>::Scalar> = //<G1 as Group>::Scalar> =
-                mle.into_iter().map(|x| int_to_ff(x)).collect();
-
-        let commit_doc = <G1 as Group>::CE::commit(&vector_gen, &scalars, &blind);
+        let hyrax_gen = HyraxPC {
+            gens_v: vector_gen.clone(),
+            gens_s: single_gen.clone(),
+        };
+        let poly = MultilinearPolynomial::new(doc_ext);
+        let (doc_commit, doc_decommit) = hyrax_gen.commit(&poly);
 
         // for in-circuit fiat shamir
         let mut ro: PoseidonRO<<G2 as Group>::Scalar, <G1 as Group>::Scalar> =
-            PoseidonRO::new(PoseidonConstantsCircuit::new(), 3);
-        commit_doc.absorb_in_ro(&mut ro);
+            PoseidonRO::new(PoseidonConstantsCircuit::new(), doc_commit.comm.len() * 3);
+        for c in 0..doc_commit.comm.len() {
+            let cc: CompressedCommitment<<G1 as Group>::CompressedGroupElement> =
+                doc_commit.comm[c];
+            let dc = cc.decompress().unwrap();
+            dc.absorb_in_ro(&mut ro);
+        }
         let commit_doc_hash = ro.squeeze(256); // todo
 
         return Self {
             pc: pc.clone(),
             vector_gens: vector_gen.clone(),
             single_gens: single_gen.clone(),
-            mle_doc: scalars,
-            doc_commit: commit_doc.compress(),
-            doc_decommit: blind,
+            hyrax_gen,
+            doc_poly: poly,
+            doc_commit,
+            doc_decommit,
             doc_commit_hash: commit_doc_hash,
             hash_salt: salt,
             cap_pk,
@@ -162,7 +179,7 @@ impl ReefCommitment {
         let v_ff = int_to_ff(v);
         let q_ff = q.clone().into_iter().map(|x| int_to_ff(x)).collect();
 
-        let (ipi, ipa, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
+        let (ipa, running_q, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
             self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len, proj, hybrid);
 
         println!("post proof dot prod prover");
@@ -211,8 +228,8 @@ impl ReefCommitment {
             circuit: cap_circuit,
             snark: cap_snark,
             v_commit,
-            ipi,
             ipa,
+            running_q,
             t_vp_gens,
             hybrid_ipi,
             hybrid_ipa,
@@ -227,8 +244,8 @@ impl ReefCommitment {
         proj: bool,
         hybrid: bool,
     ) -> (
-        InnerProductInstance<G1>,
         InnerProductArgument<G1>,
+        Vec<<G1 as Group>::Scalar>,
         Commitment<G1>,
         <G1 as Group>::Scalar,
         Option<Commitment<G1>>,
@@ -254,7 +271,7 @@ impl ReefCommitment {
 
         //println!("PROJECTIONS OLD Q {:#?}", q.clone());
         // println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
-        let new_q = if proj {
+        let running_q: Vec<<G1 as Group>::Scalar> = if proj {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q_hybrid);
             //println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
@@ -262,11 +279,6 @@ impl ReefCommitment {
         } else {
             q_hybrid
         };
-
-        // println!("PROJECTIONS + HYBRID Q {:#?}", new_q);
-
-        let q_rev = new_q.into_iter().rev().collect(); // todo get rid clone
-        let running_q = q_to_mle_q(&q_rev, self.doc_len);
 
         // set up
         let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
@@ -278,10 +290,7 @@ impl ReefCommitment {
             // v' == v when not hybrid
             (None, None, running_v.clone())
         } else {
-            let mut v_prime = <G1 as Group>::Scalar::zero();
-            for i in 0..self.mle_doc.len() {
-                v_prime += &self.mle_doc[i].clone() * running_q[i].clone();
-            }
+            let v_prime = self.doc_poly.evaluate(&running_q);
             // println!("V PRIME {:#?}", v_prime);
 
             let decommit_v_prime = <G1 as Group>::Scalar::random(&mut OsRng);
@@ -293,49 +302,35 @@ impl ReefCommitment {
 
         // D(q) = v/v'
         println!("pre IPI");
-        let (ipi, ipw) = if !hybrid {
-            let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
-                &self.doc_commit.decompress().unwrap(),
-                &running_q,
-                &commit_running_v,
-            );
-            let ipw = InnerProductWitness::new(
-                &self.mle_doc,
+        let (ipa, ipw, compressed_v) = if !hybrid {
+            let res = self.hyrax_gen.prove_eval(
+                &self.doc_poly,
+                &self.doc_commit,
                 &self.doc_decommit,
+                &running_q,
                 &running_v,
                 &decommit_running_v,
+                &mut p_transcript,
             );
-
-            (ipi, ipw)
+            assert!(res.is_ok());
+            res.unwrap()
         } else {
-            let ipi: InnerProductInstance<G1> = InnerProductInstance::new(
-                &self.doc_commit.decompress().unwrap(),
-                &running_q,
-                &commit_v_prime.unwrap(),
-            );
-            let ipw = InnerProductWitness::new(
-                &self.mle_doc,
+            let res = self.hyrax_gen.prove_eval(
+                &self.doc_poly,
+                &self.doc_commit,
                 &self.doc_decommit,
+                &running_q,
                 &v_prime,
                 &decommit_v_prime.unwrap(),
+                &mut p_transcript,
             );
-            (ipi, ipw)
+            assert!(res.is_ok());
+            res.unwrap()
         };
 
-        println!("pre IPA Prove");
-        let ipa = InnerProductArgument::prove(
-            &self.vector_gens,
-            &self.single_gens,
-            &ipi,
-            &ipw,
-            &mut p_transcript,
-        )
-        .unwrap();
-        println!("post IPA Prove");
-
         (
-            ipi,
             ipa,
+            running_q,
             commit_running_v,
             decommit_running_v,
             commit_v_prime,
@@ -400,7 +395,9 @@ impl ReefCommitment {
     }
 
     pub fn verify_consistency(&self, proof: ConsistencyProof) {
-        assert!(self.proof_dot_prod_verify(&proof.ipi, proof.ipa).is_ok());
+        assert!(self
+            .proof_dot_prod_verify(&proof.ipa, &proof.running_q, proof.v_commit)
+            .is_ok());
 
         if proof.hybrid_ipi.is_some() && proof.hybrid_ipa.is_some() {
             assert!(self
@@ -426,18 +423,19 @@ impl ReefCommitment {
 
     fn proof_dot_prod_verify(
         &self,
-        ipi: &InnerProductInstance<G1>,
-        ipa: InnerProductArgument<G1>,
+        ipa: &InnerProductArgument<G1>,
+        running_q: &Vec<<G1 as Group>::Scalar>,
+        v_commit: Commitment<G1>,
     ) -> Result<(), NovaError> {
         let mut v_transcript = Transcript::new(b"dot_prod_proof");
 
-        ipa.verify(
-            &self.vector_gens,
-            &self.single_gens,
-            self.doc_len,
-            ipi,
+        self.hyrax_gen.verify_eval(
+            running_q,
+            &self.doc_commit,
+            &v_commit.compress(), // TODO compression stuff
+            ipa,
             &mut v_transcript,
-        )?;
+        );
 
         Ok(())
     }
@@ -521,49 +519,6 @@ fn proj_prefix(proj_doc_len: usize, doc_ext_len: usize) -> Vec<<G1 as Group>::Sc
         start_idx = start_idx >> 1;
     }
     q_add
-}
-
-// TODO test, TODO over ff, not Integers
-// calculate multilinear extension from evals of univariate
-// must "pad out" pts to power of 2 !
-fn mle_from_pts(pts: Vec<Integer>) -> Vec<Integer> {
-    let num_pts = pts.len();
-    if num_pts == 1 {
-        return vec![pts[0].clone()];
-    }
-
-    let h = num_pts / 2;
-
-    let mut l = mle_from_pts(pts[..h].to_vec());
-    let mut r = mle_from_pts(pts[h..].to_vec());
-
-    for i in 0..r.len() {
-        r[i] -= &l[i];
-        l.push(r[i].clone().rem_floor(cfg().field().modulus()));
-    }
-
-    l
-}
-
-fn q_to_mle_q<F: PrimeField>(q: &Vec<F>, mle_len: usize) -> Vec<F> {
-    let mut q_out = vec![];
-    let base: usize = 2;
-
-    for idx in 0..mle_len {
-        let mut new_term = F::from(1);
-        for j in 0..q.len() {
-            // for each possible var in this term
-            if (idx / base.pow(j as u32)) % 2 == 1 {
-                // is this var in this term?
-                new_term *= q[j].clone(); // todo?
-                                          // note this loop is never triggered for constant :)
-            }
-        }
-
-        q_out.push(new_term); //.rem_floor(cfg().field().modulus()));
-    }
-
-    q_out
 }
 
 #[derive(Clone)]
@@ -723,193 +678,5 @@ mod tests {
             .verify(&gens_t, &gens_single, num_vars, &ipi, &mut v_transcript);
 
         assert!(res.is_ok());
-    }
-
-    #[test]
-    fn mle_q_ext() {
-        init();
-        let uni: Vec<Integer> = vec![
-            Integer::from(60),
-            Integer::from(80),
-            Integer::from(9),
-            Integer::from(4),
-            Integer::from(77),
-            Integer::from(18),
-            Integer::from(24),
-            Integer::from(10),
-        ];
-
-        let mle = mle_from_pts(uni.clone());
-
-        // 011 = 6
-        //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
-        let q = vec![
-            <G1 as Group>::Scalar::from(2),
-            <G1 as Group>::Scalar::from(3),
-            <G1 as Group>::Scalar::from(5),
-        ];
-
-        let mut mle_f: Vec<<G1 as Group>::Scalar> = vec![];
-        for m in &mle {
-            mle_f.push(int_to_ff(m.clone()));
-        }
-
-        let q_ext = q_to_mle_q(&q, mle_f.len());
-
-        assert_eq!(mle_f.len(), q_ext.len());
-        // inner product
-        let mut sum = <G1 as Group>::Scalar::zero();
-        for i in 0..mle.len() {
-            sum += mle_f[i].clone() * q_ext[i].clone();
-        }
-        assert_eq!(sum, <G1 as Group>::Scalar::from(1162));
-    }
-
-    #[test]
-    fn projections() {
-        init();
-        let uni: Vec<Integer> = vec![
-            Integer::from(60), // 000
-            Integer::from(80), // 001
-            Integer::from(9),  // 010
-            Integer::from(4),  // 011
-            Integer::from(77), // 100
-            Integer::from(18), // 101
-            Integer::from(24), // 110
-            Integer::from(10), // 111
-        ];
-        let mle = mle_from_pts(uni.clone());
-        let mut mle_f: Vec<<G1 as Group>::Scalar> = vec![];
-        for m in &mle {
-            mle_f.push(int_to_ff(m.clone()));
-        }
-
-        let uni_sub: Vec<Integer> = vec![
-            Integer::from(77), // 100
-            Integer::from(18), // 101
-            Integer::from(24), // 110
-            Integer::from(10), // 111
-        ];
-        let mle_sub = mle_from_pts(uni_sub.clone());
-        let mut mle_sub_f: Vec<<G1 as Group>::Scalar> = vec![];
-        for m in &mle_sub {
-            mle_sub_f.push(int_to_ff(m.clone()));
-        }
-
-        // 011 = 6
-        //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
-        let q = vec![
-            <G1 as Group>::Scalar::zero(),
-            <G1 as Group>::Scalar::from(1),
-            <G1 as Group>::Scalar::from(1), // selector
-        ];
-        let q_ext = q_to_mle_q(&q, mle_f.len());
-        assert_eq!(mle_f.len(), q_ext.len());
-        // inner product
-        let mut sum = <G1 as Group>::Scalar::zero();
-        for i in 0..mle.len() {
-            sum += mle_f[i].clone() * q_ext[i].clone();
-        }
-
-        let q_sub = vec![
-            <G1 as Group>::Scalar::zero(),
-            <G1 as Group>::Scalar::from(1),
-        ];
-        let q_ext_sub = q_to_mle_q(&q_sub, mle_sub_f.len());
-        assert_eq!(mle_sub_f.len(), q_ext_sub.len());
-
-        // inner product
-        let mut sum_sub = <G1 as Group>::Scalar::zero();
-        for i in 0..mle_sub.len() {
-            sum_sub += mle_sub_f[i].clone() * q_ext_sub[i].clone();
-        }
-        assert_eq!(sum, sum_sub);
-
-        //    println!("SUM {:#?}", sum.clone());
-    }
-
-    #[test]
-    fn hybrid() {
-        init();
-        let uni: Vec<Integer> = vec![
-            Integer::from(60), // 000
-            Integer::from(80), // 001
-            Integer::from(9),  // 010
-            Integer::from(4),  // 011
-            Integer::from(77), // 100
-            Integer::from(18), // 101
-            Integer::from(24), // 110
-            Integer::from(10), // 111
-        ];
-        let mle = mle_from_pts(uni.clone());
-        let mut mle_f: Vec<<G1 as Group>::Scalar> = vec![];
-        for m in &mle {
-            mle_f.push(int_to_ff(m.clone()));
-        }
-
-        let uni_sub: Vec<Integer> = vec![
-            Integer::from(77), // 100
-            Integer::from(18), // 101
-            Integer::from(24), // 110
-            Integer::from(10), // 111
-        ];
-        let mle_sub = mle_from_pts(uni_sub.clone());
-        let mut mle_sub_f: Vec<<G1 as Group>::Scalar> = vec![];
-        for m in &mle_sub {
-            mle_sub_f.push(int_to_ff(m.clone()));
-        }
-
-        // 011 = 6
-        //let q = vec![Integer::from(0), Integer::from(1), Integer::from(1)];
-        let q = vec![
-            <G1 as Group>::Scalar::from(2),
-            <G1 as Group>::Scalar::from(3),
-            <G1 as Group>::Scalar::from(5), // selector
-        ];
-
-        let q_ext = q_to_mle_q(&q, mle_f.len());
-        assert_eq!(mle_f.len(), q_ext.len());
-        // inner product
-        let mut v = <G1 as Group>::Scalar::zero();
-        for i in 0..mle.len() {
-            v += mle_f[i].clone() * q_ext[i].clone();
-        }
-
-        let q_sub = vec![
-            <G1 as Group>::Scalar::from(2),
-            <G1 as Group>::Scalar::from(3),
-        ];
-        let q_ext_sub = q_to_mle_q(&q_sub, mle_sub_f.len());
-        assert_eq!(mle_sub_f.len(), q_ext_sub.len());
-
-        // inner product
-        let mut v_sub = <G1 as Group>::Scalar::zero();
-        for i in 0..mle_sub.len() {
-            v_sub += mle_sub_f[i].clone() * q_ext_sub[i].clone();
-        }
-
-        let table: Vec<Integer> = vec![
-            Integer::from(60), // 000
-            Integer::from(80), // 001
-            Integer::from(9),  // 010
-            Integer::from(4),  // 011
-        ];
-        let mle_table = mle_from_pts(table.clone());
-        let mut mle_table_f: Vec<<G1 as Group>::Scalar> = vec![];
-        for m in &mle_table {
-            mle_table_f.push(int_to_ff(m.clone()));
-        }
-
-        let mut t = <G1 as Group>::Scalar::zero();
-        for i in 0..mle_sub.len() {
-            t += mle_table_f[i].clone() * q_ext_sub[i].clone();
-        }
-
-        // println!("t {:#?}, v' {:#?}, v {:#?}", t, v_sub, v);
-
-        assert_eq!(
-            v,
-            t * (<G1 as Group>::Scalar::from(1) - q[2]) + v_sub * q[2]
-        );
     }
 }
