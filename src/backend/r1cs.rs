@@ -373,13 +373,30 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             let real_start = projection.unwrap();
 
-            let end = usize_doc.len().next_power_of_two();
+            let mut end = usize_doc.len().next_power_of_two();
             let mut start = end - 1;
             let mut jump = 1;
 
             while start > real_start && start >= 0 {
                 start -= jump;
                 jump *= 2;
+            }
+
+            // see if we can shorten end (can only elim padding in this impl)
+            assert!(end - ext_len > start);
+            if ext_len > 0 {
+                let mut new_end = end;
+                let mut jump = (end - start) / 2;
+                let orig_end = end - ext_len;
+
+                // need new_end > start, new end >= orig_end
+                while (new_end - jump > start) && (new_end - jump >= orig_end) {
+                    new_end -= jump;
+                    jump = (new_end - start) / 2;
+                }
+
+                println!("START {:#?}, END {:#?}, NEW END {:#?}", start, end, new_end);
+                end = new_end;
             }
 
             // proj vs hybrid calc

@@ -72,6 +72,7 @@ pub struct ConsistencyProof {
     snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
     v_commit: Commitment<G1>,
     // dot prod verification
+    v_prime_commit: Option<Commitment<G1>>,
     ipa: InnerProductArgument<G1>,
     running_q: Vec<<G1 as Group>::Scalar>,
     t_vp_gens: Option<CommitmentGens<G1>>,
@@ -256,6 +257,7 @@ impl NLDocCommitment {
             circuit: cap_circuit,
             snark: cap_snark,
             v_commit,
+            v_prime_commit,
             ipa,
             running_q,
             t_vp_gens,
@@ -282,7 +284,7 @@ impl NLDocCommitment {
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
-        // println!("Q IN {:#?}", q.clone());
+        println!("Q IN {:#?}", q.clone());
 
         // hybrid
         let q_hybrid = if !hybrid {
@@ -295,14 +297,13 @@ impl NLDocCommitment {
             q_prime
         };
 
-        // println!("HYBRID Q {:#?}", q_hybrid.clone());
+        println!("HYBRID Q {:#?}", q_hybrid.clone());
 
-        //println!("PROJECTIONS OLD Q {:#?}", q.clone());
         // println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
         let running_q: Vec<<G1 as Group>::Scalar> = if proj {
             let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
             q_add.extend(q_hybrid);
-            //println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
+            println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
             q_add
         } else {
             q_hybrid
@@ -423,17 +424,24 @@ impl NLDocCommitment {
     }
 
     pub fn verify_consistency(&self, proof: ConsistencyProof) {
-        assert!(self
-            .proof_dot_prod_verify(&proof.ipa, &proof.running_q, proof.v_commit)
-            .is_ok());
+        if proof.hybrid_ipi.is_some()
+            && proof.hybrid_ipa.is_some()
+            && proof.v_prime_commit.is_some()
+        {
+            assert!(self
+                .proof_dot_prod_verify(&proof.ipa, &proof.running_q, proof.v_prime_commit.unwrap())
+                .is_ok());
 
-        if proof.hybrid_ipi.is_some() && proof.hybrid_ipa.is_some() {
             assert!(self
                 .verify_hybrid_combo(
                     &proof.t_vp_gens.unwrap(),
                     &proof.hybrid_ipi.unwrap(),
                     proof.hybrid_ipa.unwrap(),
                 )
+                .is_ok());
+        } else {
+            assert!(self
+                .proof_dot_prod_verify(&proof.ipa, &proof.running_q, proof.v_commit)
                 .is_ok());
         }
 
@@ -463,9 +471,7 @@ impl NLDocCommitment {
             &v_commit.compress(), // TODO compression stuff
             ipa,
             &mut v_transcript,
-        );
-
-        Ok(())
+        )
     }
 
     fn verify_hybrid_combo(
