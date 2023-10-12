@@ -355,6 +355,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         println!("BEFORE EXT {:#?}", usize_doc.len());
         // extend doc
         let base: usize = 2;
+        let orig_len = usize_doc.len();
         let ext_len = base.pow(logmn(usize_doc.len()) as u32) - usize_doc.len();
         usize_doc.extend(vec![0; ext_len]); // ep num = self.nfa.nchars()
         int_doc.extend(vec![Integer::from(0); ext_len]); // ep num = self.nfa.nchars()
@@ -374,32 +375,26 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             let real_start = projection.unwrap();
+            let real_len = orig_len - real_start;
 
-            let mut end = usize_doc.len().next_power_of_two();
-            let mut start = end - 1;
-            let mut jump = 1;
+            let chunk_len = real_len.next_power_of_two();
+            let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
 
-            while start > real_start && start >= 0 {
-                start -= jump;
-                jump *= 2;
+            let mut start = 0;
+            while start + chunk_len <= real_start {
+                start += chunk_len;
             }
 
-            // see if we can shorten end (can only elim padding in this impl)
-            assert!(end - ext_len > start);
-            if ext_len > 0 {
-                let mut new_end = end;
-                let mut jump = (end - start) / 2;
-                let orig_end = end - ext_len;
+            let end = start + chunk_len;
 
-                // need new_end > start, new end >= orig_end
-                while (new_end - jump > start) && (new_end - jump >= orig_end) {
-                    new_end -= jump;
-                    jump = (new_end - start) / 2;
-                }
+            println!(
+                "START {:#?}, END {:#?}, NEW END {:#?}",
+                start, orig_len, end
+            );
 
-                println!("START {:#?}, END {:#?}, NEW END {:#?}", start, end, new_end);
-                end = new_end;
-            }
+            assert!(start < orig_len);
+            assert!(end >= orig_len);
+            assert!(start % chunk_len == 0);
 
             // proj vs hybrid calc
             if (end - start < table.len()) && hybrid {
@@ -413,11 +408,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 println!("DOC LEN {:#?}", usize_doc.len());
 
                 // calculate chunk idx
-                let chunk_size = end - start;
-                assert!(start % chunk_size == 0);
-
-                let num_chunks = usize_doc.len().next_power_of_two() / chunk_size;
-                let mut chunk_idx = start / chunk_size;
+                let mut chunk_idx = start / chunk_len;
 
                 let mut chunk_idx_vec = vec![];
                 for _i in 0..logmn(num_chunks) {
@@ -678,7 +669,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.pub_inputs.clone(),
         );
 
-        // println!("CS {:#?}", cs);
+        //println!("CS {:#?}", cs);
 
         let mut css = Computations::new();
         css.comps.insert("main".to_string(), cs);
