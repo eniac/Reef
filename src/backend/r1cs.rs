@@ -2667,21 +2667,21 @@ mod tests {
                 None => None,
             };
 
-            let (priv_rq, priv_rv) = if !hybrid {
-                (doc_running_q.unwrap(), doc_running_v.unwrap())
-            } else {
-                (
-                    hybrid_running_q.clone().unwrap(),
-                    hybrid_running_v.clone().unwrap(),
-                )
-            };
-
             assert_eq!(next_state, r1cs_converter.exit_state);
 
             let doc_len = r1cs_converter.udoc.len();
             let proj_len = r1cs_converter.doc_len();
 
             if reef_commit.nldoc.is_some() {
+                let (priv_rq, priv_rv) = if !hybrid {
+                    (doc_running_q.unwrap(), doc_running_v.unwrap())
+                } else {
+                    (
+                        hybrid_running_q.clone().unwrap(),
+                        hybrid_running_v.clone().unwrap(),
+                    )
+                };
+
                 let dc = reef_commit.nldoc.unwrap();
                 let consist_proof = dc.prove_consistency(
                     &r1cs_converter.table,
