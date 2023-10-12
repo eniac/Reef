@@ -89,7 +89,7 @@ impl ReefCommitment {
         if merkle {
             Self {
                 nldoc: None,
-                merkle: Some(MerkleCommitment::new(doc, pc)),
+                merkle: Some(MerkleCommitment::new(&doc, pc)),
             }
         } else {
             Self {

@@ -25,7 +25,7 @@ pub struct MerkleWit<F: PrimeField> {
 }
 
 impl<F: PrimeField> MerkleCommitment<F> {
-    pub fn new(doc: Vec<usize>, pc: &PoseidonConstants<F, typenum::U4>) -> Self {
+    pub fn new(doc: &Vec<usize>, pc: &PoseidonConstants<F, typenum::U4>) -> Self {
         let mut tree = vec![];
         let mut doc_f = vec![];
 
@@ -34,12 +34,12 @@ impl<F: PrimeField> MerkleCommitment<F> {
         let mut next_level = vec![];
         while i < doc.len() {
             let char_i = F::from(doc[i] as u64);
-            let char_ip = F::from(doc[i + 1] as u64);
             doc_f.push(char_i);
-            doc_f.push(char_ip);
-
             let left = (Some(F::from(i as u64)), char_i);
+
             let right = if i + 1 < doc.len() {
+                let char_ip = F::from(doc[i + 1] as u64);
+                doc_f.push(char_ip);
                 Some((Some(F::from((i + 1) as u64)), char_ip))
             } else {
                 None
@@ -117,11 +117,11 @@ impl<F: PrimeField> MerkleCommitment<F> {
         hash[0]
     }
 
-    pub fn make_wits(&self, m_lookups: Vec<usize>) -> Vec<Vec<MerkleWit<F>>> {
+    pub fn make_wits(&self, m_lookups: &Vec<usize>) -> Vec<Vec<MerkleWit<F>>> {
         let mut wits = vec![];
 
         for q in m_lookups {
-            let tree_wits = self.path_wits(q);
+            let tree_wits = self.path_wits(*q);
 
             wits.push(tree_wits);
         }
@@ -130,8 +130,10 @@ impl<F: PrimeField> MerkleCommitment<F> {
     }
 
     pub fn path_wits(&self, idx: usize) -> Vec<MerkleWit<F>> {
+        assert!(idx < self.doc.len());
         let mut sel_wit = vec![]; // (l_or_r, opposite F)
 
+        println!("idx {:#?}", idx);
         let wit = match (idx % 2) {
             0 => {
                 if idx + 1 >= self.doc.len() {
@@ -160,14 +162,15 @@ impl<F: PrimeField> MerkleCommitment<F> {
                 panic!("bad % 2");
             }
         };
+        println!("WIT {:#?}", wit);
         sel_wit.push(wit);
 
         let mut quo = idx / 2;
-
-        for h in 0..self.tree.len() {
+        for h in 0..(self.tree.len() - 1) {
+            println!("idx {:#?}", quo);
             let wit = match (quo % 2) {
                 0 => {
-                    if idx + 1 >= self.tree[h].len() {
+                    if quo + 1 >= self.tree[h].len() {
                         MerkleWit {
                             l_or_r: true,
                             opposite_idx: None,
@@ -177,20 +180,22 @@ impl<F: PrimeField> MerkleCommitment<F> {
                         MerkleWit {
                             l_or_r: true,
                             opposite_idx: None,
-                            opposite: self.tree[h][idx + 1],
+                            opposite: self.tree[h][quo + 1],
                         }
                     }
                 }
                 1 => MerkleWit {
                     l_or_r: false,
                     opposite_idx: None,
-                    opposite: self.tree[h][idx - 1],
+                    opposite: self.tree[h][quo - 1],
                 },
                 _ => {
                     panic!("bad % 2");
                 }
             };
+            println!("WIT {:#?}", wit);
             sel_wit.push(wit);
+            quo = quo / 2;
         }
 
         sel_wit
@@ -200,6 +205,91 @@ impl<F: PrimeField> MerkleCommitment<F> {
 #[cfg(test)]
 mod tests {
 
+    type G1 = pasta_curves::pallas::Point;
+    use crate::backend::merkle_tree::MerkleCommitment;
+    use generic_array::typenum;
+    use neptune::poseidon::PoseidonConstants;
+    use neptune::sponge::api::IOPattern;
+    use neptune::sponge::api::SpongeAPI;
+    use neptune::sponge::api::SpongeOp;
+    use neptune::sponge::vanilla::Mode;
+    use neptune::sponge::vanilla::{Sponge, SpongeTrait};
+    use neptune::Strength;
+    use nova_snark::traits::Group;
+
     #[test]
-    fn commit() {}
+    fn make_mt() {
+        let pc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+        // "document"
+        let doc = vec![2, 3, 4, 5, 6, 7, 8];
+
+        let mc = MerkleCommitment::new(&doc, &pc);
+
+        println!("MC {:#?} {:#?}, root:{:#?}", mc.tree, mc.doc, mc.commitment);
+
+        let qs = vec![0, 1, 2, 3, 4, 5, 6];
+        let tree_wits = mc.make_wits(&qs);
+
+        println!("WITS {:#?}", tree_wits);
+
+        for i in 0..qs.len() {
+            // leafs
+            let w0 = tree_wits[i][0].opposite_idx.unwrap();
+            let w1 = tree_wits[i][0].opposite;
+
+            let mut query = vec![];
+            if tree_wits[i][0].l_or_r {
+                query.push(<G1 as Group>::Scalar::from(qs[i] as u64));
+                query.push(<G1 as Group>::Scalar::from(doc[qs[i]] as u64));
+                query.push(w0);
+                query.push(w1);
+            } else {
+                query.push(w0);
+                query.push(w1);
+                query.push(<G1 as Group>::Scalar::from(qs[i] as u64));
+                query.push(<G1 as Group>::Scalar::from(doc[qs[i]] as u64));
+            }
+
+            println!("HASHING: {:#?}", query);
+            let mut hash = hash_children(&query, &pc);
+
+            for h in 1..tree_wits[i].len() {
+                let w = tree_wits[i][h].opposite;
+
+                let mut query = vec![];
+                if tree_wits[i][h].l_or_r {
+                    query.push(hash);
+                    query.push(w);
+                } else {
+                    query.push(w);
+                    query.push(hash);
+                }
+                println!("HASHING: {:#?}", query);
+
+                hash = hash_children(&query, &pc);
+            }
+
+            assert_eq!(hash, mc.commitment);
+        }
+    }
+
+    fn hash_children(
+        query: &[<G1 as Group>::Scalar],
+        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    ) -> <G1 as Group>::Scalar {
+        let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
+        let acc = &mut ();
+
+        let parameter = IOPattern(vec![
+            SpongeOp::Absorb(query.len() as u32),
+            SpongeOp::Squeeze(1),
+        ]);
+        sponge.start(parameter, None, acc);
+
+        SpongeAPI::absorb(&mut sponge, query.len() as u32, query, acc);
+        let out = SpongeAPI::squeeze(&mut sponge, 1, acc);
+        sponge.finish(acc).unwrap();
+
+        out[0]
+    }
 }
