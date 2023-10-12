@@ -207,7 +207,7 @@ impl NLDocCommitment {
         let cap_d = calc_d(&[v_ff, self.hash_salt], &self.pc);
         let cap_z = vec![cap_d];
 
-        let (ipi, ipa, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
+        let (ipa, running_q, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
             self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len, proj, hybrid);
 
         println!("post proof dot prod prover");
