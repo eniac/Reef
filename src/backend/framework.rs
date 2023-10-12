@@ -7,7 +7,7 @@ type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
 type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
-use crate::backend::commitment::ReefCommitment::{Merkle, NLDoc};
+use crate::backend::merkle_tree::MerkleCommitment;
 use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::frontend::safa::SAFA;
@@ -146,10 +146,13 @@ pub fn run_backend(
             r1cs_converter.merkle,
             &sc,
         );
-        r1cs_converter.doc_hash = match reef_commit {
-            NLDoc(dc) => Some(dc.doc_commit_hash),
-            Merkle(_) => None,
-        };
+
+        let mut hash_salt = <G1 as Group>::Scalar::zero();
+        if reef_commit.nldoc.is_some() {
+            let dc = reef_commit.nldoc.as_ref().unwrap();
+            r1cs_converter.doc_hash = Some(dc.doc_commit_hash.clone());
+            hash_salt = dc.hash_salt;
+        }
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "R1CS", "Commitment Generations");
@@ -164,11 +167,12 @@ pub fn run_backend(
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "R1CS", "Proof Setup");
-        let (z0_primary, pp) = setup(&r1cs_converter, &reef_commit, &prover_data);
+        let (z0_primary, pp) = setup(&r1cs_converter, &prover_data, hash_salt);
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "R1CS", "Proof Setup");
 
+        let mc = reef_commit.merkle.clone();
         send_setup
             .send(ProofInfo {
                 pp: Arc::new(Mutex::new(pp)),
@@ -192,9 +196,10 @@ pub fn run_backend(
             sender,
             sender_qv,
             &mut r1cs_converter,
-            &reef_commit,
             &prover_data,
             &doc,
+            hash_salt,
+            mc,
         );
 
         #[cfg(feature = "metrics")]
@@ -212,8 +217,8 @@ pub fn run_backend(
 
 fn setup<'a>(
     r1cs_converter: &R1CS<<G1 as Group>::Scalar, char>,
-    reef_commit: &ReefCommitment,
     circ_data: &'a ProverData,
+    hash_salt: <G1 as Group>::Scalar,
 ) -> (Vec<<G1 as Group>::Scalar>, PublicParams<G1, G2, C1, C2>) {
     let current_state = r1cs_converter.safa.get_init().index();
     let mut z = vec![<G1 as Group>::Scalar::from(current_state as u64)];
@@ -260,9 +265,13 @@ fn setup<'a>(
         z.append(&mut vec![<G1 as Group>::Scalar::zero(); q_len]);
         z.push(int_to_ff(r1cs_converter.table[0].clone()));
         z.append(&mut vec![<G1 as Group>::Scalar::zero(); qd_len]);
-        let d = reef_commit
-            .calc_d_clear(Integer::from(r1cs_converter.udoc[0] as u64))
-            .unwrap();
+        let d = calc_d(
+            &[
+                <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
+                hash_salt,
+            ],
+            &r1cs_converter.pc,
+        );
         z.push(d);
     } else {
         let hq_len = logmn(r1cs_converter.hybrid_len.unwrap());
@@ -273,12 +282,13 @@ fn setup<'a>(
             GlueOpts::Hybrid((hq, hv, stack_ptr, stack)),
         ];
         z.append(&mut vec![<G1 as Group>::Scalar::zero(); hq_len]);
-        let d = reef_commit
-            .calc_d_clear(
-                r1cs_converter.table[0].clone(), // start with table
-            )
-            .unwrap();
-
+        let d = calc_d(
+            &[
+                <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
+                hash_salt,
+            ],
+            &r1cs_converter.pc,
+        );
         z.push(d);
     }
 
@@ -304,6 +314,8 @@ fn setup<'a>(
         r1cs_converter.max_branches,
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
+        <G1 as Group>::Scalar::zero(),
+        None,
     );
 
     // trivial circuit
@@ -359,9 +371,10 @@ fn solve<'a>(
     sender: Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     sender_qv: Sender<(Vec<Integer>, Integer)>, //itness<<G1 as Group>::Scalar>>,
     r1cs_converter: &mut R1CS<<G1 as Group>::Scalar, char>,
-    reef_commit: &ReefCommitment,
     circ_data: &'a ProverData,
     doc: &Vec<char>,
+    hash_salt: <G1 as Group>::Scalar,
+    merkle_commit: Option<MerkleCommitment<<G1 as Group>::Scalar>>,
 ) {
     let mut wits;
     let mut running_q: Option<Vec<Integer>> = None;
@@ -376,6 +389,7 @@ fn solve<'a>(
     let mut hybrid_running_v: Option<Integer> = None;
     let mut next_hybrid_running_q: Option<Vec<Integer>>;
     let mut next_hybrid_running_v: Option<Integer>;
+    let mut merkle_lookups: Option<Vec<usize>> = None;
 
     let mut prev_cursor = 0;
     let mut next_cursor;
@@ -395,10 +409,6 @@ fn solve<'a>(
     //end safa solve
 
     let commit_blind = r1cs_converter.doc_hash.unwrap();
-    let claim_blind = match reef_commit {
-        NLDoc(dc) => dc.hash_salt,
-        Merkle(_) => <G1 as Group>::Scalar::zero(),
-    };
 
     let mut i = 0;
     while r1cs_converter.sol_num < sols.len() {
@@ -420,6 +430,7 @@ fn solve<'a>(
             next_hybrid_running_q,
             next_hybrid_running_v,
             next_cursor,
+            merkle_lookups,
         ) = r1cs_converter.gen_wit_i(
             &mut sols,
             i,
@@ -508,10 +519,10 @@ fn solve<'a>(
             };
 
             let doc_v = match doc_running_v {
-                Some(rv) => rv,
-                None => Integer::from(r1cs_converter.udoc[0] as u64),
+                Some(rv) => int_to_ff(rv),
+                None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
             };
-            let doc_v_hash = reef_commit.calc_d_clear(doc_v.clone()).unwrap();
+            let doc_v_hash = calc_d(&[doc_v, hash_salt], &r1cs_converter.pc);
 
             let next_doc_q = next_doc_running_q
                 .clone()
@@ -519,8 +530,8 @@ fn solve<'a>(
                 .into_iter()
                 .map(|x| int_to_ff(x))
                 .collect();
-            let next_doc_v = next_doc_running_v.clone().unwrap();
-            let next_doc_v_hash = reef_commit.calc_d_clear(next_doc_v.clone()).unwrap();
+            let next_doc_v: <G1 as Group>::Scalar = int_to_ff(next_doc_running_v.clone().unwrap());
+            let next_doc_v_hash = calc_d(&[next_doc_v, hash_salt], &r1cs_converter.pc);
 
             vec![
                 GlueOpts::Split((q, v, doc_q, doc_v_hash, sp_0, stk_in)),
@@ -534,11 +545,11 @@ fn solve<'a>(
                 None => vec![<G1 as Group>::Scalar::zero(); hq_len],
             };
 
-            let hv = match hybrid_running_v {
-                Some(hv) => hv,
-                None => Integer::from(r1cs_converter.table[0].clone()), // table goes first
+            let hv: <G1 as Group>::Scalar = match hybrid_running_v {
+                Some(hv) => int_to_ff(hv),
+                None => int_to_ff(r1cs_converter.table[0].clone()), // table goes first
             };
-            let hv_hash = reef_commit.calc_d_clear(hv.clone()).unwrap();
+            let hv_hash = calc_d(&[hv, hash_salt], &r1cs_converter.pc);
 
             let next_hq = next_hybrid_running_q
                 .clone()
@@ -546,8 +557,8 @@ fn solve<'a>(
                 .into_iter()
                 .map(|x| int_to_ff(x))
                 .collect();
-            let next_hv = next_hybrid_running_v.clone().unwrap();
-            let next_hv_hash = reef_commit.calc_d_clear(next_hv.clone()).unwrap();
+            let next_hv: <G1 as Group>::Scalar = int_to_ff(next_hybrid_running_v.clone().unwrap());
+            let next_hv_hash = calc_d(&[next_hv, hash_salt], &r1cs_converter.pc);
 
             vec![
                 GlueOpts::Hybrid((hq, hv_hash, sp_0, stk_in)),
@@ -568,6 +579,14 @@ fn solve<'a>(
             ffs
         });
 
+        let mut merkle_root = <G1 as Group>::Scalar::zero();
+        let mut merkle_wits = None;
+        if merkle_commit.is_some() {
+            let mc = merkle_commit.as_ref().unwrap();
+            (merkle_root, merkle_wits) =
+                (mc.commitment, Some(mc.make_wits(merkle_lookups.unwrap())));
+        }
+
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
             circ_data.r1cs.clone(),
             values,
@@ -584,7 +603,9 @@ fn solve<'a>(
             r1cs_converter.batch_size,
             r1cs_converter.max_branches,
             commit_blind,
-            claim_blind,
+            hash_salt,
+            merkle_root,
+            merkle_wits,
         );
 
         #[cfg(feature = "metrics")]
@@ -696,29 +717,29 @@ fn prove_and_verify(
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
 
-    let consist_proof = match proof_info.commit {
-        NLDoc(dc) => {
-            let (q, v) = recv_qv.recv().unwrap();
+    let mut consist_proof = None;
+    if proof_info.commit.nldoc.is_some() {
+        let mut dc = proof_info.commit.nldoc.as_ref().unwrap();
+        let (q, v) = recv_qv.recv().unwrap();
 
-            println!("post compress");
+        println!("post compress");
 
-            #[cfg(feature = "metrics")]
-            log::tic(Component::Prover, "Proof", "Consistency Proofs");
-            //Doc dot prod and consistency
-            let consist_proof = dc.prove_consistency(
-                &proof_info.table,
-                proof_info.proj_doc_len,
-                q,
-                v,
-                proof_info.projections,
-                proof_info.hybrid_len.is_some(),
-            );
-            #[cfg(feature = "metrics")]
-            log::stop(Component::Prover, "Proof", "Consistency Proofs");
-            Some(consist_proof)
-        }
-        Merkle(_) => None,
-    };
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Prover, "Proof", "Consistency Proofs");
+        //Doc dot prod and consistency
+        let cp = dc.prove_consistency(
+            &proof_info.table,
+            proof_info.proj_doc_len,
+            q,
+            v,
+            proof_info.projections,
+            proof_info.hybrid_len.is_some(),
+        );
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Prover, "Proof", "Consistency Proofs");
+
+        consist_proof = Some(cp)
+    }
 
     println!("post cp");
 
@@ -788,8 +809,9 @@ fn verify(
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
     let zn = res.unwrap().0;
 
-    let (stack_ptr, eval_q, eval_v) = match reef_commit {
-        Merkle(_) => {
+    let (stack_ptr, eval_q, eval_v) = match (reef_commit.nldoc, reef_commit.merkle) {
+        (None, Some(_)) => {
+            // merkle
             let q_len = logmn(table.len());
 
             (
@@ -798,14 +820,14 @@ fn verify(
                 Some(zn[q_len + 1]),
             )
         }
-        NLDoc(dc) => {
+        (Some(dc), None) => {
             let cp = consist_proof.unwrap();
-            dc.verify_consistency(cp);
             if hybrid_len.is_none() {
                 let q_len = logmn(table.len());
                 let qd_len = logmn(proj_doc_len);
                 assert_eq!(cp.hash_d, zn[2 + q_len + qd_len]);
 
+                dc.verify_consistency(cp);
                 (
                     zn[q_len + qd_len + 3],
                     Some(zn[1..(q_len + 1)].to_vec()),
@@ -815,8 +837,12 @@ fn verify(
                 let h_len = logmn(hybrid_len.unwrap());
                 assert_eq!(cp.hash_d, zn[1 + h_len]);
 
+                dc.verify_consistency(cp);
                 (zn[h_len + 2], None, None)
             }
+        }
+        (_, _) => {
+            panic!("weird commitment");
         }
     };
 
@@ -848,12 +874,20 @@ mod tests {
         batch_size: usize,
         projections: bool,
         hybrid: bool,
+        merkle: bool,
     ) {
         let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
 
         init();
-        run_backend(safa.clone(), doc.clone(), batch_size, projections, hybrid);
+        run_backend(
+            safa.clone(),
+            doc.clone(),
+            batch_size,
+            projections,
+            hybrid,
+            merkle,
+        );
     }
 
     #[test]
@@ -865,6 +899,7 @@ mod tests {
             0,
             false,
             true,
+            false,
         );
     }
 
@@ -876,6 +911,7 @@ mod tests {
             ("aabbcc".to_string()).chars().collect(),
             0,
             true,
+            false,
             false,
         );
     }
@@ -891,6 +927,7 @@ mod tests {
             33,
             false,
             false,
+            false,
         );
     }
 
@@ -901,6 +938,7 @@ mod tests {
             "^(?=a)ab(?=c)cd$".to_string(),
             ("abcd".to_string()).chars().collect(),
             0,
+            false,
             false,
             false,
         );
@@ -916,6 +954,7 @@ mod tests {
                 //.map(|c| c.to_string())
                 .collect(),
             0,
+            false,
             false,
             false,
         );

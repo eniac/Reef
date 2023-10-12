@@ -1447,7 +1447,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     fn q_ordering_merkle(&mut self) {
         for i in 0..self.batch_size {
             let lookup_q = new_var(format!("merkle_lookup_{}", i));
-            self.pub_inputs.push(lookup_q);
+            self.pub_inputs.push(lookup_q.clone());
 
             let q_adjust = term(
                 Op::Ite,
@@ -1850,6 +1850,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         Option<Vec<Integer>>,
         Option<Integer>,
         usize,
+        Option<Vec<usize>>,
     ) {
         let mut wasted = 0;
         let mut wits = FxHashMap::default();
@@ -2059,8 +2060,22 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut next_doc_running_v = None;
         let mut next_hybrid_running_q = None;
         let mut next_hybrid_running_v = None;
+        let mut merkle_lookups = None;
 
-        if self.hybrid_len.is_some() {
+        if self.merkle {
+            assert!(running_q.is_some() || batch_num == 0);
+            assert!(running_v.is_some() || batch_num == 0);
+            let (w, rq, rv) =
+                self.wit_nlookup_gadget(wits, &self.table, q, v, running_q, running_v, "nl");
+            wits = w;
+            next_running_q = Some(rq);
+            next_running_v = Some(rv);
+
+            for i in 0..self.batch_size {
+                wits.insert(format!("merkle_lookup_{}", i), new_wit(doc_q[i]));
+            }
+            merkle_lookups = Some(doc_q.clone());
+        } else if self.hybrid_len.is_some() {
             // pub T first, then priv D
             let half_len = self.hybrid_len.unwrap() / 2;
 
@@ -2129,6 +2144,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             next_hybrid_running_q,
             next_hybrid_running_v,
             cursor_i,
+            merkle_lookups,
         )
     }
 
@@ -2578,9 +2594,17 @@ mod tests {
         for b in batch_sizes {
             let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, merkle, sc.clone());
 
-            let mut reef_commit =
-                ReefCommitment::new(r1cs_converter.udoc.clone(), r1cs_converter.hybrid_len, &sc);
-            r1cs_converter.doc_hash = Some(reef_commit.doc_commit_hash);
+            let mut reef_commit = ReefCommitment::new(
+                r1cs_converter.udoc.clone(),
+                r1cs_converter.hybrid_len,
+                merkle,
+                &sc,
+            );
+
+            if reef_commit.nldoc.is_some() {
+                let dc = reef_commit.nldoc.as_ref().unwrap();
+                r1cs_converter.doc_hash = Some(dc.doc_commit_hash);
+            };
 
             let mut running_q: Option<Vec<Integer>> = None;
             let mut running_v: Option<Integer> = None;
@@ -2588,6 +2612,7 @@ mod tests {
             let mut doc_running_v: Option<Integer> = None;
             let mut hybrid_running_q: Option<Vec<Integer>> = None;
             let mut hybrid_running_v: Option<Integer> = None;
+            let mut merkle_lookups = None;
 
             let mut doc_idx = 0;
 
@@ -2613,6 +2638,7 @@ mod tests {
                     hybrid_running_q,
                     hybrid_running_v,
                     doc_idx,
+                    merkle_lookups,
                 ) = r1cs_converter.gen_wit_i(
                     &mut sols,
                     i,
@@ -2655,16 +2681,21 @@ mod tests {
             let doc_len = r1cs_converter.udoc.len();
             let proj_len = r1cs_converter.doc_len();
 
-            let consist_proof = reef_commit.prove_consistency(
-                &r1cs_converter.table,
-                proj_len,
-                priv_rq,
-                priv_rv,
-                r1cs_converter.doc_subset.is_some(),
-                r1cs_converter.hybrid_len.is_some(),
-            );
+            if reef_commit.nldoc.is_some() {
+                let dc = reef_commit.nldoc.unwrap();
+                let consist_proof = dc.prove_consistency(
+                    &r1cs_converter.table,
+                    proj_len,
+                    priv_rq,
+                    priv_rv,
+                    r1cs_converter.doc_subset.is_some(),
+                    r1cs_converter.hybrid_len.is_some(),
+                );
 
-            let cap_d = consist_proof.hash_d.clone();
+                let cap_d = consist_proof.hash_d.clone();
+
+                dc.verify_consistency(consist_proof)
+            }
 
             final_clear_checks(
                 <G1 as Group>::Scalar::from(r1cs_converter.stack_ptr as u64),
@@ -2672,8 +2703,6 @@ mod tests {
                 rq,
                 rv,
             );
-
-            reef_commit.verify_consistency(consist_proof);
 
             // final accepting
             assert_eq!(next_state, r1cs_converter.exit_state);
@@ -2706,6 +2735,21 @@ mod tests {
     }
 
     #[test]
+    fn merkle() {
+        init();
+        test_func_no_hash(
+            ab("abcd"),
+            reg("^(?=a)ab(?=c)cd$"),
+            ab("abcd"),
+            vec![2], // 2],
+            true,
+            None,
+            false,
+            true,
+        );
+    }
+
+    #[test]
     fn proj_hybrid() {
         init();
         test_func_no_hash(
@@ -2716,6 +2760,7 @@ mod tests {
             true,
             Some(5), // (4,8)
             true,
+            false,
         );
     }
     #[test]
@@ -2729,6 +2774,7 @@ mod tests {
             true,
             Some(5), // (4,8)
             true,
+            false,
         );
     }
 
@@ -2744,6 +2790,7 @@ mod tests {
             true,
             None,
             true,
+            false,
         );
     }
 
@@ -2760,6 +2807,7 @@ mod tests {
             true,
             Some(5), // (4,8)
             false,
+            false,
         );
     }
 
@@ -2773,6 +2821,7 @@ mod tests {
             vec![2], // 2],
             true,
             None,
+            false,
             false,
         );
     }
@@ -2788,13 +2837,23 @@ mod tests {
             true,
             None,
             false,
+            false,
         );
     }
 
     #[test]
     fn nfa_2() {
         init();
-        test_func_no_hash(ab("ab"), reg("^ab$"), ab("ab"), vec![2], true, None, false);
+        test_func_no_hash(
+            ab("ab"),
+            reg("^ab$"),
+            ab("ab"),
+            vec![2],
+            true,
+            None,
+            false,
+            false,
+        );
         /*    test_func_no_hash(
             "abc".to_string(),
             "^ab$".to_string(),
@@ -2822,6 +2881,7 @@ mod tests {
             true,
             None,
             false,
+            false,
         );
         test_func_no_hash(
             ab("ab"),
@@ -2830,6 +2890,7 @@ mod tests {
             vec![2, 4],
             true,
             None,
+            false,
             false,
         );
         test_func_no_hash(
@@ -2840,6 +2901,7 @@ mod tests {
             true,
             None,
             false,
+            false,
         );
     }
 
@@ -2847,7 +2909,16 @@ mod tests {
     #[should_panic]
     fn nfa_bad_1() {
         init();
-        test_func_no_hash(ab("ab"), reg("^a$"), ab("c"), vec![2], false, None, false);
+        test_func_no_hash(
+            ab("ab"),
+            reg("^a$"),
+            ab("c"),
+            vec![2],
+            false,
+            None,
+            false,
+            false,
+        );
     }
 
     #[test]
@@ -2860,6 +2931,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
             false,
         );
         /*
@@ -2884,6 +2956,7 @@ mod tests {
             true,
             None,
             false,
+            false,
         );
 
         /*    test_func_no_hash(
@@ -2907,6 +2980,7 @@ mod tests {
             true,
             None,
             false,
+            false,
         );
 
         test_func_no_hash(
@@ -2916,6 +2990,7 @@ mod tests {
             vec![33],
             true,
             None,
+            false,
             false,
         );
     }

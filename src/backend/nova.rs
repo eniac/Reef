@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
-use crate::backend::merkle_tree::MerkleCommitment;
+use crate::backend::merkle_tree::MerkleWit;
 use ::bellperson::{
     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
     Variable,
@@ -92,7 +92,8 @@ pub struct NFAStepCircuit<F: PrimeField> {
     max_branches: usize,
     pub commit_blind: F,
     pub claim_blind: F,
-    merkle_commit: Option<MerkleCommitment>,
+    merkle_commit: F,
+    merkle_tree_wits: Option<Vec<Vec<MerkleWit<F>>>>,
 }
 
 // note that this will generate a single round, and no witnesses, unlike nova example code
@@ -109,7 +110,8 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         max_branches: usize,
         commit_blind: F,
         claim_blind: F,
-        merkle_commit: Option<MerkleCommitment>,
+        merkle_commit: F,
+        merkle_tree_wits: Option<Vec<Vec<MerkleWit<F>>>>,
     ) -> Self {
         assert_eq!(states.len(), 2);
         assert_eq!(cursors.len(), 2);
@@ -120,7 +122,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             (GlueOpts::Split(_), GlueOpts::Split(_)) => {}
             (GlueOpts::Hybrid(_), GlueOpts::Hybrid(_)) => {}
             (GlueOpts::Merkle(_), GlueOpts::Merkle(_)) => {
-                assert!(merkle_commit.is_some());
+                assert!(merkle_tree_wits.is_some());
             }
             (_, _) => {
                 panic!("glue I/O does not match");
@@ -140,6 +142,8 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             max_branches,
             commit_blind,
             claim_blind,
+            merkle_commit,
+            merkle_tree_wits,
         }
     }
 
@@ -405,54 +409,55 @@ where {
     where
         CS: ConstraintSystem<F>,
     {
-        let mc = self.merkle_commit.unwrap();
-
         // self.height, self.root
-        let alloc_root = AllocatedNum::alloc(sponge_ns.namespace(|| "root"), || Ok(mc.commitment))?;
+        let alloc_root = AllocatedNum::alloc(cs.namespace(|| "root"), || Ok(self.merkle_commit))?;
+        let tree_wits = self.merkle_tree_wits.clone().unwrap();
 
         for i in 0..alloc_cursors.len() {
             // num lookups
 
-            let tree_wits = mc.path_wits(alloc_cursors[i].clone().unwrap().get_value().unwrap());
-
             // leafs
             let w0 = AllocatedNum::alloc(cs.namespace(|| "filler witness 0"), || {
-                Ok(tree_wits[0].opposite_idx.unwrap())
+                Ok(tree_wits[i][0].opposite_idx.unwrap())
             })?;
             let w1 = AllocatedNum::alloc(cs.namespace(|| "filler witness 1"), || {
-                Ok(tree_wits[0].opposite)
+                Ok(tree_wits[i][0].opposite)
             })?;
 
-            let query = vec![];
-            if tree_wits[0].l_or_r {
-                query.push(Elt::Allocated(alloc_cursors[i].unwrap()));
-                query.push(Elt::Allocated(alloc_chars[i].unwrap()));
+            let mut query = vec![];
+            if tree_wits[i][0].l_or_r {
+                query.push(Elt::Allocated(alloc_cursors[i].clone().unwrap()));
+                query.push(Elt::Allocated(alloc_chars[i].clone().unwrap()));
                 query.push(Elt::Allocated(w0));
                 query.push(Elt::Allocated(w1));
             } else {
                 query.push(Elt::Allocated(w0));
                 query.push(Elt::Allocated(w1));
-                query.push(Elt::Allocated(alloc_cursors[i].unwrap()));
-                query.push(Elt::Allocated(alloc_chars[i].unwrap()));
+                query.push(Elt::Allocated(alloc_cursors[i].clone().unwrap()));
+                query.push(Elt::Allocated(alloc_chars[i].clone().unwrap()));
             }
 
-            let left_hash = self.merkle_circuit(&query, &format!("left leaf hash"))?;
-            let right_hash = self.merkle_circuit(&query, &format!("right leaf hash"))?;
+            let left_hash = self.merkle_circuit(cs, &query, &format!("left leaf hash"))?;
+            let right_hash = self.merkle_circuit(cs, &query, &format!("right leaf hash"))?;
 
-            let lr_var = if tree_wits[0].l_or_r { 1 } else { 0 };
+            let lr_var = if tree_wits[i][0].l_or_r {
+                F::one()
+            } else {
+                F::zero()
+            };
             let lr = AllocatedNum::alloc(cs.namespace(|| "l or r leaf"), || Ok(lr_var))?;
 
             let mut hash = select(cs, lr, left_hash, right_hash, &format!("l or r leaf"))?;
 
             // non leaf
-            for h in 1..tree_wits.len() {
+            for h in 1..tree_wits[i].len() {
                 let w = AllocatedNum::alloc(
                     cs.namespace(|| format!("filler witness lvl {}", h)),
-                    || Ok(tree_wits[h].opposite),
+                    || Ok(tree_wits[i][h].opposite),
                 )?;
 
-                let query = vec![];
-                if left_of_parent {
+                let mut query = vec![];
+                if tree_wits[i][h].l_or_r {
                     query.push(Elt::Allocated(hash));
                     query.push(Elt::Allocated(w));
                 } else {
@@ -460,20 +465,24 @@ where {
                     query.push(Elt::Allocated(hash));
                 }
 
-                let left_hash = self.merkle_circuit(&query, &format!("left hash lvl {}", h))?;
-                let right_hash = self.merkle_circuit(&query, &format!("right hash lvl {}", h))?;
+                let left_hash = self.merkle_circuit(cs, &query, &format!("left hash lvl {}", h))?;
+                let right_hash =
+                    self.merkle_circuit(cs, &query, &format!("right hash lvl {}", h))?;
 
-                let lr_var = if tree_wits[h].l_or_r { 1 } else { 0 };
-                let lr =
-                    AllocatedNum::alloc(cs.namespace(|| &format!("l or r lvl {}", h)), || {
-                        Ok(lr_var)
-                    })?;
+                let lr_var = if tree_wits[i][h].l_or_r {
+                    F::one()
+                } else {
+                    F::zero()
+                };
+                let lr = AllocatedNum::alloc(cs.namespace(|| format!("l or r lvl {}", h)), || {
+                    Ok(lr_var)
+                })?;
 
                 hash = select(cs, lr, left_hash, right_hash, &format!("l or r lvl {}", h))?;
             }
 
             cs.enforce(
-                || format!("eq {}", tag),
+                || format!("eq merkle lookup {}", i),
                 |z| z + hash.get_variable(),
                 |z| z + CS::one(),
                 |z| z + alloc_root.get_variable(),
@@ -484,6 +493,7 @@ where {
 
     fn merkle_circuit<CS>(
         &self,
+        cs: &mut CS,
         query: &[Elt<F>],
         tag: &str,
     ) -> Result<(AllocatedNum<F>), SynthesisError>

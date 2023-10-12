@@ -1,5 +1,4 @@
 type G1 = pasta_curves::pallas::Point;
-type F = <G1 as Group>::Scalar;
 
 use ff::{Field, PrimeField};
 use generic_array::typenum;
@@ -11,21 +10,21 @@ use neptune::{
 use nova_snark::traits::Group;
 
 #[derive(Debug, Clone)]
-pub struct MerkleCommitment {
-    commitment: F,
+pub struct MerkleCommitment<F: PrimeField> {
+    pub commitment: F,
     tree: Vec<Vec<F>>,
     doc: Vec<F>,
     pc: PoseidonConstants<F, typenum::U4>,
 }
 
 #[derive(Debug, Clone)]
-pub struct MerkleWit {
+pub struct MerkleWit<F: PrimeField> {
     pub l_or_r: bool,
     pub opposite_idx: Option<F>,
     pub opposite: F,
 }
 
-impl MerkleCommitment {
+impl<F: PrimeField> MerkleCommitment<F> {
     pub fn new(doc: Vec<usize>, pc: &PoseidonConstants<F, typenum::U4>) -> Self {
         let mut tree = vec![];
         let mut doc_f = vec![];
@@ -118,10 +117,22 @@ impl MerkleCommitment {
         hash[0]
     }
 
-    pub fn path_wits(&self, idx: usize) -> Vec<MerkleWit> {
-        let sel_wit = vec![]; // (l_or_r, opposite F)
+    pub fn make_wits(&self, m_lookups: Vec<usize>) -> Vec<Vec<MerkleWit<F>>> {
+        let mut wits = vec![];
 
-        let wit = match idx % 2 {
+        for q in m_lookups {
+            let tree_wits = self.path_wits(q);
+
+            wits.push(tree_wits);
+        }
+
+        wits
+    }
+
+    pub fn path_wits(&self, idx: usize) -> Vec<MerkleWit<F>> {
+        let mut sel_wit = vec![]; // (l_or_r, opposite F)
+
+        let wit = match (idx % 2) {
             0 => {
                 if idx + 1 >= self.doc.len() {
                     // TODO potentially make the "padding"
@@ -145,13 +156,16 @@ impl MerkleCommitment {
                 opposite_idx: Some(F::from((idx - 1) as u64)),
                 opposite: self.doc[idx - 1],
             },
+            _ => {
+                panic!("bad % 2");
+            }
         };
         sel_wit.push(wit);
 
         let mut quo = idx / 2;
 
         for h in 0..self.tree.len() {
-            let wit = match quo % 2 {
+            let wit = match (quo % 2) {
                 0 => {
                     if idx + 1 >= self.tree[h].len() {
                         MerkleWit {
@@ -172,6 +186,9 @@ impl MerkleCommitment {
                     opposite_idx: None,
                     opposite: self.tree[h][idx - 1],
                 },
+                _ => {
+                    panic!("bad % 2");
+                }
             };
             sel_wit.push(wit);
         }
