@@ -2,7 +2,6 @@ type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
-use crate::backend::commitment::ReefCommitment::{Merkle, NLDoc};
 use crate::backend::costs::logmn;
 use crate::backend::merkle_tree::MerkleCommitment;
 use crate::backend::nova::int_to_ff;
@@ -42,9 +41,9 @@ use pasta_curves::{
 use rand::rngs::OsRng;
 use rug::{integer::Order, ops::RemRounding, Integer};
 
-pub enum ReefCommitment {
-    NLDoc(NLDocCommitment),
-    Merkle(MerkleCommitment),
+pub struct ReefCommitment {
+    pub nldoc: Option<NLDocCommitment>,
+    pub merkle: Option<MerkleCommitment<<G1 as Group>::Scalar>>,
 }
 
 pub struct NLDocCommitment {
@@ -85,16 +84,15 @@ impl ReefCommitment {
         pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     ) -> Self {
         if merkle {
-            ReefCommitment::Merkle(MerkleCommitment::new(doc, pc))
+            Self {
+                nldoc: None,
+                merkle: Some(MerkleCommitment::new(doc, pc)),
+            }
         } else {
-            ReefCommitment::NLDoc(NLDocCommitment::new(doc, hybrid_len, pc))
-        }
-    }
-
-    pub fn calc_d_clear(&self, v: Integer) -> Option<<G1 as Group>::Scalar> {
-        match self {
-            NLDoc(dc) => Some(dc.calc_d(v)),
-            Merkle(_) => None,
+            Self {
+                nldoc: Some(NLDocCommitment::new(doc, hybrid_len, pc)),
+                merkle: None,
+            }
         }
     }
 }
@@ -177,7 +175,7 @@ impl NLDocCommitment {
     }
 
     pub fn prove_consistency(
-        &mut self,
+        &self,
         table: &Vec<Integer>,
         proj_doc_len: usize,
         q: Vec<Integer>, //<G1 as Group>::Scalar>,
@@ -185,11 +183,11 @@ impl NLDocCommitment {
         proj: bool,
         hybrid: bool,
     ) -> ConsistencyProof {
-        let cap_d = self.calc_d(v.clone());
-        let cap_z = vec![cap_d];
-
         let v_ff = int_to_ff(v);
         let q_ff = q.clone().into_iter().map(|x| int_to_ff(x)).collect();
+
+        let cap_d = calc_d(&[v_ff, self.hash_salt], &self.pc);
+        let cap_z = vec![cap_d];
 
         let (ipi, ipa, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
             self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len, proj, hybrid);
@@ -481,20 +479,23 @@ impl NLDocCommitment {
 
         Ok(())
     }
+}
 
-    fn calc_d(&self, v: Integer) -> <G1 as Group>::Scalar {
-        let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
-        let acc = &mut ();
+pub fn calc_d(
+    v_salt: &[<G1 as Group>::Scalar],
+    pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+) -> <G1 as Group>::Scalar {
+    let mut sponge = Sponge::new_with_constants(pc, Mode::Simplex);
+    let acc = &mut ();
 
-        let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
-        sponge.start(parameter, None, acc);
+    let parameter = IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]);
+    sponge.start(parameter, None, acc);
 
-        SpongeAPI::absorb(&mut sponge, 2, &[int_to_ff(v.clone()), self.hash_salt], acc);
-        let d_out_vec = SpongeAPI::squeeze(&mut sponge, 1, acc);
-        sponge.finish(acc).unwrap();
+    SpongeAPI::absorb(&mut sponge, 2, v_salt, acc);
+    let d_out_vec = SpongeAPI::squeeze(&mut sponge, 1, acc);
+    sponge.finish(acc).unwrap();
 
-        d_out_vec[0]
-    }
+    d_out_vec[0]
 }
 
 pub fn final_clear_checks(
