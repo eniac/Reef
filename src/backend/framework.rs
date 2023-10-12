@@ -8,6 +8,7 @@ type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
 type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
 use crate::backend::merkle_tree::MerkleCommitment;
+use crate::backend::merkle_tree::MerkleWit;
 use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::frontend::safa::SAFA;
@@ -303,6 +304,35 @@ fn setup<'a>(
 
     // println!("Z LEN {:#?}", z.len());
 
+    // empty wits
+    let merkle_wits = if r1cs_converter.merkle {
+        let mut w = vec![];
+
+        for q in 0..r1cs_converter.batch_size {
+            let mut sub_w = vec![];
+
+            sub_w.push(MerkleWit {
+                l_or_r: true,
+                opposite_idx: Some(<G1 as Group>::Scalar::zero()),
+                opposite: <G1 as Group>::Scalar::zero(),
+            });
+
+            for h in 0..logmn(r1cs_converter.udoc.len()) {
+                sub_w.push(MerkleWit {
+                    l_or_r: true,
+                    opposite_idx: None,
+                    opposite: <G1 as Group>::Scalar::zero(),
+                });
+            }
+
+            w.push(sub_w);
+        }
+
+        Some(w)
+    } else {
+        None
+    };
+
     let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
         circ_data.r1cs.clone(),
         None,
@@ -315,7 +345,7 @@ fn setup<'a>(
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
         <G1 as Group>::Scalar::zero(),
-        None,
+        merkle_wits,
     );
 
     // trivial circuit
@@ -887,6 +917,19 @@ mod tests {
             projections,
             hybrid,
             merkle,
+        );
+    }
+
+    #[test]
+    fn e2e_merkle() {
+        backend_test(
+            "abcd".to_string(),
+            "^(?=a)ab(?=c)cd$".to_string(),
+            ("abcd".to_string()).chars().collect(),
+            0,
+            false,
+            false,
+            true,
         );
     }
 

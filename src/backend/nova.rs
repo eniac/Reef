@@ -417,12 +417,14 @@ where {
             // num lookups
 
             // leafs
-            let w0 = AllocatedNum::alloc(cs.namespace(|| "filler witness 0"), || {
-                Ok(tree_wits[i][0].opposite_idx.unwrap())
-            })?;
-            let w1 = AllocatedNum::alloc(cs.namespace(|| "filler witness 1"), || {
-                Ok(tree_wits[i][0].opposite)
-            })?;
+            let w0 = AllocatedNum::alloc(
+                cs.namespace(|| format!("filler witness idx batch {}", i)),
+                || Ok(tree_wits[i][0].opposite_idx.unwrap()),
+            )?;
+            let w1 = AllocatedNum::alloc(
+                cs.namespace(|| format!("filler witness val batch {}", i)),
+                || Ok(tree_wits[i][0].opposite),
+            )?;
 
             let mut query = vec![];
             if tree_wits[i][0].l_or_r {
@@ -437,22 +439,33 @@ where {
                 query.push(Elt::Allocated(alloc_chars[i].clone().unwrap()));
             }
 
-            let left_hash = self.merkle_circuit(cs, &query, &format!("left leaf hash"))?;
-            let right_hash = self.merkle_circuit(cs, &query, &format!("right leaf hash"))?;
+            let left_hash =
+                self.merkle_circuit(cs, &query, &format!("left leaf hash batch {}", i))?;
+            let right_hash =
+                self.merkle_circuit(cs, &query, &format!("right leaf hash batch {}", i))?;
 
             let lr_var = if tree_wits[i][0].l_or_r {
                 F::one()
             } else {
                 F::zero()
             };
-            let lr = AllocatedNum::alloc(cs.namespace(|| "l or r leaf"), || Ok(lr_var))?;
+            let lr =
+                AllocatedNum::alloc(cs.namespace(|| format!("l or r leaf batch {}", i)), || {
+                    Ok(lr_var)
+                })?;
 
-            let mut hash = select(cs, lr, left_hash, right_hash, &format!("l or r leaf"))?;
+            let mut hash = select(
+                cs,
+                lr,
+                left_hash,
+                right_hash,
+                &format!("l or r leaf batch {}", i),
+            )?;
 
             // non leaf
             for h in 1..tree_wits[i].len() {
                 let w = AllocatedNum::alloc(
-                    cs.namespace(|| format!("filler witness lvl {}", h)),
+                    cs.namespace(|| format!("filler witness batch {} lvl {}", i, h)),
                     || Ok(tree_wits[i][h].opposite),
                 )?;
 
@@ -465,20 +478,28 @@ where {
                     query.push(Elt::Allocated(hash));
                 }
 
-                let left_hash = self.merkle_circuit(cs, &query, &format!("left hash lvl {}", h))?;
+                let left_hash =
+                    self.merkle_circuit(cs, &query, &format!("left hash batch {} lvl {}", i, h))?;
                 let right_hash =
-                    self.merkle_circuit(cs, &query, &format!("right hash lvl {}", h))?;
+                    self.merkle_circuit(cs, &query, &format!("right hash batch {} lvl {}", i, h))?;
 
                 let lr_var = if tree_wits[i][h].l_or_r {
                     F::one()
                 } else {
                     F::zero()
                 };
-                let lr = AllocatedNum::alloc(cs.namespace(|| format!("l or r lvl {}", h)), || {
-                    Ok(lr_var)
-                })?;
+                let lr = AllocatedNum::alloc(
+                    cs.namespace(|| format!("l or r batch {} lvl {}", i, h)),
+                    || Ok(lr_var),
+                )?;
 
-                hash = select(cs, lr, left_hash, right_hash, &format!("l or r lvl {}", h))?;
+                hash = select(
+                    cs,
+                    lr,
+                    left_hash,
+                    right_hash,
+                    &format!("l or r batch {} lvl {}", i, h),
+                )?;
             }
 
             cs.enforce(
@@ -1445,7 +1466,7 @@ where
     F: PrimeField,
     CS: ConstraintSystem<F>,
 {
-    let ret = AllocatedNum::alloc(cs.namespace(|| "ret"), || {
+    let ret = AllocatedNum::alloc(cs.namespace(|| format!("ret {}", tag)), || {
         Ok(b.get_value().unwrap()
             + cond.get_value().unwrap() * (a.get_value().unwrap() - b.get_value().unwrap()))
     })?;
