@@ -134,7 +134,7 @@ impl<F: PrimeField> MerkleCommitment<F> {
         let mut sel_wit = vec![]; // (l_or_r, opposite F)
 
         println!("idx {:#?}", idx);
-        let wit = match (idx % 2) {
+        let wit = match idx % 2 {
             0 => {
                 if idx + 1 >= self.doc.len() {
                     // TODO potentially make the "padding"
@@ -168,7 +168,7 @@ impl<F: PrimeField> MerkleCommitment<F> {
         let mut quo = idx / 2;
         for h in 0..(self.tree.len() - 1) {
             println!("idx {:#?}", quo);
-            let wit = match (quo % 2) {
+            let wit = match quo % 2 {
                 0 => {
                     if quo + 1 >= self.tree[h].len() {
                         MerkleWit {

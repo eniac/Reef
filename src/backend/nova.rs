@@ -534,7 +534,7 @@ where {
         cs: &mut CS,
         query: &[Elt<F>],
         tag: &str,
-    ) -> Result<(AllocatedNum<F>), SynthesisError>
+    ) -> Result<AllocatedNum<F>, SynthesisError>
     where
         CS: ConstraintSystem<F>,
     {
@@ -563,7 +563,7 @@ where {
 
         sponge.finish(&mut sponge_ns).unwrap();
 
-        Ok((new_pos))
+        Ok(new_pos)
     }
 
     fn fiatshamir_circuit<'b, CS>(
