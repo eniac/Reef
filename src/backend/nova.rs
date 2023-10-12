@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
+use crate::backend::merkle_tree::MerkleWit;
 use ::bellperson::{
     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
     Variable,
@@ -76,6 +77,7 @@ fn get_modulus<F: Field + PrimeField>() -> Integer {
 pub enum GlueOpts<F: PrimeField> {
     Split((Vec<F>, F, Vec<F>, F, F, Vec<F>)), // q, v, doc q, doc v, stack ptr, stack
     Hybrid((Vec<F>, F, F, Vec<F>)),           // hybrid q, hybrid v, stack ptr, stack
+    Merkle((Vec<F>, F, F, Vec<F>)),           // q, v, stack ptr, stack
 }
 
 #[derive(Clone, Debug)]
@@ -90,6 +92,8 @@ pub struct NFAStepCircuit<F: PrimeField> {
     max_branches: usize,
     pub commit_blind: F,
     pub claim_blind: F,
+    merkle_commit: F,
+    merkle_tree_wits: Option<Vec<Vec<MerkleWit<F>>>>,
 }
 
 // note that this will generate a single round, and no witnesses, unlike nova example code
@@ -106,6 +110,8 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         max_branches: usize,
         commit_blind: F,
         claim_blind: F,
+        merkle_commit: F,
+        merkle_tree_wits: Option<Vec<Vec<MerkleWit<F>>>>,
     ) -> Self {
         assert_eq!(states.len(), 2);
         assert_eq!(cursors.len(), 2);
@@ -115,6 +121,9 @@ impl<F: PrimeField> NFAStepCircuit<F> {
         match (&glue[0], &glue[1]) {
             (GlueOpts::Split(_), GlueOpts::Split(_)) => {}
             (GlueOpts::Hybrid(_), GlueOpts::Hybrid(_)) => {}
+            (GlueOpts::Merkle(_), GlueOpts::Merkle(_)) => {
+                assert!(merkle_tree_wits.is_some());
+            }
             (_, _) => {
                 panic!("glue I/O does not match");
             }
@@ -133,6 +142,8 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             max_branches,
             commit_blind,
             claim_blind,
+            merkle_commit,
+            merkle_tree_wits,
         }
     }
 
@@ -271,6 +282,40 @@ where {
         Ok(())
     }
 
+    fn merkle_parsing(
+        &self,
+        alloc_v: &AllocatedNum<F>,
+        s: &String,
+        alloc_cursors: &mut Vec<Option<AllocatedNum<F>>>,
+        alloc_chars: &mut Vec<Option<AllocatedNum<F>>>,
+    ) -> Result<bool, SynthesisError> {
+        if s.starts_with("char_") {
+            let v_j = Some(alloc_v.clone()); //.get_variable();
+
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[1].parse().unwrap();
+
+            if j < self.batch_size {
+                alloc_chars[j] = v_j; // j+1 -> j
+            }
+
+            return Ok(true);
+        } else if s.starts_with("merkle_lookup_") {
+            let v_j = Some(alloc_v.clone()); //.get_variable();
+
+            let s_sub: Vec<&str> = s.split("_").collect();
+            let j: usize = s_sub[2].parse().unwrap();
+
+            if j < self.batch_size {
+                alloc_cursors[j] = v_j; // j+1 -> j
+            }
+
+            return Ok(true);
+        }
+
+        return Ok(false);
+    }
+
     fn intm_fs_parsing(
         &self,
         alloc_v: &AllocatedNum<F>,
@@ -353,6 +398,172 @@ where {
             }
         }
         return Ok(false);
+    }
+
+    fn eval_merkle<CS>(
+        &self,
+        cs: &mut CS,
+        alloc_cursors: &Vec<Option<AllocatedNum<F>>>, // already ordered
+        alloc_chars: &Vec<Option<AllocatedNum<F>>>,   // already ordered
+    ) -> Result<(), SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+    {
+        // self.height, self.root
+        let alloc_root = AllocatedNum::alloc(cs.namespace(|| "root"), || Ok(self.merkle_commit))?;
+        let tree_wits = self.merkle_tree_wits.clone().unwrap();
+
+        for i in 0..alloc_cursors.len() {
+            // num lookups
+
+            // leafs
+            let w0 = AllocatedNum::alloc(
+                cs.namespace(|| format!("filler witness idx batch {}", i)),
+                || Ok(tree_wits[i][0].opposite_idx.unwrap()),
+            )?;
+            let w1 = AllocatedNum::alloc(
+                cs.namespace(|| format!("filler witness val batch {}", i)),
+                || Ok(tree_wits[i][0].opposite),
+            )?;
+
+            let lr_var = if tree_wits[i][0].l_or_r {
+                F::one()
+            } else {
+                F::zero()
+            };
+            let lr =
+                AllocatedNum::alloc(cs.namespace(|| format!("l or r leaf batch {}", i)), || {
+                    Ok(lr_var)
+                })?;
+
+            let mut query = vec![];
+            let e0 = select(
+                cs,
+                lr.clone(),
+                alloc_cursors[i].clone().unwrap().clone(),
+                w0.clone(),
+                &format!("leaf 0 batch {}", i),
+            )?;
+            //println!("e: {:#?}", e0.clone().get_value());
+            query.push(Elt::Allocated(e0));
+
+            let e1 = select(
+                cs,
+                lr.clone(),
+                alloc_chars[i].clone().unwrap().clone(),
+                w1.clone(),
+                &format!("leaf 1 batch {}", i),
+            )?;
+            //println!("e: {:#?}", e1.clone().get_value());
+            query.push(Elt::Allocated(e1));
+
+            let e2 = select(
+                cs,
+                lr.clone(),
+                w0,
+                alloc_cursors[i].clone().unwrap(),
+                &format!("leaf 2 batch {}", i),
+            )?;
+            //println!("e: {:#?}", e2.clone().get_value());
+            query.push(Elt::Allocated(e2));
+
+            let e3 = select(
+                cs,
+                lr,
+                w1,
+                alloc_chars[i].clone().unwrap(),
+                &format!("leaf 3 batch {}", i),
+            )?;
+            //println!("e: {:#?}", e3.clone().get_value());
+            query.push(Elt::Allocated(e3));
+
+            let mut hash = self.merkle_circuit(cs, &query, &format!("leaf hash batch {}", i))?;
+
+            // non leaf
+            for h in 1..tree_wits[i].len() {
+                let w = AllocatedNum::alloc(
+                    cs.namespace(|| format!("filler witness batch {} lvl {}", i, h)),
+                    || Ok(tree_wits[i][h].opposite),
+                )?;
+
+                let lr_var = if tree_wits[i][h].l_or_r {
+                    F::one()
+                } else {
+                    F::zero()
+                };
+                let lr = AllocatedNum::alloc(
+                    cs.namespace(|| format!("l or r batch {} lvl {}", i, h)),
+                    || Ok(lr_var),
+                )?;
+
+                let mut query = vec![];
+
+                let e0 = select(
+                    cs,
+                    lr.clone(),
+                    hash.clone(),
+                    w.clone(),
+                    &format!("left batch {} lvl {}", i, h),
+                )?;
+                //println!("e: {:#?}", e0.clone().get_value());
+                query.push(Elt::Allocated(e0));
+                let e1 = select(cs, lr, w, hash, &format!("right batch {} lvl {}", i, h))?;
+                //println!("e: {:#?}", e1.clone().get_value());
+                query.push(Elt::Allocated(e1));
+
+                hash = self.merkle_circuit(cs, &query, &format!("hash batch {} lvl {}", i, h))?;
+            }
+
+            //sanity
+            if hash.get_value().is_some() {
+                assert_eq!(hash.get_value().unwrap(), self.merkle_commit);
+            }
+
+            cs.enforce(
+                || format!("eq merkle lookup {}", i),
+                |z| z + hash.get_variable(),
+                |z| z + CS::one(),
+                |z| z + alloc_root.get_variable(),
+            );
+        }
+        Ok(())
+    }
+
+    fn merkle_circuit<CS>(
+        &self,
+        cs: &mut CS,
+        query: &[Elt<F>],
+        tag: &str,
+    ) -> Result<(AllocatedNum<F>), SynthesisError>
+    where
+        CS: ConstraintSystem<F>,
+    {
+        let inputs = query.len() as u32;
+        assert!(inputs == 2 || inputs == 4);
+
+        let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+        let mut sponge_ns = cs.namespace(|| format!("{} sponge", tag));
+
+        let pattern = vec![SpongeOp::Absorb(inputs), SpongeOp::Squeeze(1)];
+
+        sponge.start(IOPattern(pattern), None, &mut sponge_ns);
+
+        let new_pos = {
+            SpongeAPI::absorb(&mut sponge, inputs, query, &mut sponge_ns);
+
+            let output = SpongeAPI::squeeze(&mut sponge, 1, &mut sponge_ns);
+
+            Elt::ensure_allocated(
+                &output[0],
+                &mut sponge_ns.namespace(|| format!("ensure allocated {}", tag)), // name must be the same
+                // (??)
+                true,
+            )?
+        };
+
+        sponge.finish(&mut sponge_ns).unwrap();
+
+        Ok((new_pos))
     }
 
     fn fiatshamir_circuit<'b, CS>(
@@ -588,6 +799,10 @@ where
                 arity += hq.len() + 1;
                 arity += stack.len() + 1;
             }
+            GlueOpts::Merkle((q, _, _, stack)) => {
+                arity += q.len() + 1;
+                arity += stack.len() + 1;
+            }
         }
         arity
     }
@@ -636,6 +851,20 @@ where
                     i += 1;
                 }
             }
+            GlueOpts::Merkle((q, v, sp, stack)) => {
+                for qi in q.clone() {
+                    assert_eq!(z[i], qi);
+                    i += 1;
+                }
+                assert_eq!(z[i], *v);
+                i += 1;
+                assert_eq!(z[i], *sp);
+                i += 1;
+                for si in stack.clone() {
+                    assert_eq!(z[i], si);
+                    i += 1;
+                }
+            }
         }
         assert_eq!(z[i], self.cursors[0]);
 
@@ -654,6 +883,12 @@ where
             GlueOpts::Hybrid((hq, hv, sp, stack)) => {
                 out.extend(hq.clone());
                 out.push(*hv);
+                out.push(*sp);
+                out.extend(stack.clone());
+            }
+            GlueOpts::Merkle((q, v, sp, stack)) => {
+                out.extend(q.clone());
+                out.push(*v);
                 out.push(*sp);
                 out.extend(stack.clone());
             }
@@ -1060,6 +1295,158 @@ where
                 }
                 out.push(last_cursor.unwrap());
             }
+            GlueOpts::Merkle((q, _, _, stack)) => {
+                let sc_l = q.len();
+                let stack_len = stack.len();
+
+                let mut alloc_claim_r = None;
+
+                let mut alloc_rc = vec![None; sc_l + 1];
+                let mut alloc_prev_rc = vec![None; sc_l + 1];
+                let mut alloc_gs = vec![vec![None; 3]; sc_l];
+
+                let mut alloc_stack_ptr_popped = None;
+                let mut alloc_stack_out = vec![None; stack_len];
+
+                let prev_q = z[1..(1 + sc_l)].to_vec(); //.clone();
+                let prev_v = z[1 + sc_l].clone();
+
+                let stack_ptr_0 = z[sc_l + 2].clone();
+                let stack_in = z[(sc_l + 3)..(sc_l + 3 + stack_len)].to_vec();
+                let cursor_0 = z[sc_l + 3 + stack_len].clone();
+
+                let num_cqs = ((self.batch_size * sc_l) as f64 / 254.0).ceil() as usize;
+                let mut alloc_qs = vec![None; num_cqs];
+                let mut alloc_vs = vec![None; self.batch_size];
+
+                let mut alloc_cursors = vec![None; self.batch_size]; // TODO here
+                let mut alloc_chars = vec![None; self.batch_size];
+
+                for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
+                    let (name_f, s) = self.generate_variable_info(var);
+                    //println!("S {:#?}", s);
+
+                    let val_f = || {
+                        Ok({
+                            let i_val = &self.values.as_ref().expect("missing values")[i];
+                            let ff_val = int_to_ff(i_val.as_pf().into());
+                            //debug!("value : {var:?} -> {ff_val:?} ({i_val})");
+                            ff_val
+                        })
+                    };
+                    // println!("Var (name?) {:#?}", self.r1cs.names[&var]);
+                    let mut matched = self
+                        .input_variable_parsing(
+                            &mut vars,
+                            &s,
+                            var,
+                            state_0.clone(),
+                            //   char_0.clone(),
+                        )
+                        .unwrap();
+                    if !matched {
+                        matched = self
+                            .input_variable_qv_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                "nl",
+                                sc_l,
+                                &prev_q,
+                                &prev_v,
+                                &mut alloc_prev_rc,
+                                self.batch_size,
+                            )
+                            .unwrap();
+                    }
+                    if !matched {
+                        matched = self
+                            .input_stack_parsing(
+                                &mut vars,
+                                &s,
+                                var,
+                                &stack_in,
+                                &stack_ptr_0,
+                                &cursor_0,
+                                stack_len,
+                            )
+                            .unwrap();
+                    }
+
+                    if !matched {
+                        let alloc_v = AllocatedNum::alloc(cs.namespace(|| name_f), val_f)?;
+                        vars.insert(var, alloc_v.get_variable());
+
+                        matched = self
+                            .stack_parsing(
+                                &s,
+                                &alloc_v,
+                                &mut alloc_stack_ptr_popped,
+                                &mut alloc_stack_out,
+                                &mut last_cursor,
+                            )
+                            .unwrap();
+                        if !matched {
+                            matched = self
+                                .intm_fs_parsing(
+                                    &alloc_v,
+                                    &s,
+                                    "nl",
+                                    &mut alloc_qs,
+                                    &mut alloc_vs,
+                                    &mut alloc_claim_r,
+                                    &mut alloc_gs,
+                                )
+                                .unwrap();
+                        }
+                        if !matched {
+                            matched = self
+                                .merkle_parsing(&alloc_v, &s, &mut alloc_cursors, &mut alloc_chars)
+                                .unwrap();
+                        }
+                        if !matched {
+                            matched = self
+                                .nl_eval_parsing(
+                                    &alloc_v,
+                                    &s,
+                                    sc_l,
+                                    &mut alloc_rc,
+                                    "nl",
+                                    &mut alloc_prev_rc,
+                                )
+                                .unwrap();
+                        }
+                        if !matched {
+                            self.default_parsing(&s, &alloc_v, &mut last_state).unwrap();
+                        }
+                    }
+                }
+
+                self.nl_eval_fiatshamir(
+                    cs,
+                    "nl",
+                    sc_l,
+                    num_cqs,
+                    &alloc_qs,
+                    &alloc_vs,
+                    &alloc_prev_rc,
+                    &alloc_rc,
+                    &alloc_claim_r,
+                    &alloc_gs,
+                    self.commit_blind,
+                )?;
+                self.eval_merkle(cs, &alloc_cursors, &alloc_chars)?;
+
+                out.push(last_state.unwrap());
+                for qv in alloc_rc {
+                    out.push(qv.unwrap());
+                }
+                out.push(alloc_stack_ptr_popped.unwrap());
+                for si in alloc_stack_out {
+                    out.push(si.unwrap());
+                }
+                out.push(last_cursor.unwrap());
+            }
         }
 
         for (i, (a, b, c)) in self.r1cs.constraints.iter().enumerate() {
@@ -1079,4 +1466,35 @@ where
 
         Ok(out)
     }
+}
+
+// HELPER
+
+// ret = if condition, a, else b
+// condition already asserted to be 0 or 1
+fn select<F, CS>(
+    cs: &mut CS,
+    cond: AllocatedNum<F>,
+    a: AllocatedNum<F>,
+    b: AllocatedNum<F>,
+    tag: &String,
+) -> Result<AllocatedNum<F>, SynthesisError>
+where
+    F: PrimeField,
+    CS: ConstraintSystem<F>,
+{
+    let ret = AllocatedNum::alloc(cs.namespace(|| format!("ret {}", tag)), || {
+        Ok(b.get_value().unwrap()
+            + cond.get_value().unwrap() * (a.get_value().unwrap() - b.get_value().unwrap()))
+    })?;
+
+    // RET = B + COND * (A - B) <- ite
+    cs.enforce(
+        || format!("ite {}", tag),
+        |lc| lc + a.get_variable() - b.get_variable(),
+        |lc| lc + cond.get_variable(),
+        |lc| lc + ret.get_variable() - b.get_variable(),
+    );
+
+    return Ok(ret);
 }
