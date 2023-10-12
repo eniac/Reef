@@ -73,6 +73,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         merkle: bool,
         pcs: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
+        assert!(doc.len() > 0);
+
         // character conversions
         let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
         let mut i = 0;
