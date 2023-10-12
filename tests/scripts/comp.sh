@@ -1,8 +1,8 @@
 cargo clean 
-cargo build --release --features 'metrics,reef'
-echo "reef"
-./tests/scripts/reef.sh &> out_reef
- echo "end reef"
+#cargo build --release --features 'metrics,reef'
+#echo "reef"
+#./tests/scripts/reef.sh &> out_reef
+# echo "end reef"
 
 # echo "reef h"
 # ./tests/scripts/reef_h.sh &> out_rh 
