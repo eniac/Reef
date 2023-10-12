@@ -284,10 +284,7 @@ fn setup<'a>(
         ];
         z.append(&mut vec![<G1 as Group>::Scalar::zero(); hq_len]);
         let d = calc_d(
-            &[
-                <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
-                hash_salt,
-            ],
+            &[int_to_ff(r1cs_converter.table[0].clone()), hash_salt],
             &r1cs_converter.pc,
         );
         z.push(d);
