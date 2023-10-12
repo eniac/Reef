@@ -57,6 +57,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub doc_rc_v: Option<Integer>,
     // proj
     pub doc_subset: Option<(usize, usize)>,
+    pub proj_chunk_idx: Option<Vec<usize>>,
     // hybrid
     pub hybrid_len: Option<usize>,
     // merkle
@@ -364,6 +365,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             stack.push((0, kid_padding));
         }
 
+        let mut proj_chunk_idx = None;
         let doc_subset = if projection.is_some() {
             if (usize_doc.len().next_power_of_two() <= table.len()) && hybrid {
                 panic!(
@@ -409,6 +411,25 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             } else {
                 println!("USING PROJECTION {:#?}", ((start, end)));
                 println!("DOC LEN {:#?}", usize_doc.len());
+
+                // calculate chunk idx
+                let chunk_size = end - start;
+                assert!(start % chunk_size == 0);
+
+                let num_chunks = usize_doc.len().next_power_of_two() / chunk_size;
+                let mut chunk_idx = start / chunk_size;
+
+                let mut chunk_idx_vec = vec![];
+                for _i in 0..logmn(num_chunks) {
+                    chunk_idx_vec.push(chunk_idx % 2);
+                    chunk_idx = chunk_idx >> 1;
+                }
+
+                chunk_idx_vec = chunk_idx_vec.into_iter().rev().collect();
+
+                //println!("CHUNK IDX {:#?}", chunk_idx_vec);
+                proj_chunk_idx = Some(chunk_idx_vec);
+
                 Some((start, end)) // handle doc extension TODO?
             }
         } else {
@@ -462,6 +483,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             pc: pcs,
             doc_rc_v: Some(Integer::from(1)), // Convert back to none later
             doc_subset,
+            proj_chunk_idx,
             hybrid_len,
             merkle,
         }
@@ -2689,7 +2711,6 @@ mod tests {
             assert_eq!(next_state, r1cs_converter.exit_state);
 
             let doc_len = r1cs_converter.udoc.len();
-            let proj_len = r1cs_converter.doc_len();
 
             if reef_commit.nldoc.is_some() {
                 let (priv_rq, priv_rv) = if !hybrid {
@@ -2704,7 +2725,7 @@ mod tests {
                 let dc = reef_commit.nldoc.unwrap();
                 let consist_proof = dc.prove_consistency(
                     &r1cs_converter.table,
-                    proj_len,
+                    r1cs_converter.proj_chunk_idx,
                     priv_rq,
                     priv_rv,
                     r1cs_converter.doc_subset.is_some(),
@@ -2751,6 +2772,21 @@ mod tests {
     fn ab(s: &str) -> String {
         let mut a = s.to_string();
         a
+    }
+
+    #[test]
+    fn sub_proj() {
+        init();
+        test_func_no_hash(
+            ab("abcd"),
+            reg("^................aaaaaa$"),
+            ab("ddddddddddddddddaaaaaa"),
+            vec![2], // 2],
+            true,
+            Some(16),
+            false,
+            false,
+        );
     }
 
     #[test]

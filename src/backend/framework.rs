@@ -36,6 +36,7 @@ struct ProofInfo {
     table: Vec<Integer>,
     doc_len: usize,
     proj_doc_len: usize,
+    proj_chunk_idx: Option<Vec<usize>>,
     exit_state: usize,
     projections: bool,
     hybrid_len: Option<usize>,
@@ -182,6 +183,7 @@ pub fn run_backend(
                 table: r1cs_converter.table.clone(),
                 doc_len: r1cs_converter.udoc.len(),     // real
                 proj_doc_len: r1cs_converter.doc_len(), // projected
+                proj_chunk_idx: r1cs_converter.proj_chunk_idx.clone(),
                 exit_state: r1cs_converter.exit_state,
                 projections: r1cs_converter.doc_subset.is_some(),
                 hybrid_len: r1cs_converter.hybrid_len,
@@ -760,7 +762,7 @@ fn prove_and_verify(
         //Doc dot prod and consistency
         let cp = dc.prove_consistency(
             &proof_info.table,
-            proof_info.proj_doc_len,
+            proof_info.proj_chunk_idx,
             q,
             v,
             proof_info.projections,
@@ -918,6 +920,19 @@ mod tests {
             projections,
             hybrid,
             merkle,
+        );
+    }
+
+    #[test]
+    fn e2e_sub_proj() {
+        backend_test(
+            "abcd".to_string(),
+            "^................aaaaaa$".to_string(),
+            ("ddddddddddddddddaaaaaa".to_string()).chars().collect(),
+            0,
+            true,
+            false,
+            false,
         );
     }
 

@@ -196,7 +196,7 @@ impl NLDocCommitment {
     pub fn prove_consistency(
         &self,
         table: &Vec<Integer>,
-        proj_doc_len: usize,
+        proj_chunk_idx: Option<Vec<usize>>,
         q: Vec<Integer>, //<G1 as Group>::Scalar>,
         v: Integer,      //<G1 as Group>::Scalar,
         proj: bool,
@@ -209,7 +209,7 @@ impl NLDocCommitment {
         let cap_z = vec![cap_d];
 
         let (ipa, running_q, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
-            self.proof_dot_prod_prover(q_ff, v_ff, proj_doc_len, proj, hybrid);
+            self.proof_dot_prod_prover(q_ff, v_ff, proj_chunk_idx, proj, hybrid);
 
         println!("post proof dot prod prover");
         let (t_vp_gens, hybrid_ipi, hybrid_ipa) = if !hybrid {
@@ -270,7 +270,7 @@ impl NLDocCommitment {
         &self,
         q: Vec<<G1 as Group>::Scalar>,
         running_v: <G1 as Group>::Scalar,
-        proj_doc_len: usize,
+        proj_chunk_idx: Option<Vec<usize>>,
         proj: bool,
         hybrid: bool,
     ) -> (
@@ -284,7 +284,7 @@ impl NLDocCommitment {
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
-        println!("Q IN {:#?}", q.clone());
+        //println!("Q IN {:#?}", q.clone());
 
         // hybrid
         let q_hybrid = if !hybrid {
@@ -297,13 +297,18 @@ impl NLDocCommitment {
             q_prime
         };
 
-        println!("HYBRID Q {:#?}", q_hybrid.clone());
+        //println!("HYBRID Q {:#?}", q_hybrid.clone());
 
         // println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
         let running_q: Vec<<G1 as Group>::Scalar> = if proj {
-            let mut q_add = proj_prefix(proj_doc_len, self.doc_len);
+            let mut q_add: Vec<<G1 as Group>::Scalar> = proj_chunk_idx
+                .unwrap()
+                .into_iter()
+                .map(|x| <G1 as Group>::Scalar::from(x as u64))
+                .collect();
+
             q_add.extend(q_hybrid);
-            println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
+            //println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
             q_add
         } else {
             q_hybrid
@@ -529,29 +534,6 @@ pub fn final_clear_checks(
             (Integer::from_digits(v.to_repr().as_ref(), Order::Lsf))
         );
     }
-}
-
-fn proj_prefix(proj_doc_len: usize, doc_ext_len: usize) -> Vec<<G1 as Group>::Scalar> {
-    // what's s?
-    let chunk_size = proj_doc_len;
-    let start = doc_ext_len - proj_doc_len;
-    assert!(start % chunk_size == 0);
-
-    let num_chunks = doc_ext_len / chunk_size;
-
-    let mut start_idx = start / chunk_size;
-
-    // println!(
-    //     "chunk size {}, num chunks {}, s = {}",
-    //     chunk_size, num_chunks, start_idx
-    // );
-
-    let mut q_add = vec![];
-    for _i in 0..logmn(num_chunks) {
-        q_add.push(<G1 as Group>::Scalar::from((start_idx % 2) as u64));
-        start_idx = start_idx >> 1;
-    }
-    q_add
 }
 
 #[derive(Clone)]
