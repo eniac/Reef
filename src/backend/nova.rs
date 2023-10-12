@@ -426,24 +426,6 @@ where {
                 || Ok(tree_wits[i][0].opposite),
             )?;
 
-            let mut query = vec![];
-            if tree_wits[i][0].l_or_r {
-                query.push(Elt::Allocated(alloc_cursors[i].clone().unwrap()));
-                query.push(Elt::Allocated(alloc_chars[i].clone().unwrap()));
-                query.push(Elt::Allocated(w0));
-                query.push(Elt::Allocated(w1));
-            } else {
-                query.push(Elt::Allocated(w0));
-                query.push(Elt::Allocated(w1));
-                query.push(Elt::Allocated(alloc_cursors[i].clone().unwrap()));
-                query.push(Elt::Allocated(alloc_chars[i].clone().unwrap()));
-            }
-
-            let left_hash =
-                self.merkle_circuit(cs, &query, &format!("left leaf hash batch {}", i))?;
-            let right_hash =
-                self.merkle_circuit(cs, &query, &format!("right leaf hash batch {}", i))?;
-
             let lr_var = if tree_wits[i][0].l_or_r {
                 F::one()
             } else {
@@ -454,13 +436,48 @@ where {
                     Ok(lr_var)
                 })?;
 
-            let mut hash = select(
+            let mut query = vec![];
+            let e0 = select(
+                cs,
+                lr.clone(),
+                alloc_cursors[i].clone().unwrap().clone(),
+                w0.clone(),
+                &format!("leaf 0 batch {}", i),
+            )?;
+            //println!("e: {:#?}", e0.clone().get_value());
+            query.push(Elt::Allocated(e0));
+
+            let e1 = select(
+                cs,
+                lr.clone(),
+                alloc_chars[i].clone().unwrap().clone(),
+                w1.clone(),
+                &format!("leaf 1 batch {}", i),
+            )?;
+            //println!("e: {:#?}", e1.clone().get_value());
+            query.push(Elt::Allocated(e1));
+
+            let e2 = select(
+                cs,
+                lr.clone(),
+                w0,
+                alloc_cursors[i].clone().unwrap(),
+                &format!("leaf 2 batch {}", i),
+            )?;
+            //println!("e: {:#?}", e2.clone().get_value());
+            query.push(Elt::Allocated(e2));
+
+            let e3 = select(
                 cs,
                 lr,
-                left_hash,
-                right_hash,
-                &format!("l or r leaf batch {}", i),
+                w1,
+                alloc_chars[i].clone().unwrap(),
+                &format!("leaf 3 batch {}", i),
             )?;
+            //println!("e: {:#?}", e3.clone().get_value());
+            query.push(Elt::Allocated(e3));
+
+            let mut hash = self.merkle_circuit(cs, &query, &format!("leaf hash batch {}", i))?;
 
             // non leaf
             for h in 1..tree_wits[i].len() {
@@ -468,20 +485,6 @@ where {
                     cs.namespace(|| format!("filler witness batch {} lvl {}", i, h)),
                     || Ok(tree_wits[i][h].opposite),
                 )?;
-
-                let mut query = vec![];
-                if tree_wits[i][h].l_or_r {
-                    query.push(Elt::Allocated(hash));
-                    query.push(Elt::Allocated(w));
-                } else {
-                    query.push(Elt::Allocated(w));
-                    query.push(Elt::Allocated(hash));
-                }
-
-                let left_hash =
-                    self.merkle_circuit(cs, &query, &format!("left hash batch {} lvl {}", i, h))?;
-                let right_hash =
-                    self.merkle_circuit(cs, &query, &format!("right hash batch {} lvl {}", i, h))?;
 
                 let lr_var = if tree_wits[i][h].l_or_r {
                     F::one()
@@ -493,19 +496,29 @@ where {
                     || Ok(lr_var),
                 )?;
 
-                hash = select(
+                let mut query = vec![];
+
+                let e0 = select(
                     cs,
-                    lr,
-                    left_hash,
-                    right_hash,
-                    &format!("l or r batch {} lvl {}", i, h),
+                    lr.clone(),
+                    hash.clone(),
+                    w.clone(),
+                    &format!("left batch {} lvl {}", i, h),
                 )?;
+                //println!("e: {:#?}", e0.clone().get_value());
+                query.push(Elt::Allocated(e0));
+                let e1 = select(cs, lr, w, hash, &format!("right batch {} lvl {}", i, h))?;
+                //println!("e: {:#?}", e1.clone().get_value());
+                query.push(Elt::Allocated(e1));
+
+                hash = self.merkle_circuit(cs, &query, &format!("hash batch {} lvl {}", i, h))?;
             }
 
             //sanity
             if hash.get_value().is_some() {
                 assert_eq!(hash.get_value().unwrap(), self.merkle_commit);
             }
+
             cs.enforce(
                 || format!("eq merkle lookup {}", i),
                 |z| z + hash.get_variable(),
