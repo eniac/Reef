@@ -438,7 +438,11 @@ fn solve<'a>(
     let mut sols = trace_preprocessing(&trace);
     //end safa solve
 
-    let commit_blind = r1cs_converter.doc_hash.unwrap();
+    let commit_blind = if r1cs_converter.doc_hash.is_some() {
+        r1cs_converter.doc_hash.unwrap()
+    } else {
+        <G1 as Group>::Scalar::zero()
+    };
 
     let mut i = 0;
     while r1cs_converter.sol_num < sols.len() {
@@ -481,7 +485,7 @@ fn solve<'a>(
 
         // TODO
         // just for debugging :)
-        //circ_data.check_all(&wits);
+        circ_data.check_all(&wits);
 
         let sp_0 = <G1 as Group>::Scalar::from(stack_ptr_0 as u64);
         let spp = <G1 as Group>::Scalar::from(stack_ptr_popped as u64);
@@ -614,7 +618,7 @@ fn solve<'a>(
         if merkle_commit.is_some() {
             let mc = merkle_commit.as_ref().unwrap();
             (merkle_root, merkle_wits) =
-                (mc.commitment, Some(mc.make_wits(merkle_lookups.unwrap())));
+                (mc.commitment, Some(mc.make_wits(&merkle_lookups.unwrap())));
         }
 
         let circuit_primary: NFAStepCircuit<<G1 as Group>::Scalar> = NFAStepCircuit::new(
@@ -710,7 +714,7 @@ fn prove_and_verify(
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Prover, "prove", format!("prove_{}", i).as_str());
-        /*
+
         // verify recursive - TODO we can get rid of this verify once everything works
         // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
         let res = result.clone().unwrap().verify(
@@ -722,7 +726,7 @@ fn prove_and_verify(
         println!("Recursive res: {:#?}", res);
 
         assert!(res.is_ok()); // TODO delete
-        */
+
         recursive_snark = Some(result.unwrap());
 
         i += 1;

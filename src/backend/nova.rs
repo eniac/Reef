@@ -502,6 +502,10 @@ where {
                 )?;
             }
 
+            //sanity
+            if hash.get_value().is_some() {
+                assert_eq!(hash.get_value().unwrap(), self.merkle_commit);
+            }
             cs.enforce(
                 || format!("eq merkle lookup {}", i),
                 |z| z + hash.get_variable(),
