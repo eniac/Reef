@@ -844,3 +844,23 @@ compiler,R1CS,Size,67472,constraints
 prover,Proof Size,Spartan SNARK size,77134,bytes
 Message-ID_1000,"^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$",129664,1013
 ---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+solver,DFA Solving,Clear Match,33475997,μs
+compiler,R1CS,Circom,23551202831,μs
+compiler,DFA,DFA,426983240,μs
+compiler,R1CS,Commitment Gen,48921,μs
+Component,test,subtest,metric,metric_type
+solver,DFA Solving,Clear Match,33475997,μs
+compiler,R1CS,Circom,23551202831,μs
+compiler,R1CS,Loading,170439,μs
+compiler,DFA,DFA,426983240,μs
+compiler,R1CS,Commitment Gen,48921,μs
+Component,test,subtest,metric,metric_type
+solver,Witness,Compute,251205485,μs
+solver,DFA Solving,Clear Match,33475997,μs
+compiler,R1CS,Circom,23551202831,μs
+compiler,R1CS,Loading,170439,μs
+compiler,R1CS,Public Params,12543884,μs
+compiler,DFA,DFA,426983240,μs
+compiler,R1CS,Commitment Gen,48921,μs
+compiler,R1CS,Size,141712,constraints
