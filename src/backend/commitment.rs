@@ -26,11 +26,14 @@ use nova_snark::{
         pedersen::{Commitment, CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
-    spartan::direct::{SpartanProverKey, SpartanSNARK, SpartanVerifierKey},
-    spartan::polynomial::{EqPolynomial, MultilinearPolynomial},
+    spartan::{
+        direct::{SpartanProverKey, SpartanSNARK, SpartanVerifierKey},
+        nizk::EqualityProof,
+        polynomial::{EqPolynomial, MultilinearPolynomial},
+    },
     traits::{
         circuit::StepCircuit, commitment::*, evaluation::GetGeneratorsTrait, AbsorbInROTrait,
-        Group, ROConstantsTrait, ROTrait,
+        AppendToTranscriptTrait, ChallengeTrait, Group, ROConstantsTrait, ROTrait,
     },
     StepCounterType,
 };
@@ -76,7 +79,7 @@ pub struct ConsistencyProof {
     ipa: InnerProductArgument<G1>,
     running_q: Vec<<G1 as Group>::Scalar>,
     // eq proof
-    eq_proof: EqualityProof<G1>,
+    eq_proof: Option<EqualityProof<G1>>,
     l_commit: Option<Commitment<G1>>,
 }
 
@@ -214,25 +217,23 @@ impl NLDocCommitment {
             self.proof_dot_prod_prover(q_ff, v_ff, proj_chunk_idx, proj, hybrid);
 
         println!("post proof dot prod prover");
-        let (t_vp_gens, hybrid_ipi, hybrid_ipa) = if !hybrid {
-            (None, None, None)
+        let (eq_proof, l_commit) = if !hybrid {
+            (None, None)
         } else {
             // calculate t
             let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
             let t = int_to_ff(verifier_mle_eval(table, q_prime));
             let q0 = int_to_ff(q[0].clone());
 
-            let (gens, ipi, ipa) = self.proof_hybrid_combo(
+            let (eq_proof, l_commit) = self.proof_hybrid_combo(
                 t,
                 q0,
-                v_ff,
                 v_commit,
                 v_decommit,
-                v_prime,
                 v_prime_commit.unwrap(),
                 v_prime_decommit.unwrap(),
             );
-            (Some(gens), Some(ipi), Some(ipa))
+            (Some(eq_proof), Some(l_commit))
         };
 
         // CAP circuit
@@ -262,9 +263,8 @@ impl NLDocCommitment {
             v_prime_commit,
             ipa,
             running_q,
-            t_vp_gens,
-            hybrid_ipi,
-            hybrid_ipa,
+            eq_proof,
+            l_commit,
         };
     }
 
@@ -371,13 +371,11 @@ impl NLDocCommitment {
         &self,
         t: <G1 as Group>::Scalar,
         q0: <G1 as Group>::Scalar,
-        v: <G1 as Group>::Scalar,
         v_commit: Commitment<G1>,
         v_decommit: <G1 as Group>::Scalar,
-        v_prime: <G1 as Group>::Scalar,
         v_prime_commit: Commitment<G1>,
         v_prime_decommit: <G1 as Group>::Scalar,
-    ) -> (EqualityProof<G1>,) {
+    ) -> (EqualityProof<G1>, l_commit) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
         // make new commitment to LHS
@@ -387,7 +385,7 @@ impl NLDocCommitment {
         // rolled into below
 
         // C[(1-q0) * t] = g_0^((1-q0) * t) * h^b2
-        let q0_t_decommit = G::Scalar::random(&mut OsRng);
+        let q0_t_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
         let q0_t_commit = <G1 as Group>::CE::commit(
             &self.single_gens,
             &[(<G1 as Group>::Scalar::from(1) - q0) * t],
@@ -396,32 +394,33 @@ impl NLDocCommitment {
 
         // C[(1-q0) * t + q0 * v'] = C[q0 * v'] * C[(1-q0) * t] = g_0^LHS * h^(b*q0+b2)
         let l_commit = <G1 as Group>::vartime_multiscalar_mul(
-            &[q0, F::from(1)],
+            &[q0, <G1 as Group>::Scalar::from(1)],
             &[v_prime_commit.comm, q0_t_commit],
         );
 
         // innards of function
-        p_transcript.append_message(b"protocol-name", EqualityProof::<G>::protocol_name());
+        p_transcript.append_message(b"protocol-name", EqualityProof::<G1>::protocol_name());
 
         // produce a random scalar
         let r = <G1 as Group>::Scalar::random(&mut OsRng);
 
-        l_commit.append_to_transcript(b"C1", transcript);
-        v_commit.append_to_transcript(b"C2", transcript);
+        l_commit.append_to_transcript(b"C1", &mut p_transcript);
+        v_commit.append_to_transcript(b"C2", &mut p_transcript);
 
         let alpha =
-            <G1 as Group>::CE::commit(&self.single_gens, &[G::Scalar::zero()], &r).compress(); // h^r
-        alpha.append_to_transcript(b"alpha", transcript);
+            <G1 as Group>::CE::commit(&self.single_gens, &[<G1 as Group>::Scalar::zero()], &r)
+                .compress(); // h^r
+        alpha.append_to_transcript(b"alpha", &mut p_transcript);
 
-        let c = <G1 as Group>::Scalar::challenge(b"c", transcript);
+        let c = <G1 as Group>::Scalar::challenge(b"c", &mut p_transcript);
 
         let z = c * (*l_decommit - *v_decommit) + r;
 
-        EqualityProof { alpha, z }
+        (EqualityProof { alpha, z }, l_commit)
     }
 
     pub fn verify_consistency(&self, proof: ConsistencyProof) {
-        if proof.eq_gens.is_some() && proof.l_commit.is_some() && proof.v_prime_commit.is_some() {
+        if proof.eq_proof.is_some() && proof.l_commit.is_some() && proof.v_prime_commit.is_some() {
             assert!(self
                 .proof_dot_prod_verify(&proof.ipa, &proof.running_q, proof.v_prime_commit.unwrap())
                 .is_ok());
@@ -429,7 +428,7 @@ impl NLDocCommitment {
             // equality proof C_l = C[v_r]
             let mut v_transcript = Transcript::new(b"vs_vr_proof");
             let res = eq_proof.verify(
-                proof.eq_gens.unwrap(),
+                self.single_gens,
                 &mut v_transcript,
                 proof.l_commit.unwrap(),
                 proof.v_commit,
