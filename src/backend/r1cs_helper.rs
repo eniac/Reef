@@ -380,16 +380,22 @@ pub(crate) fn calc_rel<'a>(
 
             rel = 4;
             for k in 1..children.len() {
-                rel += children[k] * base.pow(k as u32);
+                rel += children[children.len() - k] * base.pow(k as u32);
+                println!("calc children {:#?}", children[children.len() - k]);
+                println!("calc multiplier {:#?}", base.pow(k as u32));
             }
             for k in children.len()..(max_branches + 1) {
                 rel += kid_padding * base.pow(k as u32);
+                println!("calc children {:#?}", kid_padding);
+                println!("calc multiplier {:#?}", base.pow(k as u32));
             }
         } else {
             // others are pops
             rel = 3;
         }
     }
+
+    //println!("REL CALCULATED: {:#?}", rel);
 
     rel
 }

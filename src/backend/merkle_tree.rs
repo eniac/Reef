@@ -14,7 +14,6 @@ pub struct MerkleCommitment<F: PrimeField> {
     pub commitment: F,
     tree: Vec<Vec<F>>,
     doc: Vec<F>,
-    pc: PoseidonConstants<F, typenum::U4>,
 }
 
 #[derive(Debug, Clone)]
@@ -77,7 +76,6 @@ impl<F: PrimeField> MerkleCommitment<F> {
             commitment: next_level[0],
             tree,
             doc: doc_f,
-            pc: pc.clone(),
         }
     }
 

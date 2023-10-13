@@ -779,6 +779,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut hashed_state_var = new_const(4);
         let states_bit_limit = logmn(self.num_states);
         for k in 0..self.max_branches {
+            println!("multiplier {:#?}", self.num_states.pow((k + 1) as u32));
+
             hashed_state_var = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
@@ -823,8 +825,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // get kids from rel_i hash
         let hashed_state_var = self.hashed_push_rel();
-
         let hashed_kids_eq = term(Op::Eq, vec![hashed_state_var, new_var(format!("rel_0"))]);
+
         let lmtd_push_cond = term(
             Op::Not,
             vec![term(
@@ -1023,6 +1025,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     fn cursor_circuit(&mut self) {
         for j in 0..self.batch_size {
+            self.pub_inputs.push(new_var(format!("cursor_{}", j)));
+
             let cursor_plus = term(
                 Op::Eq,
                 vec![
@@ -1037,7 +1041,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
             self.assertions.push(cursor_plus);
-            self.pub_inputs.push(new_var(format!("cursor_{}", j)));
 
             let bit_limit = logmn(max(self.udoc.len(), self.max_offsets));
             let cur_overflow = term(
@@ -1178,10 +1181,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let c0 = term(
                     Op::Ite,
                     vec![
-                        term(
-                            Op::BoolNaryOp(BoolNaryOp::And),
-                            vec![term(Op::Not, vec![self.not_forall_circ(0)]), pop_condition],
-                        ),
+                        pop_condition,
                         term(
                             Op::Eq,
                             vec![
@@ -1198,7 +1198,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 self.assertions.push(c0);
             } else {
                 // assert not forall
-
                 self.assertions.push(self.not_forall_circ(j));
             }
         }
@@ -1595,9 +1594,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("cursor_popped"), new_wit(popped_elt.0));
         wits.insert(format!("cursor_0"), new_wit(popped_elt.0));
-
         // after pop
         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
+
+        println!("POPPED CUR {:#?}, SPP {:#?}", popped_elt.0, self.stack_ptr);
 
         // return cursor
         popped_elt.0
@@ -1606,6 +1606,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // TODO if not forall, pad wits
     //
     fn stack_set(&mut self, wits: &mut FxHashMap<String, Value>, b: usize, push: bool) {
+        //println!("STACK WITS lvl {}: {:#?}", b, self.stack);
+
         for i in 0..self.max_stack {
             wits.insert(
                 format!("stack_{}_{}", b, i),
@@ -1653,6 +1655,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.stack_set(wits, b, true);
             self.stack_ptr += 1;
 
+            println!("WIT KID {:#?}", kid);
+
             wits.insert(format!("forall_0_kid_{}", b - 1), new_wit(kid));
 
             b += 1;
@@ -1664,6 +1668,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
         for pad_kid in pad_kids {
             self.stack_set(wits, b, false);
+
+            println!("WIT KID {:#?}", pad_kid);
 
             wits.insert(format!("forall_0_kid_{}", b - 1), new_wit(pad_kid));
             b += 1;
@@ -1931,9 +1937,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     // fill stack vars with padding
                     self.push_wit(&mut wits, None, cursor_i);
                     // pad out "popped" vars, since there's no pop
+                    println!("NOT FORALL PADDING");
                     wits.insert(format!("cursor_popped"), new_wit(cursor_i));
-                    wits.insert(format!("cursor_0"), new_wit(cursor_i));
                     wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
+                    wits.insert(format!("cursor_0"), new_wit(cursor_0));
                 }
 
                 offset_i = 0;
@@ -1979,13 +1986,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             // pushed
                             self.push_wit(&mut wits, Some(te_peek.from_node), cursor_i);
                             // pad pop
+                            println!("FORALL PUSH");
                             wits.insert(format!("cursor_popped"), new_wit(cursor_i));
-                            wits.insert(format!("cursor_0"), new_wit(cursor_i));
                             wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
+                            wits.insert(format!("cursor_0"), new_wit(cursor_0));
                         } else {
                             // pad push
                             self.push_wit(&mut wits, None, cursor_i);
                             // popped
+                            println!("REAL POP WITS");
                             cursor_i = self.pop_wit(&mut wits);
                         }
                     } else {
@@ -2014,9 +2023,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         // fill stack vars with padding
                         self.push_wit(&mut wits, None, cursor_i);
                         // pad out "popped" vars, since there's no pop
+                        println!("NOT FORALL PAD");
                         wits.insert(format!("cursor_popped"), new_wit(cursor_i));
-                        wits.insert(format!("cursor_0"), new_wit(cursor_i));
                         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
+                        wits.insert(format!("cursor_0"), new_wit(cursor_0));
                     }
                 }
 
@@ -2046,6 +2056,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i,
                         rel_i, i,
                     ));
+
+                    println!("REL_{}: {:#?}", i, rel_i);
 
                     i += 1;
                 }
@@ -2405,7 +2417,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         );
 
         // sanity check - TODO eliminate
-        let (_, eq_term) = prover_mle_partial_eval(
+        /*let (_, eq_term) = prover_mle_partial_eval(
             &rs,
             &sc_rs, //.into_iter().rev().collect(),
             &q,
@@ -2415,7 +2427,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         assert_eq!(
             last_claim,
             (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
-        );
+        );*/
+
         (wits, next_running_q, next_running_v)
     }
 }
