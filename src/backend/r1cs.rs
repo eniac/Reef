@@ -376,24 +376,40 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             let real_start = projection.unwrap();
+            println!("real start {}", real_start);
             let real_len = orig_len - real_start;
 
-            let chunk_len = real_len.next_power_of_two();
-            let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
-
+            let mut chunk_len = usize_doc.len().next_power_of_two() / 2;
+            let mut e = usize_doc.len().next_power_of_two();
+            let mut s = 0;
+            let mut end = e;
             let mut start = 0;
-            while start + chunk_len <= real_start {
-                start += chunk_len;
+
+            while e >= orig_len {
+                println!("CHUNK LEN {}, e {}, s {}", chunk_len, e, s);
+                end = e;
+                start = s;
+
+                s = 0;
+                while s + chunk_len <= real_start {
+                    s += chunk_len;
+                }
+                println!("found start {}", s);
+                e = s + chunk_len;
+                assert!(end <= usize_doc.len().next_power_of_two());
+
+                // try to go smaller
+                chunk_len = chunk_len / 2
             }
 
-            let end = start + chunk_len;
-
+            chunk_len = end - start;
+            assert!(chunk_len.next_power_of_two() == chunk_len);
             println!(
                 "START {:#?}, END {:#?}, NEW END {:#?}",
                 start, orig_len, end
             );
 
-            assert!(start < orig_len);
+            assert!(start <= real_start);
             assert!(end >= orig_len);
             assert!(start % chunk_len == 0);
 
@@ -408,8 +424,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 println!("USING PROJECTION {:#?}", ((start, end)));
 
                 // calculate chunk idx
+                let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
+                println!("Num chunks {}", num_chunks);
                 let mut chunk_idx = start / chunk_len;
-
+                println!("chunk_idx {}", chunk_idx);
                 let mut chunk_idx_vec = vec![];
                 for _i in 0..logmn(num_chunks) {
                     chunk_idx_vec.push(chunk_idx % 2);
@@ -419,6 +437,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 chunk_idx_vec = chunk_idx_vec.into_iter().rev().collect();
 
                 proj_chunk_idx = Some(chunk_idx_vec);
+                println!("chunk idx {:#?}", proj_chunk_idx);
 
                 Some((start, end)) // handle doc extension TODO?
             }
@@ -982,10 +1001,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             Op::Ite,
             vec![
                 pop_condition,
-                term(
+                cursor_overflow,
+                /*term(
                     Op::BoolNaryOp(BoolNaryOp::And),
                     vec![cursor_overflow, inside_ite],
-                ),
+                ), JESS TODO */
                 stack_ptr_same,
             ],
         )
@@ -1126,10 +1146,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             if j == 0 {
                 // PUSH
                 // if in_state \in forall - only first
-                let push_stmt = self.push_stack_circuit();
+                let push_stmt = new_bool_const(true); //self.push_stack_circuit();
 
                 // POP
                 // cursor = pop stack
+                // this is the prob? TODO JESS
                 let pop_stmt = self.pop_stack_circuit();
 
                 let mut inside_ite = new_bool_const(true);
