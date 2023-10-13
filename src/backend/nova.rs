@@ -261,7 +261,6 @@ where {
             return Ok(true);
         } else if s.starts_with(&format!("cursor_{}", self.batch_size)) {
             //, self.batch_size)) {
-            //println!("CURSOR {:#?}", s);
             *last_cursor = Some(alloc_v.clone());
             return Ok(true);
         }
@@ -276,7 +275,6 @@ where {
     ) -> Result<(), SynthesisError>
 where {
         if s.starts_with(&format!("state_{}", self.batch_size)) {
-            //println!("LAST STATE");
             *last_state = Some(alloc_v.clone()); //.get_variable();
         }
         Ok(())
@@ -444,7 +442,6 @@ where {
                 w0.clone(),
                 &format!("leaf 0 batch {}", i),
             )?;
-            //println!("e: {:#?}", e0.clone().get_value());
             query.push(Elt::Allocated(e0));
 
             let e1 = select(
@@ -454,7 +451,6 @@ where {
                 w1.clone(),
                 &format!("leaf 1 batch {}", i),
             )?;
-            //println!("e: {:#?}", e1.clone().get_value());
             query.push(Elt::Allocated(e1));
 
             let e2 = select(
@@ -464,7 +460,6 @@ where {
                 alloc_cursors[i].clone().unwrap(),
                 &format!("leaf 2 batch {}", i),
             )?;
-            //println!("e: {:#?}", e2.clone().get_value());
             query.push(Elt::Allocated(e2));
 
             let e3 = select(
@@ -474,7 +469,6 @@ where {
                 alloc_chars[i].clone().unwrap(),
                 &format!("leaf 3 batch {}", i),
             )?;
-            //println!("e: {:#?}", e3.clone().get_value());
             query.push(Elt::Allocated(e3));
 
             let mut hash = self.merkle_circuit(cs, &query, &format!("leaf hash batch {}", i))?;
@@ -505,10 +499,8 @@ where {
                     w.clone(),
                     &format!("left batch {} lvl {}", i, h),
                 )?;
-                //println!("e: {:#?}", e0.clone().get_value());
                 query.push(Elt::Allocated(e0));
                 let e1 = select(cs, lr, w, hash, &format!("right batch {} lvl {}", i, h))?;
-                //println!("e: {:#?}", e1.clone().get_value());
                 query.push(Elt::Allocated(e1));
 
                 hash = self.merkle_circuit(cs, &query, &format!("hash batch {} lvl {}", i, h))?;

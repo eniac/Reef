@@ -131,7 +131,6 @@ impl<F: PrimeField> MerkleCommitment<F> {
         assert!(idx < self.doc.len());
         let mut sel_wit = vec![]; // (l_or_r, opposite F)
 
-        println!("idx {:#?}", idx);
         let wit = match idx % 2 {
             0 => {
                 if idx + 1 >= self.doc.len() {
@@ -160,12 +159,10 @@ impl<F: PrimeField> MerkleCommitment<F> {
                 panic!("bad % 2");
             }
         };
-        println!("WIT {:#?}", wit);
         sel_wit.push(wit);
 
         let mut quo = idx / 2;
         for h in 0..(self.tree.len() - 1) {
-            println!("idx {:#?}", quo);
             let wit = match quo % 2 {
                 0 => {
                     if quo + 1 >= self.tree[h].len() {
@@ -191,7 +188,6 @@ impl<F: PrimeField> MerkleCommitment<F> {
                     panic!("bad % 2");
                 }
             };
-            println!("WIT {:#?}", wit);
             sel_wit.push(wit);
             quo = quo / 2;
         }
@@ -223,12 +219,8 @@ mod tests {
 
         let mc = MerkleCommitment::new(&doc, &pc);
 
-        println!("MC {:#?} {:#?}, root:{:#?}", mc.tree, mc.doc, mc.commitment);
-
         let qs = vec![0, 1, 2, 3, 4, 5, 6];
         let tree_wits = mc.make_wits(&qs);
-
-        println!("WITS {:#?}", tree_wits);
 
         for i in 0..qs.len() {
             // leafs
@@ -248,7 +240,6 @@ mod tests {
                 query.push(<G1 as Group>::Scalar::from(doc[qs[i]] as u64));
             }
 
-            println!("HASHING: {:#?}", query);
             let mut hash = hash_children(&query, &pc);
 
             for h in 1..tree_wits[i].len() {
@@ -262,7 +253,6 @@ mod tests {
                     query.push(w);
                     query.push(hash);
                 }
-                println!("HASHING: {:#?}", query);
 
                 hash = hash_children(&query, &pc);
             }
