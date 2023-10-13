@@ -73,8 +73,6 @@ pub(crate) fn trace_preprocessing(trace: &Option<Trace<char>>) -> Vec<LinkedList
             sols.push(sol);
             sol = new_sol;
             i = 0;
-
-            // println!("sols {:#?}, sol {:#?}", sols, sol);
         }
 
         state_i = e.to_node.index();
@@ -381,21 +379,15 @@ pub(crate) fn calc_rel<'a>(
             rel = 4;
             for k in 1..children.len() {
                 rel += children[children.len() - k] * base.pow(k as u32);
-                println!("calc children {:#?}", children[children.len() - k]);
-                println!("calc multiplier {:#?}", base.pow(k as u32));
             }
             for k in children.len()..(max_branches + 1) {
                 rel += kid_padding * base.pow(k as u32);
-                println!("calc children {:#?}", kid_padding);
-                println!("calc multiplier {:#?}", base.pow(k as u32));
             }
         } else {
             // others are pops
             rel = 3;
         }
     }
-
-    //println!("REL CALCULATED: {:#?}", rel);
 
     rel
 }
@@ -510,8 +502,6 @@ pub(crate) fn prover_mle_partial_eval(
     let m = x.len();
 
     if for_t {
-        //println!("prods len : {}", prods.len());
-        //println!("base pow: {}", base.pow(m as u32 - 1));
         assert!(base.pow(m as u32 - 1) <= prods.len());
         assert!(base.pow(m as u32) >= prods.len());
         assert_eq!(es.len(), prods.len()); //todo final q
