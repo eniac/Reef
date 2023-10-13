@@ -54,7 +54,6 @@ pub fn run_backend(
     hybrid: bool,
     merkle: bool,
 ) {
-    println!("hybrid: {}", hybrid);
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
         Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
@@ -304,8 +303,6 @@ fn setup<'a>(
         stack_len
     ]);
     z.push(<G1 as Group>::Scalar::from(0 as u64));
-
-    // println!("Z LEN {:#?}", z.len());
 
     // empty wits
     let merkle_wits = if r1cs_converter.merkle {

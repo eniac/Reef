@@ -355,14 +355,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         usize_doc.push(u);
         int_doc.push(Integer::from(u));
 
-        println!("BEFORE EXT {:#?}", usize_doc.len());
         // extend doc
         let base: usize = 2;
         let orig_len = usize_doc.len();
         let ext_len = base.pow(logmn(usize_doc.len()) as u32) - usize_doc.len();
         usize_doc.extend(vec![0; ext_len]); // ep num = self.nfa.nchars()
         int_doc.extend(vec![Integer::from(0); ext_len]); // ep num = self.nfa.nchars()
-        println!("EXT LEN {:#?}, AFTER EXT {:#?}", ext_len, usize_doc.len());
 
         let mut stack = vec![];
         for _i in 0..max_stack {
@@ -408,7 +406,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 None
             } else {
                 println!("USING PROJECTION {:#?}", ((start, end)));
-                println!("DOC LEN {:#?}", usize_doc.len());
 
                 // calculate chunk idx
                 let mut chunk_idx = start / chunk_len;
@@ -421,7 +418,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 chunk_idx_vec = chunk_idx_vec.into_iter().rev().collect();
 
-                //println!("CHUNK IDX {:#?}", chunk_idx_vec);
                 proj_chunk_idx = Some(chunk_idx_vec);
 
                 Some((start, end)) // handle doc extension TODO?
@@ -671,8 +667,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.assertions.clone(),
             self.pub_inputs.clone(),
         );
-
-        //println!("CS {:#?}", cs);
 
         let mut css = Computations::new();
         css.comps.insert("main".to_string(), cs);
@@ -1460,7 +1454,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 );
             }
 
-            println!("EPSILON LOC {}", epsilon_loc);
             let q_adjust = term(
                 Op::Ite,
                 vec![
@@ -1604,8 +1597,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // after pop
         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
 
-        println!("POPPED CUR {:#?}, SPP {:#?}", popped_elt.0, self.stack_ptr);
-
         // return cursor
         popped_elt.0
     }
@@ -1613,8 +1604,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // TODO if not forall, pad wits
     //
     fn stack_set(&mut self, wits: &mut FxHashMap<String, Value>, b: usize, push: bool) {
-        //println!("STACK WITS lvl {}: {:#?}", b, self.stack);
-
         for i in 0..self.max_stack {
             wits.insert(
                 format!("stack_{}_{}", b, i),
@@ -1988,7 +1977,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             // pushed
                             self.push_wit(&mut wits, Some(te_peek.from_node), cursor_i);
                             // pad pop
-                            println!("FORALL PUSH");
                             wits.insert(format!("cursor_popped"), new_wit(cursor_i));
                             wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                             wits.insert(format!("cursor_0"), new_wit(cursor_0));
@@ -1996,7 +1984,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             // pad push
                             self.push_wit(&mut wits, None, cursor_i);
                             // popped
-                            println!("REAL POP WITS");
                             cursor_i = self.pop_wit(&mut wits);
                         }
                     } else {
@@ -2065,7 +2052,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             state_i = next_state;
         }
 
-        //println!("DONE LOOP");
         println!("'WASTED' SLOTS THIS ITERATION: {}", wasted);
 
         // last state
@@ -2125,8 +2111,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let mut hybrid_table = self.table.clone();
             hybrid_table.append(&mut proj_doc.to_vec());
             hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
-
-            //println!("hybrid table {:#?}", hybrid_table.clone());
 
             let mut hybrid_q = q.clone();
             for qd in doc_q {
@@ -2202,7 +2186,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
         let sc_l = logmn(table.len()); // sum check rounds
-                                       //println!("WITNESS SC ROUNDS {}", sc_l);
 
         let num_vs = v.len();
         assert_eq!(num_vs, q.len());
@@ -2238,13 +2221,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let q_name = format!("{}_eq_{}", id, i);
                 for j in 0..sc_l {
                     let qj = (q[i] >> j) & 1;
-                    /*println!(
-                        "{}_q_{} = {:#?} from {:#?}",
-                        q_name,
-                        (sc_l - 1 - j),
-                        qj.clone(),
-                        q[i].clone()
-                    );*/
                     wits.insert(format!("{}_q_{}", q_name, (sc_l - 1 - j)), new_wit(qj));
                     qjs.push(qj);
                 }
@@ -2273,8 +2249,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 new_wit(combined_qs[cq].clone()),
             );
         }
-
-        //println!("combined_qs {:#?}", combined_qs);
 
         for j in 0..sc_l {
             // running
@@ -2638,7 +2612,6 @@ mod tests {
         for b in batch_sizes {
             let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, merkle, sc.clone());
 
-            println!("doc {:#?}", r1cs_converter.udoc.clone());
             let mut reef_commit = ReefCommitment::new(
                 r1cs_converter.udoc.clone(),
                 r1cs_converter.hybrid_len,
