@@ -142,10 +142,12 @@ impl NLDocCommitment {
             .map(|x| <G1 as Group>::Scalar::from(x as u64))
             .collect();
 
-        doc_ext.append(&mut vec![
-            <G1 as Group>::Scalar::zero();
-            doc_ext_len - doc_ext.len()
-        ]);
+        if doc_ext_len > doc_ext.len() {
+            doc_ext.append(&mut vec![
+                <G1 as Group>::Scalar::zero();
+                doc_ext_len - doc_ext.len()
+            ]);
+        }
         let poly = MultilinearPolynomial::new(doc_ext);
 
         let single_gen = cap_pk.pk.gens.get_scalar_gen();

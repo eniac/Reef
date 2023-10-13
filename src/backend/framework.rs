@@ -484,7 +484,7 @@ fn solve<'a>(
 
         // TODO
         // just for debugging :)
-        circ_data.check_all(&wits);
+        //circ_data.check_all(&wits);
 
         let sp_0 = <G1 as Group>::Scalar::from(stack_ptr_0 as u64);
         let spp = <G1 as Group>::Scalar::from(stack_ptr_popped as u64);

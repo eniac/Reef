@@ -779,8 +779,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut hashed_state_var = new_const(4);
         let states_bit_limit = logmn(self.num_states);
         for k in 0..self.max_branches {
-            println!("multiplier {:#?}", self.num_states.pow((k + 1) as u32));
-
             hashed_state_var = term(
                 Op::PfNaryOp(PfNaryOp::Add),
                 vec![
@@ -1406,7 +1404,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     fn q_ordering_circuit(&mut self, id: &str, doc_len: usize) {
         // q relations
-        for i in 0..(self.batch_size - 1) {
+        let range = if self.hybrid_len.is_some() {
+            self.batch_size..(self.batch_size * 2)
+        } else {
+            0..self.batch_size
+        };
+
+        for i in range {
             // not final q (running claim)
 
             let mut full_q = new_const(0); // dummy
@@ -1429,45 +1433,45 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 next_slot *= Integer::from(2);
             }
 
-            let q_adjust = if self.doc_subset.is_some() {
-                let ds = self.doc_subset.unwrap();
+            let mut idx = i;
+            let mut epsilon_loc = self.ep_num;
+            let mut cursor_term = new_var(format!("cursor_{}", idx));
 
-                term(
-                    Op::Ite,
-                    vec![
-                        term(
-                            Op::Eq,
-                            vec![
-                                new_var(format!("char_{}", i)),
-                                new_const(self.num_ab[&None]),
-                            ],
-                        ),
-                        new_const(self.ep_num - ds.0),
-                        term(
-                            Op::PfNaryOp(PfNaryOp::Add),
-                            vec![
-                                new_var(format!("cursor_{}", i)),
-                                new_const(-1 * (ds.0 as isize)),
-                            ],
-                        ),
-                    ],
-                )
-            } else {
-                term(
-                    Op::Ite,
-                    vec![
-                        term(
-                            Op::Eq,
-                            vec![
-                                new_var(format!("char_{}", i)),
-                                new_const(self.num_ab[&None]),
-                            ],
-                        ),
-                        new_const(self.ep_num),
-                        new_var(format!("cursor_{}", i)),
-                    ],
-                )
+            if self.hybrid_len.is_some() {
+                let len = self.hybrid_len.unwrap() / 2;
+                idx = i - self.batch_size;
+                epsilon_loc += len;
+                cursor_term = new_var(format!("cursor_{}", idx));
+                cursor_term = term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![cursor_term, new_const(len)],
+                );
             };
+
+            if self.doc_subset.is_some() {
+                let ds = self.doc_subset.unwrap();
+                epsilon_loc -= ds.0;
+                cursor_term = term(
+                    Op::PfNaryOp(PfNaryOp::Add),
+                    vec![cursor_term, new_const(-1 * (ds.0 as isize))],
+                );
+            }
+
+            println!("EPSILON LOC {}", epsilon_loc);
+            let q_adjust = term(
+                Op::Ite,
+                vec![
+                    term(
+                        Op::Eq,
+                        vec![
+                            new_var(format!("char_{}", idx)),
+                            new_const(self.num_ab[&None]),
+                        ],
+                    ),
+                    new_const(epsilon_loc),
+                    cursor_term,
+                ],
+            );
 
             let q_eq = term(Op::Eq, vec![full_q, q_adjust]);
 
@@ -1526,8 +1530,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn nlookup_hybrid(&mut self, mut pub_lookups: Vec<Term>, mut priv_lookups: Vec<Term>) {
-        // TODO ordering circuit
-
+        let len = self.doc_len() + self.table.len();
+        self.q_ordering_circuit("nlhybrid", len);
         pub_lookups.append(&mut priv_lookups);
         self.nlookup_gadget(pub_lookups, self.hybrid_len.unwrap(), "nlhybrid");
     }
@@ -1655,8 +1659,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.stack_set(wits, b, true);
             self.stack_ptr += 1;
 
-            println!("WIT KID {:#?}", kid);
-
             wits.insert(format!("forall_0_kid_{}", b - 1), new_wit(kid));
 
             b += 1;
@@ -1668,8 +1670,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
         for pad_kid in pad_kids {
             self.stack_set(wits, b, false);
-
-            println!("WIT KID {:#?}", pad_kid);
 
             wits.insert(format!("forall_0_kid_{}", b - 1), new_wit(pad_kid));
             b += 1;
@@ -1764,12 +1764,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-
-        /*println!(
-            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );*/
-
+        /*
+                println!(
+                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+                );
+        */
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -1854,12 +1854,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-
-        /*println!(
-            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );*/
-
+        /*
+                println!(
+                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+                );
+        */
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -1937,7 +1937,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     // fill stack vars with padding
                     self.push_wit(&mut wits, None, cursor_i);
                     // pad out "popped" vars, since there's no pop
-                    println!("NOT FORALL PADDING");
                     wits.insert(format!("cursor_popped"), new_wit(cursor_i));
                     wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                     wits.insert(format!("cursor_0"), new_wit(cursor_0));
@@ -2023,7 +2022,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         // fill stack vars with padding
                         self.push_wit(&mut wits, None, cursor_i);
                         // pad out "popped" vars, since there's no pop
-                        println!("NOT FORALL PAD");
                         wits.insert(format!("cursor_popped"), new_wit(cursor_i));
                         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                         wits.insert(format!("cursor_0"), new_wit(cursor_0));
@@ -2056,8 +2054,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         &mut wits, &mut q, char_num, state_i, next_state, offset_i, cursor_i,
                         rel_i, i,
                     ));
-
-                    println!("REL_{}: {:#?}", i, rel_i);
 
                     i += 1;
                 }
@@ -2639,6 +2635,7 @@ mod tests {
         for b in batch_sizes {
             let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, merkle, sc.clone());
 
+            println!("doc {:#?}", r1cs_converter.udoc.clone());
             let mut reef_commit = ReefCommitment::new(
                 r1cs_converter.udoc.clone(),
                 r1cs_converter.hybrid_len,
@@ -2779,6 +2776,21 @@ mod tests {
     }
 
     #[test]
+    fn forall_children_alignment() {
+        init();
+        test_func_no_hash(
+            (0..128).filter_map(std::char::from_u32).collect(),
+            reg("^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
+            ab("B6u$r@s#R5mE"),
+            vec![2], // 2],
+            true,
+            None,
+            false,
+            false,
+        );
+    }
+
+    #[test]
     fn sub_proj() {
         init();
         test_func_no_hash(
@@ -2817,7 +2829,7 @@ mod tests {
             ab("bbbbbbbbaabbccddaabbdd"), // really [ aabbcc, EOF, epsilon ]
             vec![2],                      // 2],
             true,
-            Some(5), // (4,8)
+            Some(18), // (4,8)
             true,
             false,
         );
