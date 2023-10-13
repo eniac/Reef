@@ -160,6 +160,7 @@ pub fn create_recursive_circuit<G1, G2>(
     private_inputs: Vec<HashMap<String, Value>>,
     start_public_input: Vec<F<G1>>,
     pp: &PublicParams<G1, G2, C1<G1>, C2<G2>>,
+    out_write:PathBuf
 ) -> Result<RecursiveSNARK<G1, G2, C1<G1>, C2<G2>>, std::io::Error>
 where
     G1: Group<Base = <G2 as Group>::Scalar>,
@@ -184,6 +185,7 @@ where
         &witness_generator_output,
     );
     log::stop(Component::Solver, "Witness", "Compute");
+    log::write_csv(&out_write.as_path().display().to_string()).unwrap();
 
     let circuit_0 = CircomCircuit {
         r1cs: r1cs.clone(),
