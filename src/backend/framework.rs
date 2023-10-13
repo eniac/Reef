@@ -54,7 +54,6 @@ pub fn run_backend(
     hybrid: bool,
     merkle: bool,
 ) {
-    println!("hybrid: {}", hybrid);
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
         Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
@@ -73,6 +72,10 @@ pub fn run_backend(
         // stop gap for cost model - don't need to time >:)
         let mut batch_size = if temp_batch_size == 0 {
             let trace = safa.solve(&doc);
+            if trace.is_none() {
+                panic!("No solution found");
+            }
+
             println!("post solve");
             let sols = trace_preprocessing(&trace);
             println!("post trace");
@@ -301,8 +304,6 @@ fn setup<'a>(
     ]);
     z.push(<G1 as Group>::Scalar::from(0 as u64));
 
-    // println!("Z LEN {:#?}", z.len());
-
     // empty wits
     let merkle_wits = if r1cs_converter.merkle {
         let mut w = vec![];
@@ -434,6 +435,9 @@ fn solve<'a>(
 
     //measure safa solve
     let trace = r1cs_converter.safa.solve(doc);
+    if trace.is_none() {
+        panic!("No solution found");
+    }
     let mut sols = trace_preprocessing(&trace);
     //end safa solve
 
@@ -484,7 +488,7 @@ fn solve<'a>(
 
         // TODO
         // just for debugging :)
-        circ_data.check_all(&wits);
+        //circ_data.check_all(&wits);
 
         let sp_0 = <G1 as Group>::Scalar::from(stack_ptr_0 as u64);
         let spp = <G1 as Group>::Scalar::from(stack_ptr_popped as u64);

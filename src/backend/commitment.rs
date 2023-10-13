@@ -142,10 +142,12 @@ impl NLDocCommitment {
             .map(|x| <G1 as Group>::Scalar::from(x as u64))
             .collect();
 
-        doc_ext.append(&mut vec![
-            <G1 as Group>::Scalar::zero();
-            doc_ext_len - doc_ext.len()
-        ]);
+        if doc_ext_len > doc_ext.len() {
+            doc_ext.append(&mut vec![
+                <G1 as Group>::Scalar::zero();
+                doc_ext_len - doc_ext.len()
+            ]);
+        }
         let poly = MultilinearPolynomial::new(doc_ext);
 
         let single_gen = cap_pk.pk.gens.get_scalar_gen();
@@ -284,8 +286,6 @@ impl NLDocCommitment {
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
-        //println!("Q IN {:#?}", q.clone());
-
         // hybrid
         let q_hybrid = if !hybrid {
             q
@@ -297,9 +297,6 @@ impl NLDocCommitment {
             q_prime
         };
 
-        //println!("HYBRID Q {:#?}", q_hybrid.clone());
-
-        // println!("DOC LENGS {:#?} {:#?}", self.doc_len, proj_doc_len);
         let running_q: Vec<<G1 as Group>::Scalar> = if proj {
             let mut q_add: Vec<<G1 as Group>::Scalar> = proj_chunk_idx
                 .unwrap()
@@ -308,7 +305,6 @@ impl NLDocCommitment {
                 .collect();
 
             q_add.extend(q_hybrid);
-            //println!("PROJECTIONS NEW Q {:#?}", q_add.clone());
             q_add
         } else {
             q_hybrid
@@ -318,14 +314,12 @@ impl NLDocCommitment {
         let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
         let commit_running_v =
             <G1 as Group>::CE::commit(&self.single_gens, &[running_v.clone()], &decommit_running_v);
-        // println!("V = {:#?}", running_v.clone());
 
         let (decommit_v_prime, commit_v_prime, v_prime) = if !hybrid {
             // v' == v when not hybrid
             (None, None, running_v.clone())
         } else {
             let v_prime = self.doc_poly.evaluate(&running_q);
-            // println!("V PRIME {:#?}", v_prime);
 
             let decommit_v_prime = <G1 as Group>::Scalar::random(&mut OsRng);
             let commit_v_prime =
