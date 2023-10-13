@@ -75,9 +75,9 @@ pub struct ConsistencyProof {
     v_prime_commit: Option<Commitment<G1>>,
     ipa: InnerProductArgument<G1>,
     running_q: Vec<<G1 as Group>::Scalar>,
-    t_vp_gens: Option<CommitmentGens<G1>>,
-    hybrid_ipi: Option<InnerProductInstance<G1>>,
-    hybrid_ipa: Option<InnerProductArgument<G1>>,
+    // eq proof
+    eq_proof: EqualityProof<G1>,
+    l_commit: Option<Commitment<G1>>,
 }
 
 impl ReefCommitment {
@@ -377,67 +377,65 @@ impl NLDocCommitment {
         v_prime: <G1 as Group>::Scalar,
         v_prime_commit: Commitment<G1>,
         v_prime_decommit: <G1 as Group>::Scalar,
-    ) -> (
-        CommitmentGens<G1>,
-        InnerProductInstance<G1>,
-        InnerProductArgument<G1>,
-    ) {
+    ) -> (EqualityProof<G1>,) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
-        // new inner prod vectors
-        let q0_vec = vec![(<G1 as Group>::Scalar::from(1) - q0), q0];
-        let t_vp_clear = vec![t, v_prime];
-
-        // make new commitment to [t, v']
+        // make new commitment to LHS
         // C(v') = g_0^v' * h^blind
-        // C([t,v']) = g_1^t * g_0^v * h^blind
-        let mut new_base = <G1 as Group>::from_label(b"new_base", 1);
+        // C[(1-q0) * t + q0 * v']
+        // C[q0 * v'] = C(v')^q0 =  g_0^(v'*q0) * h^(blind*q0)
+        // rolled into below
 
-        let mut bases = new_base.clone();
-        bases.push(v_prime_commit.comm.to_affine());
-        let t_vp_commit = Commitment {
-            comm: <G1 as Group>::vartime_multiscalar_mul(
-                &[t, <G1 as Group>::Scalar::from(1)],
-                &bases,
-            ),
-        };
-        let t_vp_decommit = v_prime_decommit;
-        let mut t_vp_gens = self.single_gens.clone();
-
-        new_base.extend(t_vp_gens.gens);
-        t_vp_gens.gens = new_base;
-
-        let ipi: InnerProductInstance<G1> =
-            InnerProductInstance::new(&t_vp_commit, &q0_vec, &v_commit);
-        let ipw = InnerProductWitness::new(&t_vp_clear, &t_vp_decommit, &v, &v_decommit);
-        let ipa = InnerProductArgument::prove(
-            &t_vp_gens,
+        // C[(1-q0) * t] = g_0^((1-q0) * t) * h^b2
+        let q0_t_decommit = G::Scalar::random(&mut OsRng);
+        let q0_t_commit = <G1 as Group>::CE::commit(
             &self.single_gens,
-            &ipi,
-            &ipw,
-            &mut p_transcript,
-        )
-        .unwrap();
+            &[(<G1 as Group>::Scalar::from(1) - q0) * t],
+            &q0_t_decommit,
+        );
 
-        (t_vp_gens, ipi, ipa)
+        // C[(1-q0) * t + q0 * v'] = C[q0 * v'] * C[(1-q0) * t] = g_0^LHS * h^(b*q0+b2)
+        let l_commit = <G1 as Group>::vartime_multiscalar_mul(
+            &[q0, F::from(1)],
+            &[v_prime_commit.comm, q0_t_commit],
+        );
+
+        // innards of function
+        p_transcript.append_message(b"protocol-name", EqualityProof::<G>::protocol_name());
+
+        // produce a random scalar
+        let r = <G1 as Group>::Scalar::random(&mut OsRng);
+
+        l_commit.append_to_transcript(b"C1", transcript);
+        v_commit.append_to_transcript(b"C2", transcript);
+
+        let alpha =
+            <G1 as Group>::CE::commit(&self.single_gens, &[G::Scalar::zero()], &r).compress(); // h^r
+        alpha.append_to_transcript(b"alpha", transcript);
+
+        let c = <G1 as Group>::Scalar::challenge(b"c", transcript);
+
+        let z = c * (*l_decommit - *v_decommit) + r;
+
+        EqualityProof { alpha, z }
     }
 
     pub fn verify_consistency(&self, proof: ConsistencyProof) {
-        if proof.hybrid_ipi.is_some()
-            && proof.hybrid_ipa.is_some()
-            && proof.v_prime_commit.is_some()
-        {
+        if proof.eq_gens.is_some() && proof.l_commit.is_some() && proof.v_prime_commit.is_some() {
             assert!(self
                 .proof_dot_prod_verify(&proof.ipa, &proof.running_q, proof.v_prime_commit.unwrap())
                 .is_ok());
 
-            assert!(self
-                .verify_hybrid_combo(
-                    &proof.t_vp_gens.unwrap(),
-                    &proof.hybrid_ipi.unwrap(),
-                    proof.hybrid_ipa.unwrap(),
-                )
-                .is_ok());
+            // equality proof C_l = C[v_r]
+            let mut v_transcript = Transcript::new(b"vs_vr_proof");
+            let res = eq_proof.verify(
+                proof.eq_gens.unwrap(),
+                &mut v_transcript,
+                proof.l_commit.unwrap(),
+                proof.v_commit,
+            );
+
+            assert!(res.is_ok());
         } else {
             assert!(self
                 .proof_dot_prod_verify(&proof.ipa, &proof.running_q, proof.v_commit)
@@ -471,20 +469,6 @@ impl NLDocCommitment {
             ipa,
             &mut v_transcript,
         )
-    }
-
-    fn verify_hybrid_combo(
-        &self,
-        t_vp_gens: &CommitmentGens<G1>,
-        ipi: &InnerProductInstance<G1>,
-        ipa: InnerProductArgument<G1>,
-    ) -> Result<(), NovaError> {
-        let mut v_transcript = Transcript::new(b"dot_prod_proof");
-
-        // prove < C(t,v'), [1-q0, q0] > = v
-        ipa.verify(t_vp_gens, &self.single_gens, 2, &ipi, &mut v_transcript)?;
-
-        Ok(())
     }
 }
 
