@@ -336,6 +336,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut usize_doc = vec![];
         let mut int_doc = vec![];
         for c in doc.clone().into_iter() {
+            if !num_ab.contains_key(&Some(c)) {
+                panic!("Character in document that's not in alphabet");
+            }
             let u = num_ab[&Some(c)];
             usize_doc.push(u);
             int_doc.push(Integer::from(u));

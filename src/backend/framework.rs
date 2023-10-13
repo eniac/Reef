@@ -73,6 +73,10 @@ pub fn run_backend(
         // stop gap for cost model - don't need to time >:)
         let mut batch_size = if temp_batch_size == 0 {
             let trace = safa.solve(&doc);
+            if trace.is_none() {
+                panic!("No solution found");
+            }
+
             println!("post solve");
             let sols = trace_preprocessing(&trace);
             println!("post trace");
@@ -434,6 +438,9 @@ fn solve<'a>(
 
     //measure safa solve
     let trace = r1cs_converter.safa.solve(doc);
+    if trace.is_none() {
+        panic!("No solution found");
+    }
     let mut sols = trace_preprocessing(&trace);
     //end safa solve
 
