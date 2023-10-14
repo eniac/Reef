@@ -376,7 +376,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             let real_start = projection.unwrap();
-            println!("real start {}", real_start);
+            //println!("real start {}", real_start);
             let real_len = orig_len - real_start;
 
             let mut chunk_len = usize_doc.len().next_power_of_two() / 2;
@@ -386,7 +386,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let mut start = 0;
 
             while e >= orig_len {
-                println!("CHUNK LEN {}, e {}, s {}", chunk_len, e, s);
+                //println!("CHUNK LEN {}, e {}, s {}", chunk_len, e, s);
                 end = e;
                 start = s;
 
@@ -394,7 +394,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 while s + chunk_len <= real_start {
                     s += chunk_len;
                 }
-                println!("found start {}", s);
+                //println!("found start {}", s);
                 e = s + chunk_len;
                 assert!(end <= usize_doc.len().next_power_of_two());
 
@@ -425,9 +425,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 // calculate chunk idx
                 let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
-                println!("Num chunks {}", num_chunks);
+                //println!("Num chunks {}", num_chunks);
                 let mut chunk_idx = start / chunk_len;
-                println!("chunk_idx {}", chunk_idx);
+                //println!("chunk_idx {}", chunk_idx);
                 let mut chunk_idx_vec = vec![];
                 for _i in 0..logmn(num_chunks) {
                     chunk_idx_vec.push(chunk_idx % 2);
@@ -437,7 +437,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 chunk_idx_vec = chunk_idx_vec.into_iter().rev().collect();
 
                 proj_chunk_idx = Some(chunk_idx_vec);
-                println!("chunk idx {:#?}", proj_chunk_idx);
+                //println!("chunk idx {:#?}", proj_chunk_idx);
 
                 Some((start, end)) // handle doc extension TODO?
             }
@@ -1001,11 +1001,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             Op::Ite,
             vec![
                 pop_condition,
-                cursor_overflow,
-                /*term(
+                term(
                     Op::BoolNaryOp(BoolNaryOp::And),
                     vec![cursor_overflow, inside_ite],
-                ), JESS TODO */
+                ),
                 stack_ptr_same,
             ],
         )
@@ -1125,6 +1124,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
 
+            println!("STAR OFFSET {}", self.star_offset);
             let ite_upper_off = term(
                 Op::Ite,
                 vec![
@@ -1143,10 +1143,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
             self.assertions.push(ite_upper_off);
+
             if j == 0 {
                 // PUSH
                 // if in_state \in forall - only first
-                let push_stmt = new_bool_const(true); //self.push_stack_circuit();
+                let push_stmt = self.push_stack_circuit();
 
                 // POP
                 // cursor = pop stack
@@ -1182,12 +1183,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let do_what = term(
                     Op::Ite,
                     vec![
-                        term(Op::Not, vec![self.not_forall_circ(0)]),
-                        term(Op::BoolNaryOp(BoolNaryOp::And), vec![pop_stmt, push_stmt]),
+                        self.not_forall_circ(0),
                         term(
                             Op::BoolNaryOp(BoolNaryOp::And),
                             vec![inside_ite, stack_ptr_same],
                         ),
+                        term(Op::BoolNaryOp(BoolNaryOp::And), vec![pop_stmt, push_stmt]),
                     ],
                 );
                 self.assertions.push(do_what);
@@ -1211,7 +1212,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         ),
                     ],
                 );
-                self.assertions.push(c0);
+                //self.assertions.push(c0);
             } else {
                 // assert not forall
                 self.assertions.push(self.not_forall_circ(j));
@@ -1704,7 +1705,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         children: &Vec<usize>,
         trans: bool,
     ) -> usize {
-        calc_rel(
+        let rel = calc_rel(
             state_i,
             next_state,
             children,
@@ -1714,7 +1715,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.num_states,
             self.exit_state,
             trans,
-        )
+        );
+        println!("REL {:#?}", rel);
+        rel
     }
 
     fn padding_v(
@@ -1777,12 +1780,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-        /*
-                println!(
-                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-                );
-        */
+
+        println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        );
+        println!(
+            "Lower off {:#?}, off {:#?}, upper off {:#?}",
+            lower_offset_i, offset_i, upper_offset_i
+        );
+
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -1818,7 +1825,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             upper_offset_i = self.star_offset;
                         } else {
                             let mut iter = openset.0.iter();
-                            if let Some(r) = iter.next() {
+                            while let Some(r) = iter.next() {
                                 // ranges
                                 lower_offset_i = r.start;
                                 upper_offset_i = if r.end.is_some() {
@@ -1826,8 +1833,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 } else {
                                     self.star_offset
                                 };
-                            } else {
-                                panic!("found edge with bad range");
+                                if (lower_offset_i <= offset_i)
+                                    && ((offset_i <= upper_offset_i)
+                                        || (upper_offset_i == self.star_offset))
+                                {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -1867,12 +1878,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-        /*
-                println!(
-                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-                );
-        */
+
+        println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        );
+        println!(
+            "Lower off {:#?}, off {:#?}, upper off {:#?}",
+            lower_offset_i, offset_i, upper_offset_i
+        );
+
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -1953,6 +1968,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     wits.insert(format!("cursor_popped"), new_wit(cursor_i));
                     wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                     wits.insert(format!("cursor_0"), new_wit(cursor_0));
+
+                    println!("STACK PUSH {:#?}", self.stack);
                 }
 
                 offset_i = 0;
@@ -2001,11 +2018,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             wits.insert(format!("cursor_popped"), new_wit(cursor_i));
                             wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                             wits.insert(format!("cursor_0"), new_wit(cursor_0));
+                            println!("STACK PUSH {:#?}", self.stack);
                         } else {
                             // pad push
                             self.push_wit(&mut wits, None, cursor_i);
                             // popped
                             cursor_i = self.pop_wit(&mut wits);
+                            println!("STACK POP {:#?}", self.stack);
                         }
                     } else {
                         // pad out the rest of this loop
@@ -2036,6 +2055,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         wits.insert(format!("cursor_popped"), new_wit(cursor_i));
                         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                         wits.insert(format!("cursor_0"), new_wit(cursor_0));
+                        println!("STACK NONE {:#?}", self.stack);
                     }
                 }
 
@@ -2622,9 +2642,14 @@ mod tests {
         proj: Option<usize>,
         hybrid: bool,
         merkle: bool,
+        negate: bool,
     ) {
         let r = re::simpl(re::new(&rstr));
-        let safa = SAFA::new(&ab[..], &r);
+        let safa = if negate {
+            SAFA::new(&ab[..], &r).negate()
+        } else {
+            SAFA::new(&ab[..], &r)
+        };
 
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
 
@@ -2773,6 +2798,22 @@ mod tests {
     }
 
     #[test]
+    fn no_foralls_bug() {
+        init();
+        test_func_no_hash(
+            ab("ATGC"),
+            reg("^.{10}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG"),
+            ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+            vec![2], // 2],
+            true,
+            None,
+            false,
+            false,
+            true,
+        );
+    }
+
+    #[test]
     fn forall_children_alignment() {
         init();
         test_func_no_hash(
@@ -2782,6 +2823,7 @@ mod tests {
             vec![2], // 2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2799,6 +2841,7 @@ mod tests {
             Some(16),
             false,
             false,
+            false,
         );
     }
 
@@ -2814,6 +2857,7 @@ mod tests {
             None,
             false,
             true,
+            false,
         );
     }
 
@@ -2829,6 +2873,7 @@ mod tests {
             Some(18), // (4,8)
             true,
             false,
+            false,
         );
     }
     #[test]
@@ -2842,6 +2887,7 @@ mod tests {
             true,
             Some(5), // (4,8)
             true,
+            false,
             false,
         );
     }
@@ -2858,6 +2904,7 @@ mod tests {
             true,
             None,
             true,
+            false,
             false,
         );
     }
@@ -2876,6 +2923,7 @@ mod tests {
             Some(5), // (4,8)
             false,
             false,
+            false,
         );
     }
 
@@ -2889,6 +2937,7 @@ mod tests {
             vec![2], // 2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2906,6 +2955,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
     }
 
@@ -2919,6 +2969,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2950,6 +3001,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
         test_func_no_hash(
             ab("ab"),
@@ -2960,6 +3012,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
         test_func_no_hash(
             ab("ab"),
@@ -2968,6 +3021,7 @@ mod tests {
             vec![2, 4],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2986,6 +3040,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
     }
 
@@ -2999,6 +3054,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -3025,6 +3081,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
 
         /*    test_func_no_hash(
@@ -3049,6 +3106,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
 
         test_func_no_hash(
@@ -3058,6 +3116,7 @@ mod tests {
             vec![33],
             true,
             None,
+            false,
             false,
             false,
         );
