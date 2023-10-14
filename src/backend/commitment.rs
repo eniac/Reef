@@ -379,27 +379,21 @@ impl NLDocCommitment {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
         // make new commitment to LHS
-        // C(v') = g_0^v' * h^blind
-        // C[(1-q0) * t + q0 * v']
-        // C[q0 * v'] = C(v')^q0 =  g_0^(v'*q0) * h^(blind*q0)
-        // rolled into below
+        // g0^((1-q0) * t) * (g0^v' * h^b)^q0
+        // = g0^((1-q0) * t) * g0^(v' * q0) * h^(b*q0)
+        // = g0&((1-q0) * t + v' * q0) * h^(b*q0)
 
-        // C[(1-q0) * t] = g_0^((1-q0) * t) * h^b2
-        let q0_t_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
-        let q0_t_commit = <G1 as Group>::CE::commit(
-            &self.single_gens,
-            &[(<G1 as Group>::Scalar::from(1) - q0) * t],
-            &q0_t_decommit,
-        );
-
-        // C[(1-q0) * t + q0 * v'] = C[q0 * v'] * C[(1-q0) * t] = g_0^LHS * h^(b*q0+b2)
         let l_commit = Commitment {
             comm: <G1 as Group>::vartime_multiscalar_mul(
-                &[q0, <G1 as Group>::Scalar::from(1)],
-                &[v_prime_commit.comm.into(), q0_t_commit.comm.into()],
+                &[(<G1 as Group>::Scalar::from(1) - q0) * t, q0],
+                &[self.single_gens.gens[0], v_prime_commit.comm.into()],
             ),
         };
-        let l_decommit = v_prime_decommit * q0 + q0_t_decommit;
+
+        let l_decommit = v_prime_decommit * q0;
+
+        // let l_commit = v_commit.clone();
+        // let l_decommit = v_decommit.clone();
 
         // innards of function
         p_transcript.append_message(b"protocol-name", EqualityProof::<G1>::protocol_name());
