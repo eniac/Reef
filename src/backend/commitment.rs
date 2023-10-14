@@ -325,6 +325,8 @@ impl NLDocCommitment {
             let commit_v_prime =
                 <G1 as Group>::CE::commit(&self.single_gens, &[v_prime.clone()], &decommit_v_prime);
 
+            println!("v = {:#?}, v' = {:#?}", running_v.clone(), v_prime.clone());
+
             (Some(decommit_v_prime), Some(commit_v_prime), v_prime)
         };
 
@@ -379,14 +381,21 @@ impl NLDocCommitment {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
         // make new commitment to LHS
-        // g0^((1-q0) * t) * (g0^v' * h^b)^q0
-        // = g0^((1-q0) * t) * g0^(v' * q0) * h^(b*q0)
-        // = g0&((1-q0) * t + v' * q0) * h^(b*q0)
+        // g0^((1-q0) * t) * (g0^v' * h^b')^q0
+        // = g0^((1-q0) * t) * g0^(v' * q0) * h^(b'*q0)
+        // = g0^((1-q0) * t + v' * q0) * h^(b'*q0)
+        // == g0^(v) * h^b
+        let mut bases = self.single_gens.gens.clone();
+        let vp_comm_to_q0 = v_prime_commit.comm * q0;
+        bases.push(vp_comm_to_q0.to_affine());
 
         let l_commit = Commitment {
             comm: <G1 as Group>::vartime_multiscalar_mul(
-                &[(<G1 as Group>::Scalar::from(1) - q0) * t, q0],
-                &[self.single_gens.gens[0], v_prime_commit.comm.into()],
+                &[
+                    (<G1 as Group>::Scalar::from(1) - q0) * t,
+                    <G1 as Group>::Scalar::from(1),
+                ],
+                &bases,
             ),
         };
 
@@ -414,6 +423,13 @@ impl NLDocCommitment {
         let z = c * (l_decommit - v_decommit) + r;
 
         (EqualityProof { alpha, z }, l_commit)
+
+        // VER
+        // h^z == (C1 - C2) * ch + alpha
+        // h^(ch * (b1 - b2) + r) == (g0^v1 * h^b1 - g0^v2 * h^b2) * ch + h^r
+        // if v1 == v2:
+        // h^(ch * (b1 - b2) + r) == g0^v * (h^b1 - h^b2) * ch + h^r
+        // h^(ch * (b1 - b2) + r) == g0^v * (h^(b1 - b2)??) * ch + h^r
     }
 
     pub fn verify_consistency(&self, proof: ConsistencyProof) {
