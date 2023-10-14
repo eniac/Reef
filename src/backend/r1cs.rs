@@ -376,24 +376,40 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             let real_start = projection.unwrap();
+            //println!("real start {}", real_start);
             let real_len = orig_len - real_start;
 
-            let chunk_len = real_len.next_power_of_two();
-            let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
-
+            let mut chunk_len = usize_doc.len().next_power_of_two() / 2;
+            let mut e = usize_doc.len().next_power_of_two();
+            let mut s = 0;
+            let mut end = e;
             let mut start = 0;
-            while start + chunk_len <= real_start {
-                start += chunk_len;
+
+            while e >= orig_len {
+                //println!("CHUNK LEN {}, e {}, s {}", chunk_len, e, s);
+                end = e;
+                start = s;
+
+                s = 0;
+                while s + chunk_len <= real_start {
+                    s += chunk_len;
+                }
+                //println!("found start {}", s);
+                e = s + chunk_len;
+                assert!(end <= usize_doc.len().next_power_of_two());
+
+                // try to go smaller
+                chunk_len = chunk_len / 2
             }
 
-            let end = start + chunk_len;
-
+            chunk_len = end - start;
+            assert!(chunk_len.next_power_of_two() == chunk_len);
             println!(
                 "START {:#?}, END {:#?}, NEW END {:#?}",
                 start, orig_len, end
             );
 
-            assert!(start < orig_len);
+            assert!(start <= real_start);
             assert!(end >= orig_len);
             assert!(start % chunk_len == 0);
 
@@ -408,8 +424,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 println!("USING PROJECTION {:#?}", ((start, end)));
 
                 // calculate chunk idx
+                let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
+                //println!("Num chunks {}", num_chunks);
                 let mut chunk_idx = start / chunk_len;
-
+                //println!("chunk_idx {}", chunk_idx);
                 let mut chunk_idx_vec = vec![];
                 for _i in 0..logmn(num_chunks) {
                     chunk_idx_vec.push(chunk_idx % 2);
@@ -419,6 +437,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 chunk_idx_vec = chunk_idx_vec.into_iter().rev().collect();
 
                 proj_chunk_idx = Some(chunk_idx_vec);
+                //println!("chunk idx {:#?}", proj_chunk_idx);
 
                 Some((start, end)) // handle doc extension TODO?
             }
@@ -1123,6 +1142,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
             self.assertions.push(ite_upper_off);
+
             if j == 0 {
                 // PUSH
                 // if in_state \in forall - only first
@@ -1161,12 +1181,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let do_what = term(
                     Op::Ite,
                     vec![
-                        term(Op::Not, vec![self.not_forall_circ(0)]),
-                        term(Op::BoolNaryOp(BoolNaryOp::And), vec![pop_stmt, push_stmt]),
+                        self.not_forall_circ(0),
                         term(
                             Op::BoolNaryOp(BoolNaryOp::And),
                             vec![inside_ite, stack_ptr_same],
                         ),
+                        term(Op::BoolNaryOp(BoolNaryOp::And), vec![pop_stmt, push_stmt]),
                     ],
                 );
                 self.assertions.push(do_what);
@@ -1190,7 +1210,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         ),
                     ],
                 );
-                self.assertions.push(c0);
+                //self.assertions.push(c0);
             } else {
                 // assert not forall
                 self.assertions.push(self.not_forall_circ(j));
@@ -1683,7 +1703,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         children: &Vec<usize>,
         trans: bool,
     ) -> usize {
-        calc_rel(
+        let rel = calc_rel(
             state_i,
             next_state,
             children,
@@ -1693,7 +1713,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.num_states,
             self.exit_state,
             trans,
-        )
+        );
+        rel
     }
 
     fn padding_v(
@@ -1756,10 +1777,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
+
         /*
                 println!(
                     "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
                     i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+                );
+                println!(
+                    "Lower off {:#?}, off {:#?}, upper off {:#?}",
+                    lower_offset_i, offset_i, upper_offset_i
                 );
         */
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
@@ -1797,7 +1823,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             upper_offset_i = self.star_offset;
                         } else {
                             let mut iter = openset.0.iter();
-                            if let Some(r) = iter.next() {
+                            while let Some(r) = iter.next() {
                                 // ranges
                                 lower_offset_i = r.start;
                                 upper_offset_i = if r.end.is_some() {
@@ -1805,8 +1831,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 } else {
                                     self.star_offset
                                 };
-                            } else {
-                                panic!("found edge with bad range");
+                                if (lower_offset_i <= offset_i)
+                                    && ((offset_i <= upper_offset_i)
+                                        || (upper_offset_i == self.star_offset))
+                                {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -1846,12 +1876,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-        /*
-                println!(
-                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-                );
-        */
+
+        /*println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        );
+        println!(
+            "Lower off {:#?}, off {:#?}, upper off {:#?}",
+            lower_offset_i, offset_i, upper_offset_i
+        );*/
+
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -2601,9 +2635,14 @@ mod tests {
         proj: Option<usize>,
         hybrid: bool,
         merkle: bool,
+        negate: bool,
     ) {
         let r = re::simpl(re::new(&rstr));
-        let safa = SAFA::new(&ab[..], &r);
+        let safa = if negate {
+            SAFA::new(&ab[..], &r).negate()
+        } else {
+            SAFA::new(&ab[..], &r)
+        };
 
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
 
@@ -2752,6 +2791,22 @@ mod tests {
     }
 
     #[test]
+    fn multiple_ranges_bug() {
+        init();
+        test_func_no_hash(
+            ab("ATGC"),
+            reg("^.{10}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG"),
+            ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+            vec![2], // 2],
+            true,
+            None,
+            false,
+            false,
+            true,
+        );
+    }
+
+    #[test]
     fn forall_children_alignment() {
         init();
         test_func_no_hash(
@@ -2761,6 +2816,7 @@ mod tests {
             vec![2], // 2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2778,6 +2834,7 @@ mod tests {
             Some(16),
             false,
             false,
+            false,
         );
     }
 
@@ -2793,6 +2850,7 @@ mod tests {
             None,
             false,
             true,
+            false,
         );
     }
 
@@ -2808,6 +2866,7 @@ mod tests {
             Some(18), // (4,8)
             true,
             false,
+            false,
         );
     }
     #[test]
@@ -2821,6 +2880,7 @@ mod tests {
             true,
             Some(5), // (4,8)
             true,
+            false,
             false,
         );
     }
@@ -2837,6 +2897,7 @@ mod tests {
             true,
             None,
             true,
+            false,
             false,
         );
     }
@@ -2855,6 +2916,7 @@ mod tests {
             Some(5), // (4,8)
             false,
             false,
+            false,
         );
     }
 
@@ -2868,6 +2930,7 @@ mod tests {
             vec![2], // 2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2885,6 +2948,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
     }
 
@@ -2898,6 +2962,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2929,6 +2994,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
         test_func_no_hash(
             ab("ab"),
@@ -2939,6 +3005,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
         test_func_no_hash(
             ab("ab"),
@@ -2947,6 +3014,7 @@ mod tests {
             vec![2, 4],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2965,6 +3033,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
     }
 
@@ -2978,6 +3047,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -3004,6 +3074,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
 
         /*    test_func_no_hash(
@@ -3028,6 +3099,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
 
         test_func_no_hash(
@@ -3037,6 +3109,7 @@ mod tests {
             vec![33],
             true,
             None,
+            false,
             false,
             false,
         );
