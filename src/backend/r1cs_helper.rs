@@ -201,11 +201,9 @@ pub fn normal_add_table<'a>(
                                 );
                             } else {
                                 // ranges
-                                println!("RANGE {:#?}", openset);
                                 let mut iter = openset.0.iter();
 
                                 while let Some(r) = iter.next() {
-                                    println!("R {:#?}", r);
                                     let lower_offset = r.start;
                                     let upper_offset = if r.end.is_some() {
                                         r.end.unwrap()

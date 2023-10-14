@@ -1124,7 +1124,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
 
-            println!("STAR OFFSET {}", self.star_offset);
             let ite_upper_off = term(
                 Op::Ite,
                 vec![
@@ -1151,7 +1150,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 // POP
                 // cursor = pop stack
-                // this is the prob? TODO JESS
                 let pop_stmt = self.pop_stack_circuit();
 
                 let mut inside_ite = new_bool_const(true);
@@ -1716,7 +1714,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.exit_state,
             trans,
         );
-        println!("REL {:#?}", rel);
         rel
     }
 
@@ -1781,15 +1778,16 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        println!(
-            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );
-        println!(
-            "Lower off {:#?}, off {:#?}, upper off {:#?}",
-            lower_offset_i, offset_i, upper_offset_i
-        );
-
+        /*
+                println!(
+                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+                );
+                println!(
+                    "Lower off {:#?}, off {:#?}, upper off {:#?}",
+                    lower_offset_i, offset_i, upper_offset_i
+                );
+        */
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -1879,14 +1877,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        println!(
+        /*println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
         );
         println!(
             "Lower off {:#?}, off {:#?}, upper off {:#?}",
             lower_offset_i, offset_i, upper_offset_i
-        );
+        );*/
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1968,8 +1966,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     wits.insert(format!("cursor_popped"), new_wit(cursor_i));
                     wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                     wits.insert(format!("cursor_0"), new_wit(cursor_0));
-
-                    println!("STACK PUSH {:#?}", self.stack);
                 }
 
                 offset_i = 0;
@@ -2018,13 +2014,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             wits.insert(format!("cursor_popped"), new_wit(cursor_i));
                             wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                             wits.insert(format!("cursor_0"), new_wit(cursor_0));
-                            println!("STACK PUSH {:#?}", self.stack);
                         } else {
                             // pad push
                             self.push_wit(&mut wits, None, cursor_i);
                             // popped
                             cursor_i = self.pop_wit(&mut wits);
-                            println!("STACK POP {:#?}", self.stack);
                         }
                     } else {
                         // pad out the rest of this loop
@@ -2055,7 +2049,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         wits.insert(format!("cursor_popped"), new_wit(cursor_i));
                         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
                         wits.insert(format!("cursor_0"), new_wit(cursor_0));
-                        println!("STACK NONE {:#?}", self.stack);
                     }
                 }
 
