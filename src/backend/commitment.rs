@@ -392,20 +392,6 @@ impl NLDocCommitment {
         // = g0^((1-q0) * t + v' * q0) * h^(b'*q0)
         // == g0^(v) * h^b
 
-        /* let mut bases = self.single_gens.gens.clone();
-                let vp_comm_to_q0 = v_prime_commit * q0;
-                bases.push(vp_comm_to_q0.comm.to_affine());
-
-                let l_commit = Commitment {
-                    comm: <G1 as Group>::vartime_multiscalar_mul(
-                        &[
-                            (<G1 as Group>::Scalar::from(1) - q0) * t,
-                            <G1 as Group>::Scalar::from(1),
-                        ],
-                        &bases,
-                    ),
-                };
-        */
         let l_decommit =
             v_prime_decommit * q0 + v_prime_decommit * (<G1 as Group>::Scalar::from(1) - q0);
 
@@ -445,6 +431,9 @@ impl NLDocCommitment {
         // if v1 == v2:
         // h^(ch * (b1 - b2) + r) == g0^v * (h^b1 - h^b2) * ch + h^r
         // h^(ch * (b1 - b2) + r) == g0^v * (h^(b1 - b2)??) * ch + h^r
+
+        // notes
+        // g^vh^b, g^rh^b bad - talk to SGA
     }
 
     pub fn verify_consistency(&self, proof: ConsistencyProof) {
