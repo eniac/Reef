@@ -393,10 +393,12 @@ impl NLDocCommitment {
         );
 
         // C[(1-q0) * t + q0 * v'] = C[q0 * v'] * C[(1-q0) * t] = g_0^LHS * h^(b*q0+b2)
-        let l_commit = <G1 as Group>::vartime_multiscalar_mul(
-            &[q0, <G1 as Group>::Scalar::from(1)],
-            &[v_prime_commit.comm, q0_t_commit],
-        );
+        let l_commit = Commitment {
+            comm: <G1 as Group>::vartime_multiscalar_mul(
+                &[q0, <G1 as Group>::Scalar::from(1)],
+                &[v_prime_commit.comm.into(), q0_t_commit.comm.into()],
+            ),
+        };
         let l_decommit = v_prime_decommit * q0 + q0_t_decommit;
 
         // innards of function
@@ -415,7 +417,7 @@ impl NLDocCommitment {
 
         let c = <G1 as Group>::Scalar::challenge(b"c", &mut p_transcript);
 
-        let z = c * (*l_decommit - *v_decommit) + r;
+        let z = c * (l_decommit - v_decommit) + r;
 
         (EqualityProof { alpha, z }, l_commit)
     }
@@ -428,11 +430,11 @@ impl NLDocCommitment {
 
             // equality proof C_l = C[v_r]
             let mut v_transcript = Transcript::new(b"vs_vr_proof");
-            let res = proof.eq_proof.verify(
-                self.single_gens,
+            let res = proof.eq_proof.unwrap().verify(
+                &self.single_gens,
                 &mut v_transcript,
-                proof.l_commit.unwrap(),
-                proof.v_commit,
+                &proof.l_commit.unwrap().compress(), // TODO compression shit
+                &proof.v_commit.compress(),
             );
 
             assert!(res.is_ok());
