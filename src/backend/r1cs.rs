@@ -2791,7 +2791,7 @@ mod tests {
     }
 
     #[test]
-    fn no_foralls_bug() {
+    fn multiple_ranges_bug() {
         init();
         test_func_no_hash(
             ab("ATGC"),
