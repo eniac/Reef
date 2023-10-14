@@ -225,6 +225,11 @@ impl NLDocCommitment {
             let t = int_to_ff(verifier_mle_eval(table, q_prime));
             let q0 = int_to_ff(q[0].clone());
 
+            assert_eq!(
+                (<G1 as Group>::Scalar::from(1) - q0) * t + q0 * v_prime,
+                v_ff
+            );
+
             let (eq_proof, l_commit) = self.proof_hybrid_combo(
                 t,
                 q0,
@@ -321,13 +326,14 @@ impl NLDocCommitment {
         } else {
             let v_prime = self.doc_poly.evaluate(&running_q);
 
-            let decommit_v_prime = <G1 as Group>::Scalar::random(&mut OsRng);
-            let commit_v_prime =
-                <G1 as Group>::CE::commit(&self.single_gens, &[v_prime.clone()], &decommit_v_prime);
+            //let decommit_v_prime = <G1 as Group>::Scalar::random(&mut OsRng);
+            let commit_v_prime = <G1 as Group>::CE::commit(
+                &self.single_gens,
+                &[v_prime.clone()],
+                &decommit_running_v,
+            );
 
-            println!("v = {:#?}, v' = {:#?}", running_v.clone(), v_prime.clone());
-
-            (Some(decommit_v_prime), Some(commit_v_prime), v_prime)
+            (Some(decommit_running_v), Some(commit_v_prime), v_prime)
         };
 
         // D(q) = v/v'
@@ -385,21 +391,30 @@ impl NLDocCommitment {
         // = g0^((1-q0) * t) * g0^(v' * q0) * h^(b'*q0)
         // = g0^((1-q0) * t + v' * q0) * h^(b'*q0)
         // == g0^(v) * h^b
-        let mut bases = self.single_gens.gens.clone();
-        let vp_comm_to_q0 = v_prime_commit * q0;
-        bases.push(vp_comm_to_q0.comm.to_affine());
 
-        let l_commit = Commitment {
-            comm: <G1 as Group>::vartime_multiscalar_mul(
-                &[
-                    (<G1 as Group>::Scalar::from(1) - q0) * t,
-                    <G1 as Group>::Scalar::from(1),
-                ],
-                &bases,
-            ),
-        };
+        /* let mut bases = self.single_gens.gens.clone();
+                let vp_comm_to_q0 = v_prime_commit * q0;
+                bases.push(vp_comm_to_q0.comm.to_affine());
 
-        let l_decommit = v_prime_decommit * q0;
+                let l_commit = Commitment {
+                    comm: <G1 as Group>::vartime_multiscalar_mul(
+                        &[
+                            (<G1 as Group>::Scalar::from(1) - q0) * t,
+                            <G1 as Group>::Scalar::from(1),
+                        ],
+                        &bases,
+                    ),
+                };
+        */
+        let l_decommit =
+            v_prime_decommit * q0 + v_prime_decommit * (<G1 as Group>::Scalar::from(1) - q0);
+
+        // CVP * q0 + CT * (1-q0) ?
+        let t_commit =
+            <G1 as Group>::CE::commit(&self.single_gens, &[t.clone()], &v_prime_decommit);
+
+        // g^v'q0 * h^b'q0 * g^(t*1-q0) * h^b'(1-q0)
+        let l_commit = v_prime_commit * q0 + t_commit * (<G1 as Group>::Scalar::from(1) - q0);
 
         // let l_commit = v_commit.clone();
         // let l_decommit = v_decommit.clone();
