@@ -197,7 +197,7 @@ pub fn run_backend(
         log::stop(Component::Compiler, "Compiler", "Full");
 
         #[cfg(feature = "metrics")]
-        log::tic(Component::Solver, "Solve", "Framework Solve");
+        log::tic(Component::Solver, "Solve", "Full");
         solve(
             sender,
             sender_qv,
@@ -209,7 +209,7 @@ pub fn run_backend(
         );
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Solver, "Solve", "Framework Solve");
+        log::stop(Component::Solver, "Solve", "Full");
     });
 
     //get args
@@ -702,6 +702,8 @@ fn prove_and_verify(
     let cp_clone = circuit_primary.clone().unwrap();
 
     let mut i = 0;
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Prover, "Prover", "Full");
     while circuit_primary.is_some() {
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, "prove", format!("prove_{}", i).as_str());
@@ -787,6 +789,9 @@ fn prove_and_verify(
         "Compressed SNARK size",
         serde_json::to_string(&compressed_snark).unwrap().len(),
     );
+
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Prover", "Full");
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Verifier, "Verification", "Full");

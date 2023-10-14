@@ -74,8 +74,8 @@ fn main() {
         safa.write_pdf("main")
             .expect("Failed to plot NFA to a pdf file");
 
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Solver, "SAFA Solving", "Clear Match");
+        // #[cfg(feature = "metrics")]
+        // log::tic(Component::Solver, "SAFA Solving", "Clear Match");
 
         /*
             println!(
@@ -85,8 +85,8 @@ fn main() {
                 .unwrap_or(String::from("NONE"))
         );*/
 
-        #[cfg(feature = "metrics")]
-        log::stop(Component::Solver, "SAFA Solving", "Clear Match");
+        // #[cfg(feature = "metrics")]
+        // log::stop(Component::Solver, "SAFA Solving", "Clear Match");
 
         init();
 

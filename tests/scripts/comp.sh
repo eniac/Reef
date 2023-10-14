@@ -23,7 +23,7 @@ echo "reef h"
 # cargo build --release --features 'metrics,reef'
 echo "dna"
 ./tests/scripts/dna.sh &> out_dna 
- echo "dna" 
+echo "dna" 
 
 #  # cargo build --release --features 'metrics,reef'
 #  echo "email"
