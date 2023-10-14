@@ -293,7 +293,7 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
     /// Includes nil
     pub fn is_nullable(&self) -> bool {
         if let Some(z) = self.start() {
-            z ==  Default::default()
+            z == Default::default()
         } else {
             false
         }
@@ -380,7 +380,11 @@ impl<C: Display + Debug + Step + Default + Ord + Copy> OpenSet<C> {
     /// Maximum offset (if it exists)
     pub fn max_offset(&self) -> Option<C> {
         let r = self.0.last()?;
-        r.end
+        if let Some(e) = r.end {
+            Some(e.max(r.start))
+        } else {
+            Some(r.start)
+        }
     }
 
     /// How many intervals

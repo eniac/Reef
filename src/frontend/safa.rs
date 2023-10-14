@@ -336,6 +336,8 @@ impl SAFA<char> {
         while let Some(nx) = dfs.next(&self.g) {
             // we can access `graph` mutably here still
             for skip in self.g.edges(nx).filter_map(|e| e.weight().0.clone().err()) {
+                println!("SKIP {:#?}", skip);
+
                 if let Some(off) = skip.max_offset() {
                     if offset <= off {
                         offset = off;
