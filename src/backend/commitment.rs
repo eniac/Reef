@@ -386,8 +386,8 @@ impl NLDocCommitment {
         // = g0^((1-q0) * t + v' * q0) * h^(b'*q0)
         // == g0^(v) * h^b
         let mut bases = self.single_gens.gens.clone();
-        let vp_comm_to_q0 = v_prime_commit.comm * q0;
-        bases.push(vp_comm_to_q0.to_affine());
+        let vp_comm_to_q0 = v_prime_commit * q0;
+        bases.push(vp_comm_to_q0.comm.to_affine());
 
         let l_commit = Commitment {
             comm: <G1 as Group>::vartime_multiscalar_mul(
