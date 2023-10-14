@@ -375,7 +375,7 @@ impl NLDocCommitment {
         v_decommit: <G1 as Group>::Scalar,
         v_prime_commit: Commitment<G1>,
         v_prime_decommit: <G1 as Group>::Scalar,
-    ) -> (EqualityProof<G1>, l_commit) {
+    ) -> (EqualityProof<G1>, Commitment<G1>) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
         // make new commitment to LHS
@@ -397,6 +397,7 @@ impl NLDocCommitment {
             &[q0, <G1 as Group>::Scalar::from(1)],
             &[v_prime_commit.comm, q0_t_commit],
         );
+        let l_decommit = v_prime_decommit * q0 + q0_t_decommit;
 
         // innards of function
         p_transcript.append_message(b"protocol-name", EqualityProof::<G1>::protocol_name());
@@ -427,7 +428,7 @@ impl NLDocCommitment {
 
             // equality proof C_l = C[v_r]
             let mut v_transcript = Transcript::new(b"vs_vr_proof");
-            let res = eq_proof.verify(
+            let res = proof.eq_proof.verify(
                 self.single_gens,
                 &mut v_transcript,
                 proof.l_commit.unwrap(),
