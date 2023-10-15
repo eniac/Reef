@@ -90,10 +90,10 @@ pub fn normal_add_table<'a>(
     set_table: &mut HashSet<Integer>,
     num_states: usize,
     exit_state: usize,
-    num_chars: usize,
+    num_chars: u128,
     kid_padding: usize,
     max_branches: usize,
-    max_offsets: usize,
+    max_offsets: u128,
     star_offset: usize,
     actual_state: NodeIndex,
     backtrace_state: usize,
@@ -103,6 +103,8 @@ pub fn normal_add_table<'a>(
     let mut sub_max_rel = 0;
     // dupicate safa, run this path
     let mut dfs_small = Dfs::new(&safa.g, actual_state);
+
+    let num_states_mult = num_states as u128;
 
     // note: duplicate "back branches" being added, but added to set so its all cool
     // this could probably be more efficient tho
@@ -140,25 +142,33 @@ pub fn normal_add_table<'a>(
                                 }
 
                                 let c = num_ab[&None]; //EPSILON
-
                                 set_table.insert(
                                     Integer::from(
-                                        (rel * num_states
-                                            * num_states
+                                        (rel as u128
+                                            * num_states_mult
+                                            * num_states_mult
                                             * num_chars
                                             * max_offsets
                                             * max_offsets)
-                                            + (in_state
-                                                * num_states
+                                            + (in_state as u128
+                                                * num_states_mult
                                                 * num_chars
                                                 * max_offsets
                                                 * max_offsets)
-                                            + (out_state * num_chars * max_offsets * max_offsets)
-                                            + (c * max_offsets * max_offsets)
-                                            + (lower_offset * max_offsets)
-                                            + upper_offset,
+                                            + (out_state as u128
+                                                * num_chars
+                                                * max_offsets
+                                                * max_offsets)
+                                            + (c as u128 * max_offsets * max_offsets)
+                                            + (lower_offset as u128 * max_offsets)
+                                            + upper_offset as u128,
                                     )
                                     .rem_floor(cfg().field().modulus()),
+                                );
+
+                                println!(
+                                    "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
+                                    in_state, out_state, c, lower_offset, upper_offset, rel,
                                 );
                             } else if openset.is_full() {
                                 // [0,*]
@@ -180,24 +190,33 @@ pub fn normal_add_table<'a>(
                                 if rel > sub_max_rel {
                                     sub_max_rel = rel;
                                 }
+
                                 set_table.insert(
                                     Integer::from(
-                                        (rel * num_states
-                                            * num_states
+                                        (rel as u128
+                                            * num_states_mult
+                                            * num_states_mult
                                             * num_chars
                                             * max_offsets
                                             * max_offsets)
-                                            + (in_state
-                                                * num_states
+                                            + (in_state as u128
+                                                * num_states_mult
                                                 * num_chars
                                                 * max_offsets
                                                 * max_offsets)
-                                            + (out_state * num_chars * max_offsets * max_offsets)
-                                            + (c * max_offsets * max_offsets)
-                                            + (lower_offset * max_offsets)
-                                            + upper_offset,
+                                            + (out_state as u128
+                                                * num_chars
+                                                * max_offsets
+                                                * max_offsets)
+                                            + (c as u128 * max_offsets * max_offsets)
+                                            + (lower_offset as u128 * max_offsets)
+                                            + upper_offset as u128,
                                     )
                                     .rem_floor(cfg().field().modulus()),
+                                );
+                                println!(
+                                    "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
+                                    in_state, out_state, c, lower_offset, upper_offset, rel,
                                 );
                             } else {
                                 // ranges
@@ -229,25 +248,30 @@ pub fn normal_add_table<'a>(
 
                                     set_table.insert(
                                         Integer::from(
-                                            (rel * num_states
-                                                * num_states
+                                            (rel as u128
+                                                * num_states_mult
+                                                * num_states_mult
                                                 * num_chars
                                                 * max_offsets
                                                 * max_offsets)
-                                                + (in_state
-                                                    * num_states
+                                                + (in_state as u128
+                                                    * num_states_mult
                                                     * num_chars
                                                     * max_offsets
                                                     * max_offsets)
-                                                + (out_state
+                                                + (out_state as u128
                                                     * num_chars
                                                     * max_offsets
                                                     * max_offsets)
-                                                + (c * max_offsets * max_offsets)
-                                                + (lower_offset * max_offsets)
-                                                + upper_offset,
+                                                + (c as u128 * max_offsets * max_offsets)
+                                                + (lower_offset as u128 * max_offsets)
+                                                + upper_offset as u128,
                                         )
                                         .rem_floor(cfg().field().modulus()),
+                                    );
+                                    println!(
+                                        "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
+                                        in_state, out_state, c, lower_offset, upper_offset, rel,
                                     );
                                 }
                             }
@@ -273,22 +297,30 @@ pub fn normal_add_table<'a>(
 
                             set_table.insert(
                                 Integer::from(
-                                    (rel * num_states
-                                        * num_states
+                                    (rel as u128
+                                        * num_states_mult
+                                        * num_states_mult
                                         * num_chars
                                         * max_offsets
                                         * max_offsets)
-                                        + (in_state
-                                            * num_states
+                                        + (in_state as u128
+                                            * num_states_mult
                                             * num_chars
                                             * max_offsets
                                             * max_offsets)
-                                        + (out_state * num_chars * max_offsets * max_offsets)
-                                        + (c * max_offsets * max_offsets)
-                                        + (lower_offset * max_offsets)
-                                        + upper_offset,
+                                        + (out_state as u128
+                                            * num_chars
+                                            * max_offsets
+                                            * max_offsets)
+                                        + (c as u128 * max_offsets * max_offsets)
+                                        + (lower_offset as u128 * max_offsets)
+                                        + upper_offset as u128,
                                 )
                                 .rem_floor(cfg().field().modulus()),
+                            );
+                            println!(
+                                "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
+                                in_state, out_state, c, lower_offset, upper_offset, rel,
                             );
                         }
                     }
@@ -328,15 +360,26 @@ pub fn normal_add_table<'a>(
                 */
 
                 let c = num_ab[&Some(26u8 as char)]; // we can only pop after EOF - this constraint
-                                                     // assures it
+
+                // assures it
+
                 set_table.insert(
                     Integer::from(
-                        (rel * num_states * num_states * num_chars * max_offsets * max_offsets)
-                            + (in_state * num_states * num_chars * max_offsets * max_offsets)
-                            + (out_state * num_chars * max_offsets * max_offsets)
-                            + (c * max_offsets * max_offsets)
-                            + (lower_offset * max_offsets)
-                            + upper_offset,
+                        (rel as u128
+                            * num_states_mult
+                            * num_states_mult
+                            * num_chars
+                            * max_offsets
+                            * max_offsets)
+                            + (in_state as u128
+                                * num_states_mult
+                                * num_chars
+                                * max_offsets
+                                * max_offsets)
+                            + (out_state as u128 * num_chars * max_offsets * max_offsets)
+                            + (c as u128 * max_offsets * max_offsets)
+                            + (lower_offset as u128 * max_offsets)
+                            + upper_offset as u128,
                     )
                     .rem_floor(cfg().field().modulus()),
                 );

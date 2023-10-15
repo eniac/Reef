@@ -88,16 +88,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // generate T
         let mut num_states = safa.g.node_count();
-        let kid_padding = num_states;
+        let kid_padding = num_states as usize;
         num_states += 1;
         let exit_state = num_states;
         num_states += 1;
 
-        let num_chars = num_ab.len();
-
-        let mut max_offsets = safa.max_skip_offset().max(1);
-        let star_offset = max_offsets;
-        max_offsets += 1;
+        let mut max_offsets = safa.max_skip_offset().max(1) as usize;
+        let star_offset = max_offsets + 1;
+        max_offsets += 2;
 
         let max_branches = safa.max_forall_fanout().max(1);
 
@@ -118,6 +116,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut max_stack = 1;
         let mut max_rel = 1;
 
+        let num_chars = num_ab.len() as u128;
+        let num_states_mult = num_states as u128;
+        let max_offsets_mult = max_offsets as u128;
+
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             //println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
@@ -132,11 +134,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     and_states.push(and_edges[i].target().index());
                 }
                 // add epsilon loop
-                let in_state = all_state.index();
-                let out_state = all_state.index();
+                let in_state = all_state.index() as usize;
+                let out_state = all_state.index() as usize;
                 let lower_offset = 0;
                 let upper_offset = 0;
-                let c = num_ab[&None]; //EPSILON
+                let c = num_ab[&None] as usize; //EPSILON
 
                 let rel = calc_rel(
                     all_state.index(),
@@ -154,12 +156,21 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
                 set_table.insert(
                     Integer::from(
-                        (rel * num_states * num_states * num_chars * max_offsets * max_offsets)
-                            + (in_state * num_states * num_chars * max_offsets * max_offsets)
-                            + (out_state * num_chars * max_offsets * max_offsets)
-                            + (c * max_offsets * max_offsets)
-                            + (lower_offset * max_offsets)
-                            + upper_offset,
+                        (rel as u128
+                            * num_states_mult
+                            * num_states_mult
+                            * num_chars
+                            * max_offsets_mult
+                            * max_offsets_mult)
+                            + (in_state as u128
+                                * num_states_mult
+                                * num_chars
+                                * max_offsets_mult
+                                * max_offsets_mult)
+                            + (out_state as u128 * num_chars * max_offsets_mult * max_offsets_mult)
+                            + (c as u128 * max_offsets_mult * max_offsets_mult)
+                            + (lower_offset as u128 * max_offsets_mult)
+                            + upper_offset as u128,
                     )
                     .rem_floor(cfg().field().modulus()),
                 );
@@ -197,26 +208,26 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                     if rel > max_rel {
                                         max_rel = rel;
                                     }
-
                                     set_table.insert(
                                         Integer::from(
-                                            (rel * num_states
-                                                * num_states
+                                            (rel as u128
+                                                * num_states_mult
+                                                * num_states_mult
                                                 * num_chars
-                                                * max_offsets
-                                                * max_offsets)
-                                                + (in_state
-                                                    * num_states
+                                                * max_offsets_mult
+                                                * max_offsets_mult)
+                                                + (in_state as u128
+                                                    * num_states_mult
                                                     * num_chars
-                                                    * max_offsets
-                                                    * max_offsets)
-                                                + (out_state
+                                                    * max_offsets_mult
+                                                    * max_offsets_mult)
+                                                + (out_state as u128
                                                     * num_chars
-                                                    * max_offsets
-                                                    * max_offsets)
-                                                + (c * max_offsets * max_offsets)
-                                                + (lower_offset * max_offsets)
-                                                + upper_offset,
+                                                    * max_offsets_mult
+                                                    * max_offsets_mult)
+                                                + (c as u128 * max_offsets_mult * max_offsets_mult)
+                                                + (lower_offset as u128 * max_offsets_mult)
+                                                + upper_offset as u128,
                                         )
                                         .rem_floor(cfg().field().modulus()),
                                     );
@@ -255,7 +266,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     num_chars,
                     kid_padding,
                     max_branches,
-                    max_offsets,
+                    max_offsets_mult,
                     star_offset,
                     NodeIndex::new(kids[k]),
                     backtrace_state,
@@ -282,7 +293,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_chars,
             kid_padding,
             max_branches,
-            max_offsets,
+            max_offsets_mult,
             star_offset,
             safa.get_init(), //exists_state,
             exit_state,      // backtrace state
@@ -303,12 +314,21 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         set_table.insert(
             Integer::from(
-                (rel * num_states * num_states * num_chars * max_offsets * max_offsets)
-                    + (in_state * num_states * num_chars * max_offsets * max_offsets)
-                    + (out_state * num_chars * max_offsets * max_offsets)
-                    + (c * max_offsets * max_offsets)
-                    + (lower_offset * max_offsets)
-                    + upper_offset,
+                (rel as u128
+                    * num_states_mult
+                    * num_states_mult
+                    * num_chars
+                    * max_offsets_mult
+                    * max_offsets_mult)
+                    + (in_state as u128
+                        * num_states_mult
+                        * num_chars
+                        * max_offsets_mult
+                        * max_offsets_mult)
+                    + (out_state as u128 * num_chars * max_offsets_mult * max_offsets_mult)
+                    + (c as u128 * max_offsets_mult * max_offsets_mult)
+                    + (lower_offset as u128 * max_offsets_mult)
+                    + upper_offset as u128,
             )
             .rem_floor(cfg().field().modulus()),
         );
@@ -318,15 +338,23 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // need to round out table size ?
         let base: usize = 2;
         let calc_fill = Integer::from(
-            (max_rel * num_states * num_states * num_chars * max_offsets * max_offsets)
-                + (num_states * num_states * num_chars * max_offsets * max_offsets)
-                + (num_states * num_chars * max_offsets * max_offsets)
-                + (num_chars * max_offsets * max_offsets)
-                + (max_offsets * max_offsets)
-                + max_offsets,
+            (max_rel as u128
+                * num_states_mult
+                * num_states_mult
+                * num_chars
+                * max_offsets_mult
+                * max_offsets_mult)
+                + (num_states_mult
+                    * num_states_mult
+                    * num_chars
+                    * max_offsets_mult
+                    * max_offsets_mult)
+                + (num_states_mult * num_chars * max_offsets_mult * max_offsets_mult)
+                + (num_chars * max_offsets_mult * max_offsets_mult)
+                + (max_offsets_mult * max_offsets_mult)
+                + max_offsets_mult,
         );
 
-        assert!(calc_fill < cfg().field().modulus().clone());
         while table.len() < base.pow(logmn(table.len()) as u32) {
             table.push(calc_fill.clone());
         }
@@ -467,6 +495,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         assert!((merkle && hybrid_len.is_none() && doc_subset.is_none()) || !merkle);
         assert!(batch_size > 1);
 
+        println!(
+            "num states {}, max offset {}, num_chars {}",
+            num_states, max_offsets, num_chars
+        );
+
         Self {
             safa,
             foralls_w_kids,
@@ -526,8 +559,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     // check if we need vs as vars
     fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
-        let num_chars = self.num_ab.len();
+        let num_chars = self.num_ab.len() as u128;
         let bit_limit = logmn(self.num_states);
+        let num_states = self.num_states as u128;
+        let max_offsets = self.max_offsets as u128;
 
         let mut v = vec![];
         for i in 1..(self.batch_size + 1) {
@@ -568,11 +603,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                                         vec![
                                                             new_var(format!("rel_{}", i - 1)),
                                                             new_const(
-                                                                self.num_states
-                                                                    * self.num_states
+                                                                num_states
+                                                                    * num_states
                                                                     * num_chars
-                                                                    * self.max_offsets
-                                                                    * self.max_offsets,
+                                                                    * max_offsets
+                                                                    * max_offsets,
                                                             ),
                                                         ],
                                                     ),
@@ -581,10 +616,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                                         vec![
                                                             new_var(format!("state_{}", i - 1)),
                                                             new_const(
-                                                                self.num_states
+                                                                num_states
                                                                     * num_chars
-                                                                    * self.max_offsets
-                                                                    * self.max_offsets,
+                                                                    * max_offsets
+                                                                    * max_offsets,
                                                             ),
                                                         ],
                                                     ),
@@ -595,9 +630,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                                 vec![
                                                     new_var(format!("state_{}", i)),
                                                     new_const(
-                                                        num_chars
-                                                            * self.max_offsets
-                                                            * self.max_offsets,
+                                                        num_chars * max_offsets * max_offsets,
                                                     ),
                                                 ],
                                             ),
@@ -607,7 +640,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                         Op::PfNaryOp(PfNaryOp::Mul),
                                         vec![
                                             new_var(format!("char_{}", i - 1)),
-                                            new_const(self.max_offsets * self.max_offsets),
+                                            new_const(max_offsets * max_offsets),
                                         ],
                                     ),
                                 ],
@@ -616,7 +649,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 Op::PfNaryOp(PfNaryOp::Mul),
                                 vec![
                                     new_var(format!("lower_offset_{}", i - 1)),
-                                    new_const(self.max_offsets),
+                                    new_const(max_offsets),
                                 ],
                             ),
                         ],
@@ -1054,9 +1087,17 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     ),
                 ],
             );
-            self.assertions.push(cursor_plus);
+            //        self.assertions.push(cursor_plus);
 
             let bit_limit = logmn(max(self.udoc.len(), self.max_offsets));
+            /*println!(
+                "BIT LIMIT {} max {} star {} max {}",
+                bit_limit,
+                self.max_offsets,
+                self.star_offset,
+                max(self.udoc.len(), self.max_offsets)
+            );*/
+
             let cur_overflow = term(
                 Op::BvBinPred(BvBinPred::Uge),
                 vec![
@@ -1757,35 +1798,31 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("rel_{}", i), new_wit(rel_i));
         wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i)); // alreaded "added" here
 
-        // v_i =
-        let num_chars = self.num_ab.len();
+        let num_chars = self.num_ab.len() as u128;
+        let num_states = self.num_states as u128;
+        let max_offsets = self.max_offsets as u128;
 
         // TODO check overflow
         let v_i = Integer::from(
-            (rel_i
-                * self.num_states
-                * self.num_states
-                * num_chars
-                * self.max_offsets
-                * self.max_offsets)
-                + (state_i * self.num_states * num_chars * self.max_offsets * self.max_offsets)
-                + (next_state * num_chars * self.max_offsets * self.max_offsets)
-                + (char_num * self.max_offsets * self.max_offsets)
-                + (lower_offset_i * self.max_offsets)
-                + upper_offset_i,
+            (rel_i as u128 * num_states * num_states * num_chars * max_offsets * max_offsets)
+                + (state_i as u128 * num_states * num_chars * max_offsets * max_offsets)
+                + (next_state as u128 * num_chars * max_offsets * max_offsets)
+                + (char_num as u128 * max_offsets * max_offsets)
+                + (lower_offset_i as u128 * max_offsets)
+                + upper_offset_i as u128,
         )
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        /*println!(
+        println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
         );
         println!(
             "Lower off {:#?}, off {:#?}, upper off {:#?}",
             lower_offset_i, offset_i, upper_offset_i
-        );*/
+        );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1857,33 +1894,30 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i)); // alreaded "added" here
 
         // v_i =
-        let num_chars = self.num_ab.len();
+        let num_chars = self.num_ab.len() as u128;
+        let num_states = self.num_states as u128;
+        let max_offsets = self.max_offsets as u128;
 
         let v_i = Integer::from(
-            (rel_i
-                * self.num_states
-                * self.num_states
-                * num_chars
-                * self.max_offsets
-                * self.max_offsets)
-                + (state_i * self.num_states * num_chars * self.max_offsets * self.max_offsets)
-                + (next_state * num_chars * self.max_offsets * self.max_offsets)
-                + (char_num * self.max_offsets * self.max_offsets)
-                + (lower_offset_i * self.max_offsets)
-                + upper_offset_i,
+            (rel_i as u128 * num_states * num_states * num_chars * max_offsets * max_offsets)
+                + (state_i as u128 * num_states * num_chars * max_offsets * max_offsets)
+                + (next_state as u128 * num_chars * max_offsets * max_offsets)
+                + (char_num as u128 * max_offsets * max_offsets)
+                + (lower_offset_i as u128 * max_offsets)
+                + upper_offset_i as u128,
         )
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        /*println!(
+        println!(
             "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
             i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
         );
         println!(
             "Lower off {:#?}, off {:#?}, upper off {:#?}",
             lower_offset_i, offset_i, upper_offset_i
-        );*/
+        );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -2787,6 +2821,23 @@ mod tests {
     fn ab(s: &str) -> String {
         let mut a = s.to_string();
         a
+    }
+
+    #[test]
+    fn make_safa_bug() {
+        init();
+        test_func_no_hash(
+            ab("ATGC"),
+            reg("^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG$"),
+
+        ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+            vec![2], // 2],
+            true,
+            None,
+            false,
+            false,
+            true,
+        );
     }
 
     #[test]
