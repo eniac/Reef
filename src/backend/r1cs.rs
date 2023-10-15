@@ -560,7 +560,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     // check if we need vs as vars
     fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
         let num_chars = self.num_ab.len() as u128;
-        let bit_limit = logmn(self.num_states);
+        let bit_limit = logmn(self.num_states) + 1;
         let num_states = self.num_states as u128;
         let max_offsets = self.max_offsets as u128;
 
@@ -826,7 +826,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     fn hashed_push_rel(&mut self) -> Term {
         let mut hashed_state_var = new_const(4);
-        let states_bit_limit = logmn(self.num_states);
+        let states_bit_limit = logmn(self.num_states) + 1;
         for k in 0..self.max_branches {
             hashed_state_var = term(
                 Op::PfNaryOp(PfNaryOp::Add),
@@ -1001,7 +1001,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // if pop, check new_cursor < prev
-        let cur_bit_limit = logmn(self.udoc.len());
+        let cur_bit_limit = logmn(self.udoc.len()) + 1;
         let cursor_overflow = term(
             Op::BvBinPred(BvBinPred::Uge),
             vec![
@@ -1089,7 +1089,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
             //        self.assertions.push(cursor_plus);
 
-            let bit_limit = logmn(max(self.udoc.len(), self.max_offsets));
+            let bit_limit = logmn(max(self.udoc.len(), self.max_offsets)) + 1;
             /*println!(
                 "BIT LIMIT {} max {} star {} max {}",
                 bit_limit,
