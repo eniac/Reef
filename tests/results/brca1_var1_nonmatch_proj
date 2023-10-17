@@ -1,21 +1,21 @@
-./tests/do_43054295,^.{43050079}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG.*AGCCTACAAGAAAGTACGAGATTTAGTCAACTTGTTGAAGAGCTATTGAAAATCATTTGTGCTTTTCAGCTTGACACAGGTTTGGAGT.*ATGCAAACAGCTATAATTTTGCAAAAAAGGAAAATAACTCTCCTGAACATCTAAAAGATGAAGTTTCTATCATCCAAAGTATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG,1509,305
+./tests/do_43054295,^.{43050079}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG.*AGCCTACAAGAAAGTACGAGATTTAGTCAACTTGTTGAAGAGCTATTGAAAATCATTTGTGCTTTTCAGCTTGACACAGGTTTGGAGT.*ATGCAAACAGCTATAATTTTGCAAAAAAGGAAAATAACTCTCCTGAACATCTAAAAGATGAAGTTTCTATCATCCAAAGTATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG,1506,305
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-compiler,R1CS,To Circuit,21885,μs
-prover,prove,prove_0,409406,μs
-solver,Witness Generation,step_0,60138,μs
-verifier,Verification,Final Checks Consistency Verification,1233887,μs
-prover,Proof,Compressed SNARK,2796095,μs
-prover,Prover,Full,16551168,μs
-compiler,R1CS,R1CS precomputations,6058857,μs
-verifier,Verification,Nova Verification,2099295,μs
-compiler,R1CS,Proof Setup,9114908,μs
-compiler,R1CS,Commitment Generations,21575318,μs
-solver,Solve,Full,167810833,μs
-compiler,Compiler,Full,216042019,μs
-compiler,SAFA,SAFA,11621451,μs
-verifier,Verification,Full,3334074,μs
-prover,Proof,Consistency Proofs,13181270,μs
-prover,add test,Primary Circuit,25387,constraints
+verifier,Verification,Final Checks Consistency Verification,1188928,μs
+compiler,Compiler,Full,62915392,μs
+prover,Proof,Consistency Proofs,14847177,μs
+solver,Witness Generation,step_0,60423,μs
+compiler,SAFA,SAFA,12155567,μs
+prover,prove,prove_0,281050,μs
+prover,Prover,Full,17867360,μs
+verifier,Verification,Nova Verification,2030837,μs
+compiler,R1CS,Proof Setup,9346513,μs
+verifier,Verification,Full,3222837,μs
+compiler,R1CS,To Circuit,21594,μs
+prover,Proof,Compressed SNARK,2571376,μs
+compiler,R1CS,R1CS precomputations,6013625,μs
+compiler,R1CS,Commitment Generations,21311098,μs
+solver,Solve,Full,14337319,μs
 prover,add test,Secondary Circuit,10347,constraints
-prover,Proof Size,Compressed SNARK size,74578,bytes
+prover,add test,Primary Circuit,25387,constraints
+prover,Proof Size,Compressed SNARK size,74589,bytes
