@@ -1815,14 +1815,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        println!(
-            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );
-        println!(
-            "Lower off {:#?}, off {:#?}, upper off {:#?}",
-            lower_offset_i, offset_i, upper_offset_i
-        );
+        // println!(
+        //     "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+        //     i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        // );
+        // println!(
+        //     "Lower off {:#?}, off {:#?}, upper off {:#?}",
+        //     lower_offset_i, offset_i, upper_offset_i
+        // );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 

@@ -20,13 +20,19 @@ echo "reef h"
 # RUST_BACKTRACE=1 ./target/release/reef --input 'adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323' --output ./tests/results/pihole_naive_2.txt --re "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]" ascii
 # echo "naive" 
 
-# cargo build --release --features 'metrics,reef'
+#  # cargo build --release --features 'metrics,reef'
+ echo "email"
+./tests/scripts/email_dkim.sh &> out_email
+ echo "email" 
+
 echo "dna"
 ./tests/scripts/dna.sh &> out_dna 
 echo "dna" 
 
-#  # cargo build --release --features 'metrics,reef'
-#  echo "email"
-# ./tests/scripts/email_dkim.sh &> out_email
-#  echo "email" 
+echo "pihole"
+./tests/scripts/pihole.sh &> out_pihole 
+echo "pihole" 
+
+
+
 

@@ -119,10 +119,15 @@ pub fn run_backend(
             temp_batch_size
         };
         batch_size += 1; // to last
-
+        
+        let n = (doc.len() as f32)/(batch_size as f32);
+        if (doc.len()>200) {
+            batch_size = (((batch_size as f32)/5.0).ceil() as usize);
+        }
+        
         if batch_size < 2 {
             batch_size = 2;
-        }
+        } 
         println!("BATCH SIZE {:#?}", batch_size);
 
         #[cfg(feature = "metrics")]
