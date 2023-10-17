@@ -502,12 +502,7 @@ impl SAFA<char> {
 
     /// Solve at the root
     pub fn solve(&self, doc: &Vec<char>) -> Option<Trace<char>> {
-        let start = Instant::now();
-        println!("Solving, doc length: {}...", doc.len());
-        let sol = self.solve_rec(self.get_init(), 0, doc);
-        let duration = start.elapsed();
-        println!("Time elapsed in solve() is: {:?}", duration);
-        sol
+        self.solve_rec(self.get_init(), 0, doc)
     }
 
     /// Produce a graph of the SAFA in a PDF file with [filename]
