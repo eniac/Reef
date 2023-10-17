@@ -21,13 +21,13 @@ cargo build --release --features 'metrics,reef'
 # echo "naive" 
 
 #  # cargo build --release --features 'metrics,reef'
- echo "email"
-./tests/scripts/email_dkim.sh &> out_email
- echo "email" 
+#  echo "email"
+# ./tests/scripts/email_dkim.sh &> out_email
+#  echo "email" 
 
-echo "dna"
-./tests/scripts/dna.sh &> out_dna 
-echo "dna" 
+# echo "dna"
+# ./tests/scripts/dna.sh &> out_dna 
+# echo "dna" 
 
 echo "pihole"
 ./tests/scripts/pihole.sh &> out_pihole 
