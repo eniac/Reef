@@ -1,253 +1,231 @@
 q1w2e3r4_8,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-compiler,R1CS,To Circuit,13410,μs
-prover,Proof,Compressed SNARK,2643627,μs
-solver,Witness Generation,step_1,55421,μs
-solver,Witness Generation,step_0,23378,μs
-verifier,Verification,Final Checks Consistency Verification,176209,μs
-verifier,Verification,Full,2233203,μs
-prover,prove,prove_0,199401,μs
-compiler,R1CS,Proof Setup,7291745,μs
-compiler,R1CS,R1CS precomputations,32798,μs
-verifier,Verification,Nova Verification,2056215,μs
-prover,Proof,Consistency Proofs,218634,μs
-compiler,SAFA,SAFA,865,μs
-compiler,R1CS,Commitment Generations,838248,μs
-solver,Solve,Full,79875,μs
-prover,Prover,Full,3409980,μs
-compiler,Compiler,Full,8181285,μs
-prover,prove,prove_1,346256,μs
+solver,Witness Generation,step_0,23185,μs
+verifier,Verification,Final Checks Consistency Verification,161230,μs
+prover,Proof,Consistency Proofs,301392,μs
+prover,prove,prove_0,304321,μs
+compiler,SAFA,SAFA,882,μs
+prover,Proof,Compressed SNARK,2553841,μs
+compiler,R1CS,Proof Setup,7445041,μs
+solver,Solve,Full,24234,μs
+compiler,R1CS,To Circuit,21534,μs
+prover,Prover,Full,3161320,μs
+verifier,Verification,Full,2271036,μs
+compiler,R1CS,Commitment Generations,843892,μs
+compiler,Compiler,Full,8347943,μs
+compiler,R1CS,R1CS precomputations,32753,μs
+verifier,Verification,Nova Verification,2108890,μs
+prover,add test,Primary Circuit,19144,constraints
 prover,add test,Secondary Circuit,10347,constraints
-prover,add test,Primary Circuit,18607,constraints
-prover,Proof Size,Compressed SNARK size,73640,bytes
+prover,Proof Size,Compressed SNARK size,73609,bytes
 12341234_8,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-verifier,Verification,Final Checks Consistency Verification,157137,μs
-prover,Proof,Compressed SNARK,2818433,μs
-prover,Proof,Consistency Proofs,218360,μs
-prover,Prover,Full,3894584,μs
-compiler,R1CS,To Circuit,13627,μs
-verifier,Verification,Nova Verification,2052964,μs
-compiler,R1CS,Proof Setup,7294039,μs
-prover,prove,prove_0,334324,μs
-compiler,R1CS,Commitment Generations,888109,μs
-solver,Witness Generation,step_0,44484,μs
-prover,prove,prove_1,521195,μs
-solver,Witness Generation,step_1,102412,μs
-compiler,Compiler,Full,8262611,μs
-compiler,R1CS,R1CS precomputations,60202,μs
-compiler,SAFA,SAFA,975,μs
-verifier,Verification,Full,2210877,μs
-solver,Solve,Full,148261,μs
+compiler,R1CS,Proof Setup,8024656,μs
+prover,prove,prove_0,358468,μs
+solver,Witness Generation,step_0,45541,μs
+verifier,Verification,Nova Verification,2068902,μs
+compiler,R1CS,R1CS precomputations,64998,μs
+compiler,Compiler,Full,9110923,μs
+prover,Prover,Full,3170553,μs
+compiler,SAFA,SAFA,1665,μs
+verifier,Verification,Full,2212428,μs
+verifier,Verification,Final Checks Consistency Verification,141910,μs
+prover,Proof,Compressed SNARK,2586969,μs
+compiler,R1CS,To Circuit,21131,μs
+compiler,R1CS,Commitment Generations,991831,μs
+prover,Proof,Consistency Proofs,222973,μs
+solver,Solve,Full,46551,μs
 prover,add test,Secondary Circuit,10347,constraints
-prover,add test,Primary Circuit,18607,constraints
-prover,Proof Size,Compressed SNARK size,73617,bytes
+prover,add test,Primary Circuit,19144,constraints
+prover,Proof Size,Compressed SNARK size,73636,bytes
 qwerty_6,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-compiler,SAFA,SAFA,981,μs
-solver,Witness Generation,step_1,54858,μs
-prover,Proof,Consistency Proofs,221431,μs
-compiler,R1CS,Proof Setup,8001615,μs
-prover,Prover,Full,3611168,μs
-solver,Witness Generation,step_0,23192,μs
-prover,Proof,Compressed SNARK,2805008,μs
-verifier,Verification,Final Checks Consistency Verification,127326,μs
-verifier,Verification,Nova Verification,1827956,μs
-compiler,Compiler,Full,8933144,μs
-compiler,R1CS,R1CS precomputations,37173,μs
-compiler,R1CS,Commitment Generations,875130,μs
-compiler,R1CS,To Circuit,13446,μs
-solver,Solve,Full,78845,μs
-prover,prove,prove_0,199094,μs
-prover,prove,prove_1,383710,μs
-verifier,Verification,Full,1956608,μs
+prover,Proof,Compressed SNARK,2271602,μs
+verifier,Verification,Full,2231796,μs
+solver,Witness Generation,step_0,23320,μs
+compiler,Compiler,Full,8977376,μs
+prover,prove,prove_0,196613,μs
+prover,Prover,Full,2687922,μs
+compiler,R1CS,Commitment Generations,870182,μs
+compiler,SAFA,SAFA,995,μs
+compiler,R1CS,To Circuit,21261,μs
+compiler,R1CS,Proof Setup,8043008,μs
+solver,Solve,Full,23973,μs
+verifier,Verification,Nova Verification,2075449,μs
+verifier,Verification,Final Checks Consistency Verification,155488,μs
+compiler,R1CS,R1CS precomputations,37192,μs
+prover,Proof,Consistency Proofs,218083,μs
 prover,add test,Secondary Circuit,10347,constraints
-prover,add test,Primary Circuit,18604,constraints
-prover,Proof Size,Compressed SNARK size,73598,bytes
+prover,add test,Primary Circuit,19141,constraints
+prover,Proof Size,Compressed SNARK size,73640,bytes
 1234561_7,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-verifier,Verification,Final Checks Consistency Verification,130742,μs
-compiler,R1CS,To Circuit,13401,μs
-prover,Prover,Full,3705118,μs
-compiler,R1CS,Proof Setup,7990303,μs
-compiler,R1CS,Commitment Generations,837566,μs
-prover,Proof,Consistency Proofs,217953,μs
-verifier,Verification,Nova Verification,2050878,μs
-solver,Witness Generation,step_0,23265,μs
-prover,Proof,Compressed SNARK,2660204,μs
-compiler,R1CS,R1CS precomputations,32788,μs
-solver,Solve,Full,78944,μs
-verifier,Verification,Full,2183473,μs
-prover,prove,prove_1,517775,μs
-solver,Witness Generation,step_1,54828,μs
-prover,prove,prove_0,306720,μs
-compiler,Compiler,Full,8879487,μs
-compiler,SAFA,SAFA,868,μs
+solver,Solve,Full,25565,μs
+verifier,Verification,Final Checks Consistency Verification,126294,μs
+prover,Prover,Full,3000002,μs
+verifier,Verification,Full,1939697,μs
+prover,Proof,Compressed SNARK,2576711,μs
+solver,Witness Generation,step_0,24703,μs
+prover,Proof,Consistency Proofs,218598,μs
+compiler,Compiler,Full,9091248,μs
+compiler,SAFA,SAFA,998,μs
+prover,prove,prove_0,202579,μs
+compiler,R1CS,R1CS precomputations,65317,μs
+compiler,R1CS,Commitment Generations,986153,μs
+verifier,Verification,Nova Verification,1811974,μs
+compiler,R1CS,To Circuit,21308,μs
+compiler,R1CS,Proof Setup,8012694,μs
+prover,add test,Primary Circuit,19144,constraints
 prover,add test,Secondary Circuit,10347,constraints
-prover,add test,Primary Circuit,18607,constraints
-prover,Proof Size,Compressed SNARK size,73690,bytes
+prover,Proof Size,Compressed SNARK size,73702,bytes
 vip_3,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-prover,Proof,Compressed SNARK,2712708,μs
-compiler,R1CS,To Circuit,13320,μs
-compiler,R1CS,Proof Setup,8057035,μs
-compiler,R1CS,Commitment Generations,903633,μs
-verifier,Verification,Full,2027694,μs
-solver,Witness Generation,step_1,55525,μs
-prover,Proof,Consistency Proofs,242319,μs
-verifier,Verification,Final Checks Consistency Verification,140610,μs
-compiler,SAFA,SAFA,1037,μs
-prover,Prover,Full,3572010,μs
-solver,Witness Generation,step_0,23338,μs
-compiler,Compiler,Full,9019165,μs
-solver,Solve,Full,79359,μs
-prover,prove,prove_0,198607,μs
-verifier,Verification,Nova Verification,1886549,μs
-compiler,R1CS,R1CS precomputations,39070,μs
-prover,prove,prove_1,416315,μs
+verifier,Verification,Nova Verification,1963198,μs
+prover,prove,prove_0,307844,μs
+compiler,R1CS,R1CS precomputations,32807,μs
+compiler,R1CS,Commitment Generations,839157,μs
+solver,Solve,Full,24107,μs
+verifier,Verification,Final Checks Consistency Verification,142281,μs
+prover,Prover,Full,3001815,μs
+prover,Proof,Consistency Proofs,243883,μs
+compiler,R1CS,Proof Setup,7432430,μs
+solver,Witness Generation,step_0,23465,μs
+compiler,SAFA,SAFA,878,μs
+compiler,Compiler,Full,8329371,μs
+prover,Proof,Compressed SNARK,2448259,μs
+compiler,R1CS,To Circuit,21117,μs
+verifier,Verification,Full,2106113,μs
+prover,add test,Primary Circuit,19141,constraints
 prover,add test,Secondary Circuit,10347,constraints
-prover,add test,Primary Circuit,18604,constraints
-prover,Proof Size,Compressed SNARK size,73634,bytes
+prover,Proof Size,Compressed SNARK size,73702,bytes
 jordan23_8,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-verifier,Verification,Nova Verification,2006694,μs
-solver,Witness Generation,step_1,54829,μs
-compiler,R1CS,Commitment Generations,865344,μs
-compiler,R1CS,R1CS precomputations,37242,μs
-compiler,SAFA,SAFA,988,μs
-compiler,R1CS,To Circuit,13512,μs
-prover,Proof,Compressed SNARK,2873573,μs
-verifier,Verification,Full,2132477,μs
-prover,prove,prove_0,306336,μs
-prover,Prover,Full,3958175,μs
-solver,Solve,Full,79040,μs
-verifier,Verification,Final Checks Consistency Verification,124027,μs
-prover,Proof,Consistency Proofs,244779,μs
-prover,prove,prove_1,531208,μs
-compiler,R1CS,Proof Setup,7964001,μs
-compiler,Compiler,Full,8885156,μs
-solver,Witness Generation,step_0,23103,μs
-prover,add test,Primary Circuit,18607,constraints
+compiler,R1CS,Commitment Generations,865862,μs
+verifier,Verification,Nova Verification,2090910,μs
+compiler,Compiler,Full,8931166,μs
+solver,Solve,Full,24424,μs
+verifier,Verification,Full,2232106,μs
+prover,Proof,Compressed SNARK,2353123,μs
+compiler,SAFA,SAFA,1002,μs
+verifier,Verification,Final Checks Consistency Verification,140630,μs
+compiler,R1CS,To Circuit,21082,μs
+prover,Proof,Consistency Proofs,219328,μs
+compiler,R1CS,Proof Setup,8001890,μs
+compiler,R1CS,R1CS precomputations,37210,μs
+prover,prove,prove_0,199328,μs
+solver,Witness Generation,step_0,23545,μs
+prover,Prover,Full,2773350,μs
 prover,add test,Secondary Circuit,10347,constraints
-prover,Proof Size,Compressed SNARK size,73625,bytes
+prover,add test,Primary Circuit,19144,constraints
+prover,Proof Size,Compressed SNARK size,73615,bytes
 family_6,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-prover,prove,prove_1,401191,μs
-verifier,Verification,Nova Verification,1959972,μs
-prover,Prover,Full,3520894,μs
-prover,Proof,Compressed SNARK,2660901,μs
-compiler,R1CS,Proof Setup,7970053,μs
-compiler,R1CS,Commitment Generations,837737,μs
-verifier,Verification,Final Checks Consistency Verification,125221,μs
-compiler,Compiler,Full,8858907,μs
-compiler,R1CS,R1CS precomputations,32845,μs
-prover,prove,prove_0,199929,μs
-solver,Solve,Full,79784,μs
-solver,Witness Generation,step_1,55277,μs
-verifier,Verification,Full,2085902,μs
-prover,Proof,Consistency Proofs,256268,μs
-solver,Witness Generation,step_0,23801,μs
-compiler,SAFA,SAFA,871,μs
-compiler,R1CS,To Circuit,13337,μs
+verifier,Verification,Nova Verification,2157409,μs
+prover,Prover,Full,3380722,μs
+compiler,R1CS,R1CS precomputations,37331,μs
+compiler,SAFA,SAFA,995,μs
+compiler,R1CS,Proof Setup,7711727,μs
+prover,prove,prove_0,208295,μs
+solver,Solve,Full,23877,μs
+compiler,Compiler,Full,8645023,μs
+compiler,R1CS,To Circuit,21668,μs
+solver,Witness Generation,step_0,23250,μs
+verifier,Verification,Full,2297696,μs
+prover,Proof,Compressed SNARK,2836078,μs
+prover,Proof,Consistency Proofs,333663,μs
+verifier,Verification,Final Checks Consistency Verification,139707,μs
+compiler,R1CS,Commitment Generations,868390,μs
+prover,add test,Primary Circuit,19141,constraints
 prover,add test,Secondary Circuit,10347,constraints
-prover,add test,Primary Circuit,18604,constraints
-prover,Proof Size,Compressed SNARK size,73592,bytes
+prover,Proof Size,Compressed SNARK size,73732,bytes
 11111111_8,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-prover,prove,prove_0,351302,μs
-solver,Witness Generation,step_1,62513,μs
-compiler,SAFA,SAFA,890,μs
-prover,Proof,Compressed SNARK,2598995,μs
-compiler,Compiler,Full,7960763,μs
-compiler,R1CS,Commitment Generations,836977,μs
-verifier,Verification,Full,2181205,μs
-verifier,Verification,Nova Verification,2039460,μs
-prover,Proof,Consistency Proofs,223985,μs
-compiler,R1CS,To Circuit,13389,μs
-solver,Witness Generation,step_0,26387,μs
-prover,prove,prove_1,546807,μs
-prover,Prover,Full,3723560,μs
-solver,Solve,Full,89858,μs
-verifier,Verification,Final Checks Consistency Verification,140679,μs
-compiler,R1CS,R1CS precomputations,33123,μs
-compiler,R1CS,Proof Setup,7071881,μs
-prover,add test,Primary Circuit,18607,constraints
+verifier,Verification,Final Checks Consistency Verification,178431,μs
+compiler,R1CS,To Circuit,20995,μs
+solver,Witness Generation,step_0,23292,μs
+compiler,SAFA,SAFA,1048,μs
+compiler,R1CS,R1CS precomputations,39000,μs
+prover,Prover,Full,2809340,μs
+compiler,Compiler,Full,9034514,μs
+compiler,R1CS,Commitment Generations,910163,μs
+solver,Solve,Full,24464,μs
+prover,Proof,Consistency Proofs,219582,μs
+compiler,R1CS,Proof Setup,8057599,μs
+prover,prove,prove_0,202282,μs
+prover,Proof,Compressed SNARK,2385866,μs
+verifier,Verification,Full,2196789,μs
+verifier,Verification,Nova Verification,2017812,μs
 prover,add test,Secondary Circuit,10347,constraints
-prover,Proof Size,Compressed SNARK size,73580,bytes
+prover,add test,Primary Circuit,19144,constraints
+prover,Proof Size,Compressed SNARK size,73646,bytes
 123qwe_6,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-solver,Witness Generation,step_0,23170,μs
-solver,Witness Generation,step_1,55265,μs
-verifier,Verification,Nova Verification,2047914,μs
-compiler,Compiler,Full,8897998,μs
-prover,prove,prove_0,201465,μs
-compiler,R1CS,Commitment Generations,867161,μs
-prover,Prover,Full,3404177,μs
-prover,prove,prove_1,382962,μs
-prover,Proof,Consistency Proofs,236519,μs
-verifier,Verification,Full,2173480,μs
-solver,Solve,Full,79157,μs
-compiler,R1CS,To Circuit,13306,μs
-verifier,Verification,Final Checks Consistency Verification,124173,μs
-compiler,R1CS,R1CS precomputations,37213,μs
-prover,Proof,Compressed SNARK,2580326,μs
-compiler,R1CS,Proof Setup,7976076,μs
-compiler,SAFA,SAFA,985,μs
-prover,add test,Primary Circuit,18604,constraints
+compiler,SAFA,SAFA,1001,μs
+verifier,Verification,Nova Verification,2043132,μs
+compiler,R1CS,Proof Setup,7397803,μs
+solver,Solve,Full,24678,μs
+prover,Prover,Full,2889711,μs
+prover,Proof,Consistency Proofs,217283,μs
+verifier,Verification,Full,2265775,μs
+solver,Witness Generation,step_0,23150,μs
+verifier,Verification,Final Checks Consistency Verification,219700,μs
+compiler,R1CS,R1CS precomputations,37191,μs
+compiler,R1CS,Commitment Generations,870986,μs
+compiler,R1CS,To Circuit,21103,μs
+prover,prove,prove_0,204063,μs
+prover,Proof,Compressed SNARK,2466850,μs
+compiler,Compiler,Full,8332659,μs
 prover,add test,Secondary Circuit,10347,constraints
-prover,Proof Size,Compressed SNARK size,73603,bytes
+prover,add test,Primary Circuit,19141,constraints
+prover,Proof Size,Compressed SNARK size,73689,bytes
 freedom_7,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-compiler,Compiler,Full,7944912,μs
-compiler,R1CS,To Circuit,13358,μs
-prover,prove,prove_0,308306,μs
-prover,prove,prove_1,550740,μs
-prover,Prover,Full,3920988,μs
-verifier,Verification,Full,2078212,μs
-verifier,Verification,Final Checks Consistency Verification,126185,μs
-prover,Proof,Compressed SNARK,2810502,μs
-compiler,R1CS,R1CS precomputations,32976,μs
-compiler,R1CS,Proof Setup,7055034,μs
-compiler,R1CS,Commitment Generations,838740,μs
-solver,Witness Generation,step_0,23578,μs
-solver,Solve,Full,81447,μs
-compiler,SAFA,SAFA,867,μs
-verifier,Verification,Nova Verification,1950498,μs
-prover,Proof,Consistency Proofs,248689,μs
-solver,Witness Generation,step_1,56707,μs
+compiler,R1CS,To Circuit,21680,μs
+prover,Proof,Consistency Proofs,254773,μs
+verifier,Verification,Nova Verification,1987294,μs
+compiler,R1CS,R1CS precomputations,60223,μs
+compiler,SAFA,SAFA,1552,μs
+solver,Witness Generation,step_0,23586,μs
+prover,Proof,Compressed SNARK,2808176,μs
+compiler,R1CS,Commitment Generations,917846,μs
+prover,prove,prove_0,306937,μs
+prover,Prover,Full,3372551,μs
+solver,Solve,Full,24535,μs
+compiler,R1CS,Proof Setup,7928458,μs
+compiler,Compiler,Full,8935594,μs
+verifier,Verification,Full,2130632,μs
+verifier,Verification,Final Checks Consistency Verification,141904,μs
+prover,add test,Primary Circuit,19144,constraints
 prover,add test,Secondary Circuit,10347,constraints
-prover,add test,Primary Circuit,18607,constraints
-prover,Proof Size,Compressed SNARK size,73702,bytes
+prover,Proof Size,Compressed SNARK size,73681,bytes
 password1_9,^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$,1188,21
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-compiler,R1CS,To Circuit,13349,μs
-verifier,Verification,Final Checks Consistency Verification,178566,μs
-compiler,SAFA,SAFA,908,μs
-solver,Witness Generation,step_1,54512,μs
-verifier,Verification,Nova Verification,2067689,μs
-prover,Prover,Full,3521481,μs
-prover,Proof,Consistency Proofs,220919,μs
-verifier,Verification,Full,2250162,μs
-prover,prove,prove_0,360946,μs
-prover,prove,prove_1,530177,μs
-prover,Proof,Compressed SNARK,2406729,μs
-compiler,Compiler,Full,7646903,μs
-solver,Solve,Full,78576,μs
-compiler,R1CS,Commitment Generations,836344,μs
-compiler,R1CS,R1CS precomputations,32936,μs
-compiler,R1CS,Proof Setup,6759388,μs
-solver,Witness Generation,step_0,22984,μs
-prover,add test,Primary Circuit,18607,constraints
+verifier,Verification,Nova Verification,1959454,μs
+prover,prove,prove_0,210234,μs
+compiler,R1CS,Proof Setup,7699634,μs
+compiler,R1CS,R1CS precomputations,37192,μs
+verifier,Verification,Full,2084967,μs
+prover,Proof,Consistency Proofs,227693,μs
+prover,Proof,Compressed SNARK,2521713,μs
+compiler,Compiler,Full,8626619,μs
+compiler,R1CS,Commitment Generations,862971,μs
+solver,Witness Generation,step_0,23172,μs
+verifier,Verification,Final Checks Consistency Verification,124998,μs
+prover,Prover,Full,2961370,μs
+compiler,SAFA,SAFA,1007,μs
+compiler,R1CS,To Circuit,21451,μs
+solver,Solve,Full,23988,μs
+prover,add test,Primary Circuit,19144,constraints
 prover,add test,Secondary Circuit,10347,constraints
-prover,Proof Size,Compressed SNARK size,73575,bytes
+prover,Proof Size,Compressed SNARK size,73710,bytes
