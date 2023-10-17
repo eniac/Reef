@@ -1,174 +1,64 @@
 ./tests/do_415,"^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$",42315,331
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-prover,prove,prove_4,438011,μs
-solver,Witness Generation,step_5,75218,μs
-solver,Witness Generation,step_18,133098,μs
-prover,prove,prove_5,361159,μs
-solver,Solve,Full,2027413,μs
-verifier,Verification,Full,2163483,μs
-prover,Proof,Consistency Proofs,222393,μs
-prover,prove,prove_2,375430,μs
-solver,Witness Generation,step_3,161704,μs
-prover,Proof,Compressed SNARK,2613722,μs
-prover,prove,prove_8,617742,μs
-prover,prove,prove_15,637038,μs
-compiler,R1CS,Commitment Generations,942929,μs
-prover,prove,prove_6,580511,μs
-prover,prove,prove_16,617331,μs
-prover,prove,prove_0,427441,μs
-prover,prove,prove_13,621310,μs
-solver,Witness Generation,step_8,88863,μs
-solver,Witness Generation,step_17,105565,μs
-prover,prove,prove_12,629729,μs
-prover,prove,prove_19,627640,μs
-solver,Witness Generation,step_12,85206,μs
-solver,Witness Generation,step_15,86089,μs
-compiler,R1CS,R1CS precomputations,34138,μs
-verifier,Verification,Final Checks Consistency Verification,137828,μs
-solver,Witness Generation,step_19,90786,μs
-prover,prove,prove_1,434897,μs
-solver,Witness Generation,step_13,74899,μs
-prover,prove,prove_3,374567,μs
-solver,Witness Generation,step_2,151204,μs
-solver,Witness Generation,step_16,91046,μs
-solver,Witness Generation,step_0,70582,μs
-prover,prove,prove_14,617916,μs
-prover,Prover,Full,14059857,μs
-prover,prove,prove_7,619610,μs
-solver,Witness Generation,step_4,117875,μs
-solver,Witness Generation,step_14,72720,μs
-prover,prove,prove_18,622930,μs
-verifier,Verification,Nova Verification,2025291,μs
-compiler,R1CS,To Circuit,91947,μs
-compiler,R1CS,Proof Setup,9096831,μs
-solver,Witness Generation,step_10,88903,μs
-prover,prove,prove_11,636528,μs
-solver,Witness Generation,step_6,86986,μs
-solver,Witness Generation,step_7,124261,μs
-prover,prove,prove_9,634229,μs
-solver,Witness Generation,step_11,93401,μs
-compiler,Compiler,Full,14122107,μs
-solver,Witness Generation,step_9,71775,μs
-compiler,SAFA,SAFA,3941151,μs
-solver,Witness Generation,step_1,140610,μs
-prover,prove,prove_17,623136,μs
-prover,prove,prove_10,623716,μs
-prover,add test,Primary Circuit,23716,constraints
+compiler,SAFA,SAFA,3959589,μs
+verifier,Verification,Full,3169613,μs
+verifier,Verification,Nova Verification,2971207,μs
+verifier,Verification,Final Checks Consistency Verification,197029,μs
+solver,Witness Generation,step_1,321563,μs
+prover,prove,prove_2,697197,μs
+prover,prove,prove_3,995639,μs
+compiler,R1CS,R1CS precomputations,32984,μs
+prover,Proof,Compressed SNARK,4422782,μs
+compiler,R1CS,To Circuit,690921,μs
+compiler,Compiler,Full,17943699,μs
+prover,prove,prove_1,647302,μs
+solver,Witness Generation,step_3,365907,μs
+solver,Witness Generation,step_2,395851,μs
+prover,Proof,Consistency Proofs,258164,μs
+solver,Witness Generation,step_0,211437,μs
+compiler,R1CS,Proof Setup,12284144,μs
+prover,prove,prove_0,466672,μs
+prover,Prover,Full,7604506,μs
+solver,Solve,Full,1309517,μs
+compiler,R1CS,Commitment Generations,970530,μs
 prover,add test,Secondary Circuit,10347,constraints
-prover,Proof Size,Compressed SNARK size,73546,bytes
+prover,add test,Primary Circuit,52739,constraints
+prover,Proof Size,Compressed SNARK size,75729,bytes
 ./tests/do_1000,"^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$",116748,908
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-solver,Witness Generation,step_11,164517,μs
-verifier,Verification,Full,1965976,μs
-solver,Witness Generation,step_24,155401,μs
-prover,prove,prove_15,452079,μs
-solver,Witness Generation,step_36,220311,μs
-prover,prove,prove_31,659488,μs
-solver,Witness Generation,step_34,175845,μs
-solver,Witness Generation,step_30,157124,μs
-solver,Witness Generation,step_44,165140,μs
-solver,Witness Generation,step_2,167351,μs
-solver,Witness Generation,step_37,176537,μs
-prover,prove,prove_9,387445,μs
-prover,prove,prove_7,386086,μs
-solver,Witness Generation,step_18,197550,μs
-prover,prove,prove_36,663263,μs
-solver,Witness Generation,step_29,178172,μs
-solver,Witness Generation,step_35,234506,μs
-solver,Witness Generation,step_39,183129,μs
-solver,Witness Generation,step_6,177311,μs
-prover,prove,prove_20,393999,μs
-prover,prove,prove_42,646488,μs
-solver,Witness Generation,step_41,350794,μs
-compiler,R1CS,Commitment Generations,842091,μs
-prover,prove,prove_46,646303,μs
-prover,prove,prove_38,679304,μs
-solver,Witness Generation,step_31,164701,μs
-solver,Witness Generation,step_1,257174,μs
-prover,prove,prove_33,662926,μs
-prover,prove,prove_45,672733,μs
-solver,Witness Generation,step_32,186599,μs
-solver,Witness Generation,step_42,208233,μs
-solver,Witness Generation,step_25,186482,μs
-solver,Witness Generation,step_10,181799,μs
-prover,prove,prove_26,649214,μs
-prover,Proof,Compressed SNARK,2281673,μs
-solver,Witness Generation,step_22,216753,μs
-prover,prove,prove_27,657855,μs
-solver,Witness Generation,step_20,201503,μs
-prover,prove,prove_37,651326,μs
-prover,prove,prove_25,672393,μs
-compiler,SAFA,SAFA,91404828,μs
-prover,prove,prove_35,673194,μs
-solver,Witness Generation,step_3,196262,μs
-compiler,R1CS,R1CS precomputations,35805,μs
-prover,prove,prove_17,398988,μs
-prover,prove,prove_0,319370,μs
-solver,Witness Generation,step_9,187894,μs
-solver,Witness Generation,step_45,163616,μs
-prover,prove,prove_23,642275,μs
-solver,Witness Generation,step_14,207187,μs
-solver,Witness Generation,step_23,194576,μs
-prover,prove,prove_19,408836,μs
-solver,Witness Generation,step_26,244094,μs
-solver,Witness Generation,step_33,158848,μs
-prover,prove,prove_8,376133,μs
-solver,Witness Generation,step_15,156531,μs
-solver,Witness Generation,step_12,190950,μs
-prover,prove,prove_13,461748,μs
-compiler,R1CS,To Circuit,112895,μs
-prover,prove,prove_29,642855,μs
-solver,Witness Generation,step_16,201762,μs
-solver,Witness Generation,step_28,243649,μs
-prover,prove,prove_21,370654,μs
-prover,prove,prove_32,700006,μs
-prover,prove,prove_5,384990,μs
-solver,Witness Generation,step_27,218993,μs
-prover,prove,prove_12,457739,μs
-compiler,Compiler,Full,100701381,μs
-solver,Witness Generation,step_43,189832,μs
-solver,Witness Generation,step_46,190096,μs
-prover,prove,prove_11,391060,μs
-prover,prove,prove_14,404371,μs
-prover,prove,prove_1,349566,μs
-prover,prove,prove_28,640347,μs
-prover,prove,prove_10,465705,μs
-solver,Witness Generation,step_17,162509,μs
-prover,prove,prove_41,666253,μs
-prover,prove,prove_2,373798,μs
-verifier,Verification,Final Checks Consistency Verification,124579,μs
-prover,prove,prove_4,372533,μs
-prover,prove,prove_40,654096,μs
-solver,Witness Generation,step_21,204021,μs
-prover,prove,prove_18,594160,μs
-solver,Witness Generation,step_7,184838,μs
-prover,Proof,Consistency Proofs,227684,μs
-prover,prove,prove_24,653227,μs
-prover,prove,prove_6,390999,μs
-solver,Witness Generation,step_13,152942,μs
-prover,prove,prove_47,639341,μs
-solver,Solve,Full,9050856,μs
-prover,prove,prove_39,666877,μs
-verifier,Verification,Nova Verification,1840652,μs
-prover,Prover,Full,28759820,μs
-solver,Witness Generation,step_38,153565,μs
-solver,Witness Generation,step_47,155344,μs
-prover,prove,prove_16,493495,μs
-solver,Witness Generation,step_19,162677,μs
-solver,Witness Generation,step_40,185674,μs
-compiler,R1CS,Proof Setup,8269716,μs
-prover,prove,prove_30,674832,μs
-solver,Witness Generation,step_5,197070,μs
-prover,prove,prove_43,681527,μs
-prover,prove,prove_22,432879,μs
-prover,prove,prove_34,651371,μs
-prover,prove,prove_44,643913,μs
-solver,Witness Generation,step_8,175422,μs
-prover,prove,prove_3,367606,μs
-solver,Witness Generation,step_4,165100,μs
-solver,Witness Generation,step_0,70966,μs
-prover,add test,Primary Circuit,25027,constraints
+compiler,R1CS,Commitment Generations,846588,μs
+solver,Solve,Full,5750983,μs
+verifier,Verification,Full,3282752,μs
+verifier,Verification,Final Checks Consistency Verification,139848,μs
+prover,prove,prove_6,1027492,μs
+compiler,R1CS,To Circuit,775937,μs
+solver,Witness Generation,step_5,931122,μs
+compiler,R1CS,R1CS precomputations,35265,μs
+prover,prove,prove_3,849137,μs
+prover,prove,prove_7,1083202,μs
+solver,Witness Generation,step_0,275169,μs
+solver,Witness Generation,step_6,599977,μs
+solver,Witness Generation,step_8,612889,μs
+solver,Witness Generation,step_3,606833,μs
+prover,prove,prove_5,856529,μs
+solver,Witness Generation,step_4,735594,μs
+solver,Witness Generation,step_1,553355,μs
+solver,Witness Generation,step_7,691563,μs
+prover,prove,prove_2,726627,μs
+prover,Prover,Full,12633310,μs
+prover,prove,prove_8,1103389,μs
+compiler,Compiler,Full,105005344,μs
+prover,prove,prove_1,670684,μs
+prover,Proof,Compressed SNARK,3882842,μs
+solver,Witness Generation,step_2,716258,μs
+prover,prove,prove_0,789298,μs
+compiler,R1CS,Proof Setup,11901153,μs
+compiler,SAFA,SAFA,91435581,μs
+verifier,Verification,Nova Verification,3139979,μs
+prover,prove,prove_4,929832,μs
+prover,Proof,Consistency Proofs,315019,μs
+prover,add test,Primary Circuit,55049,constraints
 prover,add test,Secondary Circuit,10347,constraints
-prover,Proof Size,Compressed SNARK size,73642,bytes
+prover,Proof Size,Compressed SNARK size,75793,bytes
