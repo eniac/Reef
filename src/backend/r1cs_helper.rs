@@ -166,10 +166,10 @@ pub fn normal_add_table<'a>(
                                     .rem_floor(cfg().field().modulus()),
                                 );
 
-                                println!(
+                                /*println!(
                                     "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
                                     in_state, out_state, c, lower_offset, upper_offset, rel,
-                                );
+                                ); */
                             } else if openset.is_full() {
                                 // [0,*]
                                 let c = num_ab[&None];
@@ -214,10 +214,10 @@ pub fn normal_add_table<'a>(
                                     )
                                     .rem_floor(cfg().field().modulus()),
                                 );
-                                println!(
+                                /*println!(
                                     "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
                                     in_state, out_state, c, lower_offset, upper_offset, rel,
-                                );
+                                ); */
                             } else {
                                 // ranges
                                 let mut iter = openset.0.iter();
@@ -269,10 +269,10 @@ pub fn normal_add_table<'a>(
                                         )
                                         .rem_floor(cfg().field().modulus()),
                                     );
-                                    println!(
+                                    /* println!(
                                         "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
                                         in_state, out_state, c, lower_offset, upper_offset, rel,
-                                    );
+                                    ); */
                                 }
                             }
                         }
@@ -318,10 +318,10 @@ pub fn normal_add_table<'a>(
                                 )
                                 .rem_floor(cfg().field().modulus()),
                             );
-                            println!(
+                            /* println!(
                                 "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
                                 in_state, out_state, c, lower_offset, upper_offset, rel,
-                            );
+                            ); */
                         }
                     }
                 }
