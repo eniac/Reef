@@ -19,6 +19,7 @@ use neptune::{
     sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
+use nova_snark::provider::pedersen::CompressedCommitment;
 use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
@@ -131,15 +132,15 @@ pub fn run_backend(
             temp_batch_size
         };
         batch_size += 1; // to last
-        
-        let n = (doc.len() as f32)/(batch_size as f32);
-        if (doc.len()>200) {
-            batch_size = (((batch_size as f32)/5.0).ceil() as usize);
+
+        let n = (doc.len() as f32) / (batch_size as f32);
+        if (doc.len() > 200) {
+            batch_size = (((batch_size as f32) / 5.0).ceil() as usize);
         }
-        
+
         if batch_size < 2 {
             batch_size = 2;
-        } 
+        }
         println!("BATCH SIZE {:#?}", batch_size);
 
         #[cfg(feature = "metrics")]
@@ -800,11 +801,14 @@ fn prove_and_verify(
     println!("post cp");
 
     #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Prover", "Full");
+
+    #[cfg(feature = "metrics")]
     log::space(
         Component::Prover,
         "Proof Size",
         "Compressed SNARK size",
-        serde_json::to_string(&compressed_snark).unwrap().len(),
+        bincode::serialize(&compressed_snark).unwrap().len(),
     );
 
     // #[cfg(feature = "metrics")]
@@ -832,7 +836,12 @@ fn prove_and_verify(
     // );
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Prover, "Prover", "Full");
+    log::space(
+        Component::Prover,
+        "Proof Size",
+        "Consist Proof + Doc Commit size",
+        proof_size(&consist_proof, &proof_info.commit),
+    );
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Verifier, "Verification", "Full");
@@ -940,6 +949,35 @@ fn verify(
         "Verification",
         "Final Checks Consistency Verification",
     );
+}
+
+fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> usize {
+    let mut doc_size = 0;
+    if rc.nldoc.is_some() {
+        let dc = &rc.nldoc.as_ref().unwrap().doc_commit;
+        for c in 0..dc.comm.len() {
+            let cc: CompressedCommitment<<G1 as Group>::CompressedGroupElement> = dc.comm[c];
+            doc_size += bincode::serialize(&cc).unwrap().len();
+        }
+    };
+
+    let cp = csp.as_ref().unwrap();
+
+    let snark_size = bincode::serialize(&cp.snark).unwrap().len();
+    let v_size = bincode::serialize(&cp.v_commit.comm.compress())
+        .unwrap()
+        .len();
+    let vprime_size = if cp.v_prime_commit.is_some() {
+        bincode::serialize(&cp.v_prime_commit.unwrap().comm.compress())
+            .unwrap()
+            .len()
+    } else {
+        0
+    };
+    let ipa_size = bincode::serialize(&cp.ipa).unwrap().len();
+    let q_size = bincode::serialize(&cp.running_q).unwrap().len();
+    let hybrid_size = bincode::serialize(&cp.hybrid_ipa).unwrap().len();
+    doc_size + snark_size + v_size + vprime_size + ipa_size + q_size + hybrid_size
 }
 
 #[cfg(test)]

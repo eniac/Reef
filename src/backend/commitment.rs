@@ -55,7 +55,7 @@ pub struct NLDocCommitment {
     single_gens: CommitmentGens<G1>,
     hyrax_gen: HyraxPC<G1>,
     doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,
-    doc_commit: PolyCommit<G1>,
+    pub doc_commit: PolyCommit<G1>,
     doc_decommit: PolyCommitBlinds<G1>,
     pub doc_commit_hash: <G1 as Group>::Scalar,
     pub hash_salt: <G1 as Group>::Scalar,
@@ -69,15 +69,15 @@ pub struct ConsistencyProof {
     // consistency verification
     pub hash_d: <G1 as Group>::Scalar,
     circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
-    snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
-    v_commit: Commitment<G1>,
+    pub snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
+    pub v_commit: Commitment<G1>,
     // dot prod verification
-    v_prime_commit: Option<Commitment<G1>>,
-    ipa: InnerProductArgument<G1>,
-    running_q: Vec<<G1 as Group>::Scalar>,
+    pub v_prime_commit: Option<Commitment<G1>>,
+    pub ipa: InnerProductArgument<G1>,
+    pub running_q: Vec<<G1 as Group>::Scalar>,
     t_vp_gens: Option<CommitmentGens<G1>>,
     hybrid_ipi: Option<InnerProductInstance<G1>>,
-    hybrid_ipa: Option<InnerProductArgument<G1>>,
+    pub hybrid_ipa: Option<InnerProductArgument<G1>>,
 }
 
 impl ReefCommitment {
