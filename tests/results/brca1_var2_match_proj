@@ -1,29 +1,30 @@
 ./tests/do_43054295,^.{43050079}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG.*AGCCTACAAGAAAGTACGAGATTTAGTCAACTTGTTGAAGAGCTATTGAAAATCATTTGTGCTTTTCAGCTTGACACAGGTTTGGAGT.*ATGCAAACAGCTATAATTTTGCAAAAAAGGAAAATAACTCTCCTGAACATCTAAAAGATGAAGTTTCTATCATCCAAAGTATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG,1506,305
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-solver,Witness Generation,step_4,522937,μs
-compiler,R1CS,To Circuit,615370,μs
-prover,prove,prove_3,1162173,μs
-prover,prove,prove_0,601248,μs
-prover,Proof,Consistency Proofs,14124579,μs
-solver,Witness Generation,step_3,568730,μs
-prover,prove,prove_4,912526,μs
-prover,prove,prove_1,796390,μs
-solver,Solve,Full,5210533,μs
-verifier,Verification,Nova Verification,3109926,μs
-compiler,R1CS,Proof Setup,12158059,μs
-compiler,Compiler,Full,54631825,μs
-compiler,SAFA,SAFA,11869264,μs
-compiler,R1CS,R1CS precomputations,5963938,μs
-prover,Prover,Full,23470697,μs
-solver,Witness Generation,step_1,674896,μs
-verifier,Verification,Final Checks Consistency Verification,1354499,μs
-solver,Witness Generation,step_2,576601,μs
-solver,Witness Generation,step_0,424447,μs
-verifier,Verification,Full,4466826,μs
-prover,Proof,Compressed SNARK,3838178,μs
-prover,prove,prove_2,883811,μs
-compiler,R1CS,Commitment Generations,21307540,μs
+prover,prove,prove_4,841596,μs
+prover,Proof,Compressed SNARK,4310624,μs
+compiler,Compiler,Full,56239879,μs
+solver,Witness Generation,step_4,470592,μs
+compiler,R1CS,Commitment Generations,21675362,μs
+prover,prove,prove_0,648244,μs
+verifier,Verification,Full,4290261,μs
+compiler,R1CS,To Circuit,614725,μs
+verifier,Verification,Final Checks Consistency Verification,1260642,μs
+solver,Witness Generation,step_0,248317,μs
+compiler,SAFA,SAFA,13245589,μs
+prover,Proof,Consistency Proofs,14189447,μs
+compiler,R1CS,Proof Setup,12112330,μs
+prover,Prover,Full,24834068,μs
+solver,Witness Generation,step_3,601984,μs
+prover,prove,prove_1,923531,μs
+verifier,Verification,Nova Verification,3024075,μs
+prover,prove,prove_3,1095664,μs
+prover,prove,prove_2,857235,μs
+solver,Solve,Full,4786147,μs
+solver,Witness Generation,step_1,654596,μs
+compiler,R1CS,R1CS precomputations,6095256,μs
+solver,Witness Generation,step_2,597602,μs
 prover,add test,Secondary Circuit,10347,constraints
 prover,add test,Primary Circuit,54616,constraints
-prover,Proof Size,Compressed SNARK size,76505,bytes
+prover,Proof Size,Compressed SNARK size,24640,bytes
+prover,Proof Size,Consist Proof + Doc Commit size,271489,bytes

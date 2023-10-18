@@ -1,29 +1,30 @@
 ./tests/do_43054295,^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG,309,64
 ---------,---------,---------,---------
 Component,test,subtest,metric,metric_type
-compiler,R1CS,R1CS precomputations,5943318,μs
-compiler,R1CS,Commitment Generations,21625894,μs
-prover,prove,prove_3,643006,μs
-solver,Witness Generation,step_2,368181,μs
-solver,Witness Generation,step_0,142644,μs
-compiler,R1CS,Proof Setup,8433832,μs
-compiler,SAFA,SAFA,11402774,μs
-solver,Witness Generation,step_1,333366,μs
-compiler,R1CS,To Circuit,103342,μs
-prover,Proof,Compressed SNARK,2753772,μs
-prover,Prover,Full,19068305,μs
-prover,prove,prove_1,698711,μs
-solver,Witness Generation,step_3,400474,μs
-prover,prove,prove_4,472893,μs
-prover,prove,prove_0,474416,μs
-prover,prove,prove_2,515165,μs
-verifier,Verification,Full,3284537,μs
-verifier,Verification,Nova Verification,2068543,μs
-solver,Witness Generation,step_4,214482,μs
-prover,Proof,Consistency Proofs,12527975,μs
-solver,Solve,Full,3722698,μs
-compiler,Compiler,Full,49854616,μs
-verifier,Verification,Final Checks Consistency Verification,1215232,μs
+prover,Proof,Consistency Proofs,13378361,μs
+prover,Proof,Compressed SNARK,2830875,μs
+solver,Witness Generation,step_4,198404,μs
+verifier,Verification,Full,3279190,μs
+compiler,R1CS,Commitment Generations,21601447,μs
+compiler,R1CS,Proof Setup,9465894,μs
+compiler,R1CS,R1CS precomputations,5950197,μs
+compiler,SAFA,SAFA,13504631,μs
+solver,Witness Generation,step_2,182745,μs
+prover,prove,prove_3,727890,μs
+compiler,Compiler,Full,53022074,μs
+verifier,Verification,Nova Verification,2070090,μs
+solver,Witness Generation,step_1,506224,μs
+compiler,R1CS,To Circuit,103564,μs
+prover,prove,prove_2,501523,μs
+prover,Prover,Full,19855865,μs
+verifier,Verification,Final Checks Consistency Verification,1207697,μs
+prover,prove,prove_1,485782,μs
+prover,prove,prove_0,539235,μs
+solver,Solve,Full,3682722,μs
+prover,prove,prove_4,483675,μs
+solver,Witness Generation,step_3,183914,μs
+solver,Witness Generation,step_0,153090,μs
 prover,add test,Secondary Circuit,10347,constraints
 prover,add test,Primary Circuit,27800,constraints
-prover,Proof Size,Compressed SNARK size,74201,bytes
+prover,Proof Size,Consist Proof + Doc Commit size,271489,bytes
+prover,Proof Size,Compressed SNARK size,23856,bytes
