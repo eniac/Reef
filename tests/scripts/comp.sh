@@ -1,12 +1,12 @@
-cargo clean 
-cargo build --release --features 'metrics,reef'
+# cargo clean 
+# cargo build --release --features 'metrics,reef'
 #echo "reef"
 #./tests/scripts/reef.sh &> out_reef
 #echo "end reef"
 
-echo "reef h"
-./tests/scripts/reef_h.sh &> out_rh 
-echo "reef h"
+# echo "reef h"
+# ./tests/scripts/reef_h.sh &> out_rh 
+# echo "reef h"
 
 # cargo build --release --features 'metrics,nwr'
 # echo "nwr"
@@ -29,9 +29,9 @@ echo "reef h"
 #./tests/scripts/dna.sh &> out_dna 
 #echo "dna" 
 
-echo "dna"
-./tests/scripts/dna.sh &> out_dna
-echo "dna"
+# echo "dna"
+# ./tests/scripts/dna.sh &> out_dna
+# echo "dna"
 
 echo "pihole"
 ./tests/scripts/pihole.sh &> out_pihole 

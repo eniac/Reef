@@ -28,6 +28,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use bincode;
 
 struct ProofInfo {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
@@ -44,6 +45,17 @@ struct ProofInfo {
 
 #[cfg(feature = "metrics")]
 use metrics::metrics::{log, log::Component};
+
+// fn consistency_proof_size(proof:Option<ConsistencyProof>)->usize{
+//     let cp = proof.unwrap();
+//     let snark_size = bincode::serialize(&cp.snark).unwrap().len();
+//     let v_size = bincode::serialize(&cp.v_commit.compress()).unwrap().len();
+//     let vprime_size = bincode::serialize(&cp.v_prime_commit.unwrap().compress()).unwrap().len();
+//     let ipa_size = bincode::serialize(&cp.ipa).unwrap().len();
+//     let q_size = bincode::serialize(&cp.running_q).unwrap().len();
+//     let hybrid_size = bincode::serialize(&cp.hybrid_ipa).unwrap().len();
+//     snark_size+v_size+vprime_size+ipa_size+q_size+hybrid_size
+// }
 
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(
@@ -794,6 +806,30 @@ fn prove_and_verify(
         "Compressed SNARK size",
         serde_json::to_string(&compressed_snark).unwrap().len(),
     );
+
+    // #[cfg(feature = "metrics")]
+    // log::space(
+    //     Component::Prover,
+    //     "Proof Size",
+    //     "Compressed SNARK size",
+    //     bincode::serialize(&compressed_snark).unwrap().len(),
+    // );
+
+    // #[cfg(feature = "metrics")]
+    // log::space(
+    //     Component::Prover,
+    //     "Proof Size",
+    //     "Commit Size",
+    //     bincode::serialize(&proof_info.commit).unwrap().len(),
+    // );
+
+    // #[cfg(feature = "metrics")]
+    // log::space(
+    //     Component::Prover,
+    //     "Proof Size",
+    //     "Consist Proof size",
+    //     consistency_proof_size(&consist_proof).unwrap().len(),
+    // );
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Prover, "Prover", "Full");
