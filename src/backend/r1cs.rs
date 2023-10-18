@@ -101,14 +101,19 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        //safa.write_pdf("safa1").unwrap();
+        safa.write_pdf("safa1").unwrap();
 
-        /*println!(
+        println!(
             "STATES {:#?}",
-            safa.g
-                .node_indices()
-                .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-        );*/
+            safa.g.node_indices().for_each(|i| println!(
+                "({}) -> {}, forall? {}",
+                i.index(),
+                safa.g[i],
+                safa.g[i].is_and()
+            ))
+        );
+
+        println!("ACCEPTING {:#?}", safa.accepting());
 
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
@@ -694,26 +699,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         v
     }
 
-    fn last_state_accepting_circuit(&mut self) {
-        let match_term = term(
-            Op::Ite,
-            vec![
-                term(
-                    Op::Eq,
-                    vec![
-                        new_const(2),
-                        new_var(format!("rel_{}", self.batch_size - 1)),
-                    ],
-                ),
-                term(Op::Eq, vec![new_var(format!("accepting")), new_const(1)]),
-                term(Op::Eq, vec![new_var(format!("accepting")), new_const(0)]),
-            ],
-        );
-
-        self.assertions.push(match_term);
-        self.pub_inputs.push(new_var(format!("accepting")));
-    }
-
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
         let cs = Computation::from_constraint_system_parts(
             self.assertions.clone(),
@@ -1087,7 +1072,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     ),
                 ],
             );
-            //        self.assertions.push(cursor_plus);
+            self.assertions.push(cursor_plus);
 
             let bit_limit = logmn(max(self.udoc.len(), self.max_offsets)) + 1;
             /*println!(
@@ -1571,7 +1556,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         self.cursor_circuit();
-        self.last_state_accepting_circuit();
 
         if self.merkle {
             self.nlookup_gadget(lookups, self.table.len(), "nl");
@@ -1650,11 +1634,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     // only call in "active" cases
     fn pop_wit(&mut self, wits: &mut FxHashMap<String, Value>) -> usize {
+        println!("POP WIT");
         self.stack_ptr -= 1;
         let popped_elt = self.stack[self.stack_ptr];
 
         wits.insert(format!("cursor_popped"), new_wit(popped_elt.0));
         wits.insert(format!("cursor_0"), new_wit(popped_elt.0));
+
         // after pop
         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
 
@@ -2124,9 +2110,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
 
-        let accept = if rel_i == 2 { 1 } else { 0 }; //todo
-        wits.insert(format!("accepting"), new_wit(accept));
-
+        /*let accept = if rel_i == 2 { 1 } else { 0 }; //todo
+                wits.insert(format!("accepting"), new_wit(accept));
+        */
         assert_eq!(v.len(), self.batch_size);
 
         // projections
@@ -2712,7 +2698,7 @@ mod tests {
             let mut next_state = 0;
 
             let trace = safa.solve(&chars);
-
+            println!("TRACE {:#?}", trace);
             let mut sols = trace_preprocessing(&trace);
 
             let mut i = 0;
@@ -2821,6 +2807,22 @@ mod tests {
     fn ab(s: &str) -> String {
         let mut a = s.to_string();
         a
+    }
+
+    #[test]
+    fn new_bug() {
+        init();
+        test_func_no_hash(
+            (0..128).filter_map(std::char::from_u32).collect(),
+            reg("^(?=.*[A-Z].*[A-Z])(?=.*[^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
+            ab("q1w2e3r4"),
+            vec![2], // 2],
+            true,
+            None,
+            false,
+            false,
+            true,
+        );
     }
 
     #[test]
