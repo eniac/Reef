@@ -412,8 +412,6 @@ pub(crate) fn calc_rel<'a>(
         assert!(out_state == exit_state || safa.g[NodeIndex::new(out_state)].is_and());
         assert!(safa.accepting().contains(&NodeIndex::new(in_state)));
         rel = 1;
-    } else if safa.accepting().contains(&NodeIndex::new(out_state)) {
-        rel = 2;
     } else if safa.g[NodeIndex::new(in_state)].is_and() {
         if children[0] == out_state {
             let base: usize = num_states;
@@ -431,6 +429,8 @@ pub(crate) fn calc_rel<'a>(
             // others are pops
             rel = 3;
         }
+    } else if safa.accepting().contains(&NodeIndex::new(out_state)) {
+        rel = 2;
     }
 
     rel
