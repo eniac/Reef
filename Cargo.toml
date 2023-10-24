@@ -40,6 +40,7 @@ nova-scotia = {path="./Nova-Scotia"}
 execute = "0.2.12"
 num-bigint = "0.4.3"
 metrics = {path="./metrics"}
+bincode = "1.3.3"
 
 [target.'cfg(all(not(windows), not(target_env = "musl")))'.dependencies]
 jemallocator = "0.3.0"

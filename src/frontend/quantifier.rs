@@ -10,8 +10,7 @@ use petgraph::graph::NodeIndex;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Quant<A> {
     pub inner: A,
-    is_and: bool,
-    is_neg: bool,
+    is_and: bool
 }
 
 impl<A: Clone> Quant<A> {
@@ -19,21 +18,18 @@ impl<A: Clone> Quant<A> {
         Self {
             inner,
             is_and,
-            is_neg: false,
         }
     }
     pub fn and(inner: A) -> Self {
         Self {
             inner,
             is_and: true,
-            is_neg: false,
         }
     }
     pub fn or(inner: A) -> Self {
         Self {
             inner,
             is_and: false,
-            is_neg: false,
         }
     }
     pub fn is_and(&self) -> bool {
@@ -46,7 +42,6 @@ impl<A: Clone> Quant<A> {
         Self {
             inner: self.inner.clone(),
             is_and: !self.is_and,
-            is_neg: !self.is_neg,
         }
     }
     pub fn get(&self) -> A {
@@ -59,7 +54,6 @@ impl<A: Clone> Quant<A> {
         Quant {
             inner: f(self.inner.clone()),
             is_and: self.is_and,
-            is_neg: self.is_neg,
         }
     }
 }

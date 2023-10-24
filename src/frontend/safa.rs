@@ -7,6 +7,7 @@ use petgraph::dot::Dot;
 use petgraph::graph::{EdgeReference, NodeIndex};
 use petgraph::visit::*;
 use petgraph::Graph;
+use petgraph::Direction;
 
 use std::result::Result;
 
@@ -16,6 +17,8 @@ use crate::frontend::regex::{re, Regex, RegexF};
 use crate::trace::{Trace, TraceElem};
 use rayon::iter::*;
 
+
+use std::time::{Duration, Instant};
 use core::fmt;
 use core::fmt::{Display, Formatter};
 use lazy_static::lazy_static;
@@ -83,9 +86,6 @@ pub struct SAFA<C: Clone> {
 
     /// Sink states
     pub sink: Option<NodeIndex<u32>>,
-
-    /// Forks
-    pub forks: BTreeSet<NodeIndex<u32>>,
 }
 
 impl PartialEq for SAFA<char> {
@@ -93,7 +93,6 @@ impl PartialEq for SAFA<char> {
         self.ab == other.ab
             && self.accepting == other.accepting
             && self.sink == other.sink
-            && self.forks == other.forks
             && is_isomorphic_matching(&self.g, &other.g, |a, b| a == b, |a, b| a == b)
     }
 }
@@ -107,13 +106,11 @@ impl SAFA<char> {
         // Add root
         let mut g: Graph<Quant<Regex>, Either<char, Skip>> = Graph::new();
         let n_init = g.add_node(Quant::or(re.clone()));
-        g.add_edge(n_init, n_init, SAFA::epsilon());
         let mut s = Self {
             ab,
             g,
             accepting: BTreeSet::new(),
             sink: None,
-            forks: BTreeSet::new(),
         };
         // Recursively build graph
         s.add(n_init);
@@ -133,6 +130,7 @@ impl SAFA<char> {
             } else {
                 let n_empty = self.g.add_node(Quant::new(re::empty(), false));
                 self.sink = Some(n_empty);
+                self.g.add_edge(n_empty, n_empty, SAFA::epsilon());
                 self.g.add_edge(n, n_empty, Either::right(skip.negate()));
             }
         }
@@ -160,8 +158,6 @@ impl SAFA<char> {
             .find(|i| self.g[*i] == Quant::new(r.clone(), is_and))
             .unwrap_or_else(|| {
                 let n_q = self.g.add_node(Quant::new(r.clone(), is_and));
-                // Reflexive step
-                self.g.add_edge(n_q, n_q, SAFA::epsilon());
                 n_q
             })
     }
@@ -169,6 +165,7 @@ impl SAFA<char> {
     /// Add derivative of a node in the graph
     fn add_derivatives(&mut self, from: NodeIndex<u32>) {
         // Take all the single character steps
+        self.g.add_edge(from, from, SAFA::epsilon());
         for c in self.ab.clone().iter() {
             let q_c = re::deriv(&self.g[from].get(), &c);
             let recurse = !self.exists(&q_c, false);
@@ -206,7 +203,6 @@ impl SAFA<char> {
 
         let children = to_set(&self.g[from].get(), is_and);
         if children.len() > 1 {
-            self.forks.insert(from);
             self.g[from] = Quant::new(self.g[from].get(), is_and);
             children
                 .into_iter()
@@ -230,9 +226,10 @@ impl SAFA<char> {
             .or_else(|| Some(self.add_derivatives(from))); // Catch-all
     }
 
-    /// Is this node a fork ([alt, and] with epsilon children)
+    /// Is this node a fork ([alt, and])
     pub fn is_fork(&self, from: &NodeIndex<u32>) -> bool {
-        self.forks.contains(from)
+        self.g.edges_directed(*from, Direction::Outgoing)
+            .all(|e| e.weight().0.is_err())
     }
 
     /// Number of states
@@ -248,14 +245,18 @@ impl SAFA<char> {
         // Negate states (for accepting)
         safa.accepting = self.non_accepting();
 
-        // No sinks
-        safa.sink = None;
+        // Sinks are non-accepting states with no outgoing edges
+        safa.sink =
+            self.g.node_indices()
+                .find(|n| !safa.accepting.contains(n)
+                    && self.g.edges_directed(*n, Direction::Outgoing)
+                             .all(|e| e.target() == *n));
 
         // Negate edges
         safa.g = safa.g.map(
             |i, b| {
                 if safa.is_fork(&i) {
-                    b.negate()
+                    b.clone() // b.negate()
                 } else {
                     b.clone()
                 }
@@ -307,19 +308,15 @@ impl SAFA<char> {
 
     /// And nodes in the SAFA
     pub fn forall_nodes(&self) -> BTreeSet<NodeIndex<u32>> {
-        self.forks
-            .clone()
-            .into_iter()
-            .filter(|i| self.g[*i].is_and())
+        self.g.node_indices()
+            .filter(|n| self.is_fork(n) && self.g[*n].is_and())
             .collect()
     }
 
     /// Or nodes in the SAFA
     pub fn exist_nodes(&self) -> BTreeSet<NodeIndex<u32>> {
-        self.forks
-            .clone()
-            .into_iter()
-            .filter(|i| self.g[*i].is_or())
+        self.g.node_indices()
+            .filter(|n| self.is_fork(n) && self.g[*n].is_or())
             .collect()
     }
 
@@ -378,21 +375,25 @@ impl SAFA<char> {
             // Sink state, cannot succeed
             Ok(_) if self.is_sink(&to) => None,
             // Character match
-            Ok(c) if c == doc[i] => Trace::prepend(
-                self.solve_rec(to, i + 1, doc),
-                TraceElem::new(from.index(), e, to.index(), i, i + 1),
-            ),
+            Ok(c) if c == doc[i] => {
+                let mut tail = self.solve_rec(to, i + 1, doc)?;
+                tail.push_front(TraceElem::new(from.index(), e, to.index(), i, i + 1));
+                Some(tail)
+            },
             // Character non-match
             Ok(_) => None,
             Err(skip) => skip
                 .clone()
                 .into_iter()
                 .take_while(|n| i + n <= doc.len())
-                .find_map(|n| {
-                    Trace::prepend(
-                        self.solve_rec(to, i + n, doc),
-                        TraceElem::new(from.index(), e, to.index(), i, i + n),
-                    )
+                .collect::<Vec<_>>()
+                .into_par_iter()
+                .find_map_any(|n| {
+                    let mut tail = self.solve_rec(to, i + n, doc)?;
+                    tail.push_front(
+                        TraceElem::new(from.index(), e, to.index(), i, i + n)
+                    );
+                    Some(tail)
                 }),
         }
     }
@@ -404,6 +405,28 @@ impl SAFA<char> {
             .filter(|e| e.source() != e.target() || !e.weight().test_right(|c| c.is_nil()))
             .collect()
     }
+    /*
+    fn solve_iter(&self, doc: &Vec<char>) -> Option<Trace<char>> {
+        let mut n = self.get_init();
+        let mut i = 0;
+        let mut failed = false;
+        let mut trace = Trace<char>()::empty();
+
+        while !failed && !self.is_accept(n, i, doc) && i < doc.len() {
+            if self.g[n].is_and() {
+                for e in self.g.edges_directed(n, Direction::Outgoing) {
+                    if self.is_sink(e.target()) {
+                        failed = true;
+                    } else {
+                        match e.clone() {
+                            Ok(c) if c == doc[i] => {
+                                trace.push(TraceElem::new(e.source().index(), e, e.target().index(), i, i + 1));
+                                i += 1;
+                                n = e.target();
+                            },
+                            Ok(_) => { failed = true },
+                            Err(skip) => {
+    */
 
     /// Find a non-empty list of continuous matching document strings
     fn solve_rec(&self, n: NodeIndex<u32>, i: usize, doc: &Vec<char>) -> Option<Trace<char>> {
@@ -415,32 +438,16 @@ impl SAFA<char> {
         }
         if self.g[n].is_and() {
             // All of the next entries must have solutions
-            let mut subsolutions: Vec<_> = self
-                .edges(n)
-                .into_iter()
-                .map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
+            let mut subsolutions: Vec<_> =
+                self.g
+                .edges_directed(n, Direction::Outgoing)
+                .filter_map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
                 .collect();
 
             // All of them need to be set
-            if subsolutions.iter().all(Option::is_some) {
-                subsolutions.sort_by(|a, b| {
-                    a.clone()
-                        .unwrap()
-                        .0
-                        .front()
-                        .unwrap()
-                        .to_node
-                        .index()
-                        .partial_cmp(&b.clone().unwrap().0.front().unwrap().to_node.index())
-                        .unwrap()
-                });
-
-                Some(Trace(
-                    subsolutions
-                        .into_iter()
-                        .flat_map(|c| c.unwrap().0)
-                        .collect(),
-                ))
+            if subsolutions.len() == self.g.edges_directed(n, Direction::Outgoing).count() {
+                subsolutions.sort();
+                Some(Trace::flatten(&subsolutions))
             } else {
                 None
             }
@@ -466,7 +473,6 @@ impl SAFA<char> {
 
         self.g
             .edges(n)
-            .filter(|e| e.source() != e.target())
             .filter_map(|e| {
                 let next = e.target();
                 let s = e.weight().clone().0.err()?;
@@ -540,7 +546,6 @@ mod tests {
     use crate::frontend::regex::re;
     use crate::frontend::safa::Skip;
     use crate::frontend::safa::{Either, Trace, TraceElem, SAFA};
-    use std::collections::HashSet;
     use std::collections::LinkedList;
     use std::fmt::Display;
 
@@ -800,9 +805,11 @@ mod tests {
     }
 
     #[test]
-    fn test_safa_double_negate() {
+    fn test_safa_double_negate1() {
         let r = re::simpl(re::new("(a|b).{1,3}a"));
         let safa = SAFA::new("ab", &r);
+        safa.write_pdf("original").unwrap();
+        safa.negate().write_pdf("negated").unwrap();
         assert_eq!(safa, safa.negate().negate());
     }
 

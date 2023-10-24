@@ -19,6 +19,7 @@ use neptune::{
     sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
+use nova_snark::provider::pedersen::CompressedCommitment;
 use nova_snark::{
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
@@ -28,6 +29,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use bincode;
 
 struct ProofInfo {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
@@ -44,6 +46,17 @@ struct ProofInfo {
 
 #[cfg(feature = "metrics")]
 use metrics::metrics::{log, log::Component};
+
+// fn consistency_proof_size(proof:Option<ConsistencyProof>)->usize{
+//     let cp = proof.unwrap();
+//     let snark_size = bincode::serialize(&cp.snark).unwrap().len();
+//     let v_size = bincode::serialize(&cp.v_commit.compress()).unwrap().len();
+//     let vprime_size = bincode::serialize(&cp.v_prime_commit.unwrap().compress()).unwrap().len();
+//     let ipa_size = bincode::serialize(&cp.ipa).unwrap().len();
+//     let q_size = bincode::serialize(&cp.running_q).unwrap().len();
+//     let hybrid_size = bincode::serialize(&cp.hybrid_ipa).unwrap().len();
+//     snark_size+v_size+vprime_size+ipa_size+q_size+hybrid_size
+// }
 
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(
@@ -119,6 +132,11 @@ pub fn run_backend(
             temp_batch_size
         };
         batch_size += 1; // to last
+
+        let n = (doc.len() as f32) / (batch_size as f32);
+        if (doc.len() > 200) {
+            batch_size = (((batch_size as f32) / 5.0).ceil() as usize);
+        }
 
         if batch_size < 2 {
             batch_size = 2;
@@ -197,7 +215,7 @@ pub fn run_backend(
         log::stop(Component::Compiler, "Compiler", "Full");
 
         #[cfg(feature = "metrics")]
-        log::tic(Component::Solver, "Solve", "Framework Solve");
+        log::tic(Component::Solver, "Solve", "Full");
         solve(
             sender,
             sender_qv,
@@ -209,7 +227,7 @@ pub fn run_backend(
         );
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Solver, "Solve", "Framework Solve");
+        log::stop(Component::Solver, "Solve", "Full");
     });
 
     //get args
@@ -488,7 +506,7 @@ fn solve<'a>(
 
         // TODO
         // just for debugging :)
-        //circ_data.check_all(&wits);
+        circ_data.check_all(&wits);
 
         let sp_0 = <G1 as Group>::Scalar::from(stack_ptr_0 as u64);
         let spp = <G1 as Group>::Scalar::from(stack_ptr_popped as u64);
@@ -702,6 +720,8 @@ fn prove_and_verify(
     let cp_clone = circuit_primary.clone().unwrap();
 
     let mut i = 0;
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Prover, "Prover", "Full");
     while circuit_primary.is_some() {
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, "prove", format!("prove_{}", i).as_str());
@@ -781,11 +801,46 @@ fn prove_and_verify(
     println!("post cp");
 
     #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "Prover", "Full");
+
+    #[cfg(feature = "metrics")]
     log::space(
         Component::Prover,
         "Proof Size",
         "Compressed SNARK size",
-        serde_json::to_string(&compressed_snark).unwrap().len(),
+        bincode::serialize(&compressed_snark).unwrap().len(),
+    );
+
+    // #[cfg(feature = "metrics")]
+    // log::space(
+    //     Component::Prover,
+    //     "Proof Size",
+    //     "Compressed SNARK size",
+    //     bincode::serialize(&compressed_snark).unwrap().len(),
+    // );
+
+    // #[cfg(feature = "metrics")]
+    // log::space(
+    //     Component::Prover,
+    //     "Proof Size",
+    //     "Commit Size",
+    //     bincode::serialize(&proof_info.commit).unwrap().len(),
+    // );
+
+    // #[cfg(feature = "metrics")]
+    // log::space(
+    //     Component::Prover,
+    //     "Proof Size",
+    //     "Consist Proof size",
+    //     consistency_proof_size(&consist_proof).unwrap().len(),
+    // );
+
+    #[cfg(feature = "metrics")]
+    log::space(
+        Component::Prover,
+        "Proof Size",
+        "Consist Proof + Doc Commit size",
+        proof_size(&consist_proof, &proof_info.commit),
     );
 
     #[cfg(feature = "metrics")]
@@ -894,6 +949,35 @@ fn verify(
         "Verification",
         "Final Checks Consistency Verification",
     );
+}
+
+fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> usize {
+    let mut doc_size = 0;
+    if rc.nldoc.is_some() {
+        let dc = &rc.nldoc.as_ref().unwrap().doc_commit;
+        for c in 0..dc.comm.len() {
+            let cc: CompressedCommitment<<G1 as Group>::CompressedGroupElement> = dc.comm[c];
+            doc_size += bincode::serialize(&cc).unwrap().len();
+        }
+    };
+
+    let cp = csp.as_ref().unwrap();
+
+    let snark_size = bincode::serialize(&cp.snark).unwrap().len();
+    let v_size = bincode::serialize(&cp.v_commit.comm.compress())
+        .unwrap()
+        .len();
+    let vprime_size = if cp.v_prime_commit.is_some() {
+        bincode::serialize(&cp.v_prime_commit.unwrap().comm.compress())
+            .unwrap()
+            .len()
+    } else {
+        0
+    };
+    let ipa_size = bincode::serialize(&cp.ipa).unwrap().len();
+    let q_size = bincode::serialize(&cp.running_q).unwrap().len();
+    let hybrid_size = bincode::serialize(&cp.hybrid_ipa).unwrap().len();
+    doc_size + snark_size + v_size + vprime_size + ipa_size + q_size + hybrid_size
 }
 
 #[cfg(test)]

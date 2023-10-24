@@ -88,16 +88,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         // generate T
         let mut num_states = safa.g.node_count();
-        let kid_padding = num_states;
+        let kid_padding = num_states as usize;
         num_states += 1;
         let exit_state = num_states;
         num_states += 1;
 
-        let num_chars = num_ab.len();
-
-        let mut max_offsets = safa.max_skip_offset().max(1);
-        let star_offset = max_offsets;
-        max_offsets += 1;
+        let mut max_offsets = safa.max_skip_offset().max(1) as usize;
+        let star_offset = max_offsets + 1;
+        max_offsets += 2;
 
         let max_branches = safa.max_forall_fanout().max(1);
 
@@ -107,16 +105,25 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         /*println!(
             "STATES {:#?}",
-            safa.g
-                .node_indices()
-                .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
+            safa.g.node_indices().for_each(|i| println!(
+                "({}) -> {}, forall? {}",
+                i.index(),
+                safa.g[i],
+                safa.g[i].is_and()
+            ))
         );*/
+
+        //println!("ACCEPTING {:#?}", safa.accepting());
 
         let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
 
         let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
         let mut max_stack = 1;
         let mut max_rel = 1;
+
+        let num_chars = num_ab.len() as u128;
+        let num_states_mult = num_states as u128;
+        let max_offsets_mult = max_offsets as u128;
 
         while let Some(all_state) = dfs_alls.next(&safa.g) {
             //println!("PROCESS STATE {:#?}", all_state);
@@ -132,11 +139,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     and_states.push(and_edges[i].target().index());
                 }
                 // add epsilon loop
-                let in_state = all_state.index();
-                let out_state = all_state.index();
+                let in_state = all_state.index() as usize;
+                let out_state = all_state.index() as usize;
                 let lower_offset = 0;
                 let upper_offset = 0;
-                let c = num_ab[&None]; //EPSILON
+                let c = num_ab[&None] as usize; //EPSILON
 
                 let rel = calc_rel(
                     all_state.index(),
@@ -154,12 +161,21 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 }
                 set_table.insert(
                     Integer::from(
-                        (rel * num_states * num_states * num_chars * max_offsets * max_offsets)
-                            + (in_state * num_states * num_chars * max_offsets * max_offsets)
-                            + (out_state * num_chars * max_offsets * max_offsets)
-                            + (c * max_offsets * max_offsets)
-                            + (lower_offset * max_offsets)
-                            + upper_offset,
+                        (rel as u128
+                            * num_states_mult
+                            * num_states_mult
+                            * num_chars
+                            * max_offsets_mult
+                            * max_offsets_mult)
+                            + (in_state as u128
+                                * num_states_mult
+                                * num_chars
+                                * max_offsets_mult
+                                * max_offsets_mult)
+                            + (out_state as u128 * num_chars * max_offsets_mult * max_offsets_mult)
+                            + (c as u128 * max_offsets_mult * max_offsets_mult)
+                            + (lower_offset as u128 * max_offsets_mult)
+                            + upper_offset as u128,
                     )
                     .rem_floor(cfg().field().modulus()),
                 );
@@ -197,26 +213,26 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                     if rel > max_rel {
                                         max_rel = rel;
                                     }
-
                                     set_table.insert(
                                         Integer::from(
-                                            (rel * num_states
-                                                * num_states
+                                            (rel as u128
+                                                * num_states_mult
+                                                * num_states_mult
                                                 * num_chars
-                                                * max_offsets
-                                                * max_offsets)
-                                                + (in_state
-                                                    * num_states
+                                                * max_offsets_mult
+                                                * max_offsets_mult)
+                                                + (in_state as u128
+                                                    * num_states_mult
                                                     * num_chars
-                                                    * max_offsets
-                                                    * max_offsets)
-                                                + (out_state
+                                                    * max_offsets_mult
+                                                    * max_offsets_mult)
+                                                + (out_state as u128
                                                     * num_chars
-                                                    * max_offsets
-                                                    * max_offsets)
-                                                + (c * max_offsets * max_offsets)
-                                                + (lower_offset * max_offsets)
-                                                + upper_offset,
+                                                    * max_offsets_mult
+                                                    * max_offsets_mult)
+                                                + (c as u128 * max_offsets_mult * max_offsets_mult)
+                                                + (lower_offset as u128 * max_offsets_mult)
+                                                + upper_offset as u128,
                                         )
                                         .rem_floor(cfg().field().modulus()),
                                     );
@@ -255,7 +271,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     num_chars,
                     kid_padding,
                     max_branches,
-                    max_offsets,
+                    max_offsets_mult,
                     star_offset,
                     NodeIndex::new(kids[k]),
                     backtrace_state,
@@ -282,7 +298,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             num_chars,
             kid_padding,
             max_branches,
-            max_offsets,
+            max_offsets_mult,
             star_offset,
             safa.get_init(), //exists_state,
             exit_state,      // backtrace state
@@ -303,12 +319,21 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         set_table.insert(
             Integer::from(
-                (rel * num_states * num_states * num_chars * max_offsets * max_offsets)
-                    + (in_state * num_states * num_chars * max_offsets * max_offsets)
-                    + (out_state * num_chars * max_offsets * max_offsets)
-                    + (c * max_offsets * max_offsets)
-                    + (lower_offset * max_offsets)
-                    + upper_offset,
+                (rel as u128
+                    * num_states_mult
+                    * num_states_mult
+                    * num_chars
+                    * max_offsets_mult
+                    * max_offsets_mult)
+                    + (in_state as u128
+                        * num_states_mult
+                        * num_chars
+                        * max_offsets_mult
+                        * max_offsets_mult)
+                    + (out_state as u128 * num_chars * max_offsets_mult * max_offsets_mult)
+                    + (c as u128 * max_offsets_mult * max_offsets_mult)
+                    + (lower_offset as u128 * max_offsets_mult)
+                    + upper_offset as u128,
             )
             .rem_floor(cfg().field().modulus()),
         );
@@ -318,15 +343,23 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // need to round out table size ?
         let base: usize = 2;
         let calc_fill = Integer::from(
-            (max_rel * num_states * num_states * num_chars * max_offsets * max_offsets)
-                + (num_states * num_states * num_chars * max_offsets * max_offsets)
-                + (num_states * num_chars * max_offsets * max_offsets)
-                + (num_chars * max_offsets * max_offsets)
-                + (max_offsets * max_offsets)
-                + max_offsets,
+            (max_rel as u128
+                * num_states_mult
+                * num_states_mult
+                * num_chars
+                * max_offsets_mult
+                * max_offsets_mult)
+                + (num_states_mult
+                    * num_states_mult
+                    * num_chars
+                    * max_offsets_mult
+                    * max_offsets_mult)
+                + (num_states_mult * num_chars * max_offsets_mult * max_offsets_mult)
+                + (num_chars * max_offsets_mult * max_offsets_mult)
+                + (max_offsets_mult * max_offsets_mult)
+                + max_offsets_mult,
         );
 
-        assert!(calc_fill < cfg().field().modulus().clone());
         while table.len() < base.pow(logmn(table.len()) as u32) {
             table.push(calc_fill.clone());
         }
@@ -376,24 +409,40 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             let real_start = projection.unwrap();
+            //println!("real start {}", real_start);
             let real_len = orig_len - real_start;
 
-            let chunk_len = real_len.next_power_of_two();
-            let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
-
+            let mut chunk_len = usize_doc.len().next_power_of_two() / 2;
+            let mut e = usize_doc.len().next_power_of_two();
+            let mut s = 0;
+            let mut end = e;
             let mut start = 0;
-            while start + chunk_len <= real_start {
-                start += chunk_len;
+
+            while e >= orig_len {
+                //println!("CHUNK LEN {}, e {}, s {}", chunk_len, e, s);
+                end = e;
+                start = s;
+
+                s = 0;
+                while s + chunk_len <= real_start {
+                    s += chunk_len;
+                }
+                //println!("found start {}", s);
+                e = s + chunk_len;
+                assert!(end <= usize_doc.len().next_power_of_two());
+
+                // try to go smaller
+                chunk_len = chunk_len / 2
             }
 
-            let end = start + chunk_len;
-
+            chunk_len = end - start;
+            assert!(chunk_len.next_power_of_two() == chunk_len);
             println!(
                 "START {:#?}, END {:#?}, NEW END {:#?}",
                 start, orig_len, end
             );
 
-            assert!(start < orig_len);
+            assert!(start <= real_start);
             assert!(end >= orig_len);
             assert!(start % chunk_len == 0);
 
@@ -408,8 +457,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 println!("USING PROJECTION {:#?}", ((start, end)));
 
                 // calculate chunk idx
+                let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
+                //println!("Num chunks {}", num_chunks);
                 let mut chunk_idx = start / chunk_len;
-
+                //println!("chunk_idx {}", chunk_idx);
                 let mut chunk_idx_vec = vec![];
                 for _i in 0..logmn(num_chunks) {
                     chunk_idx_vec.push(chunk_idx % 2);
@@ -419,6 +470,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 chunk_idx_vec = chunk_idx_vec.into_iter().rev().collect();
 
                 proj_chunk_idx = Some(chunk_idx_vec);
+                //println!("chunk idx {:#?}", proj_chunk_idx);
 
                 Some((start, end)) // handle doc extension TODO?
             }
@@ -447,6 +499,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // merkle does not work with proj/hybrid
         assert!((merkle && hybrid_len.is_none() && doc_subset.is_none()) || !merkle);
         assert!(batch_size > 1);
+
+        println!(
+            "num states {}, max offset {}, num_chars {}",
+            num_states, max_offsets, num_chars
+        );
 
         Self {
             safa,
@@ -507,8 +564,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     // check if we need vs as vars
     fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
-        let num_chars = self.num_ab.len();
-        let bit_limit = logmn(self.num_states);
+        let num_chars = self.num_ab.len() as u128;
+        let bit_limit = logmn(self.num_states) + 1;
+        let num_states = self.num_states as u128;
+        let max_offsets = self.max_offsets as u128;
 
         let mut v = vec![];
         for i in 1..(self.batch_size + 1) {
@@ -549,11 +608,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                                         vec![
                                                             new_var(format!("rel_{}", i - 1)),
                                                             new_const(
-                                                                self.num_states
-                                                                    * self.num_states
+                                                                num_states
+                                                                    * num_states
                                                                     * num_chars
-                                                                    * self.max_offsets
-                                                                    * self.max_offsets,
+                                                                    * max_offsets
+                                                                    * max_offsets,
                                                             ),
                                                         ],
                                                     ),
@@ -562,10 +621,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                                         vec![
                                                             new_var(format!("state_{}", i - 1)),
                                                             new_const(
-                                                                self.num_states
+                                                                num_states
                                                                     * num_chars
-                                                                    * self.max_offsets
-                                                                    * self.max_offsets,
+                                                                    * max_offsets
+                                                                    * max_offsets,
                                                             ),
                                                         ],
                                                     ),
@@ -576,9 +635,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                                 vec![
                                                     new_var(format!("state_{}", i)),
                                                     new_const(
-                                                        num_chars
-                                                            * self.max_offsets
-                                                            * self.max_offsets,
+                                                        num_chars * max_offsets * max_offsets,
                                                     ),
                                                 ],
                                             ),
@@ -588,7 +645,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                         Op::PfNaryOp(PfNaryOp::Mul),
                                         vec![
                                             new_var(format!("char_{}", i - 1)),
-                                            new_const(self.max_offsets * self.max_offsets),
+                                            new_const(max_offsets * max_offsets),
                                         ],
                                     ),
                                 ],
@@ -597,7 +654,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 Op::PfNaryOp(PfNaryOp::Mul),
                                 vec![
                                     new_var(format!("lower_offset_{}", i - 1)),
-                                    new_const(self.max_offsets),
+                                    new_const(max_offsets),
                                 ],
                             ),
                         ],
@@ -640,26 +697,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             .push(new_var(format!("state_{}", self.batch_size)));
 
         v
-    }
-
-    fn last_state_accepting_circuit(&mut self) {
-        let match_term = term(
-            Op::Ite,
-            vec![
-                term(
-                    Op::Eq,
-                    vec![
-                        new_const(2),
-                        new_var(format!("rel_{}", self.batch_size - 1)),
-                    ],
-                ),
-                term(Op::Eq, vec![new_var(format!("accepting")), new_const(1)]),
-                term(Op::Eq, vec![new_var(format!("accepting")), new_const(0)]),
-            ],
-        );
-
-        self.assertions.push(match_term);
-        self.pub_inputs.push(new_var(format!("accepting")));
     }
 
     fn r1cs_conv(&self) -> (ProverData, VerifierData) {
@@ -774,7 +811,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     fn hashed_push_rel(&mut self) -> Term {
         let mut hashed_state_var = new_const(4);
-        let states_bit_limit = logmn(self.num_states);
+        let states_bit_limit = logmn(self.num_states) + 1;
         for k in 0..self.max_branches {
             hashed_state_var = term(
                 Op::PfNaryOp(PfNaryOp::Add),
@@ -949,7 +986,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // if pop, check new_cursor < prev
-        let cur_bit_limit = logmn(self.udoc.len());
+        let cur_bit_limit = logmn(self.udoc.len()) + 1;
         let cursor_overflow = term(
             Op::BvBinPred(BvBinPred::Uge),
             vec![
@@ -1037,7 +1074,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
             self.assertions.push(cursor_plus);
 
-            let bit_limit = logmn(max(self.udoc.len(), self.max_offsets));
+            let bit_limit = logmn(max(self.udoc.len(), self.max_offsets)) + 1;
+            /*println!(
+                "BIT LIMIT {} max {} star {} max {}",
+                bit_limit,
+                self.max_offsets,
+                self.star_offset,
+                max(self.udoc.len(), self.max_offsets)
+            );*/
+
             let cur_overflow = term(
                 Op::BvBinPred(BvBinPred::Uge),
                 vec![
@@ -1123,6 +1168,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 ],
             );
             self.assertions.push(ite_upper_off);
+
             if j == 0 {
                 // PUSH
                 // if in_state \in forall - only first
@@ -1161,12 +1207,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let do_what = term(
                     Op::Ite,
                     vec![
-                        term(Op::Not, vec![self.not_forall_circ(0)]),
-                        term(Op::BoolNaryOp(BoolNaryOp::And), vec![pop_stmt, push_stmt]),
+                        self.not_forall_circ(0),
                         term(
                             Op::BoolNaryOp(BoolNaryOp::And),
                             vec![inside_ite, stack_ptr_same],
                         ),
+                        term(Op::BoolNaryOp(BoolNaryOp::And), vec![pop_stmt, push_stmt]),
                     ],
                 );
                 self.assertions.push(do_what);
@@ -1510,7 +1556,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         self.cursor_circuit();
-        self.last_state_accepting_circuit();
 
         if self.merkle {
             self.nlookup_gadget(lookups, self.table.len(), "nl");
@@ -1589,11 +1634,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     // only call in "active" cases
     fn pop_wit(&mut self, wits: &mut FxHashMap<String, Value>) -> usize {
+        println!("POP WIT");
         self.stack_ptr -= 1;
         let popped_elt = self.stack[self.stack_ptr];
 
         wits.insert(format!("cursor_popped"), new_wit(popped_elt.0));
         wits.insert(format!("cursor_0"), new_wit(popped_elt.0));
+
         // after pop
         wits.insert(format!("stack_ptr_popped"), new_wit(self.stack_ptr));
 
@@ -1683,7 +1730,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         children: &Vec<usize>,
         trans: bool,
     ) -> usize {
-        calc_rel(
+        let rel = calc_rel(
             state_i,
             next_state,
             children,
@@ -1693,7 +1740,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.num_states,
             self.exit_state,
             trans,
-        )
+        );
+        rel
     }
 
     fn padding_v(
@@ -1736,32 +1784,32 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("rel_{}", i), new_wit(rel_i));
         wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i)); // alreaded "added" here
 
-        // v_i =
-        let num_chars = self.num_ab.len();
+        let num_chars = self.num_ab.len() as u128;
+        let num_states = self.num_states as u128;
+        let max_offsets = self.max_offsets as u128;
 
         // TODO check overflow
         let v_i = Integer::from(
-            (rel_i
-                * self.num_states
-                * self.num_states
-                * num_chars
-                * self.max_offsets
-                * self.max_offsets)
-                + (state_i * self.num_states * num_chars * self.max_offsets * self.max_offsets)
-                + (next_state * num_chars * self.max_offsets * self.max_offsets)
-                + (char_num * self.max_offsets * self.max_offsets)
-                + (lower_offset_i * self.max_offsets)
-                + upper_offset_i,
+            (rel_i as u128 * num_states * num_states * num_chars * max_offsets * max_offsets)
+                + (state_i as u128 * num_states * num_chars * max_offsets * max_offsets)
+                + (next_state as u128 * num_chars * max_offsets * max_offsets)
+                + (char_num as u128 * max_offsets * max_offsets)
+                + (lower_offset_i as u128 * max_offsets)
+                + upper_offset_i as u128,
         )
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-        /*
-                println!(
-                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-                );
-        */
+
+        // println!(
+        //     "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+        //     i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        // );
+        // println!(
+        //     "Lower off {:#?}, off {:#?}, upper off {:#?}",
+        //     lower_offset_i, offset_i, upper_offset_i
+        // );
+
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -1797,7 +1845,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                             upper_offset_i = self.star_offset;
                         } else {
                             let mut iter = openset.0.iter();
-                            if let Some(r) = iter.next() {
+                            while let Some(r) = iter.next() {
                                 // ranges
                                 lower_offset_i = r.start;
                                 upper_offset_i = if r.end.is_some() {
@@ -1805,8 +1853,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                 } else {
                                     self.star_offset
                                 };
-                            } else {
-                                panic!("found edge with bad range");
+                                if (lower_offset_i <= offset_i)
+                                    && ((offset_i <= upper_offset_i)
+                                        || (upper_offset_i == self.star_offset))
+                                {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -1828,30 +1880,32 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i)); // alreaded "added" here
 
         // v_i =
-        let num_chars = self.num_ab.len();
+        let num_chars = self.num_ab.len() as u128;
+        let num_states = self.num_states as u128;
+        let max_offsets = self.max_offsets as u128;
 
         let v_i = Integer::from(
-            (rel_i
-                * self.num_states
-                * self.num_states
-                * num_chars
-                * self.max_offsets
-                * self.max_offsets)
-                + (state_i * self.num_states * num_chars * self.max_offsets * self.max_offsets)
-                + (next_state * num_chars * self.max_offsets * self.max_offsets)
-                + (char_num * self.max_offsets * self.max_offsets)
-                + (lower_offset_i * self.max_offsets)
-                + upper_offset_i,
+            (rel_i as u128 * num_states * num_states * num_chars * max_offsets * max_offsets)
+                + (state_i as u128 * num_states * num_chars * max_offsets * max_offsets)
+                + (next_state as u128 * num_chars * max_offsets * max_offsets)
+                + (char_num as u128 * max_offsets * max_offsets)
+                + (lower_offset_i as u128 * max_offsets)
+                + upper_offset_i as u128,
         )
         .rem_floor(cfg().field().modulus());
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
+
         /*
-                println!(
-                    "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-                    i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-                );
-        */
+        println!(
+            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
+            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
+        );
+        println!(
+            "Lower off {:#?}, off {:#?}, upper off {:#?}",
+            lower_offset_i, offset_i, upper_offset_i
+        );*/
+
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
@@ -2057,9 +2111,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
 
-        let accept = if rel_i == 2 { 1 } else { 0 }; //todo
-        wits.insert(format!("accepting"), new_wit(accept));
-
+        /*let accept = if rel_i == 2 { 1 } else { 0 }; //todo
+                wits.insert(format!("accepting"), new_wit(accept));
+        */
         assert_eq!(v.len(), self.batch_size);
 
         // projections
@@ -2601,9 +2655,14 @@ mod tests {
         proj: Option<usize>,
         hybrid: bool,
         merkle: bool,
+        negate: bool,
     ) {
         let r = re::simpl(re::new(&rstr));
-        let safa = SAFA::new(&ab[..], &r);
+        let safa = if negate {
+            SAFA::new(&ab[..], &r).negate()
+        } else {
+            SAFA::new(&ab[..], &r)
+        };
 
         let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
 
@@ -2640,7 +2699,7 @@ mod tests {
             let mut next_state = 0;
 
             let trace = safa.solve(&chars);
-
+            println!("TRACE {:#?}", trace);
             let mut sols = trace_preprocessing(&trace);
 
             let mut i = 0;
@@ -2752,6 +2811,55 @@ mod tests {
     }
 
     #[test]
+    fn new_bug() {
+        init();
+        test_func_no_hash(
+            (0..128).filter_map(std::char::from_u32).collect(),
+            reg("^(?=.*[A-Z].*[A-Z])(?=.*[^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
+            ab("q1w2e3r4"),
+            vec![2], // 2],
+            true,
+            None,
+            false,
+            false,
+            true,
+        );
+    }
+
+    #[test]
+    fn make_safa_bug() {
+        init();
+        test_func_no_hash(
+            ab("ATGC"),
+            reg("^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG$"),
+
+        ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+            vec![2], // 2],
+            true,
+            None,
+            false,
+            false,
+            true,
+        );
+    }
+
+    #[test]
+    fn multiple_ranges_bug() {
+        init();
+        test_func_no_hash(
+            ab("ATGC"),
+            reg("^.{10}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG"),
+            ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+            vec![2], // 2],
+            true,
+            None,
+            false,
+            false,
+            true,
+        );
+    }
+
+    #[test]
     fn forall_children_alignment() {
         init();
         test_func_no_hash(
@@ -2761,6 +2869,7 @@ mod tests {
             vec![2], // 2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2778,6 +2887,7 @@ mod tests {
             Some(16),
             false,
             false,
+            false,
         );
     }
 
@@ -2793,6 +2903,7 @@ mod tests {
             None,
             false,
             true,
+            false,
         );
     }
 
@@ -2808,6 +2919,7 @@ mod tests {
             Some(18), // (4,8)
             true,
             false,
+            false,
         );
     }
     #[test]
@@ -2821,6 +2933,7 @@ mod tests {
             true,
             Some(5), // (4,8)
             true,
+            false,
             false,
         );
     }
@@ -2837,6 +2950,7 @@ mod tests {
             true,
             None,
             true,
+            false,
             false,
         );
     }
@@ -2855,6 +2969,7 @@ mod tests {
             Some(5), // (4,8)
             false,
             false,
+            false,
         );
     }
 
@@ -2868,6 +2983,7 @@ mod tests {
             vec![2], // 2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2885,6 +3001,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
     }
 
@@ -2898,6 +3015,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2929,6 +3047,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
         test_func_no_hash(
             ab("ab"),
@@ -2939,6 +3058,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
         test_func_no_hash(
             ab("ab"),
@@ -2947,6 +3067,7 @@ mod tests {
             vec![2, 4],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -2965,6 +3086,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
     }
 
@@ -2978,6 +3100,7 @@ mod tests {
             vec![2],
             true,
             None,
+            false,
             false,
             false,
         );
@@ -3004,6 +3127,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
 
         /*    test_func_no_hash(
@@ -3028,6 +3152,7 @@ mod tests {
             None,
             false,
             false,
+            false,
         );
 
         test_func_no_hash(
@@ -3037,6 +3162,7 @@ mod tests {
             vec![33],
             true,
             None,
+            false,
             false,
             false,
         );

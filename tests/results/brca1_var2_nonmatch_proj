@@ -1,0 +1,22 @@
+./tests/do_43054295,^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG,309,64
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+compiler,R1CS,R1CS precomputations,5942335,μs
+compiler,R1CS,Proof Setup,9311566,μs
+compiler,R1CS,To Circuit,20465,μs
+solver,Witness Generation,step_0,51287,μs
+verifier,Verification,Final Checks Consistency Verification,1116268,μs
+prover,Proof,Consistency Proofs,13234333,μs
+prover,Proof,Compressed SNARK,2489946,μs
+verifier,Verification,Nova Verification,2000304,μs
+solver,Solve,Full,5501309,μs
+prover,Prover,Full,16328776,μs
+compiler,R1CS,Commitment Generations,21536419,μs
+prover,prove,prove_0,400221,μs
+compiler,SAFA,SAFA,12807187,μs
+verifier,Verification,Full,3117193,μs
+compiler,Compiler,Full,54697834,μs
+prover,add test,Secondary Circuit,10347,constraints
+prover,add test,Primary Circuit,24767,constraints
+prover,Proof Size,Consist Proof + Doc Commit size,271489,bytes
+prover,Proof Size,Compressed SNARK size,23920,bytes

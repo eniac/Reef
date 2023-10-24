@@ -1,0 +1,93 @@
+./tests/do_415,"^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$",42318,331
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+solver,Witness Generation,step_3,122470,μs
+solver,Witness Generation,step_1,108511,μs
+solver,Solve,Framework Solve,434090,μs
+verifier,Verification,Nova Verification,3092360,μs
+prover,prove,prove_0,421496,μs
+prover,prove,prove_2,949755,μs
+compiler,R1CS,Commitment Generations,795263,μs
+compiler,Compiler,Full,16945724,μs
+compiler,R1CS,R1CS precomputations,34198,μs
+prover,Proof,Compressed SNARK,4481678,μs
+solver,Witness Generation,step_0,78439,μs
+compiler,R1CS,Proof Setup,11781995,μs
+solver,SAFA Solving,Clear Match,41,μs
+compiler,R1CS,To Circuit,540712,μs
+prover,prove,prove_3,983235,μs
+compiler,SAFA,SAFA,3769012,μs
+prover,Proof,Consistency Proofs,221985,μs
+verifier,Verification,Full,3213690,μs
+verifier,Verification,Final Checks Consistency Verification,120576,μs
+prover,prove,prove_1,757083,μs
+solver,Witness Generation,step_2,107003,μs
+prover,add test,Secondary Circuit,10347,constraints
+prover,add test,Primary Circuit,48407,constraints
+prover,Proof Size,Compressed SNARK size,76381,bytes
+./tests/do_415,"^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$",42318,331
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+verifier,Verification,Full,3698433,μs
+solver,Witness Generation,step_0,95051,μs
+compiler,R1CS,Commitment Generations,840532,μs
+solver,Witness Generation,step_1,206187,μs
+solver,Solve,Framework Solve,964098,μs
+compiler,Compiler,Full,16949472,μs
+compiler,R1CS,R1CS precomputations,33472,μs
+prover,prove,prove_2,720670,μs
+compiler,R1CS,Proof Setup,11312359,μs
+prover,Proof,Consistency Proofs,215976,μs
+solver,SAFA Solving,Clear Match,17,μs
+prover,Proof,Compressed SNARK,4279980,μs
+verifier,Verification,Final Checks Consistency Verification,126227,μs
+prover,prove,prove_1,722526,μs
+prover,prove,prove_3,891673,μs
+solver,Witness Generation,step_3,376251,μs
+compiler,SAFA,SAFA,4208074,μs
+prover,prove,prove_0,394636,μs
+compiler,R1CS,To Circuit,537565,μs
+verifier,Verification,Nova Verification,3569163,μs
+solver,Witness Generation,step_2,269568,μs
+prover,add test,Primary Circuit,46215,constraints
+prover,add test,Secondary Circuit,10347,constraints
+prover,Proof Size,Compressed SNARK size,75655,bytes
+./tests/do_1000,"^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$",116751,908
+---------,---------,---------,---------
+Component,test,subtest,metric,metric_type
+prover,Proof,Compressed SNARK,3688847,μs
+solver,Witness Generation,step_6,488042,μs
+solver,Witness Generation,step_7,462604,μs
+solver,SAFA Solving,Clear Match,210,μs
+prover,prove,prove_3,842378,μs
+compiler,Compiler,Full,104223893,μs
+prover,prove,prove_9,994066,μs
+compiler,SAFA,SAFA,91324204,μs
+solver,Witness Generation,step_0,129013,μs
+prover,prove,prove_2,745415,μs
+prover,prove,prove_8,961904,μs
+compiler,R1CS,R1CS precomputations,35970,μs
+prover,prove,prove_0,658273,μs
+prover,prove,prove_5,801926,μs
+verifier,Verification,Nova Verification,3222380,μs
+compiler,R1CS,To Circuit,722444,μs
+solver,Witness Generation,step_9,938536,μs
+solver,Witness Generation,step_1,694505,μs
+solver,Witness Generation,step_3,491668,μs
+prover,prove,prove_1,725300,μs
+compiler,R1CS,Commitment Generations,610876,μs
+prover,prove,prove_7,794988,μs
+prover,Proof,Consistency Proofs,260616,μs
+solver,Witness Generation,step_2,504455,μs
+prover,prove,prove_4,809779,μs
+verifier,Verification,Final Checks Consistency Verification,125055,μs
+solver,Witness Generation,step_4,467735,μs
+solver,Solve,Framework Solve,5728827,μs
+prover,prove,prove_6,953585,μs
+compiler,R1CS,Proof Setup,11488246,μs
+solver,Witness Generation,step_5,678317,μs
+solver,Witness Generation,step_8,843729,μs
+verifier,Verification,Full,3349930,μs
+prover,add test,Secondary Circuit,10347,constraints
+prover,add test,Primary Circuit,50535,constraints
+prover,Proof Size,Compressed SNARK size,75772,bytes

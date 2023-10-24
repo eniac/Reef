@@ -98,6 +98,19 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "R1CS", "Commitment Gen");
 
+    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
+    let mut wtr = Writer::from_writer(file);
+    let _ = wtr.write_record(&[
+    format!("{}_{}",&doc[..10],doc.len()),
+    r,
+    dfa_ndelta.to_string(), //nedges().to_string(),
+    dfa_nstate.to_string(), //nstates().to_string(),
+    ]);
+    let spacer = "---------";
+
+    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    wtr.flush();
+
     let _ = make_circom(&dfa, doc_len, alpha.len());
 
     let mut command = shell("circom match.circom --r1cs --sym --wasm --prime vesta");
@@ -106,7 +119,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::tic(Component::Compiler, "R1CS", "Circom");
     let mut output  = command.execute_output().unwrap();
     #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS", "Circom");
+    {log::stop(Component::Compiler, "R1CS", "Circom");
+    log::write_csv(&out_write.as_path().display().to_string()).unwrap();}
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
@@ -128,7 +142,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler,"R1CS", "Loading");
+    {log::stop(Component::Compiler,"R1CS", "Loading");
+    log::write_csv(&out_write.as_path().display().to_string()).unwrap();}
 
     println!("R1CS loaded" );
 
@@ -191,6 +206,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         private_inputs,
         start_public_input.to_vec(),
         &pp,
+        out_write.clone()
     ).unwrap();
 
     let z0_secondary = [<G2 as Group>::Scalar::zero()];
@@ -206,7 +222,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Prover, "Prove","Prove Compressed");
+    {log::stop(Component::Prover, "Prove","Prove Compressed");
+    log::write_csv(&out_write.as_path().display().to_string()).unwrap();}
 
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
@@ -252,18 +269,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         serde_json::to_string(&compressed_snark).unwrap().len(),
     );
 
-
-    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
-    let mut wtr = Writer::from_writer(file);
-    let _ = wtr.write_record(&[
-    format!("{}_{}",&doc[..10],doc.len()),
-    r,
-    dfa_ndelta.to_string(), //nedges().to_string(),
-    dfa_nstate.to_string(), //nstates().to_string(),
-    ]);
-    let spacer = "---------";
-    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-    wtr.flush();
 
     #[cfg(feature = "metrics")]
     log::write_csv(&out_write.as_path().display().to_string()).unwrap();
