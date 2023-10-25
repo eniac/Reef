@@ -79,7 +79,7 @@ pub struct ConsistencyProof {
     pub ipa: InnerProductArgument<G1>,
     pub running_q: Vec<<G1 as Group>::Scalar>,
     // eq proof
-    eq_proof: Option<EqualityProof<G1>>,
+    pub eq_proof: Option<EqualityProof<G1>>,
     l_commit: Option<Commitment<G1>>,
 }
 
