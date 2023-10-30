@@ -1,5 +1,3 @@
-type G1 = pasta_curves::pallas::Point;
-
 use ff::{Field, PrimeField};
 use generic_array::typenum;
 use neptune::{
