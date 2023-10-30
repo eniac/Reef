@@ -12,6 +12,7 @@ use crate::backend::merkle_tree::MerkleWit;
 use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::frontend::safa::SAFA;
+use bincode;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::ProverData;
 use generic_array::typenum;
@@ -29,7 +30,6 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use bincode;
 
 struct ProofInfo {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
@@ -964,11 +964,9 @@ fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> usize {
     let cp = csp.as_ref().unwrap();
 
     let snark_size = bincode::serialize(&cp.snark).unwrap().len();
-    let v_size = bincode::serialize(&cp.v_commit.comm.compress())
-        .unwrap()
-        .len();
+    let v_size = bincode::serialize(&cp.v_commit).unwrap().len();
     let vprime_size = if cp.v_prime_commit.is_some() {
-        bincode::serialize(&cp.v_prime_commit.unwrap().comm.compress())
+        bincode::serialize(&cp.v_prime_commit.unwrap())
             .unwrap()
             .len()
     } else {
@@ -976,8 +974,11 @@ fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> usize {
     };
     let ipa_size = bincode::serialize(&cp.ipa).unwrap().len();
     let q_size = bincode::serialize(&cp.running_q).unwrap().len();
-    let hybrid_size = bincode::serialize(&cp.hybrid_ipa).unwrap().len();
-    doc_size + snark_size + v_size + vprime_size + ipa_size + q_size + hybrid_size
+
+    let eq_proof_size = bincode::serialize(&cp.eq_proof).unwrap().len();
+    // check? let l_commit_size = bincode::serialize(&cp.l_commit).unwrap().len();
+
+    doc_size + snark_size + v_size + vprime_size + ipa_size + q_size + eq_proof_size
 }
 
 #[cfg(test)]

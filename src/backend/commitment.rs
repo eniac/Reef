@@ -26,11 +26,14 @@ use nova_snark::{
         pedersen::{Commitment, CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
-    spartan::direct::{SpartanProverKey, SpartanSNARK, SpartanVerifierKey},
-    spartan::polynomial::{EqPolynomial, MultilinearPolynomial},
+    spartan::{
+        direct::{SpartanProverKey, SpartanSNARK, SpartanVerifierKey},
+        nizk::EqualityProof,
+        polynomial::{EqPolynomial, MultilinearPolynomial},
+    },
     traits::{
         circuit::StepCircuit, commitment::*, evaluation::GetGeneratorsTrait, AbsorbInROTrait,
-        Group, ROConstantsTrait, ROTrait,
+        AppendToTranscriptTrait, ChallengeTrait, Group, ROConstantsTrait, ROTrait,
     },
     StepCounterType,
 };
@@ -70,14 +73,14 @@ pub struct ConsistencyProof {
     pub hash_d: <G1 as Group>::Scalar,
     circuit: ConsistencyCircuit<<G1 as Group>::Scalar>,
     pub snark: SpartanSNARK<G1, EE1, ConsistencyCircuit<<G1 as Group>::Scalar>>,
-    pub v_commit: Commitment<G1>,
+    pub v_commit: CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
     // dot prod verification
-    pub v_prime_commit: Option<Commitment<G1>>,
+    pub v_prime_commit: Option<CompressedCommitment<<G1 as Group>::CompressedGroupElement>>,
     pub ipa: InnerProductArgument<G1>,
     pub running_q: Vec<<G1 as Group>::Scalar>,
-    t_vp_gens: Option<CommitmentGens<G1>>,
-    hybrid_ipi: Option<InnerProductInstance<G1>>,
-    pub hybrid_ipa: Option<InnerProductArgument<G1>>,
+    // eq proof
+    pub eq_proof: Option<EqualityProof<G1>>,
+    l_commit: Option<CompressedCommitment<<G1 as Group>::CompressedGroupElement>>,
 }
 
 impl ReefCommitment {
@@ -214,25 +217,28 @@ impl NLDocCommitment {
             self.proof_dot_prod_prover(q_ff, v_ff, proj_chunk_idx, proj, hybrid);
 
         println!("post proof dot prod prover");
-        let (t_vp_gens, hybrid_ipi, hybrid_ipa) = if !hybrid {
-            (None, None, None)
+        let (eq_proof, l_commit) = if !hybrid {
+            (None, None)
         } else {
             // calculate t
             let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
             let t = int_to_ff(verifier_mle_eval(table, q_prime));
             let q0 = int_to_ff(q[0].clone());
 
-            let (gens, ipi, ipa) = self.proof_hybrid_combo(
+            assert_eq!(
+                (<G1 as Group>::Scalar::from(1) - q0) * t + q0 * v_prime,
+                v_ff
+            );
+
+            let (eq_proof, l_commit) = self.proof_hybrid_combo(
                 t,
                 q0,
-                v_ff,
                 v_commit,
                 v_decommit,
-                v_prime,
                 v_prime_commit.unwrap(),
                 v_prime_decommit.unwrap(),
             );
-            (Some(gens), Some(ipi), Some(ipa))
+            (Some(eq_proof), Some(l_commit))
         };
 
         // CAP circuit
@@ -244,7 +250,7 @@ impl NLDocCommitment {
             &self.cap_pk,
             cap_circuit.clone(),
             &cap_z,
-            &v_commit.compress(),
+            &v_commit,
             &v_ff,
             &v_decommit,
         );
@@ -262,9 +268,8 @@ impl NLDocCommitment {
             v_prime_commit,
             ipa,
             running_q,
-            t_vp_gens,
-            hybrid_ipi,
-            hybrid_ipa,
+            eq_proof,
+            l_commit,
         };
     }
 
@@ -278,9 +283,9 @@ impl NLDocCommitment {
     ) -> (
         InnerProductArgument<G1>,
         Vec<<G1 as Group>::Scalar>,
-        Commitment<G1>,
+        CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
         <G1 as Group>::Scalar,
-        Option<Commitment<G1>>,
+        Option<CompressedCommitment<<G1 as Group>::CompressedGroupElement>>,
         Option<<G1 as Group>::Scalar>,
         <G1 as Group>::Scalar,
     ) {
@@ -313,7 +318,8 @@ impl NLDocCommitment {
         // set up
         let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
         let commit_running_v =
-            <G1 as Group>::CE::commit(&self.single_gens, &[running_v.clone()], &decommit_running_v);
+            <G1 as Group>::CE::commit(&self.single_gens, &[running_v.clone()], &decommit_running_v)
+                .compress();
 
         let (decommit_v_prime, commit_v_prime, v_prime) = if !hybrid {
             // v' == v when not hybrid
@@ -325,12 +331,16 @@ impl NLDocCommitment {
             let commit_v_prime =
                 <G1 as Group>::CE::commit(&self.single_gens, &[v_prime.clone()], &decommit_v_prime);
 
-            (Some(decommit_v_prime), Some(commit_v_prime), v_prime)
+            (
+                Some(decommit_v_prime),
+                Some(commit_v_prime.compress()),
+                v_prime,
+            )
         };
 
         // D(q) = v/v'
         println!("pre IPI");
-        let (ipa, ipw, compressed_v) = if !hybrid {
+        let (ipa, ipw, _) = if !hybrid {
             let res = self.hyrax_gen.prove_eval(
                 &self.doc_poly,
                 &self.doc_commit,
@@ -371,76 +381,60 @@ impl NLDocCommitment {
         &self,
         t: <G1 as Group>::Scalar,
         q0: <G1 as Group>::Scalar,
-        v: <G1 as Group>::Scalar,
-        v_commit: Commitment<G1>,
+        v_commit: CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
         v_decommit: <G1 as Group>::Scalar,
-        v_prime: <G1 as Group>::Scalar,
-        v_prime_commit: Commitment<G1>,
+        v_prime_commit: CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
         v_prime_decommit: <G1 as Group>::Scalar,
     ) -> (
-        CommitmentGens<G1>,
-        InnerProductInstance<G1>,
-        InnerProductArgument<G1>,
+        EqualityProof<G1>,
+        CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
     ) {
-        let mut p_transcript = Transcript::new(b"dot_prod_proof");
+        let r = <G1 as Group>::Scalar::random(&mut OsRng);
 
-        // new inner prod vectors
-        let q0_vec = vec![(<G1 as Group>::Scalar::from(1) - q0), q0];
-        let t_vp_clear = vec![t, v_prime];
+        let t_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+        let t_commit = <G1 as Group>::CE::commit(&self.single_gens, &[t.clone()], &t_decommit);
 
-        // make new commitment to [t, v']
-        // C(v') = g_0^v' * h^blind
-        // C([t,v']) = g_1^t * g_0^v * h^blind
-        let mut new_base = <G1 as Group>::from_label(b"new_base", 1);
+        let l_decommit = v_prime_decommit * q0 + t_decommit * (<G1 as Group>::Scalar::from(1) - q0);
+        let l_commit = (v_prime_commit.decompress().unwrap() * q0
+            + t_commit * (<G1 as Group>::Scalar::from(1) - q0))
+            .compress();
 
-        let mut bases = new_base.clone();
-        bases.push(v_prime_commit.comm.to_affine());
-        let t_vp_commit = Commitment {
-            comm: <G1 as Group>::vartime_multiscalar_mul(
-                &[t, <G1 as Group>::Scalar::from(1)],
-                &bases,
-            ),
-        };
-        let t_vp_decommit = v_prime_decommit;
-        let mut t_vp_gens = self.single_gens.clone();
+        let alpha =
+            <G1 as Group>::CE::commit(&self.single_gens, &[<G1 as Group>::Scalar::zero()], &r)
+                .compress(); // h^r
 
-        new_base.extend(t_vp_gens.gens);
-        t_vp_gens.gens = new_base;
+        let mut p_transcript = Transcript::new(b"eq_proof");
+        p_transcript.append_message(b"protocol-name", EqualityProof::<G1>::protocol_name());
+        v_commit.append_to_transcript(b"C1", &mut p_transcript);
+        l_commit.append_to_transcript(b"C2", &mut p_transcript);
+        alpha.append_to_transcript(b"alpha", &mut p_transcript);
 
-        let ipi: InnerProductInstance<G1> =
-            InnerProductInstance::new(&t_vp_commit, &q0_vec, &v_commit);
-        let ipw = InnerProductWitness::new(&t_vp_clear, &t_vp_decommit, &v, &v_decommit);
-        let ipa = InnerProductArgument::prove(
-            &t_vp_gens,
-            &self.single_gens,
-            &ipi,
-            &ipw,
-            &mut p_transcript,
-        )
-        .unwrap();
+        let c = <G1 as Group>::Scalar::challenge(b"c", &mut p_transcript);
 
-        (t_vp_gens, ipi, ipa)
+        let z = c * (v_decommit - l_decommit) + r;
+
+        (EqualityProof { alpha, z }, l_commit)
     }
 
     pub fn verify_consistency(&self, proof: ConsistencyProof) {
-        if proof.hybrid_ipi.is_some()
-            && proof.hybrid_ipa.is_some()
-            && proof.v_prime_commit.is_some()
-        {
+        if proof.eq_proof.is_some() && proof.l_commit.is_some() && proof.v_prime_commit.is_some() {
             assert!(self
-                .proof_dot_prod_verify(&proof.ipa, &proof.running_q, proof.v_prime_commit.unwrap())
+                .proof_dot_prod_verify(&proof.ipa, &proof.running_q, &proof.v_prime_commit.unwrap())
                 .is_ok());
 
-            assert!(self
-                .verify_hybrid_combo(
-                    &proof.t_vp_gens.unwrap(),
-                    &proof.hybrid_ipi.unwrap(),
-                    proof.hybrid_ipa.unwrap(),
-                )
-                .is_ok());
+            // equality proof C_l = C[v_r]
+            let mut v_transcript = Transcript::new(b"eq_proof");
+            let res = proof.eq_proof.unwrap().verify(
+                &self.single_gens,
+                &mut v_transcript,
+                &proof.v_commit,
+                &proof.l_commit.unwrap(),
+            );
+
+            assert!(res.is_ok());
         } else {
             assert!(self
-                .proof_dot_prod_verify(&proof.ipa, &proof.running_q, proof.v_commit)
+                .proof_dot_prod_verify(&proof.ipa, &proof.running_q, &proof.v_commit)
                 .is_ok());
         }
 
@@ -448,9 +442,7 @@ impl NLDocCommitment {
         let z_0 = vec![proof.hash_d];
         let z_out = proof.circuit.output(&z_0);
         let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
-        let res = proof
-            .snark
-            .cap_verify(&self.cap_vk, &io, &proof.v_commit.compress());
+        let res = proof.snark.cap_verify(&self.cap_vk, &io, &proof.v_commit);
         // TODO compress()
 
         assert!(res.is_ok());
@@ -460,31 +452,17 @@ impl NLDocCommitment {
         &self,
         ipa: &InnerProductArgument<G1>,
         running_q: &Vec<<G1 as Group>::Scalar>,
-        v_commit: Commitment<G1>,
+        v_commit: &CompressedCommitment<<G1 as Group>::CompressedGroupElement>,
     ) -> Result<(), NovaError> {
         let mut v_transcript = Transcript::new(b"dot_prod_proof");
 
         self.hyrax_gen.verify_eval(
             running_q,
             &self.doc_commit,
-            &v_commit.compress(), // TODO compression stuff
+            &v_commit,
             ipa,
             &mut v_transcript,
         )
-    }
-
-    fn verify_hybrid_combo(
-        &self,
-        t_vp_gens: &CommitmentGens<G1>,
-        ipi: &InnerProductInstance<G1>,
-        ipa: InnerProductArgument<G1>,
-    ) -> Result<(), NovaError> {
-        let mut v_transcript = Transcript::new(b"dot_prod_proof");
-
-        // prove < C(t,v'), [1-q0, q0] > = v
-        ipa.verify(t_vp_gens, &self.single_gens, 2, &ipi, &mut v_transcript)?;
-
-        Ok(())
     }
 }
 
@@ -629,6 +607,59 @@ mod tests {
     use crate::backend::r1cs_helper::init;
     use rug::Integer;
     type G1 = pasta_curves::pallas::Point;
+
+    #[test]
+    fn eq_proof() {
+        let gen = CommitmentGens::<G1>::new(b"gens_s", 1);
+
+        let t = <G1 as Group>::Scalar::from(3);
+        let v_prime = <G1 as Group>::Scalar::from(5);
+        let q0 = <G1 as Group>::Scalar::from(7);
+        let v = v_prime * q0 + t * (<G1 as Group>::Scalar::from(1) - q0);
+
+        let v_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+        let v_prime_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+        let t_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+
+        let r = <G1 as Group>::Scalar::random(&mut OsRng);
+
+        let v_commit = <G1 as Group>::CE::commit(&gen, &[v.clone()], &v_decommit).compress();
+        let v_prime_commit =
+            <G1 as Group>::CE::commit(&gen, &[v_prime.clone()], &v_prime_decommit).compress();
+        let t_commit = <G1 as Group>::CE::commit(&gen, &[t.clone()], &t_decommit);
+
+        //let l_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+        //let l_commit = <G1 as Group>::CE::commit(&gen, &[v.clone()], &l_decommit);
+
+        let l_decommit = v_prime_decommit * q0 + t_decommit * (<G1 as Group>::Scalar::from(1) - q0);
+        let l_commit = (v_prime_commit.decompress().unwrap() * q0
+            + t_commit * (<G1 as Group>::Scalar::from(1) - q0))
+            .compress();
+
+        // innards of function - PROVE
+        let alpha =
+            <G1 as Group>::CE::commit(&gen, &[<G1 as Group>::Scalar::zero()], &r).compress(); // h^r
+
+        let mut p_transcript = Transcript::new(b"eq_proof");
+        p_transcript.append_message(b"protocol-name", EqualityProof::<G1>::protocol_name());
+        v_commit.append_to_transcript(b"C1", &mut p_transcript);
+        l_commit.append_to_transcript(b"C2", &mut p_transcript);
+        alpha.append_to_transcript(b"alpha", &mut p_transcript);
+
+        let c = <G1 as Group>::Scalar::challenge(b"c", &mut p_transcript);
+
+        let z = c * (v_decommit - l_decommit) + r;
+
+        let eq_proof: EqualityProof<G1> = EqualityProof { alpha, z };
+
+        // VERIFY
+
+        // equality proof C_l = C[v_r]
+        let mut v_transcript = Transcript::new(b"eq_proof");
+        let res = eq_proof.verify(&gen, &mut v_transcript, &v_commit, &l_commit);
+
+        assert!(res.is_ok());
+    }
 
     #[test]
     fn commit() {
