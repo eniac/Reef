@@ -9,8 +9,7 @@ hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch 
 clap = "4.1.8"
 circ = { git = "https://github.com/jkwoods/circ", branch = "r1cs_pub", features = ["r1cs", "bellman", "smt", "zok"] }
 itertools = "0.10"
-#nova-snark ={ git = "https://github.com/jkwoods/Nova", branch = "pub_pk"}
-nova-snark = {path = "../nova/"}
+nova-snark ={ git = "https://github.com/jkwoods/Nova", branch = "pub_pk"}
 bellperson = { version = "0.24", default-features = false }
 pasta_curves = { version = "0.5.2", features = ["repr-c", "serde"], package = "fil_pasta_curves" }
 ff = "0.12.0"
