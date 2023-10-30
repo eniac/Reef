@@ -964,11 +964,9 @@ fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> usize {
     let cp = csp.as_ref().unwrap();
 
     let snark_size = bincode::serialize(&cp.snark).unwrap().len();
-    let v_size = bincode::serialize(&cp.v_commit.comm.compress())
-        .unwrap()
-        .len();
+    let v_size = bincode::serialize(&cp.v_commit).unwrap().len();
     let vprime_size = if cp.v_prime_commit.is_some() {
-        bincode::serialize(&cp.v_prime_commit.unwrap().comm.compress())
+        bincode::serialize(&cp.v_prime_commit.unwrap())
             .unwrap()
             .len()
     } else {
@@ -977,7 +975,6 @@ fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> usize {
     let ipa_size = bincode::serialize(&cp.ipa).unwrap().len();
     let q_size = bincode::serialize(&cp.running_q).unwrap().len();
 
-    //let hybrid_size = bincode::serialize(&cp.hybrid_ipa).unwrap().len();
     let eq_proof_size = bincode::serialize(&cp.eq_proof).unwrap().len();
     // check? let l_commit_size = bincode::serialize(&cp.l_commit).unwrap().len();
 
