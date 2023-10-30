@@ -326,12 +326,9 @@ impl NLDocCommitment {
         } else {
             let v_prime = self.doc_poly.evaluate(&running_q);
 
-            //let decommit_v_prime = <G1 as Group>::Scalar::random(&mut OsRng);
-            let commit_v_prime = <G1 as Group>::CE::commit(
-                &self.single_gens,
-                &[v_prime.clone()],
-                &decommit_running_v,
-            );
+            let decommit_v_prime = <G1 as Group>::Scalar::random(&mut OsRng);
+            let commit_v_prime =
+                <G1 as Group>::CE::commit(&self.single_gens, &[v_prime.clone()], &decommit_v_prime);
 
             (Some(decommit_running_v), Some(commit_v_prime), v_prime)
         };
@@ -384,56 +381,29 @@ impl NLDocCommitment {
         v_prime_commit: Commitment<G1>,
         v_prime_decommit: <G1 as Group>::Scalar,
     ) -> (EqualityProof<G1>, Commitment<G1>) {
-        let mut p_transcript = Transcript::new(b"dot_prod_proof");
-
-        // make new commitment to LHS
-        // g0^((1-q0) * t) * (g0^v' * h^b')^q0
-        // = g0^((1-q0) * t) * g0^(v' * q0) * h^(b'*q0)
-        // = g0^((1-q0) * t + v' * q0) * h^(b'*q0)
-        // == g0^(v) * h^b
-
-        let l_decommit =
-            v_prime_decommit * q0 + v_prime_decommit * (<G1 as Group>::Scalar::from(1) - q0);
-
-        // CVP * q0 + CT * (1-q0) ?
-        let t_commit =
-            <G1 as Group>::CE::commit(&self.single_gens, &[t.clone()], &v_prime_decommit);
-
-        // g^v'q0 * h^b'q0 * g^(t*1-q0) * h^b'(1-q0)
-        let l_commit = v_prime_commit * q0 + t_commit * (<G1 as Group>::Scalar::from(1) - q0);
-
-        // let l_commit = v_commit.clone();
-        // let l_decommit = v_decommit.clone();
-
-        // innards of function
-        p_transcript.append_message(b"protocol-name", EqualityProof::<G1>::protocol_name());
-
-        // produce a random scalar
         let r = <G1 as Group>::Scalar::random(&mut OsRng);
 
-        l_commit.append_to_transcript(b"C1", &mut p_transcript);
-        v_commit.append_to_transcript(b"C2", &mut p_transcript);
+        let t_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+        let t_commit = <G1 as Group>::CE::commit(&self.single_gens, &[t.clone()], &t_decommit);
+
+        let l_decommit = v_prime_decommit * q0 + t_decommit * (<G1 as Group>::Scalar::from(1) - q0);
+        let l_commit = v_prime_commit * q0 + t_commit * (<G1 as Group>::Scalar::from(1) - q0);
 
         let alpha =
             <G1 as Group>::CE::commit(&self.single_gens, &[<G1 as Group>::Scalar::zero()], &r)
                 .compress(); // h^r
+
+        let mut p_transcript = Transcript::new(b"eq_proof");
+        p_transcript.append_message(b"protocol-name", EqualityProof::<G1>::protocol_name());
+        v_commit.append_to_transcript(b"C1", &mut p_transcript);
+        l_commit.append_to_transcript(b"C2", &mut p_transcript);
         alpha.append_to_transcript(b"alpha", &mut p_transcript);
 
         let c = <G1 as Group>::Scalar::challenge(b"c", &mut p_transcript);
 
-        let z = c * (l_decommit - v_decommit) + r;
+        let z = c * (v_decommit - l_decommit) + r;
 
         (EqualityProof { alpha, z }, l_commit)
-
-        // VER
-        // h^z == (C1 - C2) * ch + alpha
-        // h^(ch * (b1 - b2) + r) == (g0^v1 * h^b1 - g0^v2 * h^b2) * ch + h^r
-        // if v1 == v2:
-        // h^(ch * (b1 - b2) + r) == g0^v * (h^b1 - h^b2) * ch + h^r
-        // h^(ch * (b1 - b2) + r) == g0^v * (h^(b1 - b2)??) * ch + h^r
-
-        // notes
-        // g^vh^b, g^rh^b bad - talk to SGA
     }
 
     pub fn verify_consistency(&self, proof: ConsistencyProof) {
@@ -447,8 +417,8 @@ impl NLDocCommitment {
             let res = proof.eq_proof.unwrap().verify(
                 &self.single_gens,
                 &mut v_transcript,
-                &proof.l_commit.unwrap().compress(), // TODO compression shit
                 &proof.v_commit.compress(),
+                &proof.l_commit.unwrap().compress(), // TODO compression shit
             );
 
             assert!(res.is_ok());
@@ -629,6 +599,61 @@ mod tests {
     use crate::backend::r1cs_helper::init;
     use rug::Integer;
     type G1 = pasta_curves::pallas::Point;
+
+    #[test]
+    fn eq_proof() {
+        let gen = CommitmentGens::<G1>::new(b"gens_s", 1);
+
+        let t = <G1 as Group>::Scalar::from(3);
+        let v_prime = <G1 as Group>::Scalar::from(5);
+        let q0 = <G1 as Group>::Scalar::from(7);
+        let v = v_prime * q0 + t * (<G1 as Group>::Scalar::from(1) - q0);
+
+        let v_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+        let v_prime_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+        let t_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+
+        let r = <G1 as Group>::Scalar::random(&mut OsRng);
+
+        let v_commit = <G1 as Group>::CE::commit(&gen, &[v.clone()], &v_decommit);
+        let v_prime_commit = <G1 as Group>::CE::commit(&gen, &[v_prime.clone()], &v_prime_decommit);
+        let t_commit = <G1 as Group>::CE::commit(&gen, &[t.clone()], &t_decommit);
+
+        //let l_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
+        //let l_commit = <G1 as Group>::CE::commit(&gen, &[v.clone()], &l_decommit);
+
+        let l_decommit = v_prime_decommit * q0 + t_decommit * (<G1 as Group>::Scalar::from(1) - q0);
+        let l_commit = v_prime_commit * q0 + t_commit * (<G1 as Group>::Scalar::from(1) - q0);
+
+        // innards of function - PROVE
+        let alpha =
+            <G1 as Group>::CE::commit(&gen, &[<G1 as Group>::Scalar::zero()], &r).compress(); // h^r
+
+        let mut p_transcript = Transcript::new(b"eq_proof");
+        p_transcript.append_message(b"protocol-name", EqualityProof::<G1>::protocol_name());
+        v_commit.append_to_transcript(b"C1", &mut p_transcript);
+        l_commit.append_to_transcript(b"C2", &mut p_transcript);
+        alpha.append_to_transcript(b"alpha", &mut p_transcript);
+
+        let c = <G1 as Group>::Scalar::challenge(b"c", &mut p_transcript);
+
+        let z = c * (v_decommit - l_decommit) + r;
+
+        let eq_proof: EqualityProof<G1> = EqualityProof { alpha, z };
+
+        // VERIFY
+
+        // equality proof C_l = C[v_r]
+        let mut v_transcript = Transcript::new(b"eq_proof");
+        let res = eq_proof.verify(
+            &gen,
+            &mut v_transcript,
+            &v_commit.compress(), // TODO compression shit
+            &l_commit.compress(),
+        );
+
+        assert!(res.is_ok());
+    }
 
     #[test]
     fn commit() {
