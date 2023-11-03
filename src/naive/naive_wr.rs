@@ -7,10 +7,12 @@ type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 
 use crate::naive::naive_wr_circom_writer::*;
 use crate::naive::naive_wr_nova::*;
+use std::time::SystemTime;
 use std::{env::current_dir};
 use std::path::PathBuf;
 use std::fs::{File,remove_file};
 use std::io::prelude::*;
+use bincode;
 use crate::naive::dfa::*; 
 use crate::naive::naive_regex::*;
 use itertools::Itertools;
@@ -61,20 +63,24 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let doc_len = doc_vec.len();
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "DFA","DFA");
+    log::tic(Component::Compiler, "regex_normalization");
     let regex = re::simpl(re::new(&(r.clone())));
+
+    #[cfg(feature = "metrics")] 
+    {
+        log::stop(Component::Compiler, "regex_normalization");
+        log::tic(Component::Compiler, "fa_builder");
+    }
 
     let dfa = DFA::new(&alpha[..],regex);
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "DFA","DFA");
-
-    println!("N States: {:#?}",dfa_nstate);
-
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Solver,"DFA Solving", "Clear Match");
+    #[cfg(feature = "metrics")] 
+    {
+        log::stop(Component::Compiler, "fa_builder");
+        log::tic(Component::Solver,"fa_solver");
+    }
 
     let is_match = dfa.is_match(&doc);
     let solution = dfa.solve(&doc);
@@ -87,21 +93,32 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
    
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
     #[cfg(feature = "metrics")]
-    log::stop(Component::Solver, "DFA Solving", "Clear Match");
-
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS", "Commitment Gen");
+    {
+        log::stop(Component::Solver,"fa_solver");
+        log::tic(Component::CommitmentGen, "generation");
+    }
 
     let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
     let commitment = gen_commitment(doc_vec.clone(), &pc);
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS", "Commitment Gen");
+    log::stop(Component::CommitmentGen, "generation");
+
+    #[cfg(feature = "metrics")]
+    log::space(
+        Component::CommitmentGen,
+        "commitment",
+        bincode::serialize(&commitment).unwrap().len(),
+    );
 
     let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
     let mut wtr = Writer::from_writer(file);
     let _ = wtr.write_record(&[
-    format!("{}_{}",&doc[..10],doc.len()),
+    format!("{}_{}",
+    &doc[..10],
+    doc.len()),
+    "nwr".to_string(),
+    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string(),
     r,
     dfa_ndelta.to_string(), //nedges().to_string(),
     dfa_nstate.to_string(), //nstates().to_string(),
@@ -116,11 +133,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let mut command = shell("circom match.circom --r1cs --sym --wasm --prime vesta");
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS", "Circom");
+    log::tic(Component::Compiler, "constraint_generation");
     let mut output  = command.execute_output().unwrap();
-    #[cfg(feature = "metrics")]
-    {log::stop(Component::Compiler, "R1CS", "Circom");
-    log::write_csv(&out_write.as_path().display().to_string()).unwrap();}
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
@@ -137,13 +151,13 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let witness_generator_file = root.join(witness_gen_filepath);
     let witness_generator_output = root.join("circom_witness.wtns");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS", "Loading");
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Compiler, "R1CS", "Loading");
     let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
 
-    #[cfg(feature = "metrics")]
-    {log::stop(Component::Compiler,"R1CS", "Loading");
-    log::write_csv(&out_write.as_path().display().to_string()).unwrap();}
+    // #[cfg(feature = "metrics")]
+    // {log::stop(Component::Compiler,"R1CS", "Loading");
+    // log::write_csv(&out_write.as_path().display().to_string()).unwrap();}
 
     println!("R1CS loaded" );
 
@@ -165,13 +179,20 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     }
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS","Public Params");
+    // #[cfg(feature = "metrics")]
+    // log::tic(Component::Compiler, "R1CS","Public Params");
 
     let pp = create_public_params::<G1, G2>(r1cs.clone());
     
+    // #[cfg(feature = "metrics")]
+    // log::stop(Component::Compiler, "R1CS","Public Params");
+
     #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS","Public Params");
+    {
+        log::stop(Component::Compiler, "constraint_generation");
+        log::r1cs(Component::Compiler, "step_circuit", pp.num_constraints().0);
+        log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    }
  
     println!(
         "Number of constraints per step (primary circuit): {}",
@@ -182,24 +203,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         pp.num_constraints().1
     );
 
-    println!(
-        "total n constraints: {}",
-        get_folded_cost(pp.num_constraints().0,doc_len)
-    );
-
-
     #[cfg(feature = "metrics")]
-    log::r1cs(Component::Compiler, "R1CS", "Size", pp.num_constraints().0);
-
-    println!(
-        "Number of variables per step (primary circuit): {}",
-        pp.num_variables().0
-    );
-    println!(
-        "Number of variables per step (secondary circuit): {}",
-        pp.num_variables().1
-    );
-
+    log::tic(Component::Prover, "prove+wit");
     let recursive_snark = create_recursive_circuit(
         FileLocation::PathBuf(witness_generator_file),
         r1cs,
@@ -208,6 +213,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         &pp,
         out_write.clone()
     ).unwrap();
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Prover, "prove+wit");
 
     let z0_secondary = [<G2 as Group>::Scalar::zero()];
 
@@ -217,13 +224,12 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Prover, "Prove","Prove Compressed");
+    log::tic(Component::Prover, "compressed_snark");
 
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(&pp, &recursive_snark);
 
     #[cfg(feature = "metrics")]
-    {log::stop(Component::Prover, "Prove","Prove Compressed");
-    log::write_csv(&out_write.as_path().display().to_string()).unwrap();}
+    log::stop(Component::Prover, "compressed_snark");
 
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
@@ -233,7 +239,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!("Verifying a CompressedSNARK...");
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Verifier, "Verifier","Verify");
+    log::tic(Component::Verifier, "snark_verification");
     let res = compressed_snark.verify(
         &pp,
         doc_len,
@@ -242,7 +248,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     );
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Verifier, "Verifier","Verify");
+    log::stop(Component::Verifier, "snark_verification");
 
     println!(
         "CompressedSNARK::verify: {:?}",
@@ -264,9 +270,8 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::space(
         Component::Prover,
-        "Proof Size",
-        "Spartan SNARK size",
-        serde_json::to_string(&compressed_snark).unwrap().len(),
+        "compressed_snark_size",
+        bincode::serialize(&compressed_snark).unwrap().len(),
     );
 
 

@@ -45,14 +45,17 @@ fn main() {
     #[cfg(feature = "reef")]
     {
         println!("reef");
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "Compiler", "Full");
 
         #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "SAFA", "SAFA");
+        log::tic(Component::Compiler, "regex_normalization");
 
         let r = re::simpl(re::new(&opt.re));
-        println!("make r");
+
+        #[cfg(feature = "metrics")]
+        {
+            log::stop(Component::Compiler, "regex_normalization");
+            log::tic(Component::Compiler, "fa_builder");
+        }
 
         // Compile regex to SAFA
         let safa = if opt.negate {
@@ -68,7 +71,7 @@ fn main() {
         // nfa.well_formed(&doc);
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "SAFA", "SAFA");
+        log::stop(Component::Compiler, "fa_builder");
 
         #[cfg(feature = "plot")]
         safa.write_pdf("main")
@@ -107,11 +110,16 @@ fn main() {
             .unwrap();
         let mut wtr = Writer::from_writer(file);
         let mut title = opt.input.clone();
-        if title.len() > 10 {
-            title = opt.input[..10].to_string();
-        }
+        let test_type = match opt.hybrid {
+            true => "reef",
+            false => "safa+nlookup",
+        };
         let _ = wtr.write_record(&[
-            format!("{}_{}", &title, doc.len()),
+            format!("{}_{}",
+            &doc[..10],
+            doc.len()),
+            test_type.to_string(),
+            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string(),
             opt.re,
             safa.g.edge_count().to_string(), //nedges().to_string(),
             safa.g.node_count().to_string(), //nstates().to_string(),

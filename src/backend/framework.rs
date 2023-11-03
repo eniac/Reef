@@ -84,6 +84,8 @@ pub fn run_backend(
 
         // stop gap for cost model - don't need to time >:)
         let mut batch_size = if temp_batch_size == 0 {
+  
+
             let trace = safa.solve(&doc);
             if trace.is_none() {
                 panic!("No solution found");
@@ -96,7 +98,6 @@ pub fn run_backend(
             let mut paths = vec![];
             let mut path_len = 1;
 
-            //println!("SOLS {:#?}", sols);
 
             for sol in sols {
                 for elt in sol {
@@ -113,8 +114,6 @@ pub fn run_backend(
                     }
                 }
             }
-
-            println!("PATHS {:#?}", paths);
 
             if paths.len() == 1 {
                 let elt = paths[0];
@@ -143,9 +142,6 @@ pub fn run_backend(
         }
         println!("BATCH SIZE {:#?}", batch_size);
 
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "R1CS", "R1CS precomputations");
-
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
         let proj = if projections { safa.projection() } else { None };
@@ -159,10 +155,7 @@ pub fn run_backend(
         );
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "R1CS", "R1CS precomputations");
-
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "R1CS", "Commitment Generations");
+        log::tic(Component::CommitmentGen, "generation");
         let reef_commit = ReefCommitment::new(
             r1cs_converter.udoc.clone(),
             r1cs_converter.hybrid_len,
@@ -177,23 +170,24 @@ pub fn run_backend(
             hash_salt = dc.hash_salt;
         }
 
-        #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "R1CS", "Commitment Generations");
-
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "R1CS", "To Circuit");
+        #[cfg(feature = "metrics")] 
+        {
+            log::stop(Component::CommitmentGen, "generation");
+            log::tic(Component::Compiler, "constraint_generation");
+        }
+   
 
         let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "R1CS", "To Circuit");
-
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "R1CS", "Proof Setup");
+        {
+        log::stop(Component::Compiler, "constraint_generation");
+        log::tic(Component::Compiler,"snark_setup");
+        }  
         let (z0_primary, pp) = setup(&r1cs_converter, &prover_data, hash_salt);
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "R1CS", "Proof Setup");
+        log::stop(Component::Compiler,"snark_setup");
 
         let mc = reef_commit.merkle.clone();
         send_setup
@@ -212,10 +206,7 @@ pub fn run_backend(
             .unwrap();
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "Compiler", "Full");
-
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Solver, "Solve", "Full");
+        log::tic(Component::Prover, "prove+wit");
         solve(
             sender,
             sender_qv,
@@ -225,9 +216,6 @@ pub fn run_backend(
             hash_salt,
             mc,
         );
-
-        #[cfg(feature = "metrics")]
-        log::stop(Component::Solver, "Solve", "Full");
     });
 
     //get args
@@ -451,12 +439,17 @@ fn solve<'a>(
 
     let mut next_state = 0;
 
-    //measure safa solve
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Solver, "fa_solver");
+
     let trace = r1cs_converter.safa.solve(doc);
     if trace.is_none() {
         panic!("No solution found");
     }
     let mut sols = trace_preprocessing(&trace);
+   
+    #[cfg(feature = "metrics")]
+    log::stop(Component::Solver, "fa_solver");
     //end safa solve
 
     let commit_blind = if r1cs_converter.doc_hash.is_some() {
@@ -470,8 +463,7 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::tic(
             Component::Solver,
-            "Witness Generation",
-            format!("step_{}", i).as_str(),
+            format!("witness_generation_{}", i).as_str(),
         );
         // allocate real witnesses for round i
 
@@ -666,8 +658,7 @@ fn solve<'a>(
         #[cfg(feature = "metrics")]
         log::stop(
             Component::Solver,
-            "Witness Generation",
-            format!("step_{}", i).as_str(),
+            format!("witness_generation_{}", i).as_str(),
         );
 
         sender.send(Some(circuit_primary)).unwrap(); //witness_i).unwrap();
@@ -720,11 +711,10 @@ fn prove_and_verify(
     let cp_clone = circuit_primary.clone().unwrap();
 
     let mut i = 0;
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Prover, "Prover", "Full");
+
     while circuit_primary.is_some() {
         #[cfg(feature = "metrics")]
-        log::tic(Component::Prover, "prove", format!("prove_{}", i).as_str());
+        log::tic(Component::Prover, format!("prove_{}", i).as_str());
 
         let result = RecursiveSNARK::prove_step(
             &proof_info.pp.lock().unwrap(),
@@ -736,7 +726,7 @@ fn prove_and_verify(
         );
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Prover, "prove", format!("prove_{}", i).as_str());
+        log::stop(Component::Prover, format!("prove_{}", i).as_str());
 
         // verify recursive - TODO we can get rid of this verify once everything works
         // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
@@ -763,13 +753,13 @@ fn prove_and_verify(
 
     // compressed SNARK
     #[cfg(feature = "metrics")]
-    log::tic(Component::Prover, "Proof", "Compressed SNARK");
+    log::tic(Component::Prover, "compressed_snark");
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(
         &proof_info.pp.lock().unwrap(),
         &recursive_snark,
     );
     #[cfg(feature = "metrics")]
-    log::stop(Component::Prover, "Proof", "Compressed SNARK");
+    log::stop(Component::Prover, "compressed_snark");
 
     assert!(res.is_ok());
     let compressed_snark = res.unwrap();
@@ -782,7 +772,7 @@ fn prove_and_verify(
         println!("post compress");
 
         #[cfg(feature = "metrics")]
-        log::tic(Component::Prover, "Proof", "Consistency Proofs");
+        log::tic(Component::Prover, "consistency_proof");
         //Doc dot prod and consistency
         let cp = dc.prove_consistency(
             &proof_info.table,
@@ -793,7 +783,7 @@ fn prove_and_verify(
             proof_info.hybrid_len.is_some(),
         );
         #[cfg(feature = "metrics")]
-        log::stop(Component::Prover, "Proof", "Consistency Proofs");
+        log::stop(Component::Prover, "consistency_proof");
 
         consist_proof = Some(cp)
     }
@@ -801,13 +791,14 @@ fn prove_and_verify(
     println!("post cp");
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Prover, "Prover", "Full");
+    {
+        log::stop(Component::Prover, "prove+wit");
+    }
 
     #[cfg(feature = "metrics")]
     log::space(
         Component::Prover,
-        "Proof Size",
-        "Compressed SNARK size",
+        "snark_size",
         bincode::serialize(&compressed_snark).unwrap().len(),
     );
 
@@ -836,15 +827,19 @@ fn prove_and_verify(
     // );
 
     #[cfg(feature = "metrics")]
+    {
+    let (commit_sz,consistency_proof_size) = proof_size(&consist_proof, &proof_info.commit);
     log::space(
         Component::Prover,
-        "Proof Size",
-        "Consist Proof + Doc Commit size",
-        proof_size(&consist_proof, &proof_info.commit),
+        "consistency_proof",
+        consistency_proof_size
     );
-
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Verifier, "Verification", "Full");
+    log::space(
+        Component::CommitmentGen,
+        "commitment",
+        commit_sz,
+    );
+    }
 
     verify(
         compressed_snark,
@@ -878,7 +873,7 @@ fn verify(
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Verifier, "Verification", "Nova Verification");
+    log::tic(Component::Verifier, "snark_verification");
 
     let res = compressed_snark.verify(
         &pp.lock().unwrap(),
@@ -887,15 +882,14 @@ fn verify(
         z0_secondary,
     );
     #[cfg(feature = "metrics")]
-    log::stop(Component::Verifier, "Verification", "Nova Verification");
+    log::stop(Component::Verifier, "snark_verification");
 
     assert!(res.is_ok());
 
     #[cfg(feature = "metrics")]
     log::tic(
         Component::Verifier,
-        "Verification",
-        "Final Checks Consistency Verification",
+        "consistency_verification",
     );
 
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
@@ -946,12 +940,11 @@ fn verify(
     #[cfg(feature = "metrics")]
     log::stop(
         Component::Verifier,
-        "Verification",
-        "Final Checks Consistency Verification",
+        "consistency_verification",
     );
 }
 
-fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> usize {
+fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> (usize,usize) {
     let mut doc_size = 0;
     if rc.nldoc.is_some() {
         let dc = &rc.nldoc.as_ref().unwrap().doc_commit;
@@ -978,7 +971,7 @@ fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> usize {
     let eq_proof_size = bincode::serialize(&cp.eq_proof).unwrap().len();
     // check? let l_commit_size = bincode::serialize(&cp.l_commit).unwrap().len();
 
-    doc_size + snark_size + v_size + vprime_size + ipa_size + q_size + eq_proof_size
+    (doc_size, snark_size + v_size + vprime_size + ipa_size + q_size + eq_proof_size)
 }
 
 #[cfg(test)]

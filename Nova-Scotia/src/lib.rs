@@ -177,14 +177,14 @@ where
         .collect::<Vec<String>>();
     let mut current_public_input = start_public_input_hex.clone();
 
-    log::tic(Component::Solver, "Witness", "Compute");
+    log::tic(Component::Solver, "witness_generation_0");
     let witness_0 = compute_witness::<G1, G2>(
         current_public_input.clone(),
         private_inputs[0].clone(),
         witness_generator_file.clone(),
         &witness_generator_output,
     );
-    log::stop(Component::Solver, "Witness", "Compute");
+    log::stop(Component::Solver, "witness_generation_0");
     log::write_csv(&out_write.as_path().display().to_string()).unwrap();
 
     let circuit_0 = CircomCircuit {
@@ -198,7 +198,7 @@ where
 
     for i in 0..iteration_count {
         println!("step_{}",i);
-        log::tic(Component::Solver, "Witness", format!("Compute_{}",i).as_str());
+        log::tic(Component::Solver,format!("witness_generation_{}",i).as_str());
         
         let witness = compute_witness::<G1, G2>(
             current_public_input.clone(),
@@ -206,7 +206,7 @@ where
             witness_generator_file.clone(),
             &witness_generator_output,
         );
-        log::stop(Component::Solver, "Witness", format!("Compute_{}",i).as_str());
+        log::stop(Component::Solver, format!("witness_generation_{}",i).as_str());
 
         let circuit = CircomCircuit {
             r1cs: r1cs.clone(),
@@ -220,7 +220,7 @@ where
             .map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string())
             .collect();
 
-        log::tic(Component::Prover, "Prove", format!("Prove_{}",i).as_str());
+        log::tic(Component::Prover, format!("prove_{}",i).as_str());
         let res = RecursiveSNARK::<G1, G2, C1<G1>, C2<G2>>::prove_step(
             &pp,
             recursive_snark,
@@ -229,7 +229,7 @@ where
             start_public_input.clone(),
             z0_secondary.clone(),
         );
-        log::stop(Component::Prover, "Prove", format!("Prove_{}",i).as_str());
+        log::stop(Component::Prover, format!("prove_{}",i).as_str());
 
         assert!(res.is_ok());
         recursive_snark = Some(res.unwrap());

@@ -6,13 +6,17 @@ type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
 use crate::naive::naive_circom_writer::*;
 use crate::naive::naive_nova::*;
+use std::time::SystemTime;
 use std::{env::current_dir};
 use std::path::PathBuf;
+use bincode;
+use nova_snark::traits::commitment;
 use std::fs::{File,remove_file};
 use std::io::prelude::*;
 use crate::naive::dfa::*; 
 use crate::naive::naive_regex::*;
 use itertools::Itertools;
+use metrics::metrics::log::Component;
 use neptune::{
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -52,21 +56,26 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let doc_len = doc_vec.len();
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "DFA","DFA");
+    log::tic(Component::Compiler, "regex_normalization");
     let regex = re::simpl(re::new(&(r.clone())));
 
+    #[cfg(feature = "metrics")] 
+    {
+        log::stop(Component::Compiler, "regex_normalization");
+        log::tic(Component::Compiler, "fa_builder");
+    }
     let dfa = DFA::new(&alpha[..],regex);
 
     let dfa_ndelta = dfa.deltas().len();
     let dfa_nstate = dfa.nstates();
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "DFA","DFA");
+    #[cfg(feature = "metrics")] 
+    {
+        log::stop(Component::Compiler, "fa_builder");
+        log::tic(Component::Solver,"fa_solver");
+    }
 
     println!("N States: {:#?}",dfa_nstate);
-
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Solver,"DFA Solving", "Clear Match");
 
     let is_match = dfa.is_match(&doc);
     let solution = dfa.solve(&doc);
@@ -78,29 +87,51 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!("doc length: {}",doc_len);
    
     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
+    
     #[cfg(feature = "metrics")]
-    log::stop(Component::Solver, "DFA Solving", "Clear Match");
-
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS", "Commitment Gen");
+    {
+        log::stop(Component::Solver,"fa_solver");
+        log::tic(Component::CommitmentGen, "generation");
+    }
 
     let pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
     let commitment = gen_commitment(doc_vec.clone(), &pc);
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS", "Commitment Gen");
+    log::stop(Component::CommitmentGen, "generation");
+
+    #[cfg(feature = "metrics")]
+    log::space(
+        Component::CommitmentGen,
+        "commitment",
+        bincode::serialize(&commitment).unwrap().len(),
+    );
+
+    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
+    let mut wtr = Writer::from_writer(file);
+    let _ = wtr.write_record(&[
+    format!("{}_{}",
+    &doc[..10],
+    doc.len()),
+    "naive".to_string(),
+    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string(),
+    r,
+    dfa_ndelta.to_string(), //nedges().to_string(),
+    dfa_nstate.to_string(), //nstates().to_string(),
+    ]);
+    let spacer = "---------";
+
+    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    wtr.flush();
 
     let _ = make_circom(&dfa, doc_len, alpha.len());
 
     let mut command = shell("circom match.circom --r1cs --sym --wasm --prime vesta");
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS", "Circom");
+    log::tic(Component::Compiler, "constraint_generation");
 
     let mut output  = command.execute_output().unwrap();
-
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "R1CS", "Circom");
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
@@ -115,12 +146,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let witness_generator_file = root.join(witness_gen_filepath);
     let witness_generator_output = root.join("circom_witness.wtns");
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "R1CS", "Loading");
     let r1cs = load_r1cs::<G1, G2>(&FileLocation::PathBuf(circuit_file));
-
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler,"R1CS", "Loading");
 
     let mut private_inputs: Vec<HashMap<String, serde_json::Value>> = Vec::new();
     let mut private_input = HashMap::new();
@@ -129,13 +155,18 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     private_input.insert("blind".to_string(),json!(commitment.blind));
     private_inputs.push(private_input);
 
+    #[cfg(feature = "metrics")]
+    {
+        log::stop(Component::Compiler, "constraint_generation");
+        log::r1cs(Component::Compiler, "circuit", pp.num_constraints().0);
+        log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    }
+
     println!(
         "Number of constraints: {}",
        r1cs.constraints.len()
     );
-    #[cfg(feature = "metrics")]
-    log::r1cs(Component::Compiler, "R1CS", "Size", r1cs.constraints.len());
-
+    
     println!(
         "Number of variables: {}",
        r1cs.num_variables
@@ -147,12 +178,19 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     };
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler,"Snark", "Setup");
+    log::tic(Component::Compiler,"snark_setup");
     let (pk, vk) = naive_spartan_snark_setup(circuit);
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler,"Snark","Setup");
+    log::stop(Component::Compiler,"snark_setup");
 
+
+
+    #[cfg(feature = "metrics")]
+    {
+        log::tic(Component::Prover, "prove+wit");
+        log::tic(Component::Solver,"witness_generation");
+    }
 
     //witness generation
     println!("Wit Gen");
@@ -160,9 +198,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     let public_input: [Fq;1] = [<G1 as Group>::Scalar::one()];
     let start_public_input_hex = public_input.iter().map(|&x| format!("{:?}", x).strip_prefix("0x").unwrap().to_string()).collect::<Vec<String>>();
     let mut current_public_input = start_public_input_hex.clone();
-
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Solver,"Witness","Gen");
 
     let witnesses = compute_witness::<G1, G2>(
         current_public_input,
@@ -172,7 +207,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     );
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Solver,"Witness","Gen");
+    log::stop(Component::Solver,"witness_generation");
 
     remove_file("match.sym");
     remove_file("match.r1cs");
@@ -188,12 +223,15 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     println!("Prove");
 
     #[cfg(feature = "metrics")]
-    log::tic(Component::Prover,"Prover","Prove");
+    log::tic(Component::Prover,"prove_0");
 
     let result = SpartanSNARK::prove(&pk,prove_circuit.clone(),&z);
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Prover,"Prover","Prove");
+    {
+    log::stop(Component::Prover,"prove_0");
+    log::stop(Component::Prover, "prove+wit");
+    }
 
     assert!(result.is_ok());
 
@@ -204,38 +242,24 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     log::space(
         Component::Prover,
-        "Proof Size",
-        "Spartan SNARK size",
-        serde_json::to_string(&snark).unwrap().len(),
+        "snark_size",
+        bincode::serialize(&snark).unwrap().len(),
     );
 
     // // verify the SNARK
     println!("Verify");
+    #[cfg(feature = "metrics")]
+    log::tic(Component::Verifier, "snark_verification");
     let io = z.into_iter()
       .chain(output.clone().into_iter())
       .collect::<Vec<_>>();
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Verifier, "Verify", "Verify");
-
     let verifier_result = snark.verify(&vk, &io);
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Verifier, "Verify", "Verify"); 
+    log::stop(Component::Verifier, "snark_verification"); 
 
     assert!(verifier_result.is_ok()); 
-
-    let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
-    let mut wtr = Writer::from_writer(file);
-    let _ = wtr.write_record(&[
-    format!("{}_{}",&doc[..10],doc.len()),
-    r,
-    dfa_ndelta.to_string(), //nedges().to_string(),
-    dfa_nstate.to_string(), //nstates().to_string(),
-    ]);
-    let spacer = "---------";
-    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
-    wtr.flush();
 
     #[cfg(feature = "metrics")]
     log::write_csv(&out_write.as_path().display().to_string()).unwrap();

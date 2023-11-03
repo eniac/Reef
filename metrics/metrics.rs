@@ -22,20 +22,39 @@ pub mod log {
         Prover,
         Solver,
         Verifier,
+        CommitmentGen,
     }
 
     impl Display for Component {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                Component::Compiler => write!(f, "compiler"),
-                Component::Prover => write!(f, "prover"),
-                Component::Solver => write!(f, "solver"),
-                Component::Verifier => write!(f, "verifier"),
+                Component::Compiler => write!(f, "C"),
+                Component::Prover => write!(f, "P"),
+                Component::Solver => write!(f, "S"),
+                Component::Verifier => write!(f, "V"),
+                Component::CommitmentGen => write!(f,"CG"),
             }
         }
     }
 
-    pub type Test = (Component, String, String);
+    #[derive(PartialEq, Eq, Debug, Hash, Clone)]
+    pub enum TestType {
+        Constraints,
+        Runtime,
+        Size
+    }
+
+    impl Display for TestType {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                TestType::Constraints => write!(f, "NOC"),
+                TestType::Runtime => write!(f, "R"),
+                TestType::Size => write!(f, "S"),
+            }
+        }
+    }
+
+    pub type Test = (TestType,Component, String);
 
     #[derive(PartialEq, Eq, Debug, Clone)]
     pub enum Time {
@@ -45,29 +64,29 @@ pub mod log {
     }
 
     use Time::*;
-    pub fn r1cs(comp: Component, test: &str, subtest: &str, num_constraints: usize) {
-        if R1CS.contains_key(&(comp.clone(), test.to_string(), subtest.to_string())) {
+    pub fn r1cs(comp: Component, test: &str, num_constraints: usize) {
+        if R1CS.contains_key(&(TestType::Constraints,comp.clone(), test.to_string())) {
             panic!("Trying to write multiple r1cs for same test")
         } else {
             R1CS.insert(
-                (comp, test.to_string(), subtest.to_string()),
+                (TestType::Constraints,comp, test.to_string()),
                 num_constraints,
             );
         }
     }
 
-    pub fn space(comp: Component, test: &str, subtest: &str, sz_bytes: usize) {
-        if SPACE.contains_key(&(comp.clone(), test.to_string(), subtest.to_string())) {
+    pub fn space(comp: Component, test: &str,  sz_bytes: usize) {
+        if SPACE.contains_key(&(TestType::Size, comp.clone(), test.to_string())) {
             panic!("Trying to write multiple sizes for same test")
         } else {
-            SPACE.insert((comp, test.to_string(), subtest.to_string()), sz_bytes);
+            SPACE.insert((TestType::Size,comp, test.to_string()), sz_bytes);
         }
     }
 
-    pub fn tic(comp: Component, test: &str, subtest: &str) {
-        if TIMER.contains_key(&(comp.clone(), test.to_string(), subtest.to_string())) {
+    pub fn tic(comp: Component, test: &str) {
+        if TIMER.contains_key(&(TestType::Runtime,comp.clone(), test.to_string())) {
             TIMER.alter(
-                &(comp, test.to_string(), subtest.to_string()),
+                &(TestType::Runtime,comp, test.to_string()),
                 |_, v| match v {
                     Started(start_time) => Finished(start_time.elapsed()),
                     Finished(duration) => Restarted(duration, Instant::now()),
@@ -76,15 +95,15 @@ pub mod log {
             );
         } else {
             TIMER.insert(
-                (comp, test.to_string(), subtest.to_string()),
+                (TestType::Runtime, comp, test.to_string()),
                 Started(Instant::now()),
             );
         }
     }
 
-    pub fn stop(comp: Component, test: &str, subtest: &str) {
+    pub fn stop(comp: Component, test: &str) {
         TIMER.alter(
-            &(comp, test.to_string(), subtest.to_string()),
+            &(TestType::Runtime, comp, test.to_string()),
             |_, v| match v {
                 Started(start_time) => Finished(start_time.elapsed()),
                 Finished(duration) => Finished(duration),
@@ -105,34 +124,34 @@ pub mod log {
         });
 
         wtr.write_record(&["Component", "test", "subtest", "metric", "metric_type"])?;
-        for ((c, test, subtest), value) in TIMER.clone().into_iter() {
+        for ((test_type, c, test), value) in TIMER.clone().into_iter() {
             if let Finished(duration) = value {
                 wtr.write_record(&[
+                    test_type.to_string(),
                     c.to_string(),
                     test.to_string(),
-                    subtest.to_string(),
                     duration.as_micros().to_string(),
                     "μs".to_string(),
                 ])?;
             }
         }
         println!("times");
-        for ((c, test, subtest), value) in R1CS.clone().into_iter() {
+        for ((test_type, c, test), value) in R1CS.clone().into_iter() {
             wtr.write_record(&[
+                test_type.to_string(),
                 c.to_string(),
                 test.to_string(),
-                subtest.to_string(),
                 value.to_string(),
                 "constraints".to_string(),
             ])?;
         }
         println!("r1cs");
 
-        for ((c, test, subtest), value) in SPACE.clone().into_iter() {
+        for ((test_type, c, test), value) in SPACE.clone().into_iter() {
             wtr.write_record(&[
+                test_type.to_string(),
                 c.to_string(),
                 test.to_string(),
-                subtest.to_string(),
                 value.to_string(),
                 "bytes".to_string(),
             ])?;
