@@ -187,7 +187,6 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     #[cfg(feature = "metrics")]
     {
-        log::tic(Component::Prover, "prove+wit");
         log::tic(Component::Solver,"witness_generation");
     }
 
@@ -205,8 +204,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         &witness_generator_output,
     );
 
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Solver,"witness_generation");
+    #[cfg(feature = "metrics")]{
+        log::stop(Component::Solver,"witness_generation");
+        log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    }
 
     remove_file("match.sym");
     remove_file("match.r1cs");
@@ -229,7 +230,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     {
     log::stop(Component::Prover,"prove_0");
-    log::stop(Component::Prover, "prove+wit");
+    log::write_csv(&out_write.as_path().display().to_string()).unwrap();
     }
 
     assert!(result.is_ok());

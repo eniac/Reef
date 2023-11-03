@@ -213,8 +213,10 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
         &pp,
         out_write.clone()
     ).unwrap();
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Prover, "prove+wit");
+    #[cfg(feature = "metrics")] {
+        log::stop(Component::Prover, "prove+wit");
+        log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    }
 
     let z0_secondary = [<G2 as Group>::Scalar::zero()];
 
