@@ -16,7 +16,6 @@ use std::io::prelude::*;
 use crate::naive::dfa::*; 
 use crate::naive::naive_regex::*;
 use itertools::Itertools;
-use metrics::metrics::log::Component;
 use neptune::{
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
@@ -104,7 +103,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::space(
         Component::CommitmentGen,
         "commitment",
-        bincode::serialize(&commitment).unwrap().len(),
+        bincode::serialize(&commitment.commit).unwrap().len(),
     );
 
     let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
@@ -158,7 +157,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     #[cfg(feature = "metrics")]
     {
         log::stop(Component::Compiler, "constraint_generation");
-        log::r1cs(Component::Compiler, "circuit", pp.num_constraints().0);
+        log::r1cs(Component::Compiler, "circuit", r1cs.constraints.len());
         log::write_csv(&out_write.as_path().display().to_string()).unwrap();
     }
 

@@ -5,7 +5,7 @@ pub mod log {
     use std::io::Result;
     use std::time::{Duration, Instant};
     use std::fs::OpenOptions;
-    use std::path::PathBuf;
+    use std::path::Path;
     use lazy_static::lazy_static;
 
 
@@ -114,6 +114,10 @@ pub mod log {
 
     pub fn write_csv(out: &str) -> Result<()> {
       println!("Writing timer data to {}", out);
+      let mut write_header = true;
+      if Path::new(&out).exists() {
+        write_header = false;
+      }
       let file = OpenOptions::new().write(true).append(true).create(true).open(out).unwrap();
         let mut wtr = Writer::from_writer(file);
 
@@ -123,7 +127,10 @@ pub mod log {
             Restarted(duration, start_time) => Finished(duration + start_time.elapsed()),
         });
 
-        wtr.write_record(&["Component", "test", "subtest", "metric", "metric_type"])?;
+        if write_header {
+            wtr.write_record(&["type", "component", "test", "value", "metric_type"])?;
+        }
+
         for ((test_type, c, test), value) in TIMER.clone().into_iter() {
             if let Finished(duration) = value {
                 wtr.write_record(&[
@@ -158,6 +165,9 @@ pub mod log {
         }
         println!("space");
         wtr.flush()?;
+        TIMER.clear();
+        R1CS.clear();
+        SPACE.clear();
         Ok(())
     }
 }

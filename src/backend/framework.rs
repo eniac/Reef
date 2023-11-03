@@ -368,15 +368,13 @@ fn setup<'a>(
     #[cfg(feature = "metrics")]
     log::r1cs(
         Component::Prover,
-        "add test",
-        "Primary Circuit",
+        "step_circuit",
         pp.num_constraints().0,
     );
     #[cfg(feature = "metrics")]
     log::r1cs(
         Component::Prover,
-        "add test",
-        "Secondary Circuit",
+        "verifier_circuit",
         pp.num_constraints().1,
     );
 
@@ -854,9 +852,6 @@ fn prove_and_verify(
     );
 
     println!("post verify");
-
-    #[cfg(feature = "metrics")]
-    log::stop(Component::Verifier, "Verification", "Full");
 }
 
 fn verify(

@@ -7,6 +7,7 @@ use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
 use reef::naive::naive;
 use reef::naive::naive_wr;
+use std::time::SystemTime;
 // use reef::naive::*;
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -116,7 +117,7 @@ fn main() {
         };
         let _ = wtr.write_record(&[
             format!("{}_{}",
-            &doc[..10],
+            opt.input[..10].to_string(),
             doc.len()),
             test_type.to_string(),
             SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string(),

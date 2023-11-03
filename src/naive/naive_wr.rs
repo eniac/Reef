@@ -108,7 +108,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     log::space(
         Component::CommitmentGen,
         "commitment",
-        bincode::serialize(&commitment).unwrap().len(),
+        bincode::serialize(&commitment.commit).unwrap().len(),
     );
 
     let file = OpenOptions::new().write(true).append(true).create(true).open(out_write.clone()).unwrap();
