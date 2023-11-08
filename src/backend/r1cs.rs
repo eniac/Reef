@@ -29,7 +29,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     foralls_w_kids: FxHashMap<usize, Vec<usize>>,
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
-    max_offsets: usize,
+    pub max_offsets: usize,
     star_offset: usize,
     pub doc_hash: Option<F>,
     assertions: Vec<Term>,
@@ -2699,12 +2699,12 @@ mod tests {
             let mut next_state = 0;
 
             let trace = safa.solve(&chars);
-            println!("TRACE {:#?}", trace);
+            // println!("TRACE {:#?}", trace);
             let mut sols = trace_preprocessing(&trace);
 
             let mut i = 0;
             while r1cs_converter.sol_num < sols.len() {
-                println!("STEP {:#?}", i);
+                // println!("STEP {:#?}", i);
                 (
                     values,
                     next_state,
@@ -2748,6 +2748,22 @@ mod tests {
 
             let doc_len = r1cs_converter.udoc.len();
 
+            let cost_estimate = full_round_cost_model(
+                &safa, 
+                b, 
+                doc_len, 
+                hybrid,
+                r1cs_converter.hybrid_len,
+                r1cs_converter.max_offsets,
+                r1cs_converter.max_branches, 
+                r1cs_converter.max_stack
+            );
+
+            println!("actual cost: {:#?}", pd.r1cs.constraints.len());
+            // println!("{:#?}",pd.r1cs.constraints);
+            println!("estimated cost: {:#?}", cost_estimate);
+            println!("\n\n\n");
+
             if reef_commit.nldoc.is_some() {
                 let (priv_rq, priv_rv) = if !hybrid {
                     (doc_running_q.unwrap(), doc_running_v.unwrap())
@@ -2783,20 +2799,17 @@ mod tests {
             // final accepting
             assert_eq!(next_state, r1cs_converter.exit_state);
 
-            println!("actual cost: {:#?}", pd.r1cs.constraints.len());
-            println!("\n\n\n");
-
-            /*assert!(
-                pd.r1cs.constraints.len() as usize
-                    == costs::full_round_cost_model_nohash(
-                        &nfa,
-                        r1cs_converter.batch_size,
-                        b.clone(),
-                        nfa.is_match(&chars),
-                        doc.len(),
-                        c
-                    )
-            );*/
+            // assert!(
+            //     pd.r1cs.constraints.len() as usize
+            //         == costs::full_round_cost_model_nohash(
+            //             &nfa,
+            //             r1cs_converter.batch_size,
+            //             b.clone(),
+            //             nfa.is_match(&chars),
+            //             doc.len(),
+            //             c
+            //         )
+            // );
         }
     }
 
@@ -2866,7 +2879,7 @@ mod tests {
             (0..128).filter_map(std::char::from_u32).collect(),
             reg("^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
             ab("B6u$r@s#R5mE"),
-            vec![2], // 2],
+            vec![2,3,4,6], // 2],
             true,
             None,
             false,

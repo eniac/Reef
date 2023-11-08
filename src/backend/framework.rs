@@ -10,6 +10,7 @@ type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 use crate::backend::merkle_tree::MerkleCommitment;
 use crate::backend::merkle_tree::MerkleWit;
 use crate::backend::r1cs_helper::trace_preprocessing;
+use crate::backend::costs::full_round_cost_model;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::frontend::safa::SAFA;
 use bincode;
@@ -381,6 +382,23 @@ fn setup<'a>(
     println!(
         "Number of constraints (primary circuit): {}",
         pp.num_constraints().0
+    );
+    let is_hybrid = match r1cs_converter.hybrid_len {
+        Some(_) => true,
+        _ => false,
+    };
+    println!(
+        "Estimated Number of constraints: {}",
+        full_round_cost_model(
+            &r1cs_converter.safa, 
+            r1cs_converter.batch_size, 
+            r1cs_converter.idoc.len(), 
+            is_hybrid,
+            r1cs_converter.hybrid_len,
+            r1cs_converter.max_offsets,
+            r1cs_converter.max_branches, 
+            r1cs_converter.max_stack
+        )
     );
     println!(
         "Number of constraints (secondary circuit): {}",
