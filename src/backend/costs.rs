@@ -76,8 +76,7 @@ pub fn nl_nohash<'a>(
 pub fn nl<'a>(safa: &'a SAFA<char>, batch_size: usize, table_size: usize, hybrid:bool) -> usize{
     let cost_no_hash = nl_nohash(safa, batch_size, table_size, hybrid);
     let cost_hash = nlookup_cost_hash(safa, batch_size, table_size, hybrid);
-    //cost_hash+
-    cost_no_hash
+    cost_hash+cost_no_hash
 }
 
 pub fn q_ordering(table_size: usize, batch_size: usize, hybrid: bool, project: bool)->usize{

@@ -1026,7 +1026,7 @@ mod tests {
             "^................aaaaaa$".to_string(),
             ("ddddddddddddddddaaaaaa".to_string()).chars().collect(),
             0,
-            true,
+            false,
             false,
             false,
         );
@@ -1065,7 +1065,7 @@ mod tests {
             "^....cc$".to_string(),
             ("aabbcc".to_string()).chars().collect(),
             0,
-            true,
+            false,
             false,
             false,
         );

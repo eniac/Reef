@@ -733,9 +733,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
         // LEAVE THIS IN HERE FOR DEBUGGING >:(
-        for r in circ_r1cs.constraints().clone() {
-            println!("{:#?}", circ_r1cs.format_qeq(&r));
-        }
+        // for r in circ_r1cs.constraints().clone() {
+        //     println!("{:#?}", circ_r1cs.format_qeq(&r));
+        // }
 
         circ_r1cs.finalize(&final_cs)
     }
