@@ -395,6 +395,7 @@ fn setup<'a>(
             r1cs_converter.idoc.len(), 
             is_hybrid,
             r1cs_converter.hybrid_len,
+            false,
             r1cs_converter.max_offsets,
             r1cs_converter.max_branches, 
             r1cs_converter.max_stack

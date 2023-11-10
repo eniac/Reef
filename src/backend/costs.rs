@@ -25,9 +25,11 @@ pub fn get_padding(doc_len: usize, batch_size: usize) -> usize {
 }
 
 pub fn lookup_idxs(n_states: usize, batch_size: usize) -> usize {
-    let i_leq = logmn(n_states)+1;
+    let bit_limit = logmn(n_states)+1;
     let v_i: usize = 5;
-    ((i_leq*3)+v_i)*(batch_size) + (i_leq*3)
+    let in_overflow = bit_limit*(2*batch_size+1);
+    let out_overflow = bit_limit*3;
+    in_overflow+out_overflow+v_i
 }
 
 pub fn nl_nohash<'a>(
@@ -62,16 +64,13 @@ pub fn nl_nohash<'a>(
     if hybrid {
         b = ((batch_size as f64)/2.0) as usize;
     }
-    // cost += 
-    lookup_idxs(safa.num_states(), b)
-    //;
 
     // combine qs (for fiat shamir)
-    // let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
+    let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
 
-    // cost += num_cqs;
+    cost += num_cqs;
 
-    // cost
+    cost
 }
 
 pub fn nl<'a>(safa: &'a SAFA<char>, batch_size: usize, table_size: usize, hybrid:bool) -> usize{
@@ -81,15 +80,24 @@ pub fn nl<'a>(safa: &'a SAFA<char>, batch_size: usize, table_size: usize, hybrid
     cost_no_hash
 }
 
-pub fn q_ordering(table_size: usize, batch_size: usize)->usize{
+pub fn q_ordering(table_size: usize, batch_size: usize, hybrid: bool, project: bool)->usize{
+    print!("Doc size: {}",table_size);
     let logtable = logmn(table_size);
-    (logtable+5)*batch_size
+    let mut total = logtable;
+    if hybrid {
+        total = total + 1;
+    }
+    if project {
+        total = total + 1;
+    }
+    total*batch_size
 }
 
-pub fn nl_doc<'a>(safa: &'a SAFA<char>, batch_size: usize, table_size: usize, hybrid: bool ) -> usize{
-    let q_ordering = q_ordering(table_size, batch_size);
+pub fn nl_doc<'a>(safa: &'a SAFA<char>, batch_size: usize, table_size: usize, hybrid: bool, project: bool) -> usize{
+    let q_ordering = q_ordering(table_size, batch_size, hybrid, project);
     let nl = nl(safa, batch_size, table_size, hybrid);
-    q_ordering + nl
+    // q_ordering 
+    nl
 }
 
 pub fn cursor_circuit(doc_len: usize,batch_size: usize,max_offset: usize) -> usize {
@@ -104,13 +112,14 @@ pub fn cursor_circuit(doc_len: usize,batch_size: usize,max_offset: usize) -> usi
 }
 
 pub fn stack_circuit(n_states: usize, doc_len: usize, max_branches: usize, max_stack:usize)->usize{
-    let push = 7 + max_branches*(3+logmn(n_states)+max_stack*14);
-    // let pop = max_stack*7+logmn(doc_len)+9;
-    // let ite = 6; 
-    // let stack_ptr = 4; 
-    // let not_forall = 14; 
-    push
-    //+pop+ite+stack_ptr+not_forall
+    let log_states = logmn(n_states);
+    let bitlimit = logmn(doc_len)+1;
+    let push = 7 + max_branches*(3+2*log_states+max_stack*14)+log_states;
+    let pop = 4+max_stack*7+4*bitlimit;
+    let ite = 27;
+    let stack_ptr = 3;
+    let not_forall = 14; 
+    push+pop+ite+stack_ptr+not_forall
 }
 
 pub fn nlookup_cost_hash<'a>(
@@ -150,6 +159,7 @@ pub fn full_round_cost_model<'a>(
     doc_len: usize,
     hybrid: bool, 
     hybrid_len: Option<usize>,
+    project: bool,
     max_offset: usize, 
     max_branches: usize, 
     max_stack:usize
@@ -158,20 +168,17 @@ pub fn full_round_cost_model<'a>(
     let dlen_pow2 = doc_len.next_power_of_two();
     let safa_pow2 = safa.num_edges().next_power_of_two();
     if hybrid {
-        total_nl_cost = nl_doc(safa, batch_size*2, hybrid_len.unwrap(), hybrid);
+        total_nl_cost = nl_doc(safa, batch_size*2, hybrid_len.unwrap(), hybrid, project);
     }
     else {
         let nl_cost = nl(safa, batch_size,safa_pow2, false);
-        let commit_cost = nl_doc(safa, batch_size, dlen_pow2, hybrid);
-        total_nl_cost = nl_cost
-        // + commit_cost;
+        let lookup_cost = lookup_idxs(safa.num_states(), batch_size);
+        let commit_cost = nl_doc(safa, batch_size, dlen_pow2, hybrid, project);
+        total_nl_cost = nl_cost + lookup_cost + commit_cost;
     }
     let cursor_cost = cursor_circuit(dlen_pow2, batch_size, max_offset);
     let stack_cost = stack_circuit(safa.num_states(), dlen_pow2, max_branches, max_stack);
-    //total_nl_cost
-    //+
-    stack_cost
-    //+cursor_cost
+    total_nl_cost + stack_cost+cursor_cost
 }
 
 pub fn get_folded_cost(cost: usize, doc_len: usize, batch_size: usize) -> usize {
@@ -188,6 +195,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
     doc_len: usize,
     hybrid: bool, 
     hybrid_len: Option<usize>,
+    project: bool,
     max_offset: usize, 
     max_branches: usize, 
     max_stack:usize
@@ -198,6 +206,7 @@ pub fn opt_cost_model_select_with_batch<'a>(
         doc_len,
         hybrid, 
         hybrid_len,
+        project,
         max_offset,
         max_branches, 
         max_stack,
@@ -213,9 +222,11 @@ pub fn opt_cost_model_select<'a>(
     doc_len: usize,
     hybrid: bool, 
     hybrid_len: Option<usize>,
+    project: bool,
     max_offset: usize, 
     max_branches: usize, 
-    max_stack:usize
+    max_stack:usize,
+    solution: Vec<usize>
 ) -> (usize, usize) {
     let mut opt_batch_size: usize = 1;
     let mut cost = full_round_cost_model(
@@ -224,29 +235,21 @@ pub fn opt_cost_model_select<'a>(
         doc_len,
         hybrid, 
         hybrid_len,
+        project,
         max_offset,
         max_branches, 
         max_stack,
     );
     cost = get_folded_cost(cost, doc_len, 1);
 
-    let mut range_list = vec![];
-
-    if doc_len < 100000 {
-        range_list = (1..=doc_len).collect();
-    } else {
-        for n in 1..=logmn(doc_len) {
-            range_list.push(1 << n);
-        }
-    }
-
-    for n in range_list.into_iter() {
+    for n in 2..solution.iter().sum() {
         let batching_and_cost: (usize, usize) = opt_cost_model_select_with_batch(
             safa,
             n,
             doc_len,
             hybrid, 
             hybrid_len,
+            project,
             max_offset,
             max_branches, 
             max_stack,
