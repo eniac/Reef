@@ -27,7 +27,7 @@ pub fn get_padding(doc_len: usize, batch_size: usize) -> usize {
 pub fn lookup_idxs(n_states: usize, batch_size: usize) -> usize {
     let i_leq = logmn(n_states)+1;
     let v_i: usize = 5;
-    (i_leq+v_i)*batch_size + i_leq
+    ((i_leq*3)+v_i)*(batch_size) + (i_leq*3)
 }
 
 pub fn nl_nohash<'a>(
@@ -62,14 +62,16 @@ pub fn nl_nohash<'a>(
     if hybrid {
         b = ((batch_size as f64)/2.0) as usize;
     }
-    cost += lookup_idxs(safa.num_states(), b);
+    // cost += 
+    lookup_idxs(safa.num_states(), b)
+    //;
 
     // combine qs (for fiat shamir)
-    let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
+    // let num_cqs = ((batch_size * log_mn) as f64 / 254.0).ceil() as usize;
 
-    cost += num_cqs;
+    // cost += num_cqs;
 
-    cost
+    // cost
 }
 
 pub fn nl<'a>(safa: &'a SAFA<char>, batch_size: usize, table_size: usize, hybrid:bool) -> usize{
@@ -91,17 +93,24 @@ pub fn nl_doc<'a>(safa: &'a SAFA<char>, batch_size: usize, table_size: usize, hy
 }
 
 pub fn cursor_circuit(doc_len: usize,batch_size: usize,max_offset: usize) -> usize {
-    let doc_offset_log = logmn(max(doc_len,max_offset))+1;
-    (doc_offset_log*5+4)*batch_size
+    let cursor_plus = 1;
+    let bitlimit = logmn(max(doc_len,max_offset))+1;
+    let ite = 3+3*bitlimit;
+    let cur_overflow = bitlimit * (2*batch_size+1);
+    let min_offset_leq = bitlimit*3*batch_size;
+    let max_offset_geq = bitlimit*2*batch_size;
+    let upper_overflow = bitlimit*(batch_size+1);
+    cursor_plus+cur_overflow+min_offset_leq+max_offset_geq+upper_overflow+ite
 }
 
 pub fn stack_circuit(n_states: usize, doc_len: usize, max_branches: usize, max_stack:usize)->usize{
     let push = 7 + max_branches*(3+logmn(n_states)+max_stack*14);
-    let pop = max_stack*7+logmn(doc_len)+9;
-    let ite = 6; 
-    let stack_ptr = 4; 
-    let not_forall = 14; 
-    push+pop+ite+stack_ptr+not_forall
+    // let pop = max_stack*7+logmn(doc_len)+9;
+    // let ite = 6; 
+    // let stack_ptr = 4; 
+    // let not_forall = 14; 
+    push
+    //+pop+ite+stack_ptr+not_forall
 }
 
 pub fn nlookup_cost_hash<'a>(
@@ -154,11 +163,15 @@ pub fn full_round_cost_model<'a>(
     else {
         let nl_cost = nl(safa, batch_size,safa_pow2, false);
         let commit_cost = nl_doc(safa, batch_size, dlen_pow2, hybrid);
-        total_nl_cost = nl_cost + commit_cost;
+        total_nl_cost = nl_cost
+        // + commit_cost;
     }
     let cursor_cost = cursor_circuit(dlen_pow2, batch_size, max_offset);
     let stack_cost = stack_circuit(safa.num_states(), dlen_pow2, max_branches, max_stack);
-    total_nl_cost+stack_cost+cursor_cost
+    //total_nl_cost
+    //+
+    stack_cost
+    //+cursor_cost
 }
 
 pub fn get_folded_cost(cost: usize, doc_len: usize, batch_size: usize) -> usize {
@@ -204,7 +217,6 @@ pub fn opt_cost_model_select<'a>(
     max_branches: usize, 
     max_stack:usize
 ) -> (usize, usize) {
-    let pow2_doc_len = doc_len.next_power_of_two();
     let mut opt_batch_size: usize = 1;
     let mut cost = full_round_cost_model(
         safa,

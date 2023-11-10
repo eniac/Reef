@@ -588,97 +588,97 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
             self.assertions.push(in_overflow);
 
-            let v_i = term(
-                Op::PfNaryOp(PfNaryOp::Add),
-                vec![
-                    term(
-                        Op::PfNaryOp(PfNaryOp::Add),
-                        vec![
-                            term(
-                                Op::PfNaryOp(PfNaryOp::Add),
-                                vec![
-                                    term(
-                                        Op::PfNaryOp(PfNaryOp::Add),
-                                        vec![
-                                            term(
-                                                Op::PfNaryOp(PfNaryOp::Add),
-                                                vec![
-                                                    term(
-                                                        Op::PfNaryOp(PfNaryOp::Mul),
-                                                        vec![
-                                                            new_var(format!("rel_{}", i - 1)),
-                                                            new_const(
-                                                                num_states
-                                                                    * num_states
-                                                                    * num_chars
-                                                                    * max_offsets
-                                                                    * max_offsets,
-                                                            ),
-                                                        ],
-                                                    ),
-                                                    term(
-                                                        Op::PfNaryOp(PfNaryOp::Mul),
-                                                        vec![
-                                                            new_var(format!("state_{}", i - 1)),
-                                                            new_const(
-                                                                num_states
-                                                                    * num_chars
-                                                                    * max_offsets
-                                                                    * max_offsets,
-                                                            ),
-                                                        ],
-                                                    ),
-                                                ],
-                                            ),
-                                            term(
-                                                Op::PfNaryOp(PfNaryOp::Mul),
-                                                vec![
-                                                    new_var(format!("state_{}", i)),
-                                                    new_const(
-                                                        num_chars * max_offsets * max_offsets,
-                                                    ),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                    term(
-                                        Op::PfNaryOp(PfNaryOp::Mul),
-                                        vec![
-                                            new_var(format!("char_{}", i - 1)),
-                                            new_const(max_offsets * max_offsets),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                            term(
-                                Op::PfNaryOp(PfNaryOp::Mul),
-                                vec![
-                                    new_var(format!("lower_offset_{}", i - 1)),
-                                    new_const(max_offsets),
-                                ],
-                            ),
-                        ],
-                    ),
-                    new_var(format!("upper_offset_{}", i - 1)),
-                ],
-            );
-            v.push(v_i.clone());
-            self.pub_inputs.push(new_var(format!("state_{}", i - 1)));
-            self.pub_inputs.push(new_var(format!("char_{}", i - 1)));
-            self.pub_inputs
-                .push(new_var(format!("upper_offset_{}", i - 1)));
-            self.pub_inputs
-                .push(new_var(format!("lower_offset_{}", i - 1)));
-            self.pub_inputs.push(new_var(format!("offset_{}", i - 1)));
-            self.pub_inputs.push(new_var(format!("rel_{}", i - 1)));
+        //     let v_i = term(
+        //         Op::PfNaryOp(PfNaryOp::Add),
+        //         vec![
+        //             term(
+        //                 Op::PfNaryOp(PfNaryOp::Add),
+        //                 vec![
+        //                     term(
+        //                         Op::PfNaryOp(PfNaryOp::Add),
+        //                         vec![
+        //                             term(
+        //                                 Op::PfNaryOp(PfNaryOp::Add),
+        //                                 vec![
+        //                                     term(
+        //                                         Op::PfNaryOp(PfNaryOp::Add),
+        //                                         vec![
+        //                                             term(
+        //                                                 Op::PfNaryOp(PfNaryOp::Mul),
+        //                                                 vec![
+        //                                                     new_var(format!("rel_{}", i - 1)),
+        //                                                     new_const(
+        //                                                         num_states
+        //                                                             * num_states
+        //                                                             * num_chars
+        //                                                             * max_offsets
+        //                                                             * max_offsets,
+        //                                                     ),
+        //                                                 ],
+        //                                             ),
+        //                                             term(
+        //                                                 Op::PfNaryOp(PfNaryOp::Mul),
+        //                                                 vec![
+        //                                                     new_var(format!("state_{}", i - 1)),
+        //                                                     new_const(
+        //                                                         num_states
+        //                                                             * num_chars
+        //                                                             * max_offsets
+        //                                                             * max_offsets,
+        //                                                     ),
+        //                                                 ],
+        //                                             ),
+        //                                         ],
+        //                                     ),
+        //                                     term(
+        //                                         Op::PfNaryOp(PfNaryOp::Mul),
+        //                                         vec![
+        //                                             new_var(format!("state_{}", i)),
+        //                                             new_const(
+        //                                                 num_chars * max_offsets * max_offsets,
+        //                                             ),
+        //                                         ],
+        //                                     ),
+        //                                 ],
+        //                             ),
+        //                             term(
+        //                                 Op::PfNaryOp(PfNaryOp::Mul),
+        //                                 vec![
+        //                                     new_var(format!("char_{}", i - 1)),
+        //                                     new_const(max_offsets * max_offsets),
+        //                                 ],
+        //                             ),
+        //                         ],
+        //                     ),
+        //                     term(
+        //                         Op::PfNaryOp(PfNaryOp::Mul),
+        //                         vec![
+        //                             new_var(format!("lower_offset_{}", i - 1)),
+        //                             new_const(max_offsets),
+        //                         ],
+        //                     ),
+        //                 ],
+        //             ),
+        //             new_var(format!("upper_offset_{}", i - 1)),
+        //         ],
+        //     );
+        //     v.push(v_i.clone());
+        //     self.pub_inputs.push(new_var(format!("state_{}", i - 1)));
+        //     self.pub_inputs.push(new_var(format!("char_{}", i - 1)));
+        //     self.pub_inputs
+        //         .push(new_var(format!("upper_offset_{}", i - 1)));
+        //     self.pub_inputs
+        //         .push(new_var(format!("lower_offset_{}", i - 1)));
+        //     self.pub_inputs.push(new_var(format!("offset_{}", i - 1)));
+        //     self.pub_inputs.push(new_var(format!("rel_{}", i - 1)));
 
-            if include_vs {
-                let match_v = term(Op::Eq, vec![new_var(format!("v_{}", i - 1)), v_i]);
+        //     if include_vs {
+        //         let match_v = term(Op::Eq, vec![new_var(format!("v_{}", i - 1)), v_i]);
 
-                self.assertions.push(match_v);
-                self.pub_inputs.push(new_var(format!("v_{}", i - 1)));
-            }
-        }
+        //         self.assertions.push(match_v);
+        //         self.pub_inputs.push(new_var(format!("v_{}", i - 1)));
+        //     }
+         }
 
         // out state < num states
         let out_overflow = term(
@@ -733,9 +733,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
         // LEAVE THIS IN HERE FOR DEBUGGING >:(
-        /*for r in circ_r1cs.constraints().clone() {
+        for r in circ_r1cs.constraints().clone() {
             println!("{:#?}", circ_r1cs.format_qeq(&r));
-        }*/
+        }
 
         circ_r1cs.finalize(&final_cs)
     }
@@ -1057,117 +1057,120 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     fn cursor_circuit(&mut self) {
         for j in 0..self.batch_size {
-            self.pub_inputs.push(new_var(format!("cursor_{}", j)));
+            // println!("{}",j);
+            // self.pub_inputs.push(new_var(format!("cursor_{}", j)));
 
-            let cursor_plus = term(
-                Op::Eq,
-                vec![
-                    new_var(format!("cursor_{}", j + 1)), // vanishing
-                    term(
-                        Op::PfNaryOp(PfNaryOp::Add),
-                        vec![
-                            new_var(format!("cursor_{}", j)),
-                            new_var(format!("offset_{}", j)),
-                        ],
-                    ),
-                ],
-            );
-            self.assertions.push(cursor_plus);
+            // let cursor_plus = term(
+            //     Op::Eq,
+            //     vec![
+            //         new_var(format!("cursor_{}", j + 1)), // vanishing
+            //         term(
+            //             Op::PfNaryOp(PfNaryOp::Add),
+            //             vec![
+            //                 new_var(format!("cursor_{}", j)),
+            //                 new_var(format!("offset_{}", j)),
+            //             ],
+            //         ),
+            //     ],
+            // );
+            // self.assertions.push(cursor_plus);
 
-            let bit_limit = logmn(max(self.udoc.len(), self.max_offsets)) + 1;
-            /*println!(
-                "BIT LIMIT {} max {} star {} max {}",
-                bit_limit,
-                self.max_offsets,
-                self.star_offset,
-                max(self.udoc.len(), self.max_offsets)
-            );*/
+            // let bit_limit = logmn(max(self.udoc.len(), self.max_offsets)) + 1;
+            // // println!(
+            // //     "BIT LIMIT {} max {} star {} max {}",
+            // //     bit_limit,
+            // //     self.max_offsets,
+            // //     self.star_offset,
+            // //     max(self.udoc.len(), self.max_offsets)
+            // // );
+            
+            // //new_bool_const(true);
 
-            let cur_overflow = term(
-                Op::BvBinPred(BvBinPred::Uge),
-                vec![
-                    term(
-                        Op::PfToBv(bit_limit),
-                        vec![new_var(format!("cursor_{}", j + 1))],
-                    ),
-                    term(
-                        Op::PfToBv(bit_limit),
-                        vec![new_var(format!("cursor_{}", j))],
-                    ),
-                ],
-            );
-            self.assertions.push(cur_overflow);
+            // let cur_overflow = term(
+            //     Op::BvBinPred(BvBinPred::Uge),
+            //     vec![
+            //         term(
+            //             Op::PfToBv(bit_limit),
+            //             vec![new_var(format!("cursor_{}", j + 1))],
+            //         ),
+            //         term(
+            //             Op::PfToBv(bit_limit),
+            //             vec![new_var(format!("cursor_{}", j))],
+            //         ),
+            //     ],
+            // );
+            // self.assertions.push(cur_overflow);
 
-            let min_offset_leq = term(
-                Op::BvBinPred(BvBinPred::Uge),
-                vec![
-                    term(
-                        Op::PfToBv(bit_limit),
-                        vec![new_var(format!("offset_{}", j))],
-                    ),
-                    term(
-                        Op::PfToBv(bit_limit),
-                        vec![new_var(format!("lower_offset_{}", j))],
-                    ),
-                ],
-            );
-            self.assertions.push(min_offset_leq);
+            // let min_offset_leq = term(
+            //     Op::BvBinPred(BvBinPred::Uge),
+            //     vec![
+            //         term(
+            //             Op::PfToBv(bit_limit),
+            //             vec![new_var(format!("offset_{}", j))],
+            //         ),
+            //         term(
+            //             Op::PfToBv(bit_limit),
+            //             vec![new_var(format!("lower_offset_{}", j))],
+            //         ),
+            //     ],
+            // );
+            // self.assertions.push(min_offset_leq);
 
-            let max_offset_geq = term(
-                Op::BvBinPred(BvBinPred::Uge),
-                vec![
-                    term(
-                        Op::PfToBv(bit_limit),
-                        vec![new_var(format!("upper_offset_{}", j))],
-                    ),
-                    term(
-                        Op::PfToBv(bit_limit),
-                        vec![new_var(format!("offset_{}", j))],
-                    ),
-                ],
-            );
+            // let max_offset_geq = term(
+            //     Op::BvBinPred(BvBinPred::Uge),
+            //     vec![
+            //         term(
+            //             Op::PfToBv(bit_limit),
+            //             vec![new_var(format!("upper_offset_{}", j))],
+            //         ),
+            //         term(
+            //             Op::PfToBv(bit_limit),
+            //             vec![new_var(format!("offset_{}", j))],
+            //         ),
+            //     ],
+            // );
 
-            // upper off < max off
-            let upper_overflow = term(
-                Op::BvBinPred(BvBinPred::Uge),
-                vec![
-                    term(Op::PfToBv(bit_limit), vec![new_const(self.max_offsets)]),
-                    term(
-                        Op::PfToBv(bit_limit),
-                        vec![new_var(format!("upper_offset_{}", j))],
-                    ),
-                ],
-            );
-            // if no upper off, lower off < max off
-            let lower_overflow = term(
-                Op::BvBinPred(BvBinPred::Uge),
-                vec![
-                    term(Op::PfToBv(bit_limit), vec![new_const(self.max_offsets)]),
-                    term(
-                        Op::PfToBv(bit_limit),
-                        vec![new_var(format!("lower_offset_{}", j))],
-                    ),
-                ],
-            );
+            // // upper off < max off
+            // let upper_overflow = term(
+            //     Op::BvBinPred(BvBinPred::Uge),
+            //     vec![
+            //         term(Op::PfToBv(bit_limit), vec![new_const(self.max_offsets)]),
+            //         term(
+            //             Op::PfToBv(bit_limit),
+            //             vec![new_var(format!("upper_offset_{}", j))],
+            //         ),
+            //     ],
+            // );
+            // // if no upper off, lower off < max off
+            // let lower_overflow = term(
+            //     Op::BvBinPred(BvBinPred::Uge),
+            //     vec![
+            //         term(Op::PfToBv(bit_limit), vec![new_const(self.max_offsets)]),
+            //         term(
+            //             Op::PfToBv(bit_limit),
+            //             vec![new_var(format!("lower_offset_{}", j))],
+            //         ),
+            //     ],
+            // );
 
-            let ite_upper_off = term(
-                Op::Ite,
-                vec![
-                    term(
-                        Op::Eq,
-                        vec![
-                            new_const(self.star_offset),
-                            new_var(format!("upper_offset_{}", j)),
-                        ],
-                    ),
-                    lower_overflow,
-                    term(
-                        Op::BoolNaryOp(BoolNaryOp::And),
-                        vec![max_offset_geq, upper_overflow],
-                    ),
-                ],
-            );
-            self.assertions.push(ite_upper_off);
+            // let ite_upper_off = term(
+            //     Op::Ite,
+            //     vec![
+            //         term(
+            //             Op::Eq,
+            //             vec![
+            //                 new_const(self.star_offset),
+            //                 new_var(format!("upper_offset_{}", j)),
+            //             ],
+            //         ),
+            //         lower_overflow,
+            //         term(
+            //             Op::BoolNaryOp(BoolNaryOp::And),
+            //             vec![max_offset_geq, upper_overflow],
+            //         ),
+            //     ],
+            // );
+            // self.assertions.push(ite_upper_off);
 
             if j == 0 {
                 // PUSH
@@ -1238,8 +1241,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 );
                 self.assertions.push(c0);
             } else {
-                // assert not forall
-                self.assertions.push(self.not_forall_circ(j));
+               // assert not forall
+               self.assertions.push(self.not_forall_circ(j));
             }
         }
         self.pub_inputs
@@ -1548,23 +1551,23 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     pub fn to_circuit(&mut self) -> (ProverData, VerifierData) {
-        let lookups = self.lookup_idxs(true);
-        assert_eq!(lookups.len(), self.batch_size);
+       // let lookups = self.lookup_idxs(true);
+        //assert_eq!(lookups.len(), self.batch_size);
         let mut char_lookups = vec![];
         for c in 0..self.batch_size {
             char_lookups.push(new_var(format!("char_{}", c)));
         }
 
-        self.cursor_circuit();
+       self.cursor_circuit();
 
         if self.merkle {
-            self.nlookup_gadget(lookups, self.table.len(), "nl");
-            self.q_ordering_merkle();
+            // self.nlookup_gadget(lookups, self.table.len(), "nl");
+            // self.q_ordering_merkle();
         } else if self.hybrid_len.is_some() {
-            self.nlookup_hybrid(lookups, char_lookups);
+            //self.nlookup_hybrid(lookups, char_lookups);
         } else {
-            self.nlookup_gadget(lookups, self.table.len(), "nl");
-            self.nlookup_doc_commit(char_lookups);
+           // self.nlookup_gadget(lookups, self.table.len(), "nl");
+            //self.nlookup_doc_commit(char_lookups);
         }
 
         self.r1cs_conv()
@@ -2671,17 +2674,17 @@ mod tests {
         for b in batch_sizes {
             let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, merkle, sc.clone());
 
-            let reef_commit = ReefCommitment::new(
-                r1cs_converter.udoc.clone(),
-                r1cs_converter.hybrid_len,
-                merkle,
-                &sc,
-            );
+            // let reef_commit = ReefCommitment::new(
+            //     r1cs_converter.udoc.clone(),
+            //     r1cs_converter.hybrid_len,
+            //     merkle,
+            //     &sc,
+            // );
 
-            if reef_commit.nldoc.is_some() {
-                let dc = reef_commit.nldoc.as_ref().unwrap();
-                r1cs_converter.doc_hash = Some(dc.doc_commit_hash);
-            };
+            // if reef_commit.nldoc.is_some() {
+            //     let dc = reef_commit.nldoc.as_ref().unwrap();
+            //     r1cs_converter.doc_hash = Some(dc.doc_commit_hash);
+            // };
 
             let mut running_q: Option<Vec<Integer>> = None;
             let mut running_v: Option<Integer> = None;
@@ -2689,69 +2692,68 @@ mod tests {
             let mut doc_running_v: Option<Integer> = None;
             let mut hybrid_running_q: Option<Vec<Integer>> = None;
             let mut hybrid_running_v: Option<Integer> = None;
-            let mut merkle_lookups = None;
+            //let mut merkle_lookups = None;
 
             let mut doc_idx = 0;
 
             let (pd, _vd) = r1cs_converter.to_circuit();
 
-            let mut values;
-            let mut next_state = 0;
+            // let mut values;
+            // let mut next_state = 0;
 
-            let trace = safa.solve(&chars);
-            // println!("TRACE {:#?}", trace);
-            let mut sols = trace_preprocessing(&trace);
+            // let trace = safa.solve(&chars);
+            // // println!("TRACE {:#?}", trace);
+            // let mut sols = trace_preprocessing(&trace);
 
-            let mut i = 0;
-            while r1cs_converter.sol_num < sols.len() {
-                // println!("STEP {:#?}", i);
-                (
-                    values,
-                    next_state,
-                    running_q,
-                    running_v,
-                    doc_running_q,
-                    doc_running_v,
-                    hybrid_running_q,
-                    hybrid_running_v,
-                    doc_idx,
-                    merkle_lookups,
-                ) = r1cs_converter.gen_wit_i(
-                    &mut sols,
-                    i,
-                    next_state,
-                    running_q.clone(),
-                    running_v.clone(),
-                    doc_running_q.clone(),
-                    doc_running_v.clone(),
-                    hybrid_running_q.clone(),
-                    hybrid_running_v.clone(),
-                    doc_idx,
-                );
+            // let mut i = 0;
+            // while r1cs_converter.sol_num < sols.len() {
+            //     // println!("STEP {:#?}", i);
+            //     (
+            //         values,
+            //         next_state,
+            //         running_q,
+            //         running_v,
+            //         doc_running_q,
+            //         doc_running_v,
+            //         hybrid_running_q,
+            //         hybrid_running_v,
+            //         doc_idx,
+            //         merkle_lookups,
+            //     ) = r1cs_converter.gen_wit_i(
+            //         &mut sols,
+            //         i,
+            //         next_state,
+            //         running_q.clone(),
+            //         running_v.clone(),
+            //         doc_running_q.clone(),
+            //         doc_running_v.clone(),
+            //         hybrid_running_q.clone(),
+            //         hybrid_running_v.clone(),
+            //         doc_idx,
+            //     );
 
-                pd.check_all(&values);
+            //     pd.check_all(&values);
 
-                // for next i+1 round
-                i += 1;
-            }
+            //     // for next i+1 round
+            //     i += 1;
+            // }
 
-            let rq = match running_q {
-                Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
-                None => None,
-            };
-            let rv = match running_v {
-                Some(x) => Some(int_to_ff(x)),
-                None => None,
-            };
+            // let rq = match running_q {
+            //     Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+            //     None => None,
+            // };
+            // let rv = match running_v {
+            //     Some(x) => Some(int_to_ff(x)),
+            //     None => None,
+            // };
 
-            assert_eq!(next_state, r1cs_converter.exit_state);
+            // assert_eq!(next_state, r1cs_converter.exit_state);
 
-            let doc_len = r1cs_converter.udoc.len();
 
             let cost_estimate = full_round_cost_model(
                 &safa, 
                 b, 
-                doc_len, 
+                r1cs_converter.udoc.len(), 
                 hybrid,
                 r1cs_converter.hybrid_len,
                 r1cs_converter.max_offsets,
@@ -2760,44 +2762,44 @@ mod tests {
             );
 
             println!("actual cost: {:#?}", pd.r1cs.constraints.len());
-            // println!("{:#?}",pd.r1cs.constraints);
+            println!("batch size: {:#?}",b);
             println!("estimated cost: {:#?}", cost_estimate);
             println!("\n\n\n");
 
-            if reef_commit.nldoc.is_some() {
-                let (priv_rq, priv_rv) = if !hybrid {
-                    (doc_running_q.unwrap(), doc_running_v.unwrap())
-                } else {
-                    (
-                        hybrid_running_q.clone().unwrap(),
-                        hybrid_running_v.clone().unwrap(),
-                    )
-                };
+            // if reef_commit.nldoc.is_some() {
+            //     let (priv_rq, priv_rv) = if !hybrid {
+            //         (doc_running_q.unwrap(), doc_running_v.unwrap())
+            //     } else {
+            //         (
+            //             hybrid_running_q.clone().unwrap(),
+            //             hybrid_running_v.clone().unwrap(),
+            //         )
+            //     };
 
-                let dc = reef_commit.nldoc.unwrap();
-                let consist_proof = dc.prove_consistency(
-                    &r1cs_converter.table,
-                    r1cs_converter.proj_chunk_idx,
-                    priv_rq,
-                    priv_rv,
-                    r1cs_converter.doc_subset.is_some(),
-                    r1cs_converter.hybrid_len.is_some(),
-                );
+            //     let dc = reef_commit.nldoc.unwrap();
+            //     let consist_proof = dc.prove_consistency(
+            //         &r1cs_converter.table,
+            //         r1cs_converter.proj_chunk_idx,
+            //         priv_rq,
+            //         priv_rv,
+            //         r1cs_converter.doc_subset.is_some(),
+            //         r1cs_converter.hybrid_len.is_some(),
+            //     );
 
-                let cap_d = consist_proof.hash_d.clone();
+            //     let cap_d = consist_proof.hash_d.clone();
 
-                dc.verify_consistency(consist_proof)
-            }
+            //     dc.verify_consistency(consist_proof)
+            // }
 
-            final_clear_checks(
-                <G1 as Group>::Scalar::from(r1cs_converter.stack_ptr as u64),
-                &r1cs_converter.table,
-                rq,
-                rv,
-            );
+            // final_clear_checks(
+            //     <G1 as Group>::Scalar::from(r1cs_converter.stack_ptr as u64),
+            //     &r1cs_converter.table,
+            //     rq,
+            //     rv,
+            // );
 
             // final accepting
-            assert_eq!(next_state, r1cs_converter.exit_state);
+            //assert_eq!(next_state, r1cs_converter.exit_state);
 
             // assert!(
             //     pd.r1cs.constraints.len() as usize
