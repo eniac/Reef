@@ -125,19 +125,21 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
 
     let _ = make_circom(&dfa, doc_len, alpha.len());
 
-    let mut command = shell("circom match.circom --r1cs --sym --wasm --prime vesta");
+    let mut command = shell("circom match.circom --r1cs --sym --c --prime vesta");
+    let mut make_command = shell("cd match_cpp && make && cd ..");
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "constraint_generation");
 
     let mut output  = command.execute_output().unwrap();
+    output = make_command.execute_output().unwrap();
 
     println!("{}", String::from_utf8(output.stdout).unwrap());
 
     let _ = remove_file("match.circom");
 
     let circuit_filepath = "match.r1cs";
-    let witness_gen_filepath = "match_js/match.wasm";
+    let witness_gen_filepath = "match_cpp/match";
 
     let root = current_dir().unwrap();
 
