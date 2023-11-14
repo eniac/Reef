@@ -6,8 +6,8 @@ use petgraph::algo::isomorphism::*;
 use petgraph::dot::Dot;
 use petgraph::graph::{EdgeReference, NodeIndex};
 use petgraph::visit::*;
-use petgraph::Graph;
 use petgraph::Direction;
+use petgraph::Graph;
 
 use std::result::Result;
 
@@ -17,13 +17,12 @@ use crate::frontend::regex::{re, Regex, RegexF};
 use crate::trace::{Trace, TraceElem};
 use rayon::iter::*;
 
-
-use std::time::{Duration, Instant};
 use core::fmt;
 use core::fmt::{Display, Formatter};
 use lazy_static::lazy_static;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Either<A, B>(pub Result<A, B>);
@@ -228,7 +227,8 @@ impl SAFA<char> {
 
     /// Is this node a fork ([alt, and])
     pub fn is_fork(&self, from: &NodeIndex<u32>) -> bool {
-        self.g.edges_directed(*from, Direction::Outgoing)
+        self.g
+            .edges_directed(*from, Direction::Outgoing)
             .all(|e| e.weight().0.is_err())
     }
 
@@ -246,11 +246,13 @@ impl SAFA<char> {
         safa.accepting = self.non_accepting();
 
         // Sinks are non-accepting states with no outgoing edges
-        safa.sink =
-            self.g.node_indices()
-                .find(|n| !safa.accepting.contains(n)
-                    && self.g.edges_directed(*n, Direction::Outgoing)
-                             .all(|e| e.target() == *n));
+        safa.sink = self.g.node_indices().find(|n| {
+            !safa.accepting.contains(n)
+                && self
+                    .g
+                    .edges_directed(*n, Direction::Outgoing)
+                    .all(|e| e.target() == *n)
+        });
 
         // Negate edges
         safa.g = safa.g.map(
@@ -308,14 +310,16 @@ impl SAFA<char> {
 
     /// And nodes in the SAFA
     pub fn forall_nodes(&self) -> BTreeSet<NodeIndex<u32>> {
-        self.g.node_indices()
+        self.g
+            .node_indices()
             .filter(|n| self.is_fork(n) && self.g[*n].is_and())
             .collect()
     }
 
     /// Or nodes in the SAFA
     pub fn exist_nodes(&self) -> BTreeSet<NodeIndex<u32>> {
-        self.g.node_indices()
+        self.g
+            .node_indices()
             .filter(|n| self.is_fork(n) && self.g[*n].is_or())
             .collect()
     }
@@ -379,7 +383,7 @@ impl SAFA<char> {
                 let mut tail = self.solve_rec(to, i + 1, doc)?;
                 tail.push_front(TraceElem::new(from.index(), e, to.index(), i, i + 1));
                 Some(tail)
-            },
+            }
             // Character non-match
             Ok(_) => None,
             Err(skip) => skip
@@ -390,9 +394,7 @@ impl SAFA<char> {
                 .into_par_iter()
                 .find_map_any(|n| {
                     let mut tail = self.solve_rec(to, i + n, doc)?;
-                    tail.push_front(
-                        TraceElem::new(from.index(), e, to.index(), i, i + n)
-                    );
+                    tail.push_front(TraceElem::new(from.index(), e, to.index(), i, i + n));
                     Some(tail)
                 }),
         }
@@ -438,8 +440,8 @@ impl SAFA<char> {
         }
         if self.g[n].is_and() {
             // All of the next entries must have solutions
-            let mut subsolutions: Vec<_> =
-                self.g
+            let mut subsolutions: Vec<_> = self
+                .g
                 .edges_directed(n, Direction::Outgoing)
                 .filter_map(|e| self.solve_edge(e.weight(), e.source(), e.target(), i, doc))
                 .collect();
