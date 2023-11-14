@@ -49,10 +49,9 @@ use std::{collections::HashMap};
 use metrics::metrics::{log, log::Component};
 
 pub fn get_folded_cost(circuit_size: usize, n_foldings: usize) -> usize {
-    let cost_folding = 2 * circuit_size * n_foldings;
-    let cost_snark = (((circuit_size) as f32) * 128.0).log2().ceil() as usize;
-    let total_cost = cost_folding + cost_snark;
-    total_cost
+    let V2: usize = 11376;
+    let V1: usize = 10347;
+    2*n_foldings*(V1+V2+circuit_size) + 8*(V1+circuit_size)
 }
 
 pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
