@@ -2734,10 +2734,8 @@ mod tests {
             let mut next_state = 0;
 
             let trace = safa.solve(&chars);
-            // println!("TRACE {:#?}", trace);
             let mut sols = trace_preprocessing(&trace);
             //let eq = path_eq(&r1cs_converter.path_lens, &sols);
-            //assert!(eq);
 
             let mut i = 0;
             while r1cs_converter.sol_num < sols.len() {
