@@ -1595,10 +1595,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         self.cursor_circuit();
 
         if self.merkle {
-            // self.nlookup_gadget(lookups, self.table.len(), "nl");
-            // self.q_ordering_merkle();
+            self.nlookup_gadget(lookups, self.table.len(), "nl");
+            self.q_ordering_merkle();
         } else if self.hybrid_len.is_some() {
-            //self.nlookup_hybrid(lookups, char_lookups);
+            self.nlookup_hybrid(lookups, char_lookups);
         } else {
             self.nlookup_gadget(lookups, self.table.len(), "nl");
             self.nlookup_doc_commit(char_lookups);
