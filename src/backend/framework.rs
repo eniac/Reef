@@ -7,10 +7,10 @@ type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
 type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
+use crate::backend::costs::full_round_cost_model;
 use crate::backend::merkle_tree::MerkleCommitment;
 use crate::backend::merkle_tree::MerkleWit;
 use crate::backend::r1cs_helper::trace_preprocessing;
-use crate::backend::costs::full_round_cost_model;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::frontend::safa::SAFA;
 use bincode;
@@ -85,8 +85,6 @@ pub fn run_backend(
 
         // stop gap for cost model - don't need to time >:)
         let mut batch_size = if temp_batch_size == 0 {
-  
-
             let trace = safa.solve(&doc);
             if trace.is_none() {
                 panic!("No solution found");
@@ -98,7 +96,6 @@ pub fn run_backend(
 
             let mut paths = vec![];
             let mut path_len = 1;
-
 
             for sol in sols {
                 for elt in sol {
@@ -150,7 +147,7 @@ pub fn run_backend(
         log::tic(Component::Compiler, "r1cs_init");
         let mut r1cs_converter =
             R1CS::new(&safa, &doc, batch_size, proj, hybrid, merkle, sc.clone());
-        
+
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "r1cs_init");
         println!(
@@ -176,24 +173,23 @@ pub fn run_backend(
             hash_salt = dc.hash_salt;
         }
 
-        #[cfg(feature = "metrics")] 
+        #[cfg(feature = "metrics")]
         {
             log::stop(Component::CommitmentGen, "generation");
             log::tic(Component::Compiler, "constraint_generation");
         }
-   
 
         let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
 
         #[cfg(feature = "metrics")]
         {
-        log::stop(Component::Compiler, "constraint_generation");
-        log::tic(Component::Compiler,"snark_setup");
-        }  
+            log::stop(Component::Compiler, "constraint_generation");
+            log::tic(Component::Compiler, "snark_setup");
+        }
         let (z0_primary, pp) = setup(&r1cs_converter, &prover_data, hash_salt);
 
         #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler,"snark_setup");
+        log::stop(Component::Compiler, "snark_setup");
 
         let mc = reef_commit.merkle.clone();
         send_setup
@@ -372,11 +368,7 @@ fn setup<'a>(
     >::setup(circuit_primary.clone(), circuit_secondary.clone())
     .unwrap();
     #[cfg(feature = "metrics")]
-    log::r1cs(
-        Component::Prover,
-        "step_circuit",
-        pp.num_constraints().0,
-    );
+    log::r1cs(Component::Prover, "step_circuit", pp.num_constraints().0);
     #[cfg(feature = "metrics")]
     log::r1cs(
         Component::Prover,
@@ -395,14 +387,14 @@ fn setup<'a>(
     println!(
         "Estimated Number of constraints: {}",
         full_round_cost_model(
-            &r1cs_converter.safa, 
-            r1cs_converter.batch_size, 
-            r1cs_converter.idoc.len(), 
+            &r1cs_converter.safa,
+            r1cs_converter.batch_size,
+            r1cs_converter.idoc.len(),
             is_hybrid,
             r1cs_converter.hybrid_len,
             false,
             r1cs_converter.max_offsets,
-            r1cs_converter.max_branches, 
+            r1cs_converter.max_branches,
             r1cs_converter.max_stack
         )
     );
@@ -469,7 +461,7 @@ fn solve<'a>(
         panic!("No solution found");
     }
     let mut sols = trace_preprocessing(&trace);
-   
+
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver, "fa_solver");
     //end safa solve
@@ -850,17 +842,13 @@ fn prove_and_verify(
 
     #[cfg(feature = "metrics")]
     {
-    let (commit_sz,consistency_proof_size) = proof_size(&consist_proof, &proof_info.commit);
-    log::space(
-        Component::Prover,
-        "consistency_proof",
-        consistency_proof_size
-    );
-    log::space(
-        Component::CommitmentGen,
-        "commitment",
-        commit_sz,
-    );
+        let (commit_sz, consistency_proof_size) = proof_size(&consist_proof, &proof_info.commit);
+        log::space(
+            Component::Prover,
+            "consistency_proof",
+            consistency_proof_size,
+        );
+        log::space(Component::CommitmentGen, "commitment", commit_sz);
     }
 
     verify(
@@ -906,10 +894,7 @@ fn verify(
     assert!(res.is_ok());
 
     #[cfg(feature = "metrics")]
-    log::tic(
-        Component::Verifier,
-        "consistency_verification",
-    );
+    log::tic(Component::Verifier, "consistency_verification");
 
     // [state, <q,v for eval claim>, <q,"v"(hash), for doc claim>, stack_ptr, <stack>]
     let zn = res.unwrap().0;
@@ -957,13 +942,10 @@ fn verify(
     assert_eq!(zn[0], <G1 as Group>::Scalar::from(exit_state as u64));
 
     #[cfg(feature = "metrics")]
-    log::stop(
-        Component::Verifier,
-        "consistency_verification",
-    );
+    log::stop(Component::Verifier, "consistency_verification");
 }
 
-fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> (usize,usize) {
+fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> (usize, usize) {
     let mut doc_size = 0;
     if rc.nldoc.is_some() {
         let dc = &rc.nldoc.as_ref().unwrap().doc_commit;
@@ -990,7 +972,10 @@ fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> (usize,usi
     let eq_proof_size = bincode::serialize(&cp.eq_proof).unwrap().len();
     // check? let l_commit_size = bincode::serialize(&cp.l_commit).unwrap().len();
 
-    (doc_size, snark_size + v_size + vprime_size + ipa_size + q_size + eq_proof_size)
+    (
+        doc_size,
+        snark_size + v_size + vprime_size + ipa_size + q_size + eq_proof_size,
+    )
 }
 
 #[cfg(test)]

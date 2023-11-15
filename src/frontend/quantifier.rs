@@ -10,15 +10,12 @@ use petgraph::graph::NodeIndex;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Quant<A> {
     pub inner: A,
-    is_and: bool
+    is_and: bool,
 }
 
 impl<A: Clone> Quant<A> {
     pub fn new(inner: A, is_and: bool) -> Self {
-        Self {
-            inner,
-            is_and,
-        }
+        Self { inner, is_and }
     }
     pub fn and(inner: A) -> Self {
         Self {

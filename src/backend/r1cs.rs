@@ -62,6 +62,8 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub hybrid_len: Option<usize>,
     // merkle
     pub merkle: bool,
+    // extra
+    pub path_lens: Vec<usize>,
 }
 
 impl<'a, F: PrimeField> R1CS<'a, F, char> {
@@ -115,7 +117,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         //println!("ACCEPTING {:#?}", safa.accepting());
 
-        let mut dfs_alls = Dfs::new(&safa.g, safa.get_init());
+        let mut depth_safa = safa.g.map(node_depth_map, edge_id);
+
+        let mut dfs_alls = Dfs::new(&depth_safa, NodeIndex::new(0));
 
         let mut foralls_w_kids: FxHashMap<usize, Vec<usize>> = FxHashMap::default();
         let mut max_stack = 1;
@@ -125,7 +129,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let num_states_mult = num_states as u128;
         let max_offsets_mult = max_offsets as u128;
 
-        while let Some(all_state) = dfs_alls.next(&safa.g) {
+        while let Some(all_state) = dfs_alls.next(&depth_safa) {
             //println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
                 let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
@@ -159,26 +163,26 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 if rel > max_rel {
                     max_rel = rel;
                 }
-                set_table.insert(
-                    Integer::from(
-                        (rel as u128
-                            * num_states_mult
+                set_table.insert(Integer::from(
+                    (rel as u128
+                        * num_states_mult
+                        * num_states_mult
+                        * num_chars
+                        * max_offsets_mult
+                        * max_offsets_mult)
+                        + (in_state as u128
                             * num_states_mult
                             * num_chars
                             * max_offsets_mult
                             * max_offsets_mult)
-                            + (in_state as u128
-                                * num_states_mult
-                                * num_chars
-                                * max_offsets_mult
-                                * max_offsets_mult)
-                            + (out_state as u128 * num_chars * max_offsets_mult * max_offsets_mult)
-                            + (c as u128 * max_offsets_mult * max_offsets_mult)
-                            + (lower_offset as u128 * max_offsets_mult)
-                            + upper_offset as u128,
-                    )
-                    .rem_floor(cfg().field().modulus()),
-                );
+                        + (out_state as u128 * num_chars * max_offsets_mult * max_offsets_mult)
+                        + (c as u128 * max_offsets_mult * max_offsets_mult)
+                        + (lower_offset as u128 * max_offsets_mult)
+                        + upper_offset as u128,
+                ));
+
+                let node_ref = depth_safa.node_weight_mut(all_state).unwrap();
+                *node_ref = (node_ref.0, 0, all_state);
 
                 // children
                 for i in 0..and_edges.len() {
@@ -213,29 +217,30 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                                     if rel > max_rel {
                                         max_rel = rel;
                                     }
-                                    set_table.insert(
-                                        Integer::from(
-                                            (rel as u128
-                                                * num_states_mult
+                                    set_table.insert(Integer::from(
+                                        (rel as u128
+                                            * num_states_mult
+                                            * num_states_mult
+                                            * num_chars
+                                            * max_offsets_mult
+                                            * max_offsets_mult)
+                                            + (in_state as u128
                                                 * num_states_mult
                                                 * num_chars
                                                 * max_offsets_mult
                                                 * max_offsets_mult)
-                                                + (in_state as u128
-                                                    * num_states_mult
-                                                    * num_chars
-                                                    * max_offsets_mult
-                                                    * max_offsets_mult)
-                                                + (out_state as u128
-                                                    * num_chars
-                                                    * max_offsets_mult
-                                                    * max_offsets_mult)
-                                                + (c as u128 * max_offsets_mult * max_offsets_mult)
-                                                + (lower_offset as u128 * max_offsets_mult)
-                                                + upper_offset as u128,
-                                        )
-                                        .rem_floor(cfg().field().modulus()),
-                                    );
+                                            + (out_state as u128
+                                                * num_chars
+                                                * max_offsets_mult
+                                                * max_offsets_mult)
+                                            + (c as u128 * max_offsets_mult * max_offsets_mult)
+                                            + (lower_offset as u128 * max_offsets_mult)
+                                            + upper_offset as u128,
+                                    ));
+
+                                    let node_ref =
+                                        depth_safa.node_weight_mut(and_edges[i].target()).unwrap();
+                                    *node_ref = (node_ref.0, 1, NodeIndex::new(0));
                                 } else {
                                     panic!("Non epsilon edge from ForAll state");
                                 }
@@ -253,8 +258,10 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
         }
 
+        let mut path_lens = vec![];
         let mut fa = 0;
         for (forall, kids) in &foralls_w_kids {
+            let mut lvl_paths = vec![];
             for k in 0..kids.len() {
                 let backtrace_state = if k == kids.len() - 1 && fa == foralls_w_kids.len() - 1 {
                     exit_state
@@ -262,8 +269,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     *forall
                 };
 
-                let sub_max_rel = normal_add_table(
+                let (sub_max_rel, sub_path) = normal_add_table(
                     &safa,
+                    &mut depth_safa,
                     &mut num_ab,
                     &mut set_table,
                     num_states,
@@ -281,16 +289,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 if sub_max_rel > max_rel {
                     max_rel = sub_max_rel;
                 }
+                lvl_paths.extend(sub_path);
             }
             fa += 1;
             max_stack += kids.len(); // overestimation - make this tighter
+
+            path_lens.push(lvl_paths);
+            //println!("finished lvl {:#?}, path_lens={:#?}", kids, path_lens);
         }
 
         // in case when we don't start on forall:
         // proceed from the beginning and add states until we reach a forall
-
-        let sub_max_rel = normal_add_table(
+        let (sub_max_rel, sub_path) = normal_add_table(
             &safa,
+            &mut depth_safa,
             &mut num_ab,
             &mut set_table,
             num_states,
@@ -300,14 +312,36 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             max_branches,
             max_offsets_mult,
             star_offset,
-            safa.get_init(), //exists_state,
-            exit_state,      // backtrace state
+            NodeIndex::new(0), //exists_state,
+            exit_state,        // backtrace state
             vec![],
             true,
         );
         if sub_max_rel > max_rel {
             max_rel = sub_max_rel;
         }
+
+        let mut path_dups = vec![];
+
+        for lvl in (path_lens).into_iter().rev() {
+            // reverse levels
+            let mut temp_lvl = vec![];
+            for path in lvl {
+                if !path_dups.contains(&path) {
+                    temp_lvl.push(path);
+                }
+            }
+            path_dups.extend(temp_lvl);
+        }
+        let mut temp_lvl = vec![];
+        for path in sub_path {
+            if !path_dups.contains(&path) {
+                temp_lvl.push(path);
+            }
+        }
+        path_dups.extend(temp_lvl);
+
+        let final_paths: Vec<usize> = path_dups.into_iter().map(|(x, y)| x).collect();
 
         // add "last" loop
         let in_state = exit_state;
@@ -317,26 +351,23 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let c = num_ab[&Some(26u8 as char)]; // EOF
         let rel = 0;
 
-        set_table.insert(
-            Integer::from(
-                (rel as u128
-                    * num_states_mult
+        set_table.insert(Integer::from(
+            (rel as u128
+                * num_states_mult
+                * num_states_mult
+                * num_chars
+                * max_offsets_mult
+                * max_offsets_mult)
+                + (in_state as u128
                     * num_states_mult
                     * num_chars
                     * max_offsets_mult
                     * max_offsets_mult)
-                    + (in_state as u128
-                        * num_states_mult
-                        * num_chars
-                        * max_offsets_mult
-                        * max_offsets_mult)
-                    + (out_state as u128 * num_chars * max_offsets_mult * max_offsets_mult)
-                    + (c as u128 * max_offsets_mult * max_offsets_mult)
-                    + (lower_offset as u128 * max_offsets_mult)
-                    + upper_offset as u128,
-            )
-            .rem_floor(cfg().field().modulus()),
-        );
+                + (out_state as u128 * num_chars * max_offsets_mult * max_offsets_mult)
+                + (c as u128 * max_offsets_mult * max_offsets_mult)
+                + (lower_offset as u128 * max_offsets_mult)
+                + upper_offset as u128,
+        ));
 
         let mut table: Vec<Integer> = set_table.into_iter().collect();
 
@@ -496,14 +527,15 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             None
         };
 
+        if batch_size > 0 {
+            // @ELI call cost model here, set batch_size
+
+            println!("PATH LENS {:#?}", final_paths);
+        } // else batch_size is an override
+
         // merkle does not work with proj/hybrid
         assert!((merkle && hybrid_len.is_none() && doc_subset.is_none()) || !merkle);
         assert!(batch_size > 1);
-
-        println!(
-            "num states {}, max offset {}, num_chars {}",
-            num_states, max_offsets, num_chars
-        );
 
         Self {
             safa,
@@ -533,6 +565,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             proj_chunk_idx,
             hybrid_len,
             merkle,
+            path_lens: final_paths,
         }
     }
 
@@ -678,7 +711,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 self.assertions.push(match_v);
                 self.pub_inputs.push(new_var(format!("v_{}", i - 1)));
             }
-         }
+        }
 
         // out state < num states
         let out_overflow = term(
@@ -976,7 +1009,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             ],
         );
 
-
         let mut inside_ite = self.pop_ite(0, to_pop.clone());
 
         for i in 1..self.max_stack {
@@ -1084,7 +1116,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             //     self.star_offset,
             //     max(self.udoc.len(), self.max_offsets)
             // );
-            
+
             //new_bool_const(true);
 
             let cur_overflow = term(
@@ -1199,7 +1231,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     );
                 }
 
-                let stack_ptr_same =  term(
+                let stack_ptr_same = term(
                     Op::Eq,
                     vec![
                         new_var(format!("stack_ptr_popped")),
@@ -1222,7 +1254,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 self.assertions.push(do_what);
 
                 //cursor_0
-                let pop_condition =  term(Op::Eq, vec![new_const(3), new_var(format!("rel_{}", 0))]);
+                let pop_condition = term(Op::Eq, vec![new_const(3), new_var(format!("rel_{}", 0))]);
                 let c0 = new_bool_const(true);
                 term(
                     Op::Ite,
@@ -1243,8 +1275,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 );
                 self.assertions.push(c0);
             } else {
-              // assert not forall
-               self.assertions.push(self.not_forall_circ(j));
+                // assert not forall
+                self.assertions.push(self.not_forall_circ(j));
             }
         }
         self.pub_inputs
@@ -1553,20 +1585,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     pub fn to_circuit(&mut self) -> (ProverData, VerifierData) {
-       let lookups = self.lookup_idxs(true);
+        let lookups = self.lookup_idxs(true);
         assert_eq!(lookups.len(), self.batch_size);
         let mut char_lookups = vec![];
         for c in 0..self.batch_size {
             char_lookups.push(new_var(format!("char_{}", c)));
         }
 
-       self.cursor_circuit();
+        self.cursor_circuit();
 
         if self.merkle {
-            // self.nlookup_gadget(lookups, self.table.len(), "nl");
-            // self.q_ordering_merkle();
+            self.nlookup_gadget(lookups, self.table.len(), "nl");
+            self.q_ordering_merkle();
         } else if self.hybrid_len.is_some() {
-            //self.nlookup_hybrid(lookups, char_lookups);
+            self.nlookup_hybrid(lookups, char_lookups);
         } else {
             self.nlookup_gadget(lookups, self.table.len(), "nl");
             self.nlookup_doc_commit(char_lookups);
@@ -1801,8 +1833,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 + (char_num as u128 * max_offsets * max_offsets)
                 + (lower_offset_i as u128 * max_offsets)
                 + upper_offset_i as u128,
-        )
-        .rem_floor(cfg().field().modulus());
+        );
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
@@ -1896,8 +1927,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 + (char_num as u128 * max_offsets * max_offsets)
                 + (lower_offset_i as u128 * max_offsets)
                 + upper_offset_i as u128,
-        )
-        .rem_floor(cfg().field().modulus());
+        );
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
@@ -2676,17 +2706,17 @@ mod tests {
         for b in batch_sizes {
             let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, merkle, sc.clone());
 
-            // let reef_commit = ReefCommitment::new(
-            //     r1cs_converter.udoc.clone(),
-            //     r1cs_converter.hybrid_len,
-            //     merkle,
-            //     &sc,
-            // );
+            let reef_commit = ReefCommitment::new(
+                r1cs_converter.udoc.clone(),
+                r1cs_converter.hybrid_len,
+                merkle,
+                &sc,
+            );
 
-            // if reef_commit.nldoc.is_some() {
-            //     let dc = reef_commit.nldoc.as_ref().unwrap();
-            //     r1cs_converter.doc_hash = Some(dc.doc_commit_hash);
-            // };
+            if reef_commit.nldoc.is_some() {
+                let dc = reef_commit.nldoc.as_ref().unwrap();
+                r1cs_converter.doc_hash = Some(dc.doc_commit_hash);
+            };
 
             let mut running_q: Option<Vec<Integer>> = None;
             let mut running_v: Option<Integer> = None;
@@ -2694,128 +2724,127 @@ mod tests {
             let mut doc_running_v: Option<Integer> = None;
             let mut hybrid_running_q: Option<Vec<Integer>> = None;
             let mut hybrid_running_v: Option<Integer> = None;
-            //let mut merkle_lookups = None;
+            let mut merkle_lookups = None;
 
             let mut doc_idx = 0;
 
             let (pd, _vd) = r1cs_converter.to_circuit();
 
-            // let mut values;
-            // let mut next_state = 0;
+            let mut values;
+            let mut next_state = 0;
 
-            // let trace = safa.solve(&chars);
-            // // println!("TRACE {:#?}", trace);
-            // let mut sols = trace_preprocessing(&trace);
+            let trace = safa.solve(&chars);
+            let mut sols = trace_preprocessing(&trace);
+            //let eq = path_eq(&r1cs_converter.path_lens, &sols);
 
-            // let mut i = 0;
-            // while r1cs_converter.sol_num < sols.len() {
-            //     // println!("STEP {:#?}", i);
-            //     (
-            //         values,
-            //         next_state,
-            //         running_q,
-            //         running_v,
-            //         doc_running_q,
-            //         doc_running_v,
-            //         hybrid_running_q,
-            //         hybrid_running_v,
-            //         doc_idx,
-            //         merkle_lookups,
-            //     ) = r1cs_converter.gen_wit_i(
-            //         &mut sols,
-            //         i,
-            //         next_state,
-            //         running_q.clone(),
-            //         running_v.clone(),
-            //         doc_running_q.clone(),
-            //         doc_running_v.clone(),
-            //         hybrid_running_q.clone(),
-            //         hybrid_running_v.clone(),
-            //         doc_idx,
-            //     );
+            let mut i = 0;
+            while r1cs_converter.sol_num < sols.len() {
+                // println!("STEP {:#?}", i);
+                (
+                    values,
+                    next_state,
+                    running_q,
+                    running_v,
+                    doc_running_q,
+                    doc_running_v,
+                    hybrid_running_q,
+                    hybrid_running_v,
+                    doc_idx,
+                    merkle_lookups,
+                ) = r1cs_converter.gen_wit_i(
+                    &mut sols,
+                    i,
+                    next_state,
+                    running_q.clone(),
+                    running_v.clone(),
+                    doc_running_q.clone(),
+                    doc_running_v.clone(),
+                    hybrid_running_q.clone(),
+                    hybrid_running_v.clone(),
+                    doc_idx,
+                );
 
-            //     pd.check_all(&values);
+                pd.check_all(&values);
+                // for next i+1 round
+                i += 1;
+            }
 
-            //     // for next i+1 round
-            //     i += 1;
-            // }
+            let rq = match running_q {
+                Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
+                None => None,
+            };
+            let rv = match running_v {
+                Some(x) => Some(int_to_ff(x)),
+                None => None,
+            };
 
-            // let rq = match running_q {
-            //     Some(x) => Some(x.into_iter().map(|i| int_to_ff(i)).collect()),
-            //     None => None,
-            // };
-            // let rv = match running_v {
-            //     Some(x) => Some(int_to_ff(x)),
-            //     None => None,
-            // };
-
-            // assert_eq!(next_state, r1cs_converter.exit_state);
-
+            assert_eq!(next_state, r1cs_converter.exit_state);
 
             let cost_estimate = full_round_cost_model(
-                &safa, 
-                b, 
-                r1cs_converter.udoc.len(), 
+                &safa,
+                b,
+                r1cs_converter.udoc.len(),
                 hybrid,
                 r1cs_converter.hybrid_len,
                 false,
                 r1cs_converter.max_offsets,
-                r1cs_converter.max_branches, 
-                r1cs_converter.max_stack
+                r1cs_converter.max_branches,
+                r1cs_converter.max_stack,
             );
 
             println!("actual cost: {:#?}", pd.r1cs.constraints.len());
-            println!("batch size: {:#?}",b);
+            println!("batch size: {:#?}", b);
             println!("estimated cost: {:#?}", cost_estimate);
             println!("\n\n\n");
 
-            // if reef_commit.nldoc.is_some() {
-            //     let (priv_rq, priv_rv) = if !hybrid {
-            //         (doc_running_q.unwrap(), doc_running_v.unwrap())
-            //     } else {
-            //         (
-            //             hybrid_running_q.clone().unwrap(),
-            //             hybrid_running_v.clone().unwrap(),
-            //         )
-            //     };
+            if reef_commit.nldoc.is_some() {
+                let (priv_rq, priv_rv) = if !hybrid {
+                    (doc_running_q.unwrap(), doc_running_v.unwrap())
+                } else {
+                    (
+                        hybrid_running_q.clone().unwrap(),
+                        hybrid_running_v.clone().unwrap(),
+                    )
+                };
 
-            //     let dc = reef_commit.nldoc.unwrap();
-            //     let consist_proof = dc.prove_consistency(
-            //         &r1cs_converter.table,
-            //         r1cs_converter.proj_chunk_idx,
-            //         priv_rq,
-            //         priv_rv,
-            //         r1cs_converter.doc_subset.is_some(),
-            //         r1cs_converter.hybrid_len.is_some(),
-            //     );
+                let dc = reef_commit.nldoc.unwrap();
+                let consist_proof = dc.prove_consistency(
+                    &r1cs_converter.table,
+                    r1cs_converter.proj_chunk_idx,
+                    priv_rq,
+                    priv_rv,
+                    r1cs_converter.doc_subset.is_some(),
+                    r1cs_converter.hybrid_len.is_some(),
+                );
 
-            //     let cap_d = consist_proof.hash_d.clone();
+                let cap_d = consist_proof.hash_d.clone();
 
-            //     dc.verify_consistency(consist_proof)
-            // }
+                dc.verify_consistency(consist_proof)
+            }
 
-            // final_clear_checks(
-            //     <G1 as Group>::Scalar::from(r1cs_converter.stack_ptr as u64),
-            //     &r1cs_converter.table,
-            //     rq,
-            //     rv,
-            // );
+            final_clear_checks(
+                <G1 as Group>::Scalar::from(r1cs_converter.stack_ptr as u64),
+                &r1cs_converter.table,
+                rq,
+                rv,
+            );
 
             // final accepting
-            //assert_eq!(next_state, r1cs_converter.exit_state);
-
-            // assert!(
-            //     pd.r1cs.constraints.len() as usize
-            //         == costs::full_round_cost_model_nohash(
-            //             &nfa,
-            //             r1cs_converter.batch_size,
-            //             b.clone(),
-            //             nfa.is_match(&chars),
-            //             doc.len(),
-            //             c
-            //         )
-            // );
+            assert_eq!(next_state, r1cs_converter.exit_state);
         }
+    }
+
+    // kinda sorta
+    fn path_eq(lens: &Vec<usize>, sols: &Vec<LinkedList<TraceElem<char>>>) -> bool {
+        let mut sol_lens: Vec<usize> = sols.into_iter().map(|s| s.len()).collect();
+        let mut path_lens = lens.clone();
+
+        path_lens.sort();
+        sol_lens.sort();
+
+        println!("PATHS {:#?}, SOLS {:#?}", path_lens, sol_lens);
+
+        (path_lens == sol_lens)
     }
 
     fn reg(s: &str) -> String {
