@@ -1,23 +1,22 @@
 cargo clean 
-cargo build --release --features 'metrics,reef'
-echo "reef"
-for i in {1..10}; do ./tests/scripts/reef.sh &> out_reef; done
-echo "end reef"
+# cargo build --release --features 'metrics,reef'
+# echo "reef"
+# for i in {1..10}; do ./tests/scripts/reef.sh &> out_reef; done
+# echo "end reef"
 
-echo "reef h"
-for i in {1..10}; do ./tests/scripts/reef_h.sh &> out_rh; done
-echo "reef h"
-
+# echo "reef h"
+# for i in {1..10}; do ./tests/scripts/reef_h.sh &> out_rh; done
+# echo "reef h"
+cargo clean 
 cargo build --release --features 'metrics,nwr'
 echo "nwr"
-# RUST_BACKTRACE=1 ./target/release/reef --input "adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323" --output ./tests/results/pihole_nwr_2.txt --re "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]" ascii
-for i in {1..10}; do ./tests/scripts/nwr.sh &> out_nwr; done 
+./tests/scripts/nwr.sh &> out_nwr
 echo "nwr"
 
+cargo clean 
 cargo build --release --features 'metrics,naive'
 echo "naive"
-for i in {1..10}; do ./tests/scripts/naive.sh &> out_naive; done 
-#RUST_BACKTRACE=1 ./target/release/reef --input 'adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323' --output ./tests/results/pihole_naive_2.txt --re "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]" ascii
+./tests/scripts/naive.sh &> out_naive
 echo "naive" 
 
 # cargo build --release --features 'metrics,reef'

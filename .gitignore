@@ -10,3 +10,5 @@ out*
 Cargo.lock
 fast*
 slow*
+*.sym
+*.r1cs
