@@ -526,16 +526,24 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         } else {
             None
         };
+        
+        let cost_model_batch_size;
 
-        if batch_size > 0 {
-            // @ELI call cost model here, set batch_size
+        if batch_size==0 {
+            let project = match projection {
+                Some(_) => true, 
+                _ => false, 
+            };
+            cost_model_batch_size = opt_cost_model_select(safa, usize_doc.len(), hybrid, hybrid_len, project, max_offsets, max_branches, max_stack, final_paths.clone());
 
-            println!("PATH LENS {:#?}", final_paths);
-        } // else batch_size is an override
+            println!("PATH LENS {:#?}", final_paths.clone());
+        } else { 
+            cost_model_batch_size = batch_size;
+        }
 
         // merkle does not work with proj/hybrid
         assert!((merkle && hybrid_len.is_none() && doc_subset.is_none()) || !merkle);
-        assert!(batch_size > 1);
+        assert!(cost_model_batch_size > 1);
 
         Self {
             safa,
@@ -547,7 +555,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             doc_hash: None,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
-            batch_size,
+            batch_size: cost_model_batch_size,
             udoc: usize_doc, //usizes
             idoc: int_doc,   // big ints
             ep_num,

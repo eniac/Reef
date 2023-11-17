@@ -83,62 +83,7 @@ pub fn run_backend(
     let solver_thread = thread::spawn(move || {
         // we do setup here to avoid unsafe passing
 
-        // stop gap for cost model - don't need to time >:)
-        let mut batch_size = if temp_batch_size == 0 {
-            let trace = safa.solve(&doc);
-            if trace.is_none() {
-                panic!("No solution found");
-            }
-
-            println!("post solve");
-            let sols = trace_preprocessing(&trace);
-            println!("post trace");
-
-            let mut paths = vec![];
-            let mut path_len = 1;
-
-            for sol in sols {
-                for elt in sol {
-                    if safa.g[elt.from_node].is_and() {
-                        if path_len > 1 {
-                            paths.push(path_len);
-                        }
-                        path_len = 1;
-                    } else if safa.accepting().contains(&elt.to_node) {
-                        path_len += 1;
-                        paths.push(path_len);
-                    } else {
-                        path_len += 1;
-                    }
-                }
-            }
-
-            if paths.len() == 1 {
-                let elt = paths[0];
-                if elt > 175 {
-                    let div = (elt / 100) + 1;
-                    elt / div
-                } else {
-                    elt / 2
-                }
-            } else {
-                //average(paths)
-                (paths.iter().sum::<usize>() as f32 / paths.len() as f32).ceil() as usize
-            }
-        } else {
-            temp_batch_size
-        };
-        batch_size += 1; // to last
-
-        let n = (doc.len() as f32) / (batch_size as f32);
-        if (doc.len() > 200) {
-            batch_size = (((batch_size as f32) / 5.0).ceil() as usize);
-        }
-
-        if batch_size < 2 {
-            batch_size = 2;
-        }
-        println!("BATCH SIZE {:#?}", batch_size);
+        let batch_size = temp_batch_size;
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 

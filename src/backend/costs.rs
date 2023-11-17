@@ -217,11 +217,12 @@ pub fn opt_cost_model_select<'a>(
     max_branches: usize, 
     max_stack:usize,
     solution: Vec<usize>
-) -> (usize, usize) {
+) -> usize {
     let mut opt_batch_size: usize = 0;
     let mut cost = std::usize::MAX;
+    let max_fold: usize = solution.clone().iter().sum();
 
-    for n in 1..solution.clone().iter().sum() {
+    for n in 1..max_fold+1 {
         let batching_and_cost: (usize, usize) = opt_cost_model_select_with_batch(
             safa,
             n,
@@ -241,8 +242,6 @@ pub fn opt_cost_model_select<'a>(
             opt_batch_size = n.clone();
         }
     }
-    (
-        opt_batch_size,
-        cost,
-    )
+    println!("Final Batch Size: {:#?}", opt_batch_size);
+    opt_batch_size
 }
