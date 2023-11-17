@@ -124,7 +124,7 @@ pub fn naive_bench(r: String, alpha: String, doc: String, out_write:PathBuf) {
     ]);
     let spacer = "---------";
 
-    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+    let _ = wtr.write_record(&[spacer, spacer, spacer, spacer,"\n"]);
     wtr.flush();
 
     let _ = make_circom(&dfa, doc_len, alpha.len());

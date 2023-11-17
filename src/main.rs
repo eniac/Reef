@@ -126,7 +126,7 @@ fn main() {
             safa.g.node_count().to_string(), //nstates().to_string(),
         ]);
         let spacer = "---------";
-        let _ = wtr.write_record(&[spacer, spacer, spacer, spacer]);
+        let _ = wtr.write_record(&[spacer, spacer, spacer, spacer,"\n"]);
         wtr.flush();
         #[cfg(feature = "metrics")]
         log::write_csv(opt.output.to_str().unwrap()).unwrap();
