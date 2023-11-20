@@ -129,12 +129,6 @@ pub mod log {
       let file = OpenOptions::new().write(true).append(true).create(true).open(out).unwrap();
         let mut wtr = Writer::from_writer(file);
 
-        TIMER.alter_all(|_, v| match v {
-            Started(start_time) => Finished(start_time.elapsed()),
-            Finished(duration) => Finished(duration),
-            Restarted(duration, start_time) => Finished(duration + start_time.elapsed()),
-        });
-
         if write_header {
             wtr.write_record(&["type", "component", "test", "value", "metric_type"])?;
         }
