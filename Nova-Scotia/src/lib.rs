@@ -207,6 +207,7 @@ where
             &witness_generator_output,
         );
         log::stop(Component::Solver, format!("witness_generation_{}",i).as_str());
+        log::write_csv(&out_write.as_path().display().to_string()).unwrap();
 
         let circuit = CircomCircuit {
             r1cs: r1cs.clone(),
@@ -230,6 +231,7 @@ where
             z0_secondary.clone(),
         );
         log::stop(Component::Prover, format!("prove_{}",i).as_str());
+        log::write_csv(&out_write.as_path().display().to_string()).unwrap();
 
         assert!(res.is_ok());
         recursive_snark = Some(res.unwrap());
