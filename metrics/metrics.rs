@@ -112,6 +112,14 @@ pub mod log {
         );
     }
 
+    pub fn clear_finished() {
+        TIMER.retain(|_, v|
+          match v {
+            Started(_) | Restarted(_, _) => true,
+            Finished(_) => false
+          })
+    }
+
     pub fn write_csv(out: &str) -> Result<()> {
       println!("Writing timer data to {}", out);
       let mut write_header = true;
@@ -165,7 +173,7 @@ pub mod log {
         }
         println!("space");
         wtr.flush()?;
-        TIMER.clear();
+        clear_finished();
         R1CS.clear();
         SPACE.clear();
         Ok(())
