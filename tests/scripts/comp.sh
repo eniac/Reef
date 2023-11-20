@@ -1,23 +1,24 @@
 cargo clean 
-# cargo build --release --features 'metrics,reef'
-# echo "reef"
-# for i in {1..10}; do ./tests/scripts/reef.sh &> out_reef; done
-# echo "end reef"
+cargo build --release --features 'metrics,reef'
+echo "reef"
+for i in {1..10}; do ./tests/scripts/reef.sh &> out_reef; done
+echo "end reef"
 
-# echo "reef h"
-# for i in {1..10}; do ./tests/scripts/reef_h.sh &> out_rh; done
-# echo "reef h"
-cargo clean 
-cargo build --release --features 'metrics,nwr'
-echo "nwr"
-./tests/scripts/nwr.sh &> out_nwr
-echo "nwr"
+echo "reef h"
+for i in {1..10}; do ./tests/scripts/reef_h.sh &> out_rh; done
+echo "reef h"
 
 cargo clean 
 cargo build --release --features 'metrics,naive'
 echo "naive"
 ./tests/scripts/naive.sh &> out_naive
 echo "naive" 
+
+cargo clean 
+cargo build --release --features 'metrics,nwr'
+echo "nwr"
+./tests/scripts/nwr.sh &> out_nwr
+echo "nwr"
 
 # cargo build --release --features 'metrics,reef'
 # echo "email"
