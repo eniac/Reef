@@ -1,16 +1,1420 @@
-doc len: 399
-Message-ID: .*\nDate: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)\nFrom: .*\nTo: .*\nSubject: Re:\nMime-Version: 1\.0\nContent-Type: text/plain; charset=us-ascii\nContent-Transfer-Encoding: 7bit\nX-From: Mike Maggi\nX-To: Amanda Huble\nX-cc: \nX-bcc: \nX-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent\nX-Origin: Maggi-M\nX-FileName: mmaggi\.nsf\n\nat 5:00
-N States: 797
-solution length: 400
-doc length: 399
-[32mtemplate instances[0m: 82
-non-linear constraints: 40743813
-linear constraints: 0
-public inputs: 0
-public outputs: 1
-private inputs: 800
-private outputs: 0
-wires: 40744213
-labels: 162975927
-[32mWritten successfully:[0m ./match.r1cs
-[32mWritten successfully:[0m ./match.sym
+     Removed 3905 files, 1.8GiB total
+   Compiling proc-macro2 v1.0.69
+   Compiling unicode-ident v1.0.12
+   Compiling autocfg v1.1.0
+   Compiling libc v0.2.150
+   Compiling version_check v0.9.4
+   Compiling cfg-if v1.0.0
+   Compiling syn v1.0.109
+   Compiling typenum v1.17.0
+   Compiling memchr v2.6.4
+   Compiling radium v0.7.0
+   Compiling serde v1.0.192
+   Compiling crossbeam-utils v0.8.16
+   Compiling thiserror v1.0.50
+   Compiling scopeguard v1.2.0
+   Compiling either v1.9.0
+   Compiling byteorder v1.5.0
+   Compiling lazy_static v1.4.0
+   Compiling once_cell v1.18.0
+   Compiling rand_core v0.6.4
+   Compiling ppv-lite86 v0.2.17
+   Compiling tap v1.0.1
+   Compiling rayon-core v1.12.0
+   Compiling funty v2.0.0
+   Compiling subtle v2.5.0
+   Compiling execute-command-tokens v0.1.6
+   Compiling adler v1.0.2
+   Compiling log v0.4.20
+   Compiling rustix v0.38.24
+   Compiling arrayref v0.3.7
+   Compiling ec-gpu-gen v0.5.2
+   Compiling bitflags v2.4.1
+   Compiling linux-raw-sys v0.4.11
+   Compiling constant_time_eq v0.3.0
+   Compiling hashbrown v0.14.2
+   Compiling arrayvec v0.7.4
+   Compiling crc32fast v1.3.2
+   Compiling fnv v1.0.7
+   Compiling itoa v1.0.9
+   Compiling regex-syntax v0.8.2
+   Compiling byte-slice-cast v1.2.2
+   Compiling home v0.5.5
+   Compiling encoding_index_tests v0.1.4
+   Compiling cpufeatures v0.2.11
+   Compiling rustversion v1.0.14
+   Compiling hex v0.4.3
+   Compiling ec-gpu v0.2.0
+   Compiling futures-core v0.3.29
+   Compiling gimli v0.28.0
+   Compiling proc-macro-hack v0.5.20+deprecated
+   Compiling ucd-trie v0.1.6
+   Compiling parking_lot_core v0.9.9
+   Compiling ryu v1.0.15
+   Compiling futures-task v0.3.29
+   Compiling smallvec v1.11.2
+   Compiling static_assertions v1.1.0
+   Compiling ident_case v1.0.1
+   Compiling utf8parse v0.2.1
+   Compiling gmp-mpfr-sys v1.6.1
+   Compiling bitflags v1.3.2
+   Compiling keccak v0.1.4
+   Compiling futures-channel v0.3.29
+   Compiling rustc-demangle v0.1.23
+   Compiling pkg-config v0.3.27
+   Compiling strsim v0.9.3
+   Compiling serde_json v1.0.108
+   Compiling equivalent v1.0.1
+   Compiling az v1.2.1
+   Compiling const_fn v0.4.9
+   Compiling anstyle v1.0.4
+   Compiling powerfmt v0.2.0
+   Compiling anstyle-query v1.0.0
+   Compiling futures-sink v0.3.29
+   Compiling byte-tools v0.3.1
+   Compiling colorchoice v1.0.0
+   Compiling futures-util v0.3.29
+   Compiling clap_lex v0.6.0
+   Compiling unicode-width v0.1.11
+   Compiling fs_extra v1.3.0
+   Compiling time-core v0.1.2
+   Compiling safemem v0.3.3
+   Compiling heck v0.4.1
+   Compiling arrayvec v0.5.2
+   Compiling strsim v0.10.0
+   Compiling constant_time_eq v0.1.5
+   Compiling pin-project-lite v0.2.13
+   Compiling rug v1.22.0
+   Compiling paste v1.0.14
+   Compiling futures-io v0.3.29
+   Compiling pin-utils v0.1.0
+   Compiling opaque-debug v0.2.3
+   Compiling regex-syntax v0.6.29
+   Compiling derive_builder v0.9.0
+   Compiling void v1.0.2
+   Compiling bytemuck v1.14.0
+   Compiling base64 v0.21.5
+   Compiling anyhow v1.0.75
+   Compiling beef v0.5.2
+   Compiling same-file v1.0.6
+   Compiling strsim v0.8.0
+   Compiling vec_map v0.8.2
+   Compiling weezl v0.1.7
+   Compiling ansi_term v0.12.1
+   Compiling dtoa v0.4.8
+   Compiling ttf-parser v0.12.3
+   Compiling itoa v0.4.8
+   Compiling cfg-if v0.1.10
+   Compiling linked-hash-map v0.5.6
+   Compiling lazycell v1.3.0
+   Compiling fixedbitset v0.4.2
+   Compiling bit-vec v0.6.3
+   Compiling shell-words v0.1.0
+   Compiling ieee754 v0.2.6
+   Compiling hex-literal v0.3.4
+   Compiling typed-arena v2.0.2
+   Compiling num-traits v0.2.17
+   Compiling lock_api v0.4.11
+   Compiling generic-array v0.14.7
+   Compiling num-integer v0.1.45
+   Compiling memoffset v0.9.0
+   Compiling crossbeam-epoch v0.9.15
+   Compiling num-bigint v0.3.3
+   Compiling wyz v0.5.1
+   Compiling rand v0.8.5
+   Compiling rand_xorshift v0.3.0
+   Compiling miniz_oxide v0.7.1
+   Compiling standback v0.2.17
+   Compiling ahash v0.7.7
+   Compiling slab v0.4.9
+   Compiling blake2s_simd v1.0.2
+   Compiling blake2b_simd v1.0.2
+   Compiling anstyle-parse v0.2.2
+   Compiling error-chain v0.12.4
+   Compiling deranged v0.3.9
+   Compiling encoding-index-tradchinese v1.20141219.5
+   Compiling encoding-index-simpchinese v1.20141219.5
+   Compiling encoding-index-singlebyte v1.20141219.5
+   Compiling time v0.2.27
+   Compiling encoding-index-japanese v1.20141219.5
+   Compiling block-padding v0.1.5
+   Compiling memoffset v0.6.5
+   Compiling num-bigint v0.4.4
+   Compiling encoding-index-korean v1.20141219.5
+   Compiling itertools v0.10.5
+   Compiling itertools v0.8.2
+   Compiling im v15.1.0
+   Compiling line-wrap v0.1.1
+   Compiling textwrap v0.11.0
+   Compiling fxhash v0.2.1
+   Compiling walkdir v2.4.0
+   Compiling itertools v0.9.0
+   Compiling aho-corasick v1.1.2
+   Compiling object v0.32.1
+   Compiling csv-core v0.1.11
+   Compiling quick-xml v0.31.0
+   Compiling blake2s_simd v0.5.11
+   Compiling rgb v0.8.37
+   Compiling content_inspector v0.2.4
+   Compiling bit-set v0.5.3
+   Compiling indexmap v2.1.0
+   Compiling anstream v0.6.4
+   Compiling bitvec v1.0.1
+   Compiling encoding v0.2.33
+   Compiling flate2 v1.0.28
+   Compiling ansi_colours v1.2.2
+   Compiling crossbeam-channel v0.5.8
+   Compiling quote v1.0.33
+   Compiling clap_builder v4.4.8
+   Compiling spin v0.9.8
+   Compiling owned_ttf_parser v0.12.1
+   Compiling syn v2.0.39
+   Compiling crossbeam-deque v0.8.3
+   Compiling flume v0.10.14
+   Compiling cc v1.0.83
+   Compiling num_cpus v1.16.0
+   Compiling yastl v0.1.2
+   Compiling threadpool v1.8.1
+   Compiling generic-array v0.12.4
+   Compiling bitmaps v2.1.0
+   Compiling time v0.3.30
+   Compiling petgraph v0.6.4
+   Compiling block-buffer v0.7.3
+   Compiling digest v0.8.1
+   Compiling sha3 v0.8.2
+   Compiling rayon v1.8.0
+   Compiling getrandom v0.2.11
+   Compiling memmap2 v0.5.10
+   Compiling atty v0.2.14
+   Compiling terminal_size v0.1.17
+   Compiling clicolors-control v1.0.1
+   Compiling termios v0.3.3
+   Compiling dirs-sys v0.3.7
+   Compiling nix v0.23.2
+   Compiling memory-stats v1.1.0
+   Compiling regex-automata v0.4.3
+   Compiling clap v2.34.0
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling directories v2.0.2
+   Compiling blst v0.3.11
+   Compiling backtrace v0.3.69
+   Compiling semolina v0.1.4
+   Compiling onig_sys v69.8.1
+   Compiling jemalloc-sys v0.3.2
+   Compiling digest v0.10.7
+   Compiling dashmap v5.5.3
+   Compiling parking_lot v0.12.1
+   Compiling sized-chunks v0.6.5
+   Compiling rand_chacha v0.3.1
+   Compiling rand_xoshiro v0.6.0
+   Compiling hashbrown v0.12.3
+   Compiling sha2 v0.10.8
+   Compiling which v4.4.2
+   Compiling addr2line v0.21.0
+   Compiling sppark v0.1.5
+   Compiling lurk-pasta-msm v0.1.0
+   Compiling lru v0.7.8
+   Compiling circ_hc v0.1.0 (https://github.com/jkwoods/circ?branch=r1cs_pub#a4df83d5)
+   Compiling ff v0.12.1
+   Compiling addchain v0.2.0
+   Compiling group v0.12.1
+   Compiling pairing v0.22.0
+   Compiling fil_pasta_curves v0.5.2
+   Compiling futures-executor v0.3.29
+   Compiling futures v0.3.29
+   Compiling rsmt2 v0.14.1
+   Compiling darling_core v0.10.2
+   Compiling bstr v1.8.0
+   Compiling regex v1.10.2
+   Compiling backtrace-on-stack-overflow v0.3.0
+   Compiling serde_derive v1.0.192
+   Compiling thiserror-impl v1.0.50
+   Compiling zeroize_derive v1.4.2
+   Compiling execute-command-macro-impl v0.1.9
+   Compiling clap_derive v4.4.7
+   Compiling pest-ast v0.3.4
+   Compiling derive_arbitrary v1.3.2
+   Compiling console v0.10.3
+   Compiling fancy-regex v0.11.0
+   Compiling pom v3.3.0
+   Compiling ff_derive v0.12.1
+   Compiling time-macros-impl v0.1.2
+   Compiling datasize_derive v0.2.15
+   Compiling trait-set v0.3.0
+   Compiling ff-derive-num v0.2.0
+   Compiling logos-derive v0.12.1
+   Compiling serial_test_derive v1.0.0
+   Compiling execute-command-macro v0.1.8
+   Compiling execute v0.2.12
+   Compiling darling_macro v0.10.2
+   Compiling zeroize v1.7.0
+   Compiling merlin v3.0.0
+   Compiling arbitrary v1.3.2
+   Compiling serial_test v1.0.0
+   Compiling time-macros v0.1.1
+   Compiling pest v2.7.5
+   Compiling darling v0.10.2
+   Compiling derive_builder_core v0.9.0
+   Compiling lopdf v0.27.0
+   Compiling logos v0.12.1
+   Compiling clap v4.4.8
+   Compiling circ_opt v0.1.0 (https://github.com/jkwoods/circ?branch=r1cs_pub#a4df83d5)
+   Compiling bellman v0.13.1 (https://github.com/alex-ozdemir/bellman.git?branch=mirage#94b292b2)
+   Compiling pest_meta v2.7.5
+   Compiling from-pest v0.3.2
+   Compiling printpdf v0.5.3
+   Compiling pest_generator v2.7.5
+   Compiling pest_derive v2.7.5
+   Compiling zokrates_parser v0.2.4 (https://github.com/jkwoods/circ?branch=r1cs_pub#a4df83d5)
+   Compiling zokrates_pest_ast v0.2.3 (https://github.com/jkwoods/circ?branch=r1cs_pub#a4df83d5)
+   Compiling blstrs v0.6.2
+   Compiling bincode v1.3.3
+   Compiling datasize v0.2.15
+   Compiling plist v1.6.0
+   Compiling csv v1.3.0
+   Compiling serde_bytes v0.11.12
+   Compiling hashconsing v1.3.0 (https://github.com/alex-ozdemir/hashconsing.git?branch=phash#e275caec)
+   Compiling bellperson v0.24.1
+   Compiling neptune v8.1.1
+   Compiling metrics v0.1.0 (/home/ecmargo/rezk/metrics)
+   Compiling onig v6.4.0
+   Compiling nova-snark v0.14.0 (https://github.com/jkwoods/Nova?branch=pub_pk#63cdcd24)
+   Compiling syntect v4.6.0
+   Compiling prettyprint v0.8.1
+   Compiling circ_fields v0.1.0 (https://github.com/jkwoods/circ?branch=r1cs_pub#a4df83d5)
+   Compiling nova-scotia v0.5.0 (/home/ecmargo/rezk/Nova-Scotia)
+warning: unused imports: `CompressedSNARK`, `FINAL_EXTERNAL_COUNTER`, `PublicParams`, `RecursiveSNARK`, `evaluation::EvaluationEngineTrait`, `spartan::direct::*`
+ --> Nova-Scotia/src/circom/circuit.rs:3:43
+  |
+3 |     traits::{circuit::StepCircuit, Group, evaluation::EvaluationEngineTrait},
+  |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 |     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+  |     ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^^^^                   ^^^^^^^^^^^^^^^^^^^^^^
+5 |     spartan::direct::*,
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `Ep`, `Fq`
+  --> Nova-Scotia/src/circom/circuit.rs:13:20
+   |
+13 | use pasta_curves::{Fq, Ep};
+   |                    ^^  ^^
+
+warning: unused import: `hex_literal::hex`
+ --> Nova-Scotia/src/circom/file.rs:7:5
+  |
+7 | use hex_literal::hex;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused variable: `circuit_0`
+   --> Nova-Scotia/src/lib.rs:190:9
+    |
+190 |     let circuit_0 = CircomCircuit {
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_circuit_0`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: type alias `G1` is never used
+  --> Nova-Scotia/src/circom/circuit.rs:15:6
+   |
+15 | type G1 = pasta_curves::pallas::Point;
+   |      ^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: type alias `G2` is never used
+  --> Nova-Scotia/src/circom/circuit.rs:16:6
+   |
+16 | type G2 = pasta_curves::vesta::Point;
+   |      ^^
+
+warning: type alias `EE` is never used
+  --> Nova-Scotia/src/circom/circuit.rs:17:6
+   |
+17 | type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+   |      ^^
+
+warning: type alias `Fg1` is never used
+  --> Nova-Scotia/src/circom/circuit.rs:18:6
+   |
+18 | type Fg1 = <G1 as Group>::Scalar;
+   |      ^^^
+
+warning: `nova-scotia` (lib) generated 8 warnings (run `cargo fix --lib -p nova-scotia` to apply 4 suggestions)
+   Compiling jemallocator v0.3.2
+   Compiling circ v0.1.0 (https://github.com/jkwoods/circ?branch=r1cs_pub#a4df83d5)
+   Compiling reef v0.1.0 (/home/ecmargo/rezk)
+warning: unused import: `crate::backend::costs::logmn`
+ --> src/backend/commitment.rs:5:5
+  |
+5 | use crate::backend::costs::logmn;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `circ::cfg::cfg`
+  --> src/backend/commitment.rs:10:5
+   |
+10 | use circ::cfg::cfg;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `Commitment`, `InnerProductInstance`, `InnerProductWitness`
+  --> src/backend/commitment.rs:25:40
+   |
+25 |         ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
+   |                                        ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+26 |         pedersen::{Commitment, CommitmentGens, CompressedCommitment},
+   |                    ^^^^^^^^^^
+
+warning: unused imports: `CurveAffine`, `CurveExt`, `Curve`, `EpAffine`, `Ep`, `EqAffine`, `Eq`, `Group as OtherGroup`, `GroupEncoding`, `cofactor::CofactorCurveAffine`, `pallas`, `vesta`
+  --> src/backend/commitment.rs:42:18
+   |
+42 |     arithmetic::{CurveAffine, CurveExt, Group as OtherGroup},
+   |                  ^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+43 |     group::{cofactor::CofactorCurveAffine, Curve, Group as AnotherGroup, GroupEncoding},
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^                         ^^^^^^^^^^^^^
+44 |     pallas, vesta, Ep, EpAffine, Eq, EqAffine,
+   |     ^^^^^^  ^^^^^  ^^  ^^^^^^^^  ^^  ^^^^^^^^
+
+warning: unused import: `ops::RemRounding`
+  --> src/backend/commitment.rs:47:27
+   |
+47 | use rug::{integer::Order, ops::RemRounding, Integer};
+   |                           ^^^^^^^^^^^^^^^^
+
+warning: unused import: `EdgeReference`
+  --> src/backend/r1cs_helper.rs:16:24
+   |
+16 |     graph::{EdgeIndex, EdgeReference, NodeIndex},
+   |                        ^^^^^^^^^^^^^
+
+warning: unused import: `crate::frontend::regex::Regex`
+ --> src/config.rs:1:5
+  |
+1 | use crate::frontend::regex::Regex;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `OpenRange`
+  --> src/frontend/safa.rs:14:32
+   |
+14 | use crate::frontend::openset::{OpenRange, OpenSet};
+   |                                ^^^^^^^^^
+
+warning: unused import: `lazy_static::lazy_static`
+  --> src/frontend/safa.rs:22:5
+   |
+22 | use lazy_static::lazy_static;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Duration`, `Instant`
+  --> src/frontend/safa.rs:25:17
+   |
+25 | use std::time::{Duration, Instant};
+   |                 ^^^^^^^^  ^^^^^^^
+
+warning: unused import: `File`
+  --> src/naive/naive_wr.rs:13:15
+   |
+13 | use std::fs::{File,remove_file};
+   |               ^^^^
+
+warning: unused imports: `IOPattern`, `SpongeAPI`, `SpongeOp`, `sponge::circuit::SpongeCircuit`
+  --> src/naive/naive_wr.rs:21:19
+   |
+21 |     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
+   |                   ^^^^^^^^^  ^^^^^^^^^  ^^^^^^^^
+22 |     sponge::circuit::SpongeCircuit,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `nova_scotia::circom::circuit::*`
+  --> src/naive/naive_wr.rs:27:5
+   |
+27 | use nova_scotia::circom::circuit::*;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `PublicParams`, `circuit::StepCircuit`, `spartan::*`
+  --> src/naive/naive_wr.rs:30:5
+   |
+30 |     PublicParams,
+   |     ^^^^^^^^^^^^
+31 |     traits::{circuit::StepCircuit, Group},
+   |              ^^^^^^^^^^^^^^^^^^^^
+32 |     spartan::*,
+   |     ^^^^^^^^^^
+
+warning: unused import: `ff::PrimeField`
+  --> src/naive/naive_wr.rs:35:5
+   |
+35 | use ff::PrimeField;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `pasta_curves::Fq`
+  --> src/naive/naive_wr.rs:36:5
+   |
+36 | use pasta_curves::Fq;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `memory_stats::memory_stats`
+  --> src/naive/naive_wr.rs:43:5
+   |
+43 | use memory_stats::memory_stats;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Command`, `Stdio`
+  --> src/naive/naive_wr.rs:44:20
+   |
+44 | use std::process::{Command, Stdio};
+   |                    ^^^^^^^  ^^^^^
+
+warning: unused import: `std::collections::BTreeSet`
+ --> src/naive/naive_regex/mod.rs:4:5
+  |
+4 | use std::collections::BTreeSet;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `OpenRange`
+ --> src/naive/naive_regex/mod.rs:6:32
+  |
+6 | use crate::frontend::openset::{OpenRange, OpenSet};
+  |                                ^^^^^^^^^
+
+warning: unused import: `self::re::projection`
+  --> src/naive/naive_regex/mod.rs:11:5
+   |
+11 | use self::re::projection;
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `gmp_mpfr_sys::mpc::pow`
+   --> src/naive/naive_regex/mod.rs:365:9
+    |
+365 |     use gmp_mpfr_sys::mpc::pow;
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::array::TryFromSliceError`
+   --> src/naive/naive_regex/mod.rs:367:9
+    |
+367 |     use std::array::TryFromSliceError;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::BTreeSet`
+   --> src/naive/naive_regex/mod.rs:368:9
+    |
+368 |     use std::collections::BTreeSet;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `LinearCombination`, `Namespace`, `Variable`
+ --> src/naive/naive_wr_nova.rs:8:51
+  |
+8 |     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
+  |                                                   ^^^^^^^^^^^^^^^^^  ^^^^^^^^^
+9 |     Variable,
+  |     ^^^^^^^^
+
+warning: unused import: `gmp_mpfr_sys::gmp::limb_t`
+  --> src/naive/naive_wr_nova.rs:14:5
+   |
+14 | use gmp_mpfr_sys::gmp::limb_t;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Strength`
+  --> src/naive/naive_wr_nova.rs:21:5
+   |
+21 |     Strength,
+   |     ^^^^^^^^
+
+warning: unused imports: `CompressedSNARK`, `FINAL_EXTERNAL_COUNTER`, `PublicParams`, `RecursiveSNARK`
+  --> src/naive/naive_wr_nova.rs:25:5
+   |
+25 |     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+   |     ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^^^^                   ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Ep`
+  --> src/naive/naive_wr_nova.rs:28:24
+   |
+28 | use pasta_curves::{Fq, Ep};
+   |                        ^^
+
+warning: unused imports: `IsPrime`, `Order`
+  --> src/naive/naive_wr_nova.rs:29:20
+   |
+29 | use rug::integer::{IsPrime, Order};
+   |                    ^^^^^^^  ^^^^^
+
+warning: unused import: `rand::rngs::OsRng`
+  --> src/naive/naive_wr_nova.rs:30:5
+   |
+30 | use rand::rngs::OsRng;
+   |     ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rug::Integer`
+  --> src/naive/naive_wr_nova.rs:31:5
+   |
+31 | use rug::Integer;
+   |     ^^^^^^^^^^^^
+
+warning: unused import: `serde::__private::doc`
+  --> src/naive/naive_wr_nova.rs:32:5
+   |
+32 | use serde::__private::doc;
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `default`
+  --> src/naive/naive_wr_nova.rs:33:33
+   |
+33 | use std::{collections::HashMap, default};
+   |                                 ^^^^^^^
+
+warning: unused import: `core::marker::PhantomData`
+  --> src/naive/naive_wr_nova.rs:35:5
+   |
+35 | use core::marker::PhantomData;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `LinearCombination`, `Namespace`, `Variable`
+ --> src/naive/naive_nova.rs:8:51
+  |
+8 |     gadgets::num::AllocatedNum, ConstraintSystem, LinearCombination, Namespace, SynthesisError,
+  |                                                   ^^^^^^^^^^^^^^^^^  ^^^^^^^^^
+9 |     Variable,
+  |     ^^^^^^^^
+
+warning: unused import: `gmp_mpfr_sys::gmp::limb_t`
+  --> src/naive/naive_nova.rs:14:5
+   |
+14 | use gmp_mpfr_sys::gmp::limb_t;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Strength`
+  --> src/naive/naive_nova.rs:21:5
+   |
+21 |     Strength,
+   |     ^^^^^^^^
+
+warning: unused imports: `CompressedSNARK`, `FINAL_EXTERNAL_COUNTER`, `PublicParams`, `RecursiveSNARK`
+  --> src/naive/naive_nova.rs:25:5
+   |
+25 |     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+   |     ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^^^^                   ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Ep`
+  --> src/naive/naive_nova.rs:29:24
+   |
+29 | use pasta_curves::{Fq, Ep};
+   |                        ^^
+
+warning: unused imports: `IsPrime`, `Order`
+  --> src/naive/naive_nova.rs:30:20
+   |
+30 | use rug::integer::{IsPrime, Order};
+   |                    ^^^^^^^  ^^^^^
+
+warning: unused import: `rand::rngs::OsRng`
+  --> src/naive/naive_nova.rs:31:5
+   |
+31 | use rand::rngs::OsRng;
+   |     ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rug::Integer`
+  --> src/naive/naive_nova.rs:32:5
+   |
+32 | use rug::Integer;
+   |     ^^^^^^^^^^^^
+
+warning: unused import: `serde::__private::doc`
+  --> src/naive/naive_nova.rs:33:5
+   |
+33 | use serde::__private::doc;
+   |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `default`
+  --> src/naive/naive_nova.rs:34:33
+   |
+34 | use std::{collections::HashMap, default};
+   |                                 ^^^^^^^
+
+warning: unused import: `core::marker::PhantomData`
+  --> src/naive/naive_nova.rs:36:5
+   |
+36 | use core::marker::PhantomData;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unnecessary parentheses around `if` condition
+   --> src/naive/naive_wr_circom_writer.rs:170:8
+    |
+170 |     if (n_accepting == 1) {
+    |        ^                ^
+    |
+    = note: `#[warn(unused_parens)]` on by default
+help: remove these parentheses
+    |
+170 -     if (n_accepting == 1) {
+170 +     if n_accepting == 1 {
+    |
+
+warning: unnecessary parentheses around `if` condition
+   --> src/naive/naive_circom_writer.rs:146:8
+    |
+146 |     if (n_accepting == 1) {
+    |        ^                ^
+    |
+help: remove these parentheses
+    |
+146 -     if (n_accepting == 1) {
+146 +     if n_accepting == 1 {
+    |
+
+warning: unused import: `nova_snark::traits::commitment`
+  --> src/naive/naive.rs:13:5
+   |
+13 | use nova_snark::traits::commitment;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `File`
+  --> src/naive/naive.rs:14:15
+   |
+14 | use std::fs::{File,remove_file};
+   |               ^^^^
+
+warning: unused imports: `IOPattern`, `SpongeAPI`, `SpongeOp`, `sponge::circuit::SpongeCircuit`
+  --> src/naive/naive.rs:21:19
+   |
+21 |     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
+   |                   ^^^^^^^^^  ^^^^^^^^^  ^^^^^^^^
+22 |     sponge::circuit::SpongeCircuit,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `PublicParams`
+  --> src/naive/naive.rs:30:5
+   |
+30 |     PublicParams,
+   |     ^^^^^^^^^^^^
+
+warning: unused import: `ff::PrimeField`
+  --> src/naive/naive.rs:34:5
+   |
+34 | use ff::PrimeField;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `F`, `create_public_params`, `create_recursive_circuit`
+  --> src/naive/naive.rs:38:32
+   |
+38 |     circom::reader::load_r1cs, create_public_params, create_recursive_circuit, FileLocation, F,
+   |                                ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^                ^
+
+warning: unused import: `memory_stats::memory_stats`
+  --> src/naive/naive.rs:42:5
+   |
+42 | use memory_stats::memory_stats;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `Command`, `Stdio`
+  --> src/naive/naive.rs:43:20
+   |
+43 | use std::process::{Command, Stdio};
+   |                    ^^^^^^^  ^^^^^
+
+warning: unused `#[macro_use]` import
+ --> src/lib.rs:8:1
+  |
+8 | #[macro_use]
+  | ^^^^^^^^^^^^
+
+warning: unused import: `Group`
+  --> src/backend/commitment.rs:43:51
+   |
+43 |     group::{cofactor::CofactorCurveAffine, Curve, Group as AnotherGroup, GroupEncoding},
+   |                                                   ^^^^^
+
+warning: unused import: `std::io::prelude`
+  --> src/naive/naive.rs:15:5
+   |
+15 | use std::io::prelude::*;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `Field`
+ --> src/backend/merkle_tree.rs:1:10
+  |
+1 | use ff::{Field, PrimeField};
+  |          ^^^^^
+
+warning: unused import: `nova_snark::traits::Group`
+ --> src/backend/merkle_tree.rs:8:5
+  |
+8 | use nova_snark::traits::Group;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Field`
+  --> src/naive/naive_nova.rs:12:10
+   |
+12 | use ff::{Field, PrimeField};
+   |          ^^^^^
+
+warning: unused import: `evaluation::EvaluationEngineTrait`
+  --> src/naive/naive_nova.rs:24:43
+   |
+24 |     traits::{circuit::StepCircuit, Group, evaluation::EvaluationEngineTrait},
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::io::prelude`
+  --> src/naive/naive_wr.rs:14:5
+   |
+14 | use std::io::prelude::*;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `evaluation::EvaluationEngineTrait`
+  --> src/naive/naive_wr_nova.rs:24:43
+   |
+24 |     traits::{circuit::StepCircuit, Group, evaluation::EvaluationEngineTrait},
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Field`
+  --> src/naive/naive_wr_nova.rs:12:10
+   |
+12 | use ff::{Field, PrimeField};
+   |          ^^^^^
+
+warning: unused variable: `ipw`
+   --> src/backend/commitment.rs:343:19
+    |
+343 |         let (ipa, ipw, _) = if !hybrid {
+    |                   ^^^ help: if this is intentional, prefix it with an underscore: `_ipw`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `q`
+   --> src/backend/framework.rs:264:13
+    |
+264 |         for q in 0..r1cs_converter.batch_size {
+    |             ^ help: if this is intentional, prefix it with an underscore: `_q`
+
+warning: unused variable: `h`
+   --> src/backend/framework.rs:273:17
+    |
+273 |             for h in 0..(logmn(r1cs_converter.udoc.len()) - 1) {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_h`
+
+warning: value assigned to `merkle_lookups` is never read
+   --> src/backend/framework.rs:387:13
+    |
+387 |     let mut merkle_lookups: Option<Vec<usize>> = None;
+    |             ^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: unused variable: `cp_clone`
+   --> src/backend/framework.rs:670:9
+    |
+670 |     let cp_clone = circuit_primary.clone().unwrap();
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_cp_clone`
+
+warning: variable does not need to be mutable
+   --> src/backend/framework.rs:657:5
+    |
+657 |     mut proof_info: ProofInfo,
+    |     ----^^^^^^^^^^
+    |     |
+    |     help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> src/backend/framework.rs:728:13
+    |
+728 |         let mut dc = proof_info.commit.nldoc.as_ref().unwrap();
+    |             ----^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `real_len`
+   --> src/backend/r1cs.rs:444:17
+    |
+444 |             let real_len = orig_len - real_start;
+    |                 ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_real_len`
+
+warning: unused variable: `y`
+   --> src/backend/r1cs.rs:344:70
+    |
+344 |         let final_paths: Vec<usize> = path_dups.into_iter().map(|(x, y)| x).collect();
+    |                                                                      ^ help: if this is intentional, prefix it with an underscore: `_y`
+
+warning: value assigned to `rel_i` is never read
+    --> src/backend/r1cs.rs:1990:17
+     |
+1990 |         let mut rel_i = 0;
+     |                 ^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `add_normal` is never read
+    --> src/backend/r1cs.rs:2004:17
+     |
+2004 |                 add_normal = false;
+     |                 ^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: unused variable: `idx`
+   --> src/backend/r1cs_helper.rs:473:26
+    |
+473 | pub(crate) fn edge_id<C>(idx: EdgeIndex<u32>, e: &Either<C, Skip>) -> &Either<C, Skip> {
+    |                          ^^^ help: if this is intentional, prefix it with an underscore: `_idx`
+
+warning: unused variable: `idx`
+   --> src/backend/r1cs_helper.rs:478:5
+    |
+478 |     idx: NodeIndex<u32>,
+    |     ^^^ help: if this is intentional, prefix it with an underscore: `_idx`
+
+warning: unused variable: `a`
+   --> src/frontend/regex/mod.rs:406:31
+    |
+406 |             RegexF::Range(ref a, i, j) if *i == 0 && *j == 0 => RegexF::empty(),
+    |                               ^ help: if this is intentional, prefix it with an underscore: `_a`
+
+warning: unused variable: `is_match_g`
+  --> src/naive/naive_wr.rs:93:9
+   |
+93 |     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
+   |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_match_g`
+
+warning: value assigned to `output` is never read
+   --> src/naive/naive_wr.rs:138:13
+    |
+138 |     let mut output  = command.execute_output().unwrap();
+    |             ^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `witness_generator_output`
+   --> src/naive/naive_wr.rs:154:9
+    |
+154 |     let witness_generator_output = root.join("circom_witness.wtns");
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_witness_generator_output`
+
+warning: unused variable: `b`
+  --> src/naive/naive_wr.rs:86:76
+   |
+86 |     let mut prover_states: Vec<u32> = solution.clone().into_iter().map(|(a,b,c)| a).collect_vec();
+   |                                                                            ^ help: if this is intentional, prefix it with an underscore: `_b`
+
+warning: unused variable: `c`
+  --> src/naive/naive_wr.rs:86:78
+   |
+86 |     let mut prover_states: Vec<u32> = solution.clone().into_iter().map(|(a,b,c)| a).collect_vec();
+   |                                                                              ^ help: if this is intentional, prefix it with an underscore: `_c`
+
+warning: unused variable: `a`
+  --> src/naive/naive_wr.rs:87:47
+   |
+87 |     if let Some(last) = solution.last().map(|(a,b,c)| (*c).clone()) {
+   |                                               ^ help: if this is intentional, prefix it with an underscore: `_a`
+
+warning: unused variable: `b`
+  --> src/naive/naive_wr.rs:87:49
+   |
+87 |     if let Some(last) = solution.last().map(|(a,b,c)| (*c).clone()) {
+   |                                                 ^ help: if this is intentional, prefix it with an underscore: `_b`
+
+warning: unused variable: `g`
+  --> src/naive/naive_regex/naive_parser.rs:49:30
+   |
+49 |             Expr::LookAround(g, LookAround::LookAhead) =>
+   |                              ^ help: if this is intentional, prefix it with an underscore: `_g`
+
+warning: unused variable: `g`
+  --> src/naive/naive_regex/naive_parser.rs:51:30
+   |
+51 |             Expr::LookAround(g, LookAround::LookBehind) =>
+   |                              ^ help: if this is intentional, prefix it with an underscore: `_g`
+
+warning: unused variable: `g`
+  --> src/naive/naive_regex/naive_parser.rs:95:30
+   |
+95 |             Expr::LookAround(g, LookAround::LookAhead) => panic!("Regex not supported"),
+   |                              ^ help: if this is intentional, prefix it with an underscore: `_g`
+
+warning: unused variable: `g`
+  --> src/naive/naive_regex/naive_parser.rs:96:30
+   |
+96 |             Expr::LookAround(g, LookAround::LookBehind) => panic!("Regex not supported"),
+   |                              ^ help: if this is intentional, prefix it with an underscore: `_g`
+
+warning: value assigned to `trailing_dot` is never read
+   --> src/naive/naive_regex/mod.rs:560:25
+    |
+560 |                         trailing_dot = 0;
+    |                         ^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: value assigned to `trailing_dot` is never read
+   --> src/naive/naive_regex/mod.rs:578:37
+    |
+578 | ...                   trailing_dot = 0;
+    |                       ^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: value assigned to `out` is never read
+   --> src/naive/naive_regex/mod.rs:598:17
+    |
+598 |         let mut out = 0;
+    |                 ^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `y`
+   --> src/naive/naive_regex/mod.rs:619:28
+    |
+619 |             RegexF::Alt(x, y) => {
+    |                            ^ help: if this is intentional, prefix it with an underscore: `_y`
+
+warning: unused variable: `a`
+   --> src/naive/naive_regex/mod.rs:628:26
+    |
+628 |             RegexF::Star(a) => out = 0,
+    |                          ^ help: if this is intentional, prefix it with an underscore: `_a`
+
+warning: unused variable: `b`
+   --> src/naive/naive_regex/mod.rs:642:33
+    |
+642 |         intervals.dedup_by(|(a, b), (c, d)| a == c);
+    |                                 ^ help: if this is intentional, prefix it with an underscore: `_b`
+
+warning: unused variable: `d`
+   --> src/naive/naive_regex/mod.rs:642:41
+    |
+642 |         intervals.dedup_by(|(a, b), (c, d)| a == c);
+    |                                         ^ help: if this is intentional, prefix it with an underscore: `_d`
+
+warning: variable does not need to be mutable
+   --> src/naive/naive_regex/mod.rs:663:17
+    |
+663 |             let mut new_interval: (u32, u32);
+    |                 ----^^^^^^^^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/naive/naive_wr_nova.rs:240:9
+    |
+240 |     let mut hash: Vec<Fq>;
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/naive/naive_wr_nova.rs:266:9
+    |
+266 |     let mut hash: Vec<Fq>;
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `dfa`
+   --> src/naive/naive_wr_nova.rs:299:102
+    |
+299 | ..., solution: Vec<(u32,u32,u32)>, dfa: &DFA<'_>, n_char: usize, P:&'a ProverData)->Option<Vec<Value>> {
+    |                                    ^^^ help: if this is intentional, prefix it with an underscore: `_dfa`
+
+warning: unused variable: `n_char`
+   --> src/naive/naive_wr_nova.rs:299:117
+    |
+299 | ...32,u32,u32)>, dfa: &DFA<'_>, n_char: usize, P:&'a ProverData)->Option<Vec<Value>> {
+    |                                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_n_char`
+
+warning: variable does not need to be mutable
+   --> src/naive/naive_nova.rs:241:9
+    |
+241 |     let mut hash: Vec<Fq>;
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `dfa`
+   --> src/naive/naive_nova.rs:274:102
+    |
+274 | ..., solution: Vec<(u32,u32,u32)>, dfa: &DFA<'_>, n_char: usize, P:&'a ProverData)->Option<Vec<Value>> {
+    |                                    ^^^ help: if this is intentional, prefix it with an underscore: `_dfa`
+
+warning: unused variable: `n_char`
+   --> src/naive/naive_nova.rs:274:117
+    |
+274 | ...32,u32,u32)>, dfa: &DFA<'_>, n_char: usize, P:&'a ProverData)->Option<Vec<Value>> {
+    |                                 ^^^^^^ help: if this is intentional, prefix it with an underscore: `_n_char`
+
+warning: unused variable: `doc_len`
+  --> src/naive/naive_wr_circom_writer.rs:39:34
+   |
+39 | pub fn make_utils(dfa: &DFA<'_>, doc_len: usize, n_char: usize) -> std::io::Result<()> {
+   |                                  ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_doc_len`
+
+warning: unused variable: `doc_len`
+   --> src/naive/naive_wr_circom_writer.rs:168:18
+    |
+168 | pub fn make_main(doc_len: usize,deltas:usize,n_accepting:usize, n_char: usize, n_states: usize)->String{
+    |                  ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_doc_len`
+
+warning: variable does not need to be mutable
+   --> src/naive/naive_wr_circom_writer.rs:268:9
+    |
+268 |     let mut final_string = make_main(doc_len, dfa.deltas().len(), dfa.get_final_states().len(), n_char,dfa.nstates());
+    |         ----^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `doc_len`
+  --> src/naive/naive_circom_writer.rs:39:34
+   |
+39 | pub fn make_utils(dfa: &DFA<'_>, doc_len: usize, n_char: usize) -> std::io::Result<()> {
+   |                                  ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_doc_len`
+
+warning: variable does not need to be mutable
+   --> src/naive/naive_circom_writer.rs:218:9
+    |
+218 |     let mut final_string = make_main(doc_len, doc_len+1, dfa.deltas().len(), dfa.get_final_states().len(), n_char,dfa.nstates());
+    |         ----^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `is_match_g`
+  --> src/naive/naive.rs:88:9
+   |
+88 |     let is_match_g = <G1 as Group>::Scalar::from(is_match as u64);
+   |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_is_match_g`
+
+warning: value assigned to `output` is never read
+   --> src/naive/naive.rs:134:13
+    |
+134 |     let mut output  = command.execute_output().unwrap();
+    |             ^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `iteration_count`
+   --> src/naive/naive.rs:197:9
+    |
+197 |     let iteration_count = private_inputs.len();
+    |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_iteration_count`
+
+warning: unused variable: `b`
+  --> src/naive/naive.rs:81:76
+   |
+81 |     let mut prover_states: Vec<u32> = solution.clone().into_iter().map(|(a,b,c)| a).collect_vec();
+   |                                                                            ^ help: if this is intentional, prefix it with an underscore: `_b`
+
+warning: unused variable: `c`
+  --> src/naive/naive.rs:81:78
+   |
+81 |     let mut prover_states: Vec<u32> = solution.clone().into_iter().map(|(a,b,c)| a).collect_vec();
+   |                                                                              ^ help: if this is intentional, prefix it with an underscore: `_c`
+
+warning: unused variable: `a`
+  --> src/naive/naive.rs:82:47
+   |
+82 |     if let Some(last) = solution.last().map(|(a,b,c)| (*c).clone()) {
+   |                                               ^ help: if this is intentional, prefix it with an underscore: `_a`
+
+warning: unused variable: `b`
+  --> src/naive/naive.rs:82:49
+   |
+82 |     if let Some(last) = solution.last().map(|(a,b,c)| (*c).clone()) {
+   |                                                 ^ help: if this is intentional, prefix it with an underscore: `_b`
+
+warning: variable does not need to be mutable
+   --> src/naive/naive.rs:200:9
+    |
+200 |     let mut current_public_input = start_public_input_hex.clone();
+    |         ----^^^^^^^^^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: fields `vector_gens` and `doc_len` are never read
+  --> src/backend/commitment.rs:57:5
+   |
+54 | pub struct NLDocCommitment {
+   |            --------------- fields in this struct
+...
+57 |     vector_gens: CommitmentGens<G1>,
+   |     ^^^^^^^^^^^
+...
+68 |     doc_len: usize,
+   |     ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: static `POSEIDON_NUM` is never used
+ --> src/backend/costs.rs:6:8
+  |
+6 | static POSEIDON_NUM: usize = 292;
+  |        ^^^^^^^^^^^^
+
+warning: field `doc_len` is never read
+  --> src/backend/framework.rs:40:5
+   |
+35 | struct ProofInfo {
+   |        --------- field in this struct
+...
+40 |     doc_len: usize,
+   |     ^^^^^^^
+
+warning: methods `test_left` and `right_or` are never used
+  --> src/frontend/safa.rs:37:8
+   |
+30 | impl<A, B> Either<A, B> {
+   | ----------------------- methods in this implementation
+...
+37 |     fn test_left<F>(&self, f: F) -> bool
+   |        ^^^^^^^^^
+...
+55 |     fn right_or<'a>(&'a self, default: &'a B) -> &'a B {
+   |        ^^^^^^^^
+
+warning: type alias `Fg1` is never used
+ --> src/naive/naive_wr_nova.rs:5:6
+  |
+5 | type Fg1 = <G1 as Group>::Scalar;
+  |      ^^^
+
+warning: fields `commitment` and `is_match` are never read
+  --> src/naive/naive_wr_nova.rs:49:5
+   |
+43 | pub struct NaiveCircuit<F: PrimeField> {
+   |            ------------ fields in this struct
+...
+49 |     commitment: F,
+   |     ^^^^^^^^^^
+50 |     is_match: F,
+   |     ^^^^^^^^
+   |
+   = note: `NaiveCircuit` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: type alias `Fg1` is never used
+ --> src/naive/naive_nova.rs:5:6
+  |
+5 | type Fg1 = <G1 as Group>::Scalar;
+  |      ^^^
+
+warning: fields `commitment` and `is_match` are never read
+  --> src/naive/naive_nova.rs:50:5
+   |
+44 | pub struct NaiveCircuit<F: PrimeField> {
+   |            ------------ fields in this struct
+...
+50 |     commitment: F,
+   |     ^^^^^^^^^^
+51 |     is_match: F,
+   |     ^^^^^^^^
+   |
+   = note: `NaiveCircuit` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: type alias `EE` is never used
+ --> src/naive/naive.rs:5:6
+  |
+5 | type EE = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+  |      ^^
+
+warning: call to `.clone()` on a reference in this situation does nothing
+  --> src/frontend/regex/parser.rs:21:49
+   |
+21 |                 let mut inner = Self::to_regex(e.clone())?;
+   |                                                 ^^^^^^^^ help: remove this redundant call
+   |
+   = note: the type `Expr` does not implement `Clone`, so calling `clone` on `&Expr` copies the reference, which does not do anything and can be removed
+   = note: `#[warn(noop_method_call)]` on by default
+
+warning: unused `Result` that must be used
+   --> src/naive/naive_wr.rs:128:5
+    |
+128 |     wtr.flush();
+    |     ^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+    = note: `#[warn(unused_must_use)]` on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+128 |     let _ = wtr.flush();
+    |     +++++++
+
+warning: unused `Result` that must be used
+   --> src/naive/naive_wr.rs:143:5
+    |
+143 |     remove_file("match.circom");
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+143 |     let _ = remove_file("match.circom");
+    |     +++++++
+
+warning: unused `Result` that must be used
+   --> src/naive/naive_wr.rs:285:5
+    |
+285 |     remove_file("match.sym");
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+285 |     let _ = remove_file("match.sym");
+    |     +++++++
+
+warning: unused `Result` that must be used
+   --> src/naive/naive_wr.rs:286:5
+    |
+286 |     remove_file("match.r1cs");
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+286 |     let _ = remove_file("match.r1cs");
+    |     +++++++
+
+warning: unused `Result` that must be used
+   --> src/naive/naive_wr.rs:287:5
+    |
+287 |     remove_file("circom_witness.wtns");
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+287 |     let _ = remove_file("circom_witness.wtns");
+    |     +++++++
+
+warning: call to `.clone()` on a reference in this situation does nothing
+  --> src/naive/naive_regex/naive_parser.rs:22:49
+   |
+22 |                 let mut inner = Self::to_regex(e.clone())?;
+   |                                                 ^^^^^^^^ help: remove this redundant call
+   |
+   = note: the type `Expr` does not implement `Clone`, so calling `clone` on `&Expr` copies the reference, which does not do anything and can be removed
+
+warning: variable `outR` should have a snake case name
+   --> src/naive/naive_regex/mod.rs:470:17
+    |
+470 |         let mut outR = r.clone();
+    |                 ^^^^ help: convert the identifier to snake case: `out_r`
+    |
+    = note: `#[warn(non_snake_case)]` on by default
+
+warning: variable `P` should have a snake case name
+   --> src/naive/naive_wr_nova.rs:299:132
+    |
+299 | ...,u32,u32)>, dfa: &DFA<'_>, n_char: usize, P:&'a ProverData)->Option<Vec<Value>> {
+    |                                              ^ help: convert the identifier to snake case: `p`
+
+warning: variable `P` should have a snake case name
+   --> src/naive/naive_nova.rs:274:132
+    |
+274 | ...,u32,u32)>, dfa: &DFA<'_>, n_char: usize, P:&'a ProverData)->Option<Vec<Value>> {
+    |                                              ^ help: convert the identifier to snake case: `p`
+
+warning: unused `Result` that must be used
+   --> src/naive/naive_wr_circom_writer.rs:267:5
+    |
+267 |     make_utils(dfa, doc_len, n_char);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+267 |     let _ = make_utils(dfa, doc_len, n_char);
+    |     +++++++
+
+warning: unused `Result` that must be used
+   --> src/naive/naive_circom_writer.rs:217:5
+    |
+217 |     make_utils(dfa, doc_len, n_char);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+217 |     let _ = make_utils(dfa, doc_len, n_char);
+    |     +++++++
+
+warning: unused `Result` that must be used
+   --> src/naive/naive.rs:124:5
+    |
+124 |     wtr.flush();
+    |     ^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+124 |     let _ = wtr.flush();
+    |     +++++++
+
+warning: unused `Result` that must be used
+   --> src/naive/naive.rs:214:5
+    |
+214 |     remove_file("match.sym");
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+214 |     let _ = remove_file("match.sym");
+    |     +++++++
+
+warning: unused `Result` that must be used
+   --> src/naive/naive.rs:215:5
+    |
+215 |     remove_file("match.r1cs");
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+215 |     let _ = remove_file("match.r1cs");
+    |     +++++++
+
+warning: unused `Result` that must be used
+   --> src/naive/naive.rs:216:5
+    |
+216 |     remove_file("circom_witness.wtns");
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+help: use `let _ = ...` to ignore the resulting value
+    |
+216 |     let _ = remove_file("circom_witness.wtns");
+    |     +++++++
+
+warning: `reef` (lib) generated 144 warnings (run `cargo fix --lib -p reef` to apply 103 suggestions)
+warning: unused import: `reef::naive::naive`
+ --> src/main.rs:8:5
+  |
+8 | use reef::naive::naive;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `reef::naive::naive_wr`
+ --> src/main.rs:9:5
+  |
+9 | use reef::naive::naive_wr;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused `Result` that must be used
+   --> src/main.rs:133:9
+    |
+133 |         wtr.flush();
+    |         ^^^^^^^^^^^
+    |
+    = note: this `Result` may be an `Err` variant, which should be handled
+    = note: `#[warn(unused_must_use)]` on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+133 |         let _ = wtr.flush();
+    |         +++++++
+
+warning: `reef` (bin "reef") generated 3 warnings (run `cargo fix --bin "reef"` to apply 2 suggestions)
+    Finished release [optimized + debuginfo] target(s) in 1m 01s
+reef

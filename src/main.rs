@@ -111,13 +111,16 @@ fn main() {
             .unwrap();
         let mut wtr = Writer::from_writer(file);
         let mut title = opt.input.clone();
+        if title.len() > 10 {
+            title = title[..10].to_string();
+        }
         let test_type = match opt.hybrid {
             true => "reef",
             false => "safa+nlookup",
         };
         let _ = wtr.write_record(&[
             format!("{}_{}",
-            opt.input[..10].to_string(),
+            title,
             doc.len()),
             test_type.to_string(),
             SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string(),
