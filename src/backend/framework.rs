@@ -13,6 +13,7 @@ use crate::backend::merkle_tree::MerkleWit;
 use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::frontend::safa::SAFA;
+use std::path::PathBuf;
 use bincode;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::ProverData;
@@ -67,6 +68,7 @@ pub fn run_backend(
     projections: bool,
     hybrid: bool,
     merkle: bool,
+    out_write: PathBuf,
 ) {
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
@@ -168,7 +170,7 @@ pub fn run_backend(
     //get args
     let proof_info = recv_setup.recv().unwrap();
 
-    prove_and_verify(recv, recv_qv, proof_info);
+    prove_and_verify(recv, recv_qv, proof_info, out_write.clone());
 
     // rejoin child
     solver_thread.join().expect("setup/solver thread panicked");
@@ -615,10 +617,12 @@ fn solve<'a>(
         );
 
         #[cfg(feature = "metrics")]
+        {
         log::stop(
             Component::Solver,
             format!("witness_generation_{}", i).as_str(),
         );
+        }
 
         sender.send(Some(circuit_primary)).unwrap(); //witness_i).unwrap();
 
@@ -655,6 +659,7 @@ fn prove_and_verify(
     recv: Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     recv_qv: Receiver<(Vec<Integer>, Integer)>,
     mut proof_info: ProofInfo,
+    out_write: PathBuf
 ) {
     println!("Proving thread starting...");
 
@@ -685,7 +690,10 @@ fn prove_and_verify(
         );
 
         #[cfg(feature = "metrics")]
+        {
         log::stop(Component::Prover, format!("prove_{}", i).as_str());
+        log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+    }
 
         // verify recursive - TODO we can get rid of this verify once everything works
         // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging

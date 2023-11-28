@@ -94,15 +94,6 @@ fn main() {
 
         init();
 
-        run_backend(
-            safa.clone(),
-            doc.clone(),
-            opt.batch_size,
-            opt.projections,
-            opt.hybrid,
-            opt.merkle,
-        );
-
         let file = OpenOptions::new()
             .write(true)
             .append(true)
@@ -114,9 +105,11 @@ fn main() {
         if title.len() > 10 {
             title = title[..10].to_string();
         }
-        let test_type = match opt.hybrid {
-            true => "reef",
-            false => "safa+nlookup",
+        let mut test_type;
+        if opt.hybrid | opt.projections {
+            test_type = "reef"; 
+        } else {
+            test_type = "safa+nlookup";
         };
         let _ = wtr.write_record(&[
             format!("{}_{}",
@@ -133,6 +126,16 @@ fn main() {
         wtr.flush();
         #[cfg(feature = "metrics")]
         log::write_csv(opt.output.to_str().unwrap()).unwrap();
+
+        run_backend(
+            safa.clone(),
+            doc.clone(),
+            opt.batch_size,
+            opt.projections,
+            opt.hybrid,
+            opt.merkle,
+            opt.output.clone()
+        );
 
         //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
     }

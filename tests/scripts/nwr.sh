@@ -1,20 +1,20 @@
-echo 'pihole'
-for i in {1..10}; do
-RUST_BACKTRACE=1 ./target/release/reef --input "ad.stackoverflow.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1234567" --output ./tests/results/pihole --re "^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+\.){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323" --output ./tests/results/pihole --re "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "adimage101.testingads.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-5000379" --output ./tests/results/pihole --re "^(.+[_.-])?telemetry[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "adimage101.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=12" --output ./tests/results/pihole --re "^adim(age|g)s?[0-9]*[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "adtracker101.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=" --output ./tests/results/pihole --re "^adtrack(er|ing)?[0-9]*[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "advertising101.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&click1" --output ./tests/results/pihole --re "^advert(s|is(ing|ements?))?[0-9]*[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "affiliate.link.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickI" --output ./tests/results/pihole --re "^aff(iliat(es?|ion))?[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "analytics.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=123" --output ./tests/results/pihole --re "^analytics?[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "banners.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=12345" --output ./tests/results/pihole --re "^banners?[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "beacons2212.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1" --output ./tests/results/pihole --re "^beacons?[0-9]*[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "counters223.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=2" --output ./tests/results/pihole --re "^count(ers?)?[0-9]*[_.-]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "mads.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=11233456" --output ./tests/results/pihole --re "^mads\." ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "pixel.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&click" --output ./tests/results/pihole --re "^pixels?[-.]" ascii;
-RUST_BACKTRACE=1 ./target/release/reef --input "statistics19902.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037" --output ./tests/results/pihole --re "^stat(s|istics)?[0-9]*[_.-]" ascii;
-done
+# echo 'pihole'
+# for i in {1..10}; do
+# RUST_BACKTRACE=1 ./target/release/reef --input "ad.stackoverflow.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1234567" --output ./tests/results/pihole --re "^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+\.){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323" --output ./tests/results/pihole --re "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "adimage101.testingads.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-5000379" --output ./tests/results/pihole --re "^(.+[_.-])?telemetry[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "adimage101.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=12" --output ./tests/results/pihole --re "^adim(age|g)s?[0-9]*[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "adtracker101.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=" --output ./tests/results/pihole --re "^adtrack(er|ing)?[0-9]*[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "advertising101.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&click1" --output ./tests/results/pihole --re "^advert(s|is(ing|ements?))?[0-9]*[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "affiliate.link.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickI" --output ./tests/results/pihole --re "^aff(iliat(es?|ion))?[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "analytics.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=123" --output ./tests/results/pihole --re "^analytics?[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "banners.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=12345" --output ./tests/results/pihole --re "^banners?[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "beacons2212.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1" --output ./tests/results/pihole --re "^beacons?[0-9]*[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "counters223.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=2" --output ./tests/results/pihole --re "^count(ers?)?[0-9]*[_.-]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "mads.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=11233456" --output ./tests/results/pihole --re "^mads\." ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "pixel.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&click" --output ./tests/results/pihole --re "^pixels?[-.]" ascii;
+# RUST_BACKTRACE=1 ./target/release/reef --input "statistics19902.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037" --output ./tests/results/pihole --re "^stat(s|istics)?[0-9]*[_.-]" ascii;
+# done
 #echo 'zombie'
 #RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_100B --output ./tests/results/zombie --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii
 #RUST_BACKTRACE=1 ./target/release/reef --input ./tests/docs/date_2000B --output ./tests/results/zombie --re "([0-9][0-9]?)/([0-9][0-9]?)/([0-9][0-9]([0-9][0-9])?)" ascii

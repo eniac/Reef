@@ -1,0 +1,13 @@
+./tests/do_43054295,reef,1701102773,^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG,309,64
+---------,---------,---------,---------,"
+R,C,fa_builder,8443552,μs
+R,C,regex_normalization,1949,μs
+R,C,snark_setup,26053501,μs
+R,C,constraint_generation,209890,μs
+R,CG,generation,12863693,μs
+R,S,witness_generation_0,93203,μs
+R,C,r1cs_init,5694095,μs
+R,S,fa_solver,2417974,μs
+R,P,prove_0,221462,μs
+NOC,P,verifier_circuit,10347,constraints
+NOC,P,step_circuit,38885,constraints

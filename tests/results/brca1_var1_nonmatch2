@@ -313,3 +313,7 @@ NOC,P,step_circuit,38885,constraints
 S,P,consistency_proof,9345,bytes
 S,CG,commitment,262144,bytes
 S,P,snark_size,24608,bytes
+./tests/do_43054295,safa+nlookup,1701132397,^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG,309,64
+---------,---------,---------,---------,"
+R,C,regex_normalization,2058,μs
+R,C,fa_builder,8446559,μs
