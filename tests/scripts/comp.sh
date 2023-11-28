@@ -8,7 +8,11 @@ echo "reef"
 ./tests/scripts/reef.sh &> out_reef
 echo "end reef"
 
-
+cargo clean 
+cargo build --release --features 'metrics,nwr'
+echo "nwr"
+./tests/scripts/nwr.sh &> out_nwr
+echo "nwr"
 
 cargo clean 
 cargo build --release --features 'metrics,naive'
@@ -16,11 +20,7 @@ echo "naive"
 ./tests/scripts/naive.sh &> out_naive
 echo "naive" 
 
-cargo clean 
-cargo build --release --features 'metrics,nwr'
-echo "nwr"
-./tests/scripts/nwr.sh &> out_nwr
-echo "nwr"
+
 
 # cargo build --release --features 'metrics,reef'
 # echo "email"
