@@ -312,7 +312,8 @@ NOC,P,verifier_circuit,10347,constraints
 NOC,P,step_circuit,38885,constraints
 S,P,consistency_proof,9345,bytes
 S,CG,commitment,262144,bytes
-S,P,snark_size,24608,bytes./tests/do_43054295,safa+nlookup,1701299562,^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG,309,64
+S,P,snark_size,24608,bytes
+./tests/do_43054295,safa+nlookup,1701299562,^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG,309,64
 ---------,---------,---------,---------,"
 R,C,fa_builder,8817149,μs
 R,C,regex_normalization,1986,μs
