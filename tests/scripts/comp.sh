@@ -5,16 +5,17 @@ cargo clean
 # echo "reef h"
 
 cargo clean 
+cargo build --release --features 'metrics,naive'
+echo "naive"
+./tests/scripts/naive.sh &> out_naive
+echo "naive" 
+
+cargo clean 
 cargo build --release --features 'metrics,nwr'
 echo "nwr"
 ./tests/scripts/nwr.sh &> out_nwr
 echo "nwr"
 
-cargo clean 
-cargo build --release --features 'metrics,naive'
-echo "naive"
-./tests/scripts/naive.sh &> out_naive
-echo "naive" 
 
 echo "reef"
 ./tests/scripts/reef.sh &> out_reef

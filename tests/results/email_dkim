@@ -2499,3 +2499,5 @@ R,P,prove+wit,8517174266,μs
 R,V,snark_verification,476646,μs
 R,P,compressed_snark,1802103,μs
 S,P,compressed_snark_size,24528,bytes
+Message-ID_415,naive,1701442596,"^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$",55424,433
+---------,---------,---------,---------,"
