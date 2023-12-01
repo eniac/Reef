@@ -16,19 +16,19 @@
             ||} 
           \textbf{Application} &
             \textbf{Document size} (B) &
-            \textbf{\# states} &
-            \textbf{\mbox{\# transitions}} &
-            \textbf{R1CS \mbox{constraints}} &
+            \textbf{\# States} &
+            \textbf{\mbox{\# Transitions}} &
+            \textbf{R1CS \mbox{Constraints}} &
             \textbf{\# Steps} &
-            \textbf{Compiler time} (s) &
-            \textbf{Solver time} (s) &
-            \textbf{Prover time} (s) &
-            \textbf{Verifier time} (s) &
+            \textbf{Compiler Time} (s) &
+            \textbf{Solver Time} (s) &
+            \textbf{Prover Time} (s) &
+            \textbf{Verifier Time} (s) &
             \textbf{Proof Size} (KB)\\ [0.5ex] 
             \toprule
                 \textbf{Redactions} \\
-                Small Email & 415 & %cfd4b\\
-                Large Email & 1,000 & %55ff1\\
+                Small Email & 415 & %6b8a9\\
+                Large Email & 1,000 & %e9c44\\
              \midrule
                 \textbf{ODoH} & 128 & %25424\\
              \midrule

@@ -10,17 +10,18 @@
             >{\centering\arraybackslash}X
             >{\centering\arraybackslash}X
             >{\centering\arraybackslash}X
+            >{\centering\arraybackslash}X
             >{\centering\arraybackslash}X ||}
         \textbf{Application} & \textbf{Document ID} & \textbf{Regex ID} & \textbf{R1CS Constraints}
-        & \textbf{Document Length} & \textbf{Compile
-        time} (s) &  \textbf{Solving time} (s) & \textbf{Proving time} (s) 
-        & \textbf{Verifying time} (s) & \textbf{Proof Size} (KB) \\
+        & \textbf{Document Length} & \textbf{\# Steps} & \textbf{Compile
+        Time} (s) &  \textbf{Solving Time} (s) & \textbf{Proving Time} (s) 
+        & \textbf{Verifying Time} (s) & \textbf{Proof Size} (KB) \\
       \toprule
-        \textbf{Redactions} & & & & & & & & \\
-        & Small Email & r1 & %cfd4b\\
-        & Large Email  & r2 & %55ff1\\
+        \textbf{Redactions} & & & & & & & & & & \\
+        & Small Email & r1 & %6b8a9\\
+        & Large Email  & r2 & %e9c44\\
        \midrule
-        \textbf{ODoH} & & & & & & & & \\
+        \textbf{ODoH} & & & & & & & & & & \\
         & 5f558 & r3 & %5f558\\
         & 25424 & r4 & %25424\\
         & 55824 & r5 & %55824\\
@@ -37,7 +38,7 @@
         & b4ebd & r16 & %b4ebd\\
      
         \midrule
-        \textbf{Passwords} & & & & & & & & \\
+        \textbf{Passwords} & & & & & & & & & & \\
         Match & dcdc9 & r17 & %dcdc9\\
         &  43db4 & r17 & %43db4\\
         & 91edc & r17 & %91edc\\
@@ -59,7 +60,7 @@
         & 27ba9 & r17 & %27ba9\\
         & 304b5 &  r17 & %304b5\\
       \midrule
-        \textbf{DNA} & & & & & & & & \\
+        \textbf{DNA} & & & & & & & & & & \\
         Match & BRCA1 Var1\  & r18 & %ae846\\
         & BRCA1 Var2\ & r19 & %5a448\\
         & BRCA2 Var1  & r20 & %e5e5b\\

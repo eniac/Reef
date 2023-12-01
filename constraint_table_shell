@@ -12,8 +12,8 @@
             \textbf{DFA} & \textbf{DFA+Recursion} & \textbf{SAFA+nlookup} &  \textbf{Reef} \\
       \toprule
         \textbf{Redactions} & & & & & &\\
-        & Small Email & r1 & %X\\
-        & Large Email  & r2 & %X\\
+        & Small Email & r1 & %6b8a9\\
+        & Large Email  & r2 & %e9c44\\
        \midrule
         \textbf{ODoH} & & & & & & \\
         & 5f558 & r3 & %5f558\\
