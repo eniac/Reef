@@ -7,15 +7,21 @@
             >{\centering\arraybackslash}X
             >{\centering\arraybackslash}X
             >{\centering\arraybackslash}X
+            >{\centering\arraybackslash}X
+            >{\centering\arraybackslash}X
+            >{\centering\arraybackslash}X
+            >{\centering\arraybackslash}X
             >{\centering\arraybackslash}X||}
             \textbf{Application} & \textbf{Document ID} & \textbf{Regex ID} &
-            \textbf{DFA} & \textbf{DFA+Recursion} & \textbf{SAFA+nlookup} &  \textbf{Reef} \\
+            \textbf{DFA} & \textbf{DFA \# Foldings} & \textbf{DFA+Recursion} &
+            \textbf{DFA+Recursion \# Foldings} & \textbf{SAFA+nlookup} &
+            \textbf{SAFA+nlookup \# Foldings} &  \textbf{Reef} & \textbf{Reef \# Foldings}\\
       \toprule
-        \textbf{Redactions} & & & & & &\\
+        \textbf{Redactions} & & & & & & & & & &\\
         & Small Email & r1 & %6b8a9\\
         & Large Email  & r2 & %e9c44\\
        \midrule
-        \textbf{ODoH} & & & & & & \\
+        \textbf{ODoH} & & & & & & & & & &\\
         & 5f558 & r3 & %5f558\\
         & 25424 & r4 & %25424\\
         & 55824 & r5 & %55824\\
@@ -32,7 +38,7 @@
         & b4ebd & r16 & %b4ebd\\
 
         \midrule
-        \textbf{Passwords} & & & & & &\\
+        \textbf{Passwords} & & & & & & & & & &\\
         Match & dcdc9 & r17 & %dcdc9\\
         &  43db4 & r17 & %43db4\\
         & 91edc & r17 & %91edc\\
@@ -54,7 +60,7 @@
         & 27ba9 & r17 & %27ba9\\
         & 304b5 &  r17 & %304b5\\
       \midrule
-        \textbf{DNA} & & & & & &\\
+        \textbf{DNA} & & & & & & & & & &\\
         Match & BRCA1 Var1\  & r18 & %ae846\\
         & BRCA1 Var2\ & r19 & %5a448\\
         & BRCA2 Var1  & r20 & %e5e5b\\
