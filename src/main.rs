@@ -5,16 +5,10 @@ use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
 use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
-use reef::naive::naive;
-use reef::naive::naive_wr;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::SystemTime;
-
-// #[cfg(all(not(windows), not(target_env = "musl")))]
-// #[global_allocator]
-// static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[cfg(feature = "metrics")]
 use metrics::metrics::{log, log::Component};
@@ -35,15 +29,6 @@ fn main() {
     } else {
         opt.input.chars().collect()
     };
-
-    #[cfg(feature = "nwr")]
-    naive_wr::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output);
-
-    #[cfg(feature = "naive")]
-    naive::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output);
-
-    #[cfg(feature = "reef")]
-    {
         println!("reef");
 
         #[cfg(feature = "metrics")]
@@ -120,5 +105,4 @@ fn main() {
             opt.merkle,
             Some(opt.output.clone()),
         );
-    }
 }
