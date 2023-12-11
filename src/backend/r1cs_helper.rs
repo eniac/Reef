@@ -13,7 +13,7 @@ use fxhash::FxHashMap;
 use generic_array::typenum;
 use neptune::sponge::{api::SpongeAPI, vanilla::Sponge};
 use petgraph::{
-    graph::{EdgeIndex, EdgeReference, NodeIndex},
+    graph::{EdgeIndex, NodeIndex},
     prelude::Dfs,
     visit::EdgeRef,
     Graph,
@@ -426,7 +426,7 @@ fn incr_depth<C>(
     return None;
 }
 
-pub(crate) fn edge_id<C>(idx: EdgeIndex<u32>, e: &Either<C, Skip>) -> &Either<C, Skip> {
+pub(crate) fn edge_id<C>(_idx: EdgeIndex<u32>, e: &Either<C, Skip>) -> &Either<C, Skip> {
     e
 }
 

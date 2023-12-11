@@ -320,7 +320,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
         path_dups.extend(temp_lvl);
 
-        let final_paths: Vec<usize> = path_dups.into_iter().map(|(x, y)| x).collect();
+        let final_paths: Vec<usize> = path_dups.into_iter().map(|(x, _)| x).collect();
 
         // add "last" loop
         let in_state = exit_state;
@@ -418,8 +418,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             let real_start = projection.unwrap();
-            let real_len = orig_len - real_start;
-
             let mut chunk_len = usize_doc.len().next_power_of_two() / 2;
             let mut e = usize_doc.len().next_power_of_two();
             let mut s = 0;
@@ -1892,7 +1890,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut next_state = 0;
         let mut char_num;
         let mut offset_i;
-        let mut rel_i = 0;
 
         let mut v = vec![];
         let mut q = vec![];
@@ -1925,7 +1922,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             } else if sols[self.sol_num].is_empty() {
                 // need to transition
 
-                // not forall (TODO check cursor_i correct)
+                // not forall
                 if i == 0 {
                     // fill stack vars with padding
                     self.push_wit(&mut wits, None, cursor_i);
@@ -1947,7 +1944,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 char_num = self.num_ab[&Some(26u8 as char)]; // EOF
                 cursor_access.push(cursor_i);
 
-                rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
+                let rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
                     self.wit_rel(state_i, next_state, &self.foralls_w_kids[&state_i], true)
                 } else {
                     self.wit_rel(state_i, next_state, &vec![], true)
@@ -2035,7 +2032,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                     cursor_i += offset_i;
 
-                    rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
+                    let rel_i = if self.safa.g[NodeIndex::new(state_i)].is_and() {
                         self.wit_rel(state_i, next_state, &self.foralls_w_kids[&state_i], false)
                     } else {
                         self.wit_rel(state_i, next_state, &vec![], false)
@@ -2052,7 +2049,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             state_i = next_state;
         }
 
-        // println!("'WASTED' SLOTS THIS ITERATION: {}", wasted);
+        println!("'wasted' slots this iteration: {}", wasted);
 
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));

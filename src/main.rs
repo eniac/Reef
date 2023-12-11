@@ -118,7 +118,7 @@ fn main() {
             opt.projections,
             opt.hybrid,
             opt.merkle,
-            opt.output.clone(),
+            Some(opt.output.clone()),
         );
     }
 }

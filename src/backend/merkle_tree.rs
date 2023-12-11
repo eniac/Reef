@@ -1,11 +1,10 @@
-use ff::{Field, PrimeField};
+use ff::PrimeField;
 use generic_array::typenum;
 use neptune::{
     poseidon::PoseidonConstants,
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
 };
-use nova_snark::traits::Group;
 
 #[derive(Debug, Clone)]
 pub struct MerkleCommitment<F: PrimeField> {

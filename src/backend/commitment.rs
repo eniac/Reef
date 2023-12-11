@@ -2,12 +2,10 @@ type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
-use crate::backend::costs::logmn;
 use crate::backend::merkle_tree::MerkleCommitment;
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::verifier_mle_eval;
 use ::bellperson::{gadgets::num::AllocatedNum, ConstraintSystem, SynthesisError};
-use circ::cfg::cfg;
 use ff::{Field, PrimeField};
 use generic_array::typenum;
 use merlin::Transcript;
@@ -22,8 +20,8 @@ use nova_snark::{
     errors::NovaError,
     provider::{
         hyrax_pc::{HyraxPC, PolyCommit, PolyCommitBlinds},
-        ipa_pc::{InnerProductArgument, InnerProductInstance, InnerProductWitness},
-        pedersen::{Commitment, CommitmentGens, CompressedCommitment},
+        ipa_pc::InnerProductArgument,
+        pedersen::{CommitmentGens, CompressedCommitment},
         poseidon::{PoseidonConstantsCircuit, PoseidonRO},
     },
     spartan::{
@@ -37,14 +35,8 @@ use nova_snark::{
     },
     StepCounterType,
 };
-use pasta_curves::{
-    self,
-    arithmetic::{CurveAffine, CurveExt, Group as OtherGroup},
-    group::{cofactor::CofactorCurveAffine, Curve, Group as AnotherGroup, GroupEncoding},
-    pallas, vesta, Ep, EpAffine, Eq, EqAffine,
-};
 use rand::rngs::OsRng;
-use rug::{integer::Order, ops::RemRounding, Integer};
+use rug::{integer::Order, Integer};
 
 pub struct ReefCommitment {
     pub nldoc: Option<NLDocCommitment>,
@@ -54,7 +46,6 @@ pub struct ReefCommitment {
 pub struct NLDocCommitment {
     // commitment to doc
     pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    vector_gens: CommitmentGens<G1>,
     single_gens: CommitmentGens<G1>,
     hyrax_gen: HyraxPC<G1>,
     doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,
@@ -65,7 +56,6 @@ pub struct NLDocCommitment {
     // consistency verification
     cap_pk: SpartanProverKey<G1, EE1>,
     cap_vk: SpartanVerifierKey<G1, EE1>,
-    doc_len: usize,
 }
 
 pub struct ConsistencyProof {
@@ -182,7 +172,6 @@ impl NLDocCommitment {
 
         return Self {
             pc: pc.clone(),
-            vector_gens: vector_gen.clone(),
             single_gens: single_gen.clone(),
             hyrax_gen,
             doc_poly: poly,
@@ -192,7 +181,6 @@ impl NLDocCommitment {
             hash_salt: salt,
             cap_pk,
             cap_vk,
-            doc_len: doc_ext_len,
         };
     }
 
@@ -333,7 +321,7 @@ impl NLDocCommitment {
             )
         };
 
-        let (ipa, ipw, _) = if !hybrid {
+        let (ipa, _, _) = if !hybrid {
             let res = self.hyrax_gen.prove_eval(
                 &self.doc_poly,
                 &self.doc_commit,
@@ -645,65 +633,6 @@ mod tests {
         // equality proof C_l = C[v_r]
         let mut v_transcript = Transcript::new(b"eq_proof");
         let res = eq_proof.verify(&gen, &mut v_transcript, &v_commit, &l_commit);
-
-        assert!(res.is_ok());
-    }
-
-    #[test]
-    fn commit() {
-        // "document"
-        let scalars = vec![
-            <<G1 as Group>::Scalar>::from(0),
-            <<G1 as Group>::Scalar>::from(1),
-            <<G1 as Group>::Scalar>::from(0),
-            <<G1 as Group>::Scalar>::from(1),
-        ];
-
-        let gens_t = CommitmentGens::<G1>::new(b"nlookup document commitment", scalars.len()); // n is dimension
-        let decommit_doc = <G1 as Group>::Scalar::random(&mut OsRng);
-        let commit_doc = <G1 as Group>::CE::commit(&gens_t, &scalars, &decommit_doc);
-
-        let running_q = vec![
-            <<G1 as Group>::Scalar>::from(2),
-            <<G1 as Group>::Scalar>::from(3),
-            <<G1 as Group>::Scalar>::from(5),
-            <<G1 as Group>::Scalar>::from(7),
-        ];
-
-        let running_v = <<G1 as Group>::Scalar>::from(10);
-
-        // sanity
-        let mut sum = <G1 as Group>::Scalar::zero();
-        for i in 0..scalars.len() {
-            sum += scalars[i].clone() * running_q[i].clone();
-        }
-
-        assert_eq!(sum, running_v); // <MLE_scalars * running_q> = running_v
-
-        // proof of dot prod
-        let mut p_transcript = Transcript::new(b"dot_prod_proof");
-        let mut v_transcript = Transcript::new(b"dot_prod_proof");
-
-        // set up
-        let gens_single =
-            CommitmentGens::<G1>::new_with_blinding_gen(b"gens_s", 1, &gens_t.get_blinding_gen());
-        let decommit_running_v = <G1 as Group>::Scalar::random(&mut OsRng);
-        let commit_running_v =
-            <G1 as Group>::CE::commit(&gens_single, &[running_v.clone()], &decommit_running_v);
-
-        // prove
-        let ipi: InnerProductInstance<G1> =
-            InnerProductInstance::new(&commit_doc, &running_q, &commit_running_v);
-        let ipw =
-            InnerProductWitness::new(&scalars, &decommit_doc, &running_v, &decommit_running_v);
-        let ipa = InnerProductArgument::prove(&gens_t, &gens_single, &ipi, &ipw, &mut p_transcript);
-
-        // verify
-        let num_vars = running_q.len();
-
-        let res = ipa
-            .unwrap()
-            .verify(&gens_t, &gens_single, num_vars, &ipi, &mut v_transcript);
 
         assert!(res.is_ok());
     }

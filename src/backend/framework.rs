@@ -38,7 +38,6 @@ struct ProofInfo {
     z0_primary: Vec<<G1 as Group>::Scalar>,
     commit: ReefCommitment,
     table: Vec<Integer>,
-    doc_len: usize,
     proj_doc_len: usize,
     proj_chunk_idx: Option<Vec<usize>>,
     exit_state: usize,
@@ -57,7 +56,7 @@ pub fn run_backend(
     projections: bool,
     hybrid: bool,
     merkle: bool,
-    out_write: PathBuf,
+    out_write: Option<PathBuf>,
 ) {
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
@@ -133,7 +132,6 @@ pub fn run_backend(
                 z0_primary,
                 commit: reef_commit,
                 table: r1cs_converter.table.clone(),
-                doc_len: r1cs_converter.udoc.len(),     // real
                 proj_doc_len: r1cs_converter.doc_len(), // projected
                 proj_chunk_idx: r1cs_converter.proj_chunk_idx.clone(),
                 exit_state: r1cs_converter.exit_state,
@@ -251,7 +249,7 @@ fn setup<'a>(
     let merkle_wits = if r1cs_converter.merkle {
         let mut w = vec![];
 
-        for q in 0..r1cs_converter.batch_size {
+        for _b in 0..r1cs_converter.batch_size {
             let mut sub_w = vec![];
 
             sub_w.push(MerkleWit {
@@ -260,7 +258,7 @@ fn setup<'a>(
                 opposite: <G1 as Group>::Scalar::zero(),
             });
 
-            for h in 0..(logmn(r1cs_converter.udoc.len()) - 1) {
+            for _h in 0..(logmn(r1cs_converter.udoc.len()) - 1) {
                 sub_w.push(MerkleWit {
                     l_or_r: true,
                     opposite_idx: None,
@@ -374,7 +372,7 @@ fn solve<'a>(
     let mut hybrid_running_v: Option<Integer> = None;
     let mut next_hybrid_running_q: Option<Vec<Integer>>;
     let mut next_hybrid_running_v: Option<Integer>;
-    let mut merkle_lookups: Option<Vec<usize>> = None;
+    let mut merkle_lookups: Option<Vec<usize>>;
 
     let mut prev_cursor = 0;
     let mut next_cursor;
@@ -637,8 +635,8 @@ fn solve<'a>(
 fn prove_and_verify(
     recv: Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     recv_qv: Receiver<(Vec<Integer>, Integer)>,
-    mut proof_info: ProofInfo,
-    out_write: PathBuf,
+    proof_info: ProofInfo,
+    out_write: Option<PathBuf>,
 ) {
     println!("Proving thread starting...");
 
@@ -650,8 +648,6 @@ fn prove_and_verify(
 
     // blocks until we receive first witness
     let mut circuit_primary = recv.recv().unwrap();
-
-    let cp_clone = circuit_primary.clone().unwrap();
 
     let mut i = 0;
 
@@ -671,7 +667,7 @@ fn prove_and_verify(
         #[cfg(feature = "metrics")]
         {
             log::stop(Component::Prover, format!("prove_{}", i).as_str());
-            log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+            log::write_csv(&out_write.unwrap().as_path().display().to_string()).unwrap();
         }
 
         recursive_snark = Some(result.unwrap());
@@ -698,7 +694,7 @@ fn prove_and_verify(
 
     let mut consist_proof = None;
     if proof_info.commit.nldoc.is_some() {
-        let mut dc = proof_info.commit.nldoc.as_ref().unwrap();
+        let dc = proof_info.commit.nldoc.as_ref().unwrap();
         let (q, v) = recv_qv.recv().unwrap();
 
         #[cfg(feature = "metrics")]
@@ -893,6 +889,7 @@ mod tests {
             projections,
             hybrid,
             merkle,
+            None,
         );
     }
 
