@@ -7,11 +7,10 @@ use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
 use reef::naive::naive;
 use reef::naive::naive_wr;
-use std::time::SystemTime;
-// use reef::naive::*;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::SystemTime;
 
 // #[cfg(all(not(windows), not(target_env = "musl")))]
 // #[global_allocator]
@@ -31,7 +30,7 @@ fn main() {
         opt.config
             .read_file(&PathBuf::from(&opt.input))
             .iter()
-            .map(|c| c.clone()) //to_string())
+            .map(|c| c.clone())
             .collect()
     } else {
         opt.input.chars().collect()
@@ -64,9 +63,6 @@ fn main() {
         } else {
             SAFA::new(&ab, &r)
         };
-        println!("make safa");
-        println!("safa states: {}", safa.num_states());
-        println!("safa size: {}", safa.num_edges());
 
         // Is document well-formed
         // nfa.well_formed(&doc);
@@ -77,20 +73,6 @@ fn main() {
         #[cfg(feature = "plot")]
         safa.write_pdf("main")
             .expect("Failed to plot NFA to a pdf file");
-
-        // #[cfg(feature = "metrics")]
-        // log::tic(Component::Solver, "SAFA Solving", "Clear Match");
-
-        /*
-            println!(
-            "Match: {}",
-            nfa.is_match(&doc)
-                .map(|c| format!("{:?}", c))
-                .unwrap_or(String::from("NONE"))
-        );*/
-
-        // #[cfg(feature = "metrics")]
-        // log::stop(Component::Solver, "SAFA Solving", "Clear Match");
 
         init();
 
@@ -107,22 +89,24 @@ fn main() {
         }
         let mut test_type;
         if opt.hybrid | opt.projections {
-            test_type = "reef"; 
+            test_type = "reef";
         } else {
             test_type = "safa+nlookup";
         };
         let _ = wtr.write_record(&[
-            format!("{}_{}",
-            title,
-            doc.len()),
+            format!("{}_{}", title, doc.len()),
             test_type.to_string(),
-            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                .to_string(),
             opt.re,
             safa.g.edge_count().to_string(), //nedges().to_string(),
             safa.g.node_count().to_string(), //nstates().to_string(),
         ]);
         let spacer = "---------";
-        let _ = wtr.write_record(&[spacer, spacer, spacer, spacer,"\n"]);
+        let _ = wtr.write_record(&[spacer, spacer, spacer, spacer, "\n"]);
         wtr.flush();
         #[cfg(feature = "metrics")]
         log::write_csv(opt.output.to_str().unwrap()).unwrap();
@@ -134,9 +118,7 @@ fn main() {
             opt.projections,
             opt.hybrid,
             opt.merkle,
-            opt.output.clone()
+            opt.output.clone(),
         );
-
-        //println!("parse_ms {:#?}, commit_ms {:#?}, r1cs_ms {:#?}, setup_ms {:#?}, precomp_ms {:#?}, nova_ms {:#?},",parse_ms, commit_ms, r1cs_ms, setup_ms, precomp_ms, nova_ms);
     }
 }

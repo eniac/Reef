@@ -39,22 +39,20 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     // sticking out here
     pub_inputs: Vec<Term>,
     pub batch_size: usize,
-    //pub cdoc: Vec<String>,
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     ep_num: usize,
-    // circuit crap
+    // circuit
     pub max_branches: usize,
     pub max_stack: usize,
     pub num_states: usize,
     pub exit_state: usize,
     pub kid_padding: usize,
-    // witness crap
+    // witness
     pub sol_num: usize,
     pub stack: Vec<(usize, usize)>,
     pub stack_ptr: usize,
     pub pc: PoseidonConstants<F, typenum::U4>,
-    pub doc_rc_v: Option<Integer>,
     // proj
     pub doc_subset: Option<(usize, usize)>,
     pub proj_chunk_idx: Option<Vec<usize>>,
@@ -103,20 +101,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut set_table: HashSet<Integer> = HashSet::default();
 
-        //safa.write_pdf("safa1").unwrap();
-
-        /*println!(
-            "STATES {:#?}",
-            safa.g.node_indices().for_each(|i| println!(
-                "({}) -> {}, forall? {}",
-                i.index(),
-                safa.g[i],
-                safa.g[i].is_and()
-            ))
-        );*/
-
-        //println!("ACCEPTING {:#?}", safa.accepting());
-
         let mut depth_safa = safa.g.map(node_depth_map, edge_id);
 
         let mut dfs_alls = Dfs::new(&depth_safa, NodeIndex::new(0));
@@ -130,7 +114,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let max_offsets_mult = max_offsets as u128;
 
         while let Some(all_state) = dfs_alls.next(&depth_safa) {
-            //println!("PROCESS STATE {:#?}", all_state);
             if safa.g[all_state].is_and() {
                 let mut and_edges: Vec<EdgeReference<Either<char, Skip>>> = safa
                     .g
@@ -190,14 +173,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                         Either(Err(openset)) => {
                             let single = openset.is_single(); // single offset/epsilon
                             if single.is_some() {
-                                // is single
                                 let offset = single.unwrap();
                                 if offset == 0 {
-                                    // epsilon
                                     let lower_offset = 0;
                                     let upper_offset = 0;
 
-                                    // add table
                                     let in_state = all_state.index();
                                     let out_state = and_edges[i].target().index();
 
@@ -292,10 +272,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 lvl_paths.extend(sub_path);
             }
             fa += 1;
-            max_stack += kids.len(); // overestimation - make this tighter
+            max_stack += kids.len(); // overestimation
 
             path_lens.push(lvl_paths);
-            //println!("finished lvl {:#?}, path_lens={:#?}", kids, path_lens);
         }
 
         // in case when we don't start on forall:
@@ -312,7 +291,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             max_branches,
             max_offsets_mult,
             star_offset,
-            NodeIndex::new(0), //exists_state,
+            NodeIndex::new(0), // exists_state
             exit_state,        // backtrace state
             vec![],
             true,
@@ -371,7 +350,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut table: Vec<Integer> = set_table.into_iter().collect();
 
-        // need to round out table size ?
+        // need to round out table size
         let base: usize = 2;
         let calc_fill = Integer::from(
             (max_rel as u128
@@ -396,7 +375,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // generate usize doc
-        // doc to usizes - can I use this elsewhere too? TODO
         let mut usize_doc = vec![];
         let mut int_doc = vec![];
         for c in doc.clone().into_iter() {
@@ -423,8 +401,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let base: usize = 2;
         let orig_len = usize_doc.len();
         let ext_len = base.pow(logmn(usize_doc.len()) as u32) - usize_doc.len();
-        usize_doc.extend(vec![0; ext_len]); // ep num = self.nfa.nchars()
-        int_doc.extend(vec![Integer::from(0); ext_len]); // ep num = self.nfa.nchars()
+        usize_doc.extend(vec![0; ext_len]);
+        int_doc.extend(vec![Integer::from(0); ext_len]);
 
         let mut stack = vec![];
         for _i in 0..max_stack {
@@ -440,7 +418,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             }
 
             let real_start = projection.unwrap();
-            //println!("real start {}", real_start);
             let real_len = orig_len - real_start;
 
             let mut chunk_len = usize_doc.len().next_power_of_two() / 2;
@@ -450,7 +427,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let mut start = 0;
 
             while e >= orig_len {
-                //println!("CHUNK LEN {}, e {}, s {}", chunk_len, e, s);
                 end = e;
                 start = s;
 
@@ -458,7 +434,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 while s + chunk_len <= real_start {
                     s += chunk_len;
                 }
-                //println!("found start {}", s);
                 e = s + chunk_len;
                 assert!(end <= usize_doc.len().next_power_of_two());
 
@@ -468,10 +443,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             chunk_len = end - start;
             assert!(chunk_len.next_power_of_two() == chunk_len);
-            println!(
-                "START {:#?}, END {:#?}, NEW END {:#?}",
-                start, orig_len, end
-            );
 
             assert!(start <= real_start);
             assert!(end >= orig_len);
@@ -485,13 +456,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             if start == 0 {
                 None
             } else {
-                println!("USING PROJECTION {:#?}", ((start, end)));
-
                 // calculate chunk idx
                 let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
-                //println!("Num chunks {}", num_chunks);
                 let mut chunk_idx = start / chunk_len;
-                //println!("chunk_idx {}", chunk_idx);
                 let mut chunk_idx_vec = vec![];
                 for _i in 0..logmn(num_chunks) {
                     chunk_idx_vec.push(chunk_idx % 2);
@@ -501,9 +468,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 chunk_idx_vec = chunk_idx_vec.into_iter().rev().collect();
 
                 proj_chunk_idx = Some(chunk_idx_vec);
-                //println!("chunk idx {:#?}", proj_chunk_idx);
 
-                Some((start, end)) // handle doc extension TODO?
+                Some((start, end))
             }
         } else {
             None
@@ -519,25 +485,31 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let hybrid_len = if hybrid {
             let half_len = max(pub_len, priv_len).next_power_of_two();
-
             table.append(&mut vec![calc_fill; half_len - table.len()]);
-
             Some(half_len * 2)
         } else {
             None
         };
-        
+
         let cost_model_batch_size;
 
-        if batch_size==0 {
+        if batch_size == 0 {
             let project = match projection {
-                Some(_) => true, 
-                _ => false, 
+                Some(_) => true,
+                _ => false,
             };
-            cost_model_batch_size = opt_cost_model_select(safa, usize_doc.len(), hybrid, hybrid_len, project, max_offsets, max_branches, max_stack, final_paths.clone());
-
-            println!("PATH LENS {:#?}", final_paths.clone());
-        } else { 
+            cost_model_batch_size = opt_cost_model_select(
+                safa,
+                usize_doc.len(),
+                hybrid,
+                hybrid_len,
+                project,
+                max_offsets,
+                max_branches,
+                max_stack,
+                final_paths.clone(),
+            );
+        } else {
             cost_model_batch_size = batch_size;
         }
 
@@ -556,7 +528,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: cost_model_batch_size,
-            udoc: usize_doc, //usizes
+            udoc: usize_doc, // usizes
             idoc: int_doc,   // big ints
             ep_num,
             max_branches,
@@ -568,7 +540,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             stack,
             stack_ptr: 0,
             pc: pcs,
-            doc_rc_v: Some(Integer::from(1)), // Convert back to none later
             doc_subset,
             proj_chunk_idx,
             hybrid_len,
@@ -586,24 +557,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
-    pub fn prover_accepting_state(&self, state: usize) -> u64 {
-        let mut out = false;
-
-        // proof of membership
-        for a in self.safa.accepting().iter() {
-            out = out || a.index() == state;
-        }
-
-        if out {
-            1
-        } else {
-            0
-        }
-    }
-
-    // CIRCUIT
-
-    // check if we need vs as vars
     fn lookup_idxs(&mut self, include_vs: bool) -> Vec<Term> {
         let num_chars = self.num_ab.len() as u128;
         let bit_limit = logmn(self.num_states) + 1;
@@ -773,11 +726,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut circ_r1cs = to_r1cs(final_cs, cfg());
         circ_r1cs = reduce_linearities(circ_r1cs, cfg());
 
-        // LEAVE THIS IN HERE FOR DEBUGGING >:(
-        // for r in circ_r1cs.constraints().clone() {
-        //     println!("{:#?}", circ_r1cs.format_qeq(&r));
-        // }
-
         circ_r1cs.finalize(&final_cs)
     }
 
@@ -930,7 +878,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 if b > 0 || i == self.max_stack - 1 {
                     self.pub_inputs
                         .push(new_var(format!("stack_ptr_{}_{}", b, i)));
-                    // TODO last?
                 }
 
                 inside_ite = term(
@@ -1098,13 +1045,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     fn cursor_circuit(&mut self) {
         for j in 0..self.batch_size {
-            // println!("{}",j);
             self.pub_inputs.push(new_var(format!("cursor_{}", j)));
 
             let cursor_plus = term(
                 Op::Eq,
                 vec![
-                    new_var(format!("cursor_{}", j + 1)), // vanishing
+                    new_var(format!("cursor_{}", j + 1)),
                     term(
                         Op::PfNaryOp(PfNaryOp::Add),
                         vec![
@@ -1117,15 +1063,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.assertions.push(cursor_plus);
 
             let bit_limit = logmn(max(self.udoc.len(), self.max_offsets)) + 1;
-            // println!(
-            //     "BIT LIMIT {} max {} star {} max {}",
-            //     bit_limit,
-            //     self.max_offsets,
-            //     self.star_offset,
-            //     max(self.udoc.len(), self.max_offsets)
-            // );
-
-            //new_bool_const(true);
 
             let cur_overflow = term(
                 Op::BvBinPred(BvBinPred::Uge),
@@ -1182,6 +1119,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     ),
                 ],
             );
+
             // if no upper off, lower off < max off
             let lower_overflow = term(
                 Op::BvBinPred(BvBinPred::Uge),
@@ -1215,7 +1153,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             if j == 0 {
                 // PUSH
-                // if in_state \in forall - only first
                 let push_stmt = self.push_stack_circuit();
 
                 // POP
@@ -1247,7 +1184,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     ],
                 );
 
-                // ite
                 let do_what = term(
                     Op::Ite,
                     vec![
@@ -1261,7 +1197,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 );
                 self.assertions.push(do_what);
 
-                //cursor_0
+                // cursor_0
                 let pop_condition = term(Op::Eq, vec![new_const(3), new_var(format!("rel_{}", 0))]);
                 let c0 = new_bool_const(true);
                 term(
@@ -1283,7 +1219,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 );
                 self.assertions.push(c0);
             } else {
-                // assert not forall
                 self.assertions.push(self.not_forall_circ(j));
             }
         }
@@ -1447,7 +1382,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             self.pub_inputs.push(new_var(format!("{}_sc_r_{}", id, j)));
 
             // "V" chooses rand r_{j} (P chooses this with hash)
-            //let r_j = new_var(format!("sc_r_{}", j));
 
             // update claim for the next round g_j(r_j)
             claim = term(
@@ -1478,7 +1412,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
             if j == num_rounds {
                 // output last g_v(r_v) claim
-
                 let last_claim = term(
                     Op::Eq,
                     vec![claim.clone(), new_var(format!("{}_sc_last_claim", id))],
@@ -1500,7 +1433,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         for i in range {
             // not final q (running claim)
-
             let mut full_q = new_const(0); // dummy
             let mut next_slot = Integer::from(1);
             let doc_l = logmn(doc_len);
@@ -1629,7 +1561,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     }
 
     fn nlookup_gadget(&mut self, mut lookup_vals: Vec<Term>, t_size: usize, id: &str) {
-        // TODO pub inputs -> can make which priv?
         // last state_batch is final "next_state" output
         // v_{batch-1} = (state_{batch-1}, c, state_batch)
         // v_batch = T eval check (optimization)
@@ -1679,7 +1610,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
     // only call in "active" cases
     fn pop_wit(&mut self, wits: &mut FxHashMap<String, Value>) -> usize {
-        println!("POP WIT");
         self.stack_ptr -= 1;
         let popped_elt = self.stack[self.stack_ptr];
 
@@ -1693,8 +1623,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         popped_elt.0
     }
 
-    // TODO if not forall, pad wits
-    //
     fn stack_set(&mut self, wits: &mut FxHashMap<String, Value>, b: usize, push: bool) {
         for i in 0..self.max_stack {
             wits.insert(
@@ -1760,7 +1688,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
     }
 
-    // returns char_num, is_star
     fn get_char_num(&self, edge: Either<char, OpenSet<usize>>) -> usize {
         match edge {
             Either(Err(_openset)) => self.num_ab[&None],
@@ -1827,13 +1754,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("upper_offset_{}", i), new_wit(upper_offset_i));
         wits.insert(format!("offset_{}", i), new_wit(offset_i));
         wits.insert(format!("rel_{}", i), new_wit(rel_i));
-        wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i)); // alreaded "added" here
+        wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i));
 
         let num_chars = self.num_ab.len() as u128;
         let num_states = self.num_states as u128;
         let max_offsets = self.max_offsets as u128;
 
-        // TODO check overflow
         let v_i = Integer::from(
             (rel_i as u128 * num_states * num_states * num_chars * max_offsets * max_offsets)
                 + (state_i as u128 * num_states * num_chars * max_offsets * max_offsets)
@@ -1844,15 +1770,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         );
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
-
-        // println!(
-        //     "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-        //     i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        // );
-        // println!(
-        //     "Lower off {:#?}, off {:#?}, upper off {:#?}",
-        //     lower_offset_i, offset_i, upper_offset_i
-        // );
 
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
@@ -1921,9 +1838,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         wits.insert(format!("upper_offset_{}", i), new_wit(upper_offset_i));
         wits.insert(format!("offset_{}", i), new_wit(offset_i));
         wits.insert(format!("rel_{}", i), new_wit(rel_i));
-        wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i)); // alreaded "added" here
+        wits.insert(format!("cursor_{}", i + 1), new_wit(cursor_i));
 
-        // v_i =
         let num_chars = self.num_ab.len() as u128;
         let num_states = self.num_states as u128;
         let max_offsets = self.max_offsets as u128;
@@ -1939,25 +1855,14 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         wits.insert(format!("v_{}", i), new_wit(v_i.clone()));
 
-        /*
-        println!(
-            "V_{} = {:#?} from {:#?},{:#?},{:#?},{:#?},{:#?} cursor={:#?}",
-            i, v_i, state_i, next_state, char_num, offset_i, rel_i, cursor_i,
-        );
-        println!(
-            "Lower off {:#?}, off {:#?}, upper off {:#?}",
-            lower_offset_i, offset_i, upper_offset_i
-        );*/
-
         q.push(self.table.iter().position(|val| val == &v_i).unwrap());
 
         v_i
     }
 
     pub fn gen_wit_i(
-        //_nlookup(
         &mut self,
-        sols: &mut Vec<LinkedList<TraceElem<char>>>, //move_num: (usize, usize),
+        sols: &mut Vec<LinkedList<TraceElem<char>>>,
         batch_num: usize,
         in_state: usize,
         running_q: Option<Vec<Integer>>,
@@ -2022,7 +1927,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
                 // not forall (TODO check cursor_i correct)
                 if i == 0 {
-                    // must pad out the stack
                     // fill stack vars with padding
                     self.push_wit(&mut wits, None, cursor_i);
                     // pad out "popped" vars, since there's no pop
@@ -2062,9 +1966,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 // handle stack pushes during forall
                 if self.safa.g[te_peek.from_node].is_and() {
                     // push branch
-                    //forall and not coming from
-                    //a transition
-                    // forall
+                    
+                    // forall and not coming from
+                    // a transition
                     if i == 0 {
                         // correct place
 
@@ -2105,7 +2009,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 } else {
                     // not forall
                     if i == 0 {
-                        // must pad out the stack
                         // fill stack vars with padding
                         self.push_wit(&mut wits, None, cursor_i);
                         // pad out "popped" vars, since there's no pop
@@ -2149,14 +2052,11 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             state_i = next_state;
         }
 
-        println!("'WASTED' SLOTS THIS ITERATION: {}", wasted);
+        // println!("'WASTED' SLOTS THIS ITERATION: {}", wasted);
 
         // last state
         wits.insert(format!("state_{}", self.batch_size), new_wit(next_state));
 
-        /*let accept = if rel_i == 2 { 1 } else { 0 }; //todo
-                wits.insert(format!("accepting"), new_wit(accept));
-        */
         assert_eq!(v.len(), self.batch_size);
 
         // projections
@@ -2302,7 +2202,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             format!("{}_prev_running_claim", id),
             new_wit(prev_running_v.clone()),
         );
-        // q.push(prev_running_q);
 
         // q processing
         let mut combined_qs = vec![];
@@ -2356,8 +2255,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
         }
 
-        // sponge
-
         let mut sponge = Sponge::new_with_constants(&self.pc, Mode::Simplex);
         let acc = &mut ();
 
@@ -2403,13 +2300,12 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 .collect(),
         );
         query.push(int_to_ff(prev_running_v.clone()));
-        //let query_f: Vec<G1::Scalar> = query.into_iter().map(|i| int_to_ff(i)).collect();
 
         SpongeAPI::absorb(&mut sponge, query.len() as u32, &query, acc);
 
         // generate claim r
         let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
-        let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+        let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf);
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
 
         let mut rs = vec![claim_r.clone()];
@@ -2426,7 +2322,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 let len = base.pow(logmn(table.len()) as u32) - table.len();
 
                 let mut sct = table.to_vec();
-                sct.extend(vec![Integer::from(0); len]); // ep num = self.nfa.nchars()
+                sct.extend(vec![Integer::from(0); len]);
                 sct
             }
             "nlhybrid" => table.to_vec(),
@@ -2486,19 +2382,6 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             new_wit(next_running_v.clone()),
         );
 
-        // sanity check - TODO eliminate
-        /*let (_, eq_term) = prover_mle_partial_eval(
-            &rs,
-            &sc_rs, //.into_iter().rev().collect(),
-            &q,
-            false,
-            Some(&prev_running_q),
-        );
-        assert_eq!(
-            last_claim,
-            (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
-        );*/
-
         (wits, next_running_q, next_running_v)
     }
 }
@@ -2557,7 +2440,7 @@ mod tests {
             // claim check
             let (_, running_v) = prover_mle_partial_eval(
                 &evals,
-                &last_q, //.clone().into_iter().rev().collect(),
+                &last_q,
                 &(0..evals.len()).collect(),
                 true,
                 None,
@@ -2609,7 +2492,7 @@ mod tests {
             // next
             let (_, next_running_v) = prover_mle_partial_eval(
                 &table,
-                &sc_rs, //.clone().into_iter().rev().collect(),
+                &sc_rs,
                 &(0..table.len()).collect(),
                 true,
                 None,
@@ -2618,10 +2501,10 @@ mod tests {
             // sanity check
             let (_, eq_term) = prover_mle_partial_eval(
                 &claims,
-                &sc_rs, //.into_iter().rev().collect(),
+                &sc_rs,
                 &qs,
                 false,
-                Some(&last_q), //.into_iter().rev().collect()),
+                Some(&last_q),
             );
             assert_eq!(
                 claim, // last claim
@@ -2707,7 +2590,7 @@ mod tests {
             SAFA::new(&ab[..], &r)
         };
 
-        let chars: Vec<char> = doc.chars().collect(); //map(|c| c.to_string()).collect();
+        let chars: Vec<char> = doc.chars().collect();
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
@@ -2842,15 +2725,12 @@ mod tests {
         }
     }
 
-    // kinda sorta
     fn path_eq(lens: &Vec<usize>, sols: &Vec<LinkedList<TraceElem<char>>>) -> bool {
         let mut sol_lens: Vec<usize> = sols.into_iter().map(|s| s.len()).collect();
         let mut path_lens = lens.clone();
 
         path_lens.sort();
         sol_lens.sort();
-
-        println!("PATHS {:#?}, SOLS {:#?}", path_lens, sol_lens);
 
         (path_lens == sol_lens)
     }
@@ -2872,7 +2752,7 @@ mod tests {
             (0..128).filter_map(std::char::from_u32).collect(),
             reg("^(?=.*[A-Z].*[A-Z])(?=.*[^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
             "q1w2e3r4".to_string(),
-            vec![2], // 2],
+            vec![2], 
             true,
             None,
             false,
@@ -2889,7 +2769,7 @@ mod tests {
             reg("^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG$"),
 
         ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
-            vec![2], // 2],
+            vec![2],
             true,
             None,
             false,
@@ -2905,7 +2785,7 @@ mod tests {
             ab("ATGC"),
             reg("^.{10}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG"),
             ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
-            vec![2], // 2],
+            vec![2],
             true,
             None,
             false,
@@ -2921,7 +2801,7 @@ mod tests {
             (0..128).filter_map(std::char::from_u32).collect(),
             reg("^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
             ab("B6u$r@s#R5mE"),
-            vec![2,3,4,6], // 2],
+            vec![2,3,4,6],
             true,
             None,
             false,
@@ -2937,7 +2817,7 @@ mod tests {
             ab("abcd"),
             reg("^................aaaaaa$"),
             ab("ddddddddddddddddaaaaaa"),
-            vec![2], // 2],
+            vec![2],
             true,
             Some(16),
             false,
@@ -2953,7 +2833,7 @@ mod tests {
             ab("abcd"),
             reg("^(?=a)ab(?=c)cd$"),
             ab("abcd"),
-            vec![2], // 2],
+            vec![2],
             true,
             None,
             false,
@@ -2968,10 +2848,10 @@ mod tests {
         test_func_no_hash(
             ab("abcd"),
             reg("^.....................d$"),
-            ab("bbbbbbbbaabbccddaabbdd"), // really [ aabbcc, EOF, epsilon ]
-            vec![2],                      // 2],
+            ab("bbbbbbbbaabbccddaabbdd"),
+            vec![2],
             true,
-            Some(18), // (4,8)
+            Some(18),
             true,
             false,
             false,
@@ -2984,9 +2864,9 @@ mod tests {
             ab("abcd"),
             reg("^.....c$"),
             ab("aabbcc"),
-            vec![2], // 2],
+            vec![2],
             true,
-            Some(5), // (4,8)
+            Some(5),
             true,
             false,
             false,
@@ -3000,8 +2880,8 @@ mod tests {
         test_func_no_hash(
             ab("ab"),
             reg("^ab$"),
-            ab("ab"), // really [ aabbcc, EOF, epsilon ]
-            vec![2],  // 2],
+            ab("ab"),
+            vec![2],
             true,
             None,
             true,
@@ -3019,7 +2899,7 @@ mod tests {
             ab("abcd"),
             reg("^.....c$"),
             ab("aabbcc"),
-            vec![2], // 2],
+            vec![2],
             true,
             Some(5), // (4,8)
             false,
@@ -3035,7 +2915,7 @@ mod tests {
             ab("abcd"),
             reg("^(?=a)ab(?=c)cd$"),
             ab("abcd"),
-            vec![2], // 2],
+            vec![2],
             true,
             None,
             false,
@@ -3051,7 +2931,7 @@ mod tests {
             ab("abcd"),
             reg("^(?=a)ab(?=c)cd$"),
             ab("abcd"),
-            vec![2], // 2],
+            vec![2],
             true,
             None,
             false,
@@ -3074,20 +2954,6 @@ mod tests {
             false,
             false,
         );
-        /*    test_func_no_hash(
-            "abc".to_string(),
-            "^ab$".to_string(),
-            "ab".to_string(),
-            vec![1],
-            true,
-        );
-        test_func_no_hash(
-            "abcdef".to_string(),
-            "^ab.*f$".to_string(),
-            "abcdeffff".to_string(),
-            vec![1, 3],
-            true,
-        );*/
     }
 
     #[test]
@@ -3159,15 +3025,6 @@ mod tests {
             false,
             false,
         );
-        /*
-              test_func_no_hash(
-                  "helowrd".to_string(),
-                  "^hello$".to_string(),
-                  "helloworld".to_string(),
-                  vec![1, 5],
-                  false,
-              );
-        */
     }
 
     #[test]
@@ -3184,15 +3041,6 @@ mod tests {
             false,
             false,
         );
-
-        /*    test_func_no_hash(
-                "helowrd".to_string(),
-                "^hello$".to_string(),
-                "helloworld".to_string(),
-                vec![3, 4, 6, 7],
-                false,
-            );
-        */
     }
 
     #[test]

@@ -10,50 +10,54 @@
 
 ## Description
 
-A zero-knowledge regular expression matching scheme based on polynomials.
+A system for generating zero-knowledge proofs that a committed document matches or does not match a regular expression
 
-## Useage
+## Compile
 
-There are four subcommands in Reef.
 ```
-Usage: reef <COMMAND>
+cargo build
+```
+
+With metrics:
+```
+cargo build --feature metrics
+```
+
+## Usage
+
+```
+Usage: reef [OPTIONS] --input <FILE> --output <FILE> --re <RE> <COMMAND>
 
 Commands:
   ascii  Accepts ASCII regular-expressions and documents
   utf8   Accepts UTF8 regular-expressions and documents
-  dna    Accepts DNA base encoded binary files (2-bits/base)
+  dna    Accepts DNA base ASCII files
   help   Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+  -i, --input <FILE>
+  -o, --output <FILE>
+  -r, --re <RE>             Perl-style regular expression
+  -b, --batch-size <USIZE>  Batch size (override auto select) [default: 0]
+  -p, --projections         Use document projections
+  -y, --hybrid              Use hybrid nlookup
+  -m, --merkle              Use merkle tree for document commitment
+  -n, --negate              Negate the match result
+  -h, --help                Print help
+  -V, --version             Print version
 ```
 
 A good starting point is to generate the proof that `aaaaaaaab` matches the regex `.*b`.
 
 ```
 $ echo aaaaaaaab > input.txt
-$ reef ascii -t basic-english -i input.txt -r ".*b"
-```
-
-For ASCII and UTF8 documents, Reef supports any subset of the following rules
-
-- `ignore-whitespace` ignore space, tabs, carriage returns and newlines in the input document.
-- `alpha-numeric` reduce the alphabet to the alphanumeric charset of ASCII.
-- `case-insensitive` ignore upper/lowercasing in the document (regex must be uppercase).
-- `basic-english` Upper/lowercase latin characters and basic punctuation.
-
-For example, Reef runs all the rules in an input with mixed casing, whitespace, alphanumeric characters
-
-```
-$ echo -n "aA\tb" > input.txt
-$ reef ascii -t ignore-whitespace,alpha-numeric,case-insensitive -i input.txt -r ".*B"
+$ reef -i input.txt -o metrics.txt -r ".*b" ascii
 ```
 
 or another example
 ```
 $ echo "hello world happy to be here" > hello.txt
-$ reef ascii -t ignore-whitespace,alpha-numeric -i hello.txt -r "hello.*"
+$ reef -i hello.txt -o metrics.txt -r "hello.*" ascii
 ```
 
 Thank you for using Reef,

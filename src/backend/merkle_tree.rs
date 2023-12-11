@@ -26,7 +26,7 @@ impl<F: PrimeField> MerkleCommitment<F> {
         let mut tree = vec![];
         let mut doc_f = vec![];
 
-        // leafs
+        // leaves
         let mut i = 0;
         let mut next_level = vec![];
         while i < doc.len() {
@@ -49,7 +49,7 @@ impl<F: PrimeField> MerkleCommitment<F> {
         }
         tree.push(next_level.clone());
 
-        // non leafs
+        // non leaves
         while next_level.len() > 1 {
             i = 0;
             let prev = next_level;
@@ -132,9 +132,6 @@ impl<F: PrimeField> MerkleCommitment<F> {
         let wit = match idx % 2 {
             0 => {
                 if idx + 1 >= self.doc.len() {
-                    // TODO potentially make the "padding"
-                    // something else
-
                     MerkleWit {
                         l_or_r: true,
                         opposite_idx: Some(F::zero()),

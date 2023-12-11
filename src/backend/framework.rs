@@ -13,7 +13,6 @@ use crate::backend::merkle_tree::MerkleWit;
 use crate::backend::r1cs_helper::trace_preprocessing;
 use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
 use crate::frontend::safa::SAFA;
-use std::path::PathBuf;
 use bincode;
 use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
 use circ::target::r1cs::ProverData;
@@ -28,6 +27,7 @@ use nova_snark::{
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 use rug::Integer;
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -48,17 +48,6 @@ struct ProofInfo {
 
 #[cfg(feature = "metrics")]
 use metrics::metrics::{log, log::Component};
-
-// fn consistency_proof_size(proof:Option<ConsistencyProof>)->usize{
-//     let cp = proof.unwrap();
-//     let snark_size = bincode::serialize(&cp.snark).unwrap().len();
-//     let v_size = bincode::serialize(&cp.v_commit.compress()).unwrap().len();
-//     let vprime_size = bincode::serialize(&cp.v_prime_commit.unwrap().compress()).unwrap().len();
-//     let ipa_size = bincode::serialize(&cp.ipa).unwrap().len();
-//     let q_size = bincode::serialize(&cp.running_q).unwrap().len();
-//     let hybrid_size = bincode::serialize(&cp.hybrid_ipa).unwrap().len();
-//     snark_size+v_size+vprime_size+ipa_size+q_size+hybrid_size
-// }
 
 // gen R1CS object, commitment, make step circuit for nova
 pub fn run_backend(
@@ -84,7 +73,6 @@ pub fn run_backend(
 
     let solver_thread = thread::spawn(move || {
         // we do setup here to avoid unsafe passing
-
         let batch_size = temp_batch_size;
 
         let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
@@ -396,8 +384,6 @@ fn solve<'a>(
     let mut stack_out;
 
     let mut current_state = r1cs_converter.safa.get_init().index();
-    // TODO don't recalc :(
-
     let mut next_state = 0;
 
     #[cfg(feature = "metrics")]
@@ -411,7 +397,6 @@ fn solve<'a>(
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver, "fa_solver");
-    //end safa solve
 
     let commit_blind = if r1cs_converter.doc_hash.is_some() {
         r1cs_converter.doc_hash.unwrap()
@@ -426,8 +411,6 @@ fn solve<'a>(
             Component::Solver,
             format!("witness_generation_{}", i).as_str(),
         );
-        // allocate real witnesses for round i
-
         (
             wits,
             next_state,
@@ -456,10 +439,6 @@ fn solve<'a>(
         for (cur, kid) in &r1cs_converter.stack {
             stack_out.push(cur * r1cs_converter.num_states + kid);
         }
-
-        // TODO
-        // just for debugging :)
-        circ_data.check_all(&wits);
 
         let sp_0 = <G1 as Group>::Scalar::from(stack_ptr_0 as u64);
         let spp = <G1 as Group>::Scalar::from(stack_ptr_popped as u64);
@@ -618,10 +597,10 @@ fn solve<'a>(
 
         #[cfg(feature = "metrics")]
         {
-        log::stop(
-            Component::Solver,
-            format!("witness_generation_{}", i).as_str(),
-        );
+            log::stop(
+                Component::Solver,
+                format!("witness_generation_{}", i).as_str(),
+            );
         }
 
         sender.send(Some(circuit_primary)).unwrap(); //witness_i).unwrap();
@@ -659,7 +638,7 @@ fn prove_and_verify(
     recv: Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     recv_qv: Receiver<(Vec<Integer>, Integer)>,
     mut proof_info: ProofInfo,
-    out_write: PathBuf
+    out_write: PathBuf,
 ) {
     println!("Proving thread starting...");
 
@@ -691,22 +670,10 @@ fn prove_and_verify(
 
         #[cfg(feature = "metrics")]
         {
-        log::stop(Component::Prover, format!("prove_{}", i).as_str());
-        log::write_csv(&out_write.as_path().display().to_string()).unwrap();
-    }
+            log::stop(Component::Prover, format!("prove_{}", i).as_str());
+            log::write_csv(&out_write.as_path().display().to_string()).unwrap();
+        }
 
-        // verify recursive - TODO we can get rid of this verify once everything works
-        // PLEASE LEAVE this here for Jess for now - immensely helpful with debugging
-        /*let res = result.clone().unwrap().verify(
-                    &proof_info.pp.lock().unwrap(),
-                    FINAL_EXTERNAL_COUNTER,
-                    proof_info.z0_primary.clone(),
-                    z0_secondary.clone(),
-                );
-                println!("Recursive res: {:#?}", res);
-
-                assert!(res.is_ok()); // TODO delete
-        */
         recursive_snark = Some(result.unwrap());
 
         i += 1;
@@ -715,8 +682,6 @@ fn prove_and_verify(
 
     assert!(recursive_snark.is_some());
     let recursive_snark = recursive_snark.unwrap();
-
-    println!("post recurisve snark");
 
     // compressed SNARK
     #[cfg(feature = "metrics")]
@@ -736,8 +701,6 @@ fn prove_and_verify(
         let mut dc = proof_info.commit.nldoc.as_ref().unwrap();
         let (q, v) = recv_qv.recv().unwrap();
 
-        println!("post compress");
-
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, "consistency_proof");
         //Doc dot prod and consistency
@@ -755,8 +718,6 @@ fn prove_and_verify(
         consist_proof = Some(cp)
     }
 
-    println!("post cp");
-
     #[cfg(feature = "metrics")]
     {
         log::stop(Component::Prover, "prove+wit");
@@ -768,30 +729,6 @@ fn prove_and_verify(
         "snark_size",
         bincode::serialize(&compressed_snark).unwrap().len(),
     );
-
-    // #[cfg(feature = "metrics")]
-    // log::space(
-    //     Component::Prover,
-    //     "Proof Size",
-    //     "Compressed SNARK size",
-    //     bincode::serialize(&compressed_snark).unwrap().len(),
-    // );
-
-    // #[cfg(feature = "metrics")]
-    // log::space(
-    //     Component::Prover,
-    //     "Proof Size",
-    //     "Commit Size",
-    //     bincode::serialize(&proof_info.commit).unwrap().len(),
-    // );
-
-    // #[cfg(feature = "metrics")]
-    // log::space(
-    //     Component::Prover,
-    //     "Proof Size",
-    //     "Consist Proof size",
-    //     consistency_proof_size(&consist_proof).unwrap().len(),
-    // );
 
     #[cfg(feature = "metrics")]
     {
@@ -815,8 +752,6 @@ fn prove_and_verify(
         proof_info.hybrid_len,
         consist_proof,
     );
-
-    println!("post verify");
 }
 
 fn verify(
@@ -923,7 +858,6 @@ fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> (usize, us
     let q_size = bincode::serialize(&cp.running_q).unwrap().len();
 
     let eq_proof_size = bincode::serialize(&cp.eq_proof).unwrap().len();
-    // check? let l_commit_size = bincode::serialize(&cp.l_commit).unwrap().len();
 
     (
         doc_size,
@@ -1056,48 +990,5 @@ mod tests {
             false,
             false,
         );
-        /* backend_test(
-                "ab".to_string(),
-                "^a*b*$".to_string(),
-                &("aa".to_string()).chars().map(|c| c.to_string()).collect(),
-                Some(JBatching::Nlookup),
-                Some(JCommit::Nlookup),
-                vec![0, 1, 2],
-            );
-            backend_test(
-                "ab".to_string(),
-                "^a*b*$".to_string(),
-                &("aaab".to_string())
-                    .chars()
-                    .map(|c| c.to_string())
-                    .collect(),
-                Some(JBatching::Nlookup),
-                Some(JCommit::Nlookup),
-                vec![0, 2],
-            );
-            backend_test(
-                "ab".to_string(),
-                "^ab*$".to_string(),
-                &("abbbbbbb".to_string())
-                    .chars()
-                    .map(|c| c.to_string())
-                    .collect(),
-                Some(JBatching::Nlookup),
-                Some(JCommit::Nlookup),
-                vec![0, 2, 5],
-            );
-            backend_test(
-                "ab".to_string(),
-                "^a*$".to_string(),
-                &("aaaaaaaaaaaaaaaa".to_string())
-                    .chars()
-                    .map(|c| c.to_string())
-                    .collect(),
-                Some(JBatching::Nlookup),
-                Some(JCommit::Nlookup),
-                vec![0, 2, 5],
-                // [1,2,3,4,5,6,7,8,
-            );
-        */
     }
 }

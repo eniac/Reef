@@ -25,12 +25,13 @@ use rug::integer::{IsPrime, Order};
 use rug::Integer;
 use std::collections::HashMap;
 
+// helper functions from CirC, with modifications
+
 /// Convert a (rug) integer to a prime field element.
 pub fn int_to_ff<F: PrimeField>(i: Integer) -> F {
     let mut accumulator = F::from(0);
     let limb_bits = (std::mem::size_of::<limb_t>() as u64) << 3;
     let limb_base = F::from(2).pow_vartime([limb_bits]);
-    // as_ref yeilds a least-significant-first array.
     for digit in i.as_ref().iter().rev() {
         accumulator *= limb_base;
         accumulator += F::from(*digit);
@@ -59,7 +60,7 @@ pub fn lc_to_bellman<F: PrimeField, CS: ConstraintSystem<F>>(
     lc_bellman
 }
 
-// hmmm... this should work essentially all the time, I think
+// from Alex: hmmm... this should work essentially all the time, I think
 fn get_modulus<F: Field + PrimeField>() -> Integer {
     let neg_1_f = -F::one();
     let p_lsf: Integer = Integer::from_digits(neg_1_f.to_repr().as_ref(), Order::Lsf) + 1;
@@ -82,7 +83,7 @@ pub enum GlueOpts<F: PrimeField> {
 
 #[derive(Clone, Debug)]
 pub struct NFAStepCircuit<F: PrimeField> {
-    r1cs: R1csFinal, // TODO later ref
+    r1cs: R1csFinal,
     values: Option<Vec<Value>>,
     pub pc: PoseidonConstants<F, typenum::U4>,
     states: Vec<F>,
@@ -96,8 +97,6 @@ pub struct NFAStepCircuit<F: PrimeField> {
     merkle_tree_wits: Option<Vec<Vec<MerkleWit<F>>>>,
 }
 
-// note that this will generate a single round, and no witnesses, unlike nova example code
-// witness and loops will happen at higher level bc its my code and i can do what i want
 impl<F: PrimeField> NFAStepCircuit<F> {
     pub fn new(
         r1cs: R1csFinal,
@@ -128,8 +127,6 @@ impl<F: PrimeField> NFAStepCircuit<F> {
                 panic!("glue I/O does not match");
             }
         }
-
-        // println!("wits {:#?}", values);
 
         NFAStepCircuit {
             r1cs,
@@ -198,8 +195,6 @@ impl<F: PrimeField> NFAStepCircuit<F> {
             alloc_prev_rc[sc_l] = Some(prev_v.clone());
             return Ok(true);
         } else if s.starts_with(&format!("{}_eq_{}_q", tag, num_lookups)) {
-            //self.batch_size)) {
-            // q
             let s_sub: Vec<&str> = s.split("_").collect();
             let q: usize = s_sub[4].parse().unwrap();
 
@@ -251,7 +246,7 @@ impl<F: PrimeField> NFAStepCircuit<F> {
     ) -> Result<bool, SynthesisError>
 where {
         if s.starts_with(&format!("stack_ptr_popped")) {
-            *alloc_stack_ptr_popped = Some(alloc_v.clone()); //.get_variable();
+            *alloc_stack_ptr_popped = Some(alloc_v.clone());
             return Ok(true);
         } else if s.starts_with(&format!("stack_{}_", self.max_branches)) {
             let s_sub: Vec<&str> = s.split("_").collect();
@@ -260,7 +255,6 @@ where {
 
             return Ok(true);
         } else if s.starts_with(&format!("cursor_{}", self.batch_size)) {
-            //, self.batch_size)) {
             *last_cursor = Some(alloc_v.clone());
             return Ok(true);
         }
@@ -275,7 +269,7 @@ where {
     ) -> Result<(), SynthesisError>
 where {
         if s.starts_with(&format!("state_{}", self.batch_size)) {
-            *last_state = Some(alloc_v.clone()); //.get_variable();
+            *last_state = Some(alloc_v.clone());
         }
         Ok(())
     }
@@ -288,24 +282,24 @@ where {
         alloc_chars: &mut Vec<Option<AllocatedNum<F>>>,
     ) -> Result<bool, SynthesisError> {
         if s.starts_with("char_") {
-            let v_j = Some(alloc_v.clone()); //.get_variable();
+            let v_j = Some(alloc_v.clone());
 
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
 
             if j < self.batch_size {
-                alloc_chars[j] = v_j; // j+1 -> j
+                alloc_chars[j] = v_j;
             }
 
             return Ok(true);
         } else if s.starts_with("merkle_lookup_") {
-            let v_j = Some(alloc_v.clone()); //.get_variable();
+            let v_j = Some(alloc_v.clone());
 
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[2].parse().unwrap();
 
             if j < self.batch_size {
-                alloc_cursors[j] = v_j; // j+1 -> j
+                alloc_cursors[j] = v_j;
             }
 
             return Ok(true);
@@ -332,27 +326,26 @@ where {
 
             return Ok(true);
         } else if (tag == "nl") && s.starts_with("v_") {
-            let v_j = Some(alloc_v.clone()); //.get_variable();
+            let v_j = Some(alloc_v.clone());
 
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
-            alloc_vs[j] = v_j; // TODO check
+            alloc_vs[j] = v_j;
 
             return Ok(true);
         } else if (tag == "nldoc") && s.starts_with("char_") {
-            let v_j = Some(alloc_v.clone()); //.get_variable();
+            let v_j = Some(alloc_v.clone());
 
-            //let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
 
             if j < self.batch_size {
-                alloc_vs[j] = v_j; // j+1 -> j
+                alloc_vs[j] = v_j;
             } // don't add the last one
 
             return Ok(true);
         } else if (tag == "nlhybrid") && s.starts_with("v_") {
-            let v_j = Some(alloc_v.clone()); //.get_variable();
+            let v_j = Some(alloc_v.clone());
 
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
@@ -360,15 +353,13 @@ where {
 
             return Ok(true);
         } else if (tag == "nlhybrid") && s.starts_with("char_") {
-            let v_j = Some(alloc_v.clone()); //.get_variable();
+            let v_j = Some(alloc_v.clone());
 
-            //let j = s.chars().nth(5).unwrap().to_digit(10).unwrap() as usize;
             let s_sub: Vec<&str> = s.split("_").collect();
             let j: usize = s_sub[1].parse().unwrap();
 
             if j < self.batch_size {
-                // CORRECT?
-                alloc_vs[self.batch_size + j] = v_j; // j+1 -> j
+                alloc_vs[self.batch_size + j] = v_j;
             } // don't add the last one
 
             return Ok(true);
@@ -412,9 +403,7 @@ where {
         let tree_wits = self.merkle_tree_wits.clone().unwrap();
 
         for i in 0..alloc_cursors.len() {
-            // num lookups
-
-            // leafs
+            // leaves
             let w0 = AllocatedNum::alloc(
                 cs.namespace(|| format!("filler witness idx batch {}", i)),
                 || Ok(tree_wits[i][0].opposite_idx.unwrap()),
@@ -547,8 +536,7 @@ where {
 
             Elt::ensure_allocated(
                 &output[0],
-                &mut sponge_ns.namespace(|| format!("ensure allocated {}", tag)), // name must be the same
-                // (??)
+                &mut sponge_ns.namespace(|| format!("ensure allocated {}", tag)),
                 true,
             )?
         };
@@ -570,8 +558,6 @@ where {
         //A: Arity<F>,
         CS: ConstraintSystem<F>,
     {
-        // original var alloc'd before
-
         let new_pos = {
             SpongeAPI::absorb(sponge, query.len() as u32, query, sponge_ns);
 
@@ -579,8 +565,7 @@ where {
 
             Elt::ensure_allocated(
                 &output[0],
-                &mut sponge_ns.namespace(|| format!("ensure allocated {}", tag)), // name must be the same
-                // (??)
+                &mut sponge_ns.namespace(|| format!("ensure allocated {}", tag)),
                 true,
             )?
         };
@@ -621,21 +606,19 @@ where {
         let mut pattern = match tag {
             "nl" => {
                 vec![
-                    SpongeOp::Absorb((self.batch_size + sc_l + 1 + num_cqs) as u32), // vs,
-                    // combined_q,
-                    // running q,v
+                    SpongeOp::Absorb((self.batch_size + sc_l + 1 + num_cqs) as u32),
                     SpongeOp::Squeeze(1),
                 ]
             }
             "nldoc" => {
                 vec![
-                    SpongeOp::Absorb((self.batch_size + sc_l + 2 + num_cqs) as u32), // vs,
+                    SpongeOp::Absorb((self.batch_size + sc_l + 2 + num_cqs) as u32),
                     SpongeOp::Squeeze(1),
                 ]
             }
             "nlhybrid" => {
                 vec![
-                    SpongeOp::Absorb((self.batch_size * 2 + sc_l + 2 + num_cqs) as u32), // vs,
+                    SpongeOp::Absorb((self.batch_size * 2 + sc_l + 2 + num_cqs) as u32),
                     SpongeOp::Squeeze(1),
                 ]
             }
@@ -650,28 +633,22 @@ where {
 
         // (combined_q, vs, running_q, running_v)
         let mut elts = vec![];
-        //println!("FIAT SHAMIR ELTS {}", tag);
 
         // if DOC
         if matches!(tag, "nldoc") || matches!(tag, "nlhybrid") {
             let e = AllocatedNum::alloc(sponge_ns.namespace(|| "doc commit hash start"), || {
                 Ok(vesta_hash)
             })?;
-
-            //println!("e: {:#?}", e.clone().get_value());
             elts.push(Elt::Allocated(e));
         }
         for e in alloc_qs {
             elts.push(Elt::Allocated(e.clone().unwrap()));
-            //println!("e: {:#?}", e.clone().unwrap().get_value());
         }
         for e in alloc_vs {
             elts.push(Elt::Allocated(e.clone().unwrap()));
-            //println!("e: {:#?}", e.clone().unwrap().get_value());
         }
         for e in alloc_prev_rc {
             elts.push(Elt::Allocated(e.clone().unwrap()));
-            //println!("e: {:#?}", e.clone().unwrap().get_value());
         }
 
         self.fiatshamir_circuit(
@@ -718,7 +695,6 @@ where {
 
             return Ok(true);
         } else if s.starts_with(&format!("{}_sc_r_", tag)) {
-            // TODO move, do this in order
             // q
             let s_sub: Vec<&str> = s.split("_").collect();
             let q: usize = s_sub[3].parse().unwrap();
@@ -778,9 +754,6 @@ where
     F: PrimeField,
 {
     fn arity(&self) -> usize {
-        // [state, optional<q,v for eval claim>, optional<q,"v"(hash), for doc claim>,
-        // optional<q, "v"(hash) for hybrid claim>, stack_ptr, <stack>]
-
         let mut arity = 2;
         match &self.glue[0] {
             GlueOpts::Split((q, _, dq, _, _, stack)) => {
@@ -802,9 +775,7 @@ where
     fn output(&self, z: &[F]) -> Vec<F> {
         // sanity check
         assert_eq!(z.len(), self.arity());
-
         assert_eq!(z[0], self.states[0]); // "current state"
-                                          //assert_eq!(z[1], self.chars[0]);
 
         let mut i = 1;
         match &self.glue[0] {
@@ -913,7 +884,7 @@ where
         let mut out = vec![];
 
         // convert
-        let f_mod = get_modulus::<F>(); // TODO
+        let f_mod = get_modulus::<F>();
 
         assert_eq!(
             self.r1cs.field.modulus(),
@@ -946,9 +917,9 @@ where
                 let mut alloc_stack_ptr_popped = None;
                 let mut alloc_stack_out = vec![None; stack_len];
 
-                let prev_q = z[1..(1 + sc_l)].to_vec(); //.clone();
+                let prev_q = z[1..(1 + sc_l)].to_vec();
                 let prev_v = z[1 + sc_l].clone();
-                let prev_dq = z[(sc_l + 2)..(sc_l + doc_l + 2)].to_vec(); //.clone();
+                let prev_dq = z[(sc_l + 2)..(sc_l + doc_l + 2)].to_vec();
                 let prev_dv = z[sc_l + doc_l + 2].clone();
 
                 let stack_ptr_0 = z[sc_l + doc_l + 3].clone();
@@ -965,25 +936,16 @@ where
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
-                    //println!("S {:#?}", s);
 
                     let val_f = || {
                         Ok({
                             let i_val = &self.values.as_ref().expect("missing values")[i];
                             let ff_val = int_to_ff(i_val.as_pf().into());
-                            //debug!("value : {var:?} -> {ff_val:?} ({i_val})");
                             ff_val
                         })
                     };
-                    // println!("Var (name?) {:#?}", self.r1cs.names[&var]);
                     let mut matched = self
-                        .input_variable_parsing(
-                            &mut vars,
-                            &s,
-                            var,
-                            state_0.clone(),
-                            //   char_0.clone(),
-                        )
+                        .input_variable_parsing(&mut vars, &s, var, state_0.clone())
                         .unwrap();
                     if !matched {
                         matched = self
@@ -1155,7 +1117,7 @@ where
                 let mut alloc_stack_ptr_popped = None;
                 let mut alloc_stack_out = vec![None; stack_len];
 
-                let prev_q = z[1..(1 + hyb_l)].to_vec(); //.clone();
+                let prev_q = z[1..(1 + hyb_l)].to_vec();
                 let prev_v = z[1 + hyb_l].clone();
 
                 let stack_ptr_0 = z[hyb_l + 2].clone();
@@ -1173,19 +1135,11 @@ where
                         Ok({
                             let i_val = &self.values.as_ref().expect("missing values")[i];
                             let ff_val = int_to_ff(i_val.as_pf().into());
-                            //debug!("value : {var:?} -> {ff_val:?} ({i_val})");
                             ff_val
                         })
                     };
-                    // println!("Var (name?) {:#?}", self.r1cs.names[&var]);
                     let mut matched = self
-                        .input_variable_parsing(
-                            &mut vars,
-                            &s,
-                            var,
-                            state_0.clone(),
-                            //   char_0.clone(),
-                        )
+                        .input_variable_parsing(&mut vars, &s, var, state_0.clone())
                         .unwrap();
                     if !matched {
                         matched = self
@@ -1300,7 +1254,7 @@ where
                 let mut alloc_stack_ptr_popped = None;
                 let mut alloc_stack_out = vec![None; stack_len];
 
-                let prev_q = z[1..(1 + sc_l)].to_vec(); //.clone();
+                let prev_q = z[1..(1 + sc_l)].to_vec();
                 let prev_v = z[1 + sc_l].clone();
 
                 let stack_ptr_0 = z[sc_l + 2].clone();
@@ -1311,30 +1265,21 @@ where
                 let mut alloc_qs = vec![None; num_cqs];
                 let mut alloc_vs = vec![None; self.batch_size];
 
-                let mut alloc_cursors = vec![None; self.batch_size]; // TODO here
+                let mut alloc_cursors = vec![None; self.batch_size];
                 let mut alloc_chars = vec![None; self.batch_size];
 
                 for (i, var) in self.r1cs.vars.iter().copied().enumerate() {
                     let (name_f, s) = self.generate_variable_info(var);
-                    //println!("S {:#?}", s);
 
                     let val_f = || {
                         Ok({
                             let i_val = &self.values.as_ref().expect("missing values")[i];
                             let ff_val = int_to_ff(i_val.as_pf().into());
-                            //debug!("value : {var:?} -> {ff_val:?} ({i_val})");
                             ff_val
                         })
                     };
-                    // println!("Var (name?) {:#?}", self.r1cs.names[&var]);
                     let mut matched = self
-                        .input_variable_parsing(
-                            &mut vars,
-                            &s,
-                            var,
-                            state_0.clone(),
-                            //   char_0.clone(),
-                        )
+                        .input_variable_parsing(&mut vars, &s, var, state_0.clone())
                         .unwrap();
                     if !matched {
                         matched = self
@@ -1450,17 +1395,9 @@ where
             );
         }
 
-        /*println!(
-            "done with synth: {} vars {} cs",
-            vars.len(),
-            self.r1cs.constraints.len()
-        );*/
-
         Ok(out)
     }
 }
-
-// HELPER
 
 // ret = if condition, a, else b
 // condition already asserted to be 0 or 1

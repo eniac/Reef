@@ -49,7 +49,7 @@ jemallocator = "0.3.0"
 criterion = { version = "0.4", features = [ "html_reports" ] }
 
 [features]
-default = []
+default = ["reef"]
 metrics = ["dep:dashmap"]
 plot = []
 nwr = []

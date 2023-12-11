@@ -114,8 +114,6 @@ impl NLDocCommitment {
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,
     {
-        // keys for the H(s||v) proof later
-        // need empty circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(
             &pc,
             <G1 as Group>::Scalar::zero(),
@@ -180,7 +178,7 @@ impl NLDocCommitment {
             let dc = cc.decompress().unwrap();
             dc.absorb_in_ro(&mut ro);
         }
-        let commit_doc_hash = ro.squeeze(256); // todo
+        let commit_doc_hash = ro.squeeze(256);
 
         return Self {
             pc: pc.clone(),
@@ -202,8 +200,8 @@ impl NLDocCommitment {
         &self,
         table: &Vec<Integer>,
         proj_chunk_idx: Option<Vec<usize>>,
-        q: Vec<Integer>, //<G1 as Group>::Scalar>,
-        v: Integer,      //<G1 as Group>::Scalar,
+        q: Vec<Integer>,
+        v: Integer,
         proj: bool,
         hybrid: bool,
     ) -> ConsistencyProof {
@@ -216,12 +214,11 @@ impl NLDocCommitment {
         let (ipa, running_q, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
             self.proof_dot_prod_prover(q_ff, v_ff, proj_chunk_idx, proj, hybrid);
 
-        println!("post proof dot prod prover");
         let (eq_proof, l_commit) = if !hybrid {
             (None, None)
         } else {
             // calculate t
-            let q_prime = &q[1..]; // wonder if this is okay in combo with projections?
+            let q_prime = &q[1..];
             let t = int_to_ff(verifier_mle_eval(table, q_prime));
             let q0 = int_to_ff(q[0].clone());
 
@@ -245,7 +242,6 @@ impl NLDocCommitment {
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
             ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt);
 
-        println!("post new cap");
         let cap_res = SpartanSNARK::cap_prove(
             &self.cap_pk,
             cap_circuit.clone(),
@@ -254,7 +250,6 @@ impl NLDocCommitment {
             &v_ff,
             &v_decommit,
         );
-        println!("post cap prove");
         assert!(cap_res.is_ok());
 
         let cap_snark = cap_res.unwrap();
@@ -338,8 +333,6 @@ impl NLDocCommitment {
             )
         };
 
-        // D(q) = v/v'
-        println!("pre IPI");
         let (ipa, ipw, _) = if !hybrid {
             let res = self.hyrax_gen.prove_eval(
                 &self.doc_poly,
@@ -443,7 +436,6 @@ impl NLDocCommitment {
         let z_out = proof.circuit.output(&z_0);
         let io = z_0.into_iter().chain(z_out.into_iter()).collect::<Vec<_>>();
         let res = proof.snark.cap_verify(&self.cap_vk, &io, &proof.v_commit);
-        // TODO compress()
 
         assert!(res.is_ok());
     }
@@ -628,9 +620,6 @@ mod tests {
             <G1 as Group>::CE::commit(&gen, &[v_prime.clone()], &v_prime_decommit).compress();
         let t_commit = <G1 as Group>::CE::commit(&gen, &[t.clone()], &t_decommit);
 
-        //let l_decommit = <G1 as Group>::Scalar::random(&mut OsRng);
-        //let l_commit = <G1 as Group>::CE::commit(&gen, &[v.clone()], &l_decommit);
-
         let l_decommit = v_prime_decommit * q0 + t_decommit * (<G1 as Group>::Scalar::from(1) - q0);
         let l_commit = (v_prime_commit.decompress().unwrap() * q0
             + t_commit * (<G1 as Group>::Scalar::from(1) - q0))
@@ -653,7 +642,6 @@ mod tests {
         let eq_proof: EqualityProof<G1> = EqualityProof { alpha, z };
 
         // VERIFY
-
         // equality proof C_l = C[v_r]
         let mut v_transcript = Transcript::new(b"eq_proof");
         let res = eq_proof.verify(&gen, &mut v_transcript, &v_commit, &l_commit);
@@ -689,7 +677,7 @@ mod tests {
         for i in 0..scalars.len() {
             sum += scalars[i].clone() * running_q[i].clone();
         }
-        // this passes
+
         assert_eq!(sum, running_v); // <MLE_scalars * running_q> = running_v
 
         // proof of dot prod

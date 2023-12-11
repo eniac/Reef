@@ -40,35 +40,28 @@ fn setup_circ() {
     }
 }
 
-// circuit values
 pub(crate) fn new_const<I>(i: I) -> Term
-// constants
 where
     Integer: From<I>,
 {
     leaf_term(Op::Const(Value::Field(cfg().field().new_v(i))))
 }
 
-pub(crate) fn new_bool_const(b: bool) -> Term
-// constants
-{
+pub(crate) fn new_bool_const(b: bool) -> Term {
     leaf_term(Op::Const(Value::Bool(b)))
 }
 
 pub(crate) fn new_var(name: String) -> Term {
-    // empty holes
     leaf_term(Op::Var(name, Sort::Field(cfg().field().clone())))
 }
 
 pub(crate) fn new_wit<I>(i: I) -> Value
-// wit values
 where
     Integer: From<I>,
 {
     Value::Field(cfg().field().new_v(i))
 }
 
-// PROVER WORK
 pub(crate) fn trace_preprocessing(trace: &Option<Trace<char>>) -> Vec<LinkedList<TraceElem<char>>> {
     // split
     let mut sols: Vec<LinkedList<TraceElem<char>>> = Vec::new();
@@ -132,12 +125,9 @@ pub fn normal_add_table<'a, C>(
                         Either(Err(openset)) => {
                             let single = openset.is_single(); // single offset/epsilon
                             if single.is_some() {
-                                // is single
                                 let lower_offset = single.unwrap();
                                 let upper_offset = single.unwrap();
 
-                                // if offset == 0 { -> doesn't matter, always use epsilon for actual
-                                // epsilon and for jumps
                                 let rel = calc_rel(
                                     state.index(),
                                     out_state,
@@ -174,11 +164,6 @@ pub fn normal_add_table<'a, C>(
                                         + (lower_offset as u128 * max_offsets)
                                         + upper_offset as u128,
                                 ));
-
-                                /*println!(
-                                    "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
-                                    in_state, out_state, c, lower_offset, upper_offset, rel,
-                                ); */
                             } else if openset.is_full() {
                                 // [0,*]
                                 let c = num_ab[&None];
@@ -220,11 +205,6 @@ pub fn normal_add_table<'a, C>(
                                         + (lower_offset as u128 * max_offsets)
                                         + upper_offset as u128,
                                 ));
-
-                                /*println!(
-                                    "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
-                                    in_state, out_state, c, lower_offset, upper_offset, rel,
-                                ); */
                             } else {
                                 // ranges
                                 let mut iter = openset.0.iter();
@@ -273,11 +253,6 @@ pub fn normal_add_table<'a, C>(
                                             + (lower_offset as u128 * max_offsets)
                                             + upper_offset as u128,
                                     ));
-
-                                    /* println!(
-                                        "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
-                                        in_state, out_state, c, lower_offset, upper_offset, rel,
-                                    ); */
                                 }
                             }
                         }
@@ -317,11 +292,6 @@ pub fn normal_add_table<'a, C>(
                                     + (lower_offset as u128 * max_offsets)
                                     + upper_offset as u128,
                             ));
-
-                            /* println!(
-                                "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
-                                in_state, out_state, c, lower_offset, upper_offset, rel,
-                            ); */
                         }
                     }
                 }
@@ -332,7 +302,6 @@ pub fn normal_add_table<'a, C>(
             }
 
             if safa.accepting().contains(&state) {
-                // add check entries to table
                 let lower_offset = 0;
                 let upper_offset = 0;
 
@@ -354,18 +323,7 @@ pub fn normal_add_table<'a, C>(
                 }
                 let in_state = state.index();
 
-                // TODO we have to make sure the multipliers are big enough
-
-                /*println!("ADDITIONAL FOR ACCEPTING");
-                println!(
-                    "V from {:#?},{:#?},{:#?},{:#?},{:#?},{:#?}",
-                    in_state, out_state, c, lower_offset, upper_offset, rel,
-                );
-                */
-
-                let c = num_ab[&Some(26u8 as char)]; // we can only pop after EOF - this constraint
-
-                // assures it
+                let c = num_ab[&Some(26u8 as char)]; // we can only pop after EOF
 
                 set_table.insert(Integer::from(
                     (rel as u128
@@ -402,8 +360,8 @@ pub fn normal_add_table<'a, C>(
 }
 
 pub(crate) fn calc_rel<'a>(
-    in_state: usize,  //NodeIndex,
-    out_state: usize, //NodeIndex,
+    in_state: usize,
+    out_state: usize,
     children: &Vec<usize>,
     kid_padding: usize,
     max_branches: usize,
@@ -427,9 +385,7 @@ pub(crate) fn calc_rel<'a>(
     } else if safa.g[NodeIndex::new(in_state)].is_and() {
         if children[0] == out_state {
             let base: usize = num_states;
-
             // push only for the "first branch"
-
             rel = 4;
             for k in 1..children.len() {
                 rel += children[children.len() - k] * base.pow(k as u32);
@@ -481,7 +437,7 @@ pub(crate) fn node_depth_map(
     (n, 0, NodeIndex::new(0))
 }
 
-// a starts with evals on hypercube
+// starts with evals on hypercube
 pub(crate) fn linear_mle_product<F: PrimeField>(
     table_t: &mut Vec<Integer>,
     table_eq: &mut Vec<Integer>,
@@ -499,7 +455,6 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     let mut con = Integer::from(0);
 
     for b in 0..pow {
-        //for t in vec![0,1] {
         let ti_0 = &table_t[b];
         let ti_1 = &table_t[b + pow];
         let ei_0 = &table_eq[b];
@@ -518,7 +473,6 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     x = x.rem_floor(cfg().field().modulus());
     con = con.rem_floor(cfg().field().modulus());
 
-    // generate rands
     let query = vec![
         int_to_ff(con.clone()),
         int_to_ff(x.clone()),
@@ -528,10 +482,9 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     let acc = &mut ();
     SpongeAPI::absorb(sponge, 3, &query, acc);
     let rand = SpongeAPI::squeeze(sponge, 1, acc);
-    let r_i = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf); // TODO?
+    let r_i = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf);
 
     for b in 0..pow {
-        // todo opt
         table_t[b] = &table_t[b] * (Integer::from(1) - &r_i) + &table_t[b + pow] * &r_i;
         table_eq[b] = &table_eq[b] * (Integer::from(1) - &r_i) + &table_eq[b + pow] * &r_i;
     }
@@ -552,15 +505,12 @@ pub(crate) fn gen_eq_table(
 
     let mut eq_t = vec![Integer::from(0); t_len];
 
-    //let mut term = Integer::from(0);
     for i in 0..qs.len() {
         eq_t[qs[i]] += &rs[i];
-        //term += evals[qs[i]].clone() * &claims[i];
     }
 
     for i in 0..eq_t.len() {
-        // eq_t
-        let mut term = rs[qs.len()].clone(); //Integer::from(1);
+        let mut term = rs[qs.len()].clone();
 
         for j in (0..ell).rev() {
             let xi = (i >> j) & 1;
@@ -585,7 +535,7 @@ pub(crate) fn prover_mle_partial_eval(
     x: &[Integer],
     es: &Vec<usize>,
     for_t: bool,
-    last_q: Option<&Vec<Integer>>, // only q that isn't in {0,1}, inelegant but whatever
+    last_q: Option<&Vec<Integer>>, // only q that isn't in {0,1}
 ) -> (Integer, Integer) {
     let base: usize = 2;
     let m = x.len();
@@ -601,13 +551,10 @@ pub(crate) fn prover_mle_partial_eval(
     let mut hole_coeff = Integer::from(0);
     let mut minus_coeff = Integer::from(0);
     for i in 0..es.len() + 1 {
-        //e in 0..table.len() {
-
         // ~eq(x,e)
         if i < es.len() {
             let mut prod = prods[i].clone();
-            let mut next_hole_coeff = 0; // TODO as below ???
-                                         //let mut next_minus_coeff;
+            let mut next_hole_coeff = 0;
             for j in (0..m).rev() {
                 let ej = (es[i] >> j) & 1;
 
@@ -615,22 +562,19 @@ pub(crate) fn prover_mle_partial_eval(
                 if x[m - j - 1] == -1 {
                     // if x_j is the hole
                     next_hole_coeff = ej;
-                //      next_minus_coeff = 1 - ej;
                 } else {
                     let mut intm = Integer::from(1);
                     if ej == 1 {
                         intm.assign(&x[m - j - 1]);
                     } else {
-                        // ej == 0
                         intm -= &x[m - j - 1];
                     }
-                    prod *= intm; //&x[j] * ej + (1 - &x[j]) * (1 - ej);
+                    prod *= intm;
                 }
             }
             if next_hole_coeff == 1 {
                 hole_coeff += &prod;
             } else {
-                // next minus coeff == 1
                 minus_coeff += &prod;
             }
         } else {
@@ -641,19 +585,17 @@ pub(crate) fn prover_mle_partial_eval(
                     let mut next_hole_coeff = Integer::from(1); // in case of no hole
                     let mut next_minus_coeff = Integer::from(1);
                     for j in 0..m {
-                        let ej = q[j].clone(); // TODO order?
-                                               // for each x
+                        let ej = q[j].clone();
                         if x[j] == -1 {
                             // if x_j is the hole
                             next_hole_coeff = ej.clone();
                             next_minus_coeff = Integer::from(1) - &ej;
                         } else {
-                            let mut intm = ej.clone() * &x[j]; // ei*xi
-                            intm += (Integer::from(1) - &ej) * (Integer::from(1) - &x[j]); // +(1-ei)(1-xi)
-                            prod *= intm; //&x[j] * ej + (1 - &x[j]) * (1 - ej);
+                            let mut intm = ej.clone() * &x[j];
+                            intm += (Integer::from(1) - &ej) * (Integer::from(1) - &x[j]);
+                            prod *= intm;
                         }
                     }
-
                     hole_coeff += &prod * next_hole_coeff;
                     minus_coeff += &prod * next_minus_coeff;
                 }
@@ -674,8 +616,6 @@ pub fn verifier_mle_eval(table: &[Integer], q: &[Integer]) -> Integer {
 
     con
 }
-
-// CIRCUITS
 
 // coeffs = [constant, x, x^2 ...]
 pub(crate) fn horners_circuit_vars(coeffs: &Vec<Term>, x_lookup: Term) -> Term {
