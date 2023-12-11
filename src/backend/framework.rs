@@ -359,6 +359,8 @@ fn solve<'a>(
     hash_salt: <G1 as Group>::Scalar,
     merkle_commit: Option<MerkleCommitment<<G1 as Group>::Scalar>>,
 ) {
+    println!("Solving thread starting...");
+
     let mut wits;
     let mut running_q: Option<Vec<Integer>> = None;
     let mut running_v: Option<Integer> = None;
@@ -714,6 +716,8 @@ fn prove_and_verify(
         consist_proof = Some(cp)
     }
 
+    println!("Proving Finished");
+
     #[cfg(feature = "metrics")]
     {
         log::stop(Component::Prover, "prove+wit");
@@ -761,6 +765,8 @@ fn verify(
     hybrid_len: Option<usize>,
     consist_proof: Option<ConsistencyProof>,
 ) {
+    println!("Verification starting...");
+
     let z0_secondary = vec![<G2 as Group>::Scalar::zero()];
 
     #[cfg(feature = "metrics")]
@@ -824,6 +830,8 @@ fn verify(
 
     // final accepting
     assert_eq!(zn[0], <G1 as Group>::Scalar::from(exit_state as u64));
+
+    println!("Verification Finished");
 
     #[cfg(feature = "metrics")]
     log::stop(Component::Verifier, "consistency_verification");

@@ -12,3 +12,4 @@ fast*
 slow*
 *.sym
 *.r1cs
+*.txt
