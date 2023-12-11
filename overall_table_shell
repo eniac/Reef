@@ -72,7 +72,5 @@
 
       }
         \caption{Summary of all costs for all applications evaluated in \sys{}.
-        R1CS Constraints are for the step function in Nova.
-        Times are averaged across 10 runs, standard deviation was less than 5\%
-        for all components and applications.}\label{t:overall}
+        R1CS Constraints are for the step function in Nova.}\label{t:overall}
 \end{figure*}
