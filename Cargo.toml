@@ -56,10 +56,6 @@ nwr = []
 reef = []
 naive = []
 
-[[bench]]
-name = "bench"
-harness = false
-
 [profile.release]
 debug = true
 

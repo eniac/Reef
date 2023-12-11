@@ -669,7 +669,7 @@ fn prove_and_verify(
         #[cfg(feature = "metrics")]
         {
             log::stop(Component::Prover, format!("prove_{}", i).as_str());
-            log::write_csv(&out_write.unwrap().as_path().display().to_string()).unwrap();
+            log::write_csv(&out_write.clone().unwrap().as_path().display().to_string()).unwrap();
         }
 
         recursive_snark = Some(result.unwrap());

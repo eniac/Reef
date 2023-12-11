@@ -33,10 +33,10 @@ fn main() {
     };
 
     #[cfg(feature = "nwr")]
-    naive_wr::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output);
+    naive_wr::naive_bench(opt.re.clone(), ab.clone(), doc.iter().collect::<String>(), opt.output.clone());
 
     #[cfg(feature = "naive")]
-    naive::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output);
+    naive::naive_bench(opt.re.clone(), ab.clone(), doc.iter().collect::<String>(), opt.output.clone());
 
     #[cfg(feature = "reef")]
     {
