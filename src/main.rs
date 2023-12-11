@@ -12,10 +12,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-// #[cfg(all(not(windows), not(target_env = "musl")))]
-// #[global_allocator]
-// static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
 #[cfg(feature = "metrics")]
 use metrics::metrics::{log, log::Component};
 
