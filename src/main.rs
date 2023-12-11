@@ -87,7 +87,7 @@ fn main() {
         if title.len() > 10 {
             title = title[..10].to_string();
         }
-        let mut test_type;
+        let test_type;
         if opt.hybrid | opt.projections {
             test_type = "reef";
         } else {
@@ -107,7 +107,7 @@ fn main() {
         ]);
         let spacer = "---------";
         let _ = wtr.write_record(&[spacer, spacer, spacer, spacer, "\n"]);
-        wtr.flush();
+        let _ = wtr.flush();
         #[cfg(feature = "metrics")]
         log::write_csv(opt.output.to_str().unwrap()).unwrap();
 
