@@ -4,7 +4,7 @@
 # Reef
 
 This is an implementation of Reef, a system for generating zero-knowledge proofs that a committed document matches or does not match a regular expression.
-The details of Reef are described in our [Reef: Fast Succinct Non-Interactive Zero-Knowledge Regex Proofs] (https://eprint.iacr.org/2023/1886) by 
+The details of Reef are described in our [Reef: Fast Succinct Non-Interactive Zero-Knowledge Regex Proofs](https://eprint.iacr.org/2023/1886) by 
 Sebastian Angel, Eleftherios Ioannidis, Elizabeth Margolin, Srinath Setty, and Jess Woods.
 
 ## Compile
