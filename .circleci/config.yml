@@ -9,4 +9,6 @@ jobs:
       - run: cargo --version
       - run:
           name: Run Tests
-          command: "cargo test"
+          no_output_timeout: 30m
+          command: cargo test
+
