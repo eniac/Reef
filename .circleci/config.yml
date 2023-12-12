@@ -10,5 +10,5 @@ jobs:
       - run:
           name: Run Tests
           no_output_timeout: 30m
-          command: cargo test -- --skip e2e
+          command: cargo test --release -- --skip e2e
 
