@@ -1963,7 +1963,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 // handle stack pushes during forall
                 if self.safa.g[te_peek.from_node].is_and() {
                     // push branch
-                    
+
                     // forall and not coming from
                     // a transition
                     if i == 0 {
@@ -2623,7 +2623,6 @@ mod tests {
 
             let trace = safa.solve(&chars);
             let mut sols = trace_preprocessing(&trace);
-            //let eq = path_eq(&r1cs_converter.path_lens, &sols);
 
             let mut i = 0;
             while r1cs_converter.sol_num < sols.len() {
@@ -2722,16 +2721,6 @@ mod tests {
         }
     }
 
-    fn path_eq(lens: &Vec<usize>, sols: &Vec<LinkedList<TraceElem<char>>>) -> bool {
-        let mut sol_lens: Vec<usize> = sols.into_iter().map(|s| s.len()).collect();
-        let mut path_lens = lens.clone();
-
-        path_lens.sort();
-        sol_lens.sort();
-
-        (path_lens == sol_lens)
-    }
-
     fn reg(s: &str) -> String {
         let mut d = s.to_string();
         d
@@ -2749,7 +2738,7 @@ mod tests {
             (0..128).filter_map(std::char::from_u32).collect(),
             reg("^(?=.*[A-Z].*[A-Z])(?=.*[^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
             "q1w2e3r4".to_string(),
-            vec![2], 
+            vec![2],
             true,
             None,
             false,

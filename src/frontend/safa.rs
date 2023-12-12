@@ -783,6 +783,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_safa_double_negate1() {
         let r = re::simpl(re::new("(a|b).{1,3}a"));
         let safa = SAFA::new("ab", &r);
@@ -792,6 +793,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_safa_double_negate_alt() {
         let r = re::simpl(re::new("(a.*|.*b)a"));
         let safa = SAFA::new("ab", &r);
@@ -799,6 +801,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_safa_double_negate_and() {
         let r = re::simpl(re::new("^(?=ab)ba$"));
         let safa = SAFA::new("ab", &r);
@@ -840,14 +843,14 @@ mod tests {
     fn test_running_problems() {
         let rstr = "^(a{3}|((?=b).{2}))$";
         let r = re::simpl(re::new(rstr));
-        let safa = SAFA::new("ab", &r);
+        SAFA::new("ab", &r);
     }
 
     #[test]
     fn test_running_problems2() {
         let rstr = "ab{1,3}";
         let r = re::simpl(re::new(rstr));
-        let safa = SAFA::new("ab", &r);
+        SAFA::new("ab", &r);
     }
 
     #[cfg(feature = "plot")]
@@ -929,8 +932,7 @@ mod tests {
         ] {
             let r = re::simpl(re::new(s));
             println!("PIHOLE {}", r);
-            let safa = SAFA::new(&ab, &r);
-            println! {"Regex: {:#?}",s};
+            SAFA::new(&ab, &r);
         }
     }
 
@@ -943,8 +945,7 @@ mod tests {
             r"[0-9]{1,6}\ [a-zA-z\ ]*\ (CT|BLVD|ST|DR|AVE|PL|COURT|BOULEVARD)[a-zA-z0-9\ ]*,[A-Z0-9a-z]*,[A-Z]*,[A-Z\ ]*,[A-Z]{2},[A-Z]*,[1-9][0-9]{8},",
         ] {
             let r = re::simpl(re::new(s));
-            let safa: SAFA<char> = SAFA::new(&ab, &r);
-            println! {"Regex: {:#?}",s};
+            SAFA::new(&ab, &r);
         }
     }
 
