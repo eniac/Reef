@@ -959,23 +959,6 @@ mod tests {
     }
 
     #[test]
-    fn test_real_safa_validate_dns() {
-        let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
-        let ab: String = abvec.iter().collect();
-        for s in vec![r"^(?!you).*tube\.", r"\.ir\.{5}$", "porn|sex|xxx"] {
-            let r = re::simpl(re::new(s));
-            let safa = SAFA::new(&ab, &r);
-            // let safa = SAFA::new("abcdefghijklmnopqrstuvwxyz", &r);
-            println! {"Regex: {:#?}",s};
-            let strdoc = "sadtube.com";
-            let doc = strdoc.chars().collect();
-
-            println!("SOLUTION for: {}", strdoc);
-            println!("{:?}", safa.solve(&doc));
-        }
-    }
-
-    #[test]
     fn test_real_safa_validate_pii() {
         let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
         let ab: String = abvec.iter().collect();
