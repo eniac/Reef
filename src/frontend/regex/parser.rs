@@ -18,7 +18,7 @@ impl RegexParser {
     fn to_regex_top(e: &Expr) -> Result<Regex, String> {
         let res = match e {
             Expr::Concat(l) => {
-                let mut inner = Self::to_regex(e.clone())?;
+                let mut inner = Self::to_regex(e)?;
                 if let Some(e) = l.get(0) {
                     match e {
                         Expr::StartLine | Expr::StartText => (),

@@ -403,7 +403,7 @@ impl RegexF {
             RegexF::And(ref a, ref b) => RegexF::and(&a.deriv(c), &b.deriv(c)),
             RegexF::Star(ref a) => RegexF::app(&a.deriv(c), &RegexF::star(a)),
             // The [nil] rule again
-            RegexF::Range(ref a, i, j) if *i == 0 && *j == 0 => RegexF::empty(),
+            RegexF::Range(_, i, j) if *i == 0 && *j == 0 => RegexF::empty(),
             // The app rule: a{i, j} = aa{i-1, j-1} but if a is nullable, repeat the app rule
             RegexF::Range(ref a, i, j) if a.nullable() => RegexF::alt(
                 &RegexF::app(&a.deriv(c), &RegexF::range_pred(a, i, j)),

@@ -11,7 +11,7 @@ use petgraph::Graph;
 
 use std::result::Result;
 
-use crate::frontend::openset::{OpenRange, OpenSet};
+use crate::frontend::openset::OpenSet;
 use crate::frontend::quantifier::Quant;
 use crate::frontend::regex::{re, Regex, RegexF};
 use crate::trace::{Trace, TraceElem};
@@ -19,10 +19,8 @@ use rayon::iter::*;
 
 use core::fmt;
 use core::fmt::{Display, Formatter};
-use lazy_static::lazy_static;
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Either<A, B>(pub Result<A, B>);
@@ -34,15 +32,6 @@ impl<A, B> Either<A, B> {
     fn right(b: B) -> Self {
         Self(Err(b))
     }
-    fn test_left<F>(&self, f: F) -> bool
-    where
-        F: Fn(&A) -> bool,
-    {
-        match self.0 {
-            Ok(ref a) => f(a),
-            _ => false,
-        }
-    }
     fn test_right<F>(&self, f: F) -> bool
     where
         F: Fn(&B) -> bool,
@@ -50,12 +39,6 @@ impl<A, B> Either<A, B> {
         match self.0 {
             Err(ref b) => f(b),
             _ => false,
-        }
-    }
-    fn right_or<'a>(&'a self, default: &'a B) -> &'a B {
-        match self.0 {
-            Ok(_) => default,
-            Err(ref e) => e,
         }
     }
 }
@@ -551,13 +534,6 @@ mod tests {
     use std::collections::LinkedList;
     use std::fmt::Display;
 
-    /// Helper function to output states
-    fn print_states<C: Display + Clone + Eq>(safa: &SAFA<C>) {
-        safa.g
-            .node_indices()
-            .for_each(|i| println!("({}) -> {}", i.index(), safa.g[i]))
-    }
-
     /// Equivalent solutions up to epsilon steps
     fn equiv_upto_epsilon(test: &Option<Trace<char>>, control: &Trace<char>) {
         if let Some(t) = test {
@@ -781,7 +757,7 @@ mod tests {
         let abvec: Vec<char> = (0..128).filter_map(std::char::from_u32).collect();
         let ab: String = abvec.iter().collect();
         let r = re::new(r"\.");
-        println!("{:#?}", r);
+        SAFA::new(&ab, &r);
     }
 
     #[test]
@@ -985,8 +961,7 @@ mod tests {
         GATGGATCATATGGAAACTGGCAGCTATGGAATGTGCCTTTCCTAAGGAATTTGCTAATAGATGCCTAAGCCCAGAAAGGGTGCTTCTTCAACTAAAATA
         CAG"] {
             let r = re::simpl(re::new(s));
-            let safa: SAFA<char> = SAFA::new("ACTGactg", &r);
-            println!{"Regex: {:#?}",s};
+            SAFA::new("ACTGactg", &r);
         }
     }
 
