@@ -1,16 +1,9 @@
-
 [![CircleCI](https://circleci.com/gh/elefthei/rezk.svg?style=svg&circle-token=88c4900395a0fc7ac7d9d63b3186d31c9d840ef2)](https://app.circleci.com/pipelines/github/elefthei/rezk?branch=main&circle-token=88c4900395a0fc7ac7d9d63b3186d31c9d840ef2)
 
 # Reef
 
-## Authors
-- Lef Ioannidis `elefthei at seas.upenn.edu`
-- Eli Margolin `ecmargo at seas.upenn.edu`
-- Jess Woods `jkwoods at seas.upenn.edu`
-
-## Description
-
-A system for generating zero-knowledge proofs that a committed document matches or does not match a regular expression
+This is an implementation of Reef, a system for generating zero-knowledge proofs that a committed document matches or does not match a regular expression.
+The details of Reef are described in our paper: [Reef: Fast Succinct Non-Interactive Zero-Knowledge Regex Proofs](https://eprint.iacr.org/2023/1886).
 
 ## Compile
 
@@ -58,6 +51,19 @@ or another example
 ```
 $ echo "hello world happy to be here" > hello.txt
 $ reef -i hello.txt -o metrics.txt -r "hello.*" ascii
+```
+
+## Reproducing Baseline Results
+If you're interested in reproducing our baseline results (DFA and DFA with recursion), you'll need to checkout the branch reef_with_baselines and build as follows: 
+
+For DFA 
+```
+cargo build --feature naive
+```
+
+For DFA with Recursion
+```
+cargo build --feature nwr
 ```
 
 Thank you for using Reef,
