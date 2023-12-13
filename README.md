@@ -54,5 +54,18 @@ $ echo "hello world happy to be here" > hello.txt
 $ reef -i hello.txt -o metrics.txt -r "hello.*" ascii
 ```
 
+## Reproducing Baseline Results
+If you're interested in reproducing our baseline results (DFA and DFA with recursion), you'll need to build as follows: 
+
+For DFA 
+```
+cargo build --feature naive
+```
+
+For DFA with Recursion
+```
+cargo build --feature nwr
+```
+
 Thank you for using Reef,
 Happy proving!
