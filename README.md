@@ -55,7 +55,7 @@ $ reef -i hello.txt -o metrics.txt -r "hello.*" ascii
 ```
 
 ## Reproducing Baseline Results
-If you're interested in reproducing our baseline results (DFA and DFA with recursion), you'll need to build as follows: 
+If you're interested in reproducing our baseline results (DFA and DFA with recursion), you'll need to checkout the branch reef_with_baselines and build as follows: 
 
 For DFA 
 ```
