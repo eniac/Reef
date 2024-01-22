@@ -78,6 +78,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
     ) -> Self {
         assert!(udoc.len() > 0);
 
+        println!("udoc: {:#?}", udoc.clone());
+
         // character conversions
         let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
         let mut i = 0;
@@ -386,7 +388,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // EPSILON
-        let ep_num = udoc.len() - 1;
+        let ep_num = orig_doc_len + 1;
 
         let mut stack = vec![];
         for _i in 0..max_stack {
