@@ -45,7 +45,7 @@ pub struct ReefCommitment {
 
 pub struct NLDocCommitment {
     // commitment to doc
-    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    pub pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     single_gens: CommitmentGens<G1>,
     hyrax_gen: HyraxPC<G1>,
     doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,

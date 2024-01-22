@@ -39,6 +39,7 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     // sticking out here
     pub_inputs: Vec<Term>,
     pub batch_size: usize,
+    orig_doc_len: usize,
     pub udoc: Vec<usize>,
     pub idoc: Vec<Integer>,
     ep_num: usize,
@@ -67,14 +68,15 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
 impl<'a, F: PrimeField> R1CS<'a, F, char> {
     pub fn new(
         safa: &'a SAFA<char>,
-        doc: &Vec<char>,
+        udoc: Vec<usize>,
+        orig_doc_len: usize,
         batch_size: usize,
         projection: Option<usize>,
         hybrid: bool,
         merkle: bool,
         pcs: PoseidonConstants<F, typenum::U4>,
     ) -> Self {
-        assert!(doc.len() > 0);
+        assert!(udoc.len() > 0);
 
         // character conversions
         let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
@@ -85,6 +87,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
         num_ab.insert(None, i + 1); // EPSILON
         num_ab.insert(Some(26u8 as char), i + 2); // EOF
+
+        assert!(udoc.len() >= orig_doc_len);
+        assert!(udoc.len().next_power_of_two() == udoc.len());
 
         // generate T
         let mut num_states = safa.g.node_count();
@@ -375,34 +380,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // generate usize doc
-        let mut usize_doc = vec![];
         let mut int_doc = vec![];
-        for c in doc.clone().into_iter() {
-            if !num_ab.contains_key(&Some(c)) {
-                panic!("Character in document that's not in alphabet");
-            }
-            let u = num_ab[&Some(c)];
-            usize_doc.push(u);
+        for u in udoc.clone().into_iter() {
             int_doc.push(Integer::from(u));
         }
 
-        // EOF
-        let u = num_ab[&Some(26u8 as char)];
-        usize_doc.push(u);
-        int_doc.push(Integer::from(u));
-
         // EPSILON
-        let ep_num = usize_doc.len();
-        let u = num_ab[&None];
-        usize_doc.push(u);
-        int_doc.push(Integer::from(u));
-
-        // extend doc
-        let base: usize = 2;
-        let orig_len = usize_doc.len();
-        let ext_len = base.pow(logmn(usize_doc.len()) as u32) - usize_doc.len();
-        usize_doc.extend(vec![0; ext_len]);
-        int_doc.extend(vec![Integer::from(0); ext_len]);
+        let ep_num = udoc.len() - 1;
 
         let mut stack = vec![];
         for _i in 0..max_stack {
@@ -411,20 +395,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut proj_chunk_idx = None;
         let doc_subset = if projection.is_some() {
-            if (usize_doc.len().next_power_of_two() <= table.len()) && hybrid {
+            if (udoc.len().next_power_of_two() <= table.len()) && hybrid {
                 panic!(
                     "Doc len {} <= table size {} already. Projections AND hybrid not useful together, choose one.",
-                usize_doc.len().next_power_of_two(), table.len());
+                udoc.len().next_power_of_two(), table.len());
             }
 
             let real_start = projection.unwrap();
-            let mut chunk_len = usize_doc.len().next_power_of_two() / 2;
-            let mut e = usize_doc.len().next_power_of_two();
+            let mut chunk_len = udoc.len().next_power_of_two() / 2;
+            let mut e = udoc.len().next_power_of_two();
             let mut s = 0;
             let mut end = e;
             let mut start = 0;
 
-            while e >= orig_len {
+            while e >= orig_doc_len {
                 end = e;
                 start = s;
 
@@ -433,7 +417,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     s += chunk_len;
                 }
                 e = s + chunk_len;
-                assert!(end <= usize_doc.len().next_power_of_two());
+                assert!(end <= udoc.len().next_power_of_two());
 
                 // try to go smaller
                 chunk_len = chunk_len / 2
@@ -443,7 +427,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             assert!(chunk_len.next_power_of_two() == chunk_len);
 
             assert!(start <= real_start);
-            assert!(end >= orig_len);
+            assert!(end >= orig_doc_len);
             assert!(start % chunk_len == 0);
 
             // proj vs hybrid calc
@@ -455,7 +439,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 None
             } else {
                 // calculate chunk idx
-                let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
+                let num_chunks = udoc.len().next_power_of_two() / chunk_len;
                 let mut chunk_idx = start / chunk_len;
                 let mut chunk_idx_vec = vec![];
                 for _i in 0..logmn(num_chunks) {
@@ -478,7 +462,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let ds = doc_subset.unwrap();
             ds.1 - ds.0
         } else {
-            usize_doc.len()
+            udoc.len()
         };
 
         let hybrid_len = if hybrid {
@@ -498,7 +482,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             };
             cost_model_batch_size = opt_cost_model_select(
                 safa,
-                usize_doc.len(),
+                udoc.len(),
                 hybrid,
                 hybrid_len,
                 project,
@@ -526,8 +510,9 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: cost_model_batch_size,
-            udoc: usize_doc, // usizes
-            idoc: int_doc,   // big ints
+            orig_doc_len,
+            udoc,          // usizes
+            idoc: int_doc, // big ints
             ep_num,
             max_branches,
             max_stack,
@@ -2391,6 +2376,7 @@ pub fn ceil_div(a: usize, b: usize) -> usize {
 mod tests {
     use crate::backend::commitment::final_clear_checks;
     use crate::backend::commitment::ReefCommitment;
+    use crate::backend::framework::run_committer;
     use crate::backend::r1cs::*;
     use crate::frontend::regex::re;
     use crate::frontend::safa::SAFA;
@@ -2435,13 +2421,8 @@ mod tests {
             let mut eq_a = gen_eq_table(&claims, &qs, &last_q.clone().into_iter().rev().collect());
 
             // claim check
-            let (_, running_v) = prover_mle_partial_eval(
-                &evals,
-                &last_q,
-                &(0..evals.len()).collect(),
-                true,
-                None,
-            );
+            let (_, running_v) =
+                prover_mle_partial_eval(&evals, &last_q, &(0..evals.len()).collect(), true, None);
             term += running_v * &claims[3];
 
             let mut claim: Integer = evals
@@ -2487,22 +2468,11 @@ mod tests {
             }
 
             // next
-            let (_, next_running_v) = prover_mle_partial_eval(
-                &table,
-                &sc_rs,
-                &(0..table.len()).collect(),
-                true,
-                None,
-            );
+            let (_, next_running_v) =
+                prover_mle_partial_eval(&table, &sc_rs, &(0..table.len()).collect(), true, None);
 
             // sanity check
-            let (_, eq_term) = prover_mle_partial_eval(
-                &claims,
-                &sc_rs,
-                &qs,
-                false,
-                Some(&last_q),
-            );
+            let (_, eq_term) = prover_mle_partial_eval(&claims, &sc_rs, &qs, false, Some(&last_q));
             assert_eq!(
                 claim, // last claim
                 (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
@@ -2589,17 +2559,12 @@ mod tests {
 
         let chars: Vec<char> = doc.chars().collect();
 
-        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-
         for b in batch_sizes {
-            let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, merkle, sc.clone());
+            let hybrid_len = None; // TODO JESS
+            let (reef_commit, sc, udoc) = run_committer(&chars, &ab, hybrid_len, merkle);
 
-            let reef_commit = ReefCommitment::new(
-                r1cs_converter.udoc.clone(),
-                r1cs_converter.hybrid_len,
-                merkle,
-                &sc,
-            );
+            let mut r1cs_converter =
+                R1CS::new(&safa, udoc, chars.len(), b, proj, hybrid, merkle, sc);
 
             if reef_commit.nldoc.is_some() {
                 let dc = reef_commit.nldoc.as_ref().unwrap();

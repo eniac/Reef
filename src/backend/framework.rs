@@ -7,22 +7,28 @@ type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
 type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
-use crate::backend::costs::full_round_cost_model;
-use crate::backend::merkle_tree::MerkleCommitment;
-use crate::backend::merkle_tree::MerkleWit;
-use crate::backend::r1cs_helper::trace_preprocessing;
-use crate::backend::{commitment::*, costs::logmn, nova::*, r1cs::*};
-use crate::frontend::safa::SAFA;
+use crate::{
+    backend::{
+        commitment::*,
+        costs::{full_round_cost_model, logmn},
+        merkle_tree::{MerkleCommitment, MerkleWit},
+        nova::*,
+        r1cs::*,
+        r1cs_helper::trace_preprocessing,
+    },
+    frontend::safa::SAFA,
+};
 use bincode;
-use circ::target::r1cs::wit_comp::StagedWitCompEvaluator;
-use circ::target::r1cs::ProverData;
+use circ::target::r1cs::{wit_comp::StagedWitCompEvaluator, ProverData};
+use fxhash::FxHashMap;
 use generic_array::typenum;
 use neptune::{
+    poseidon::PoseidonConstants,
     sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
-use nova_snark::provider::pedersen::CompressedCommitment;
 use nova_snark::{
+    provider::pedersen::CompressedCommitment,
     traits::{circuit::TrivialTestCircuit, Group},
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
@@ -33,7 +39,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-struct ProofInfo {
+pub struct ProofInfo {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
     commit: ReefCommitment,
@@ -48,15 +54,72 @@ struct ProofInfo {
 #[cfg(feature = "metrics")]
 use metrics::metrics::{log, log::Component};
 
-// gen R1CS object, commitment, make step circuit for nova
-pub fn run_backend(
+pub fn run_committer(
+    doc: &Vec<char>,
+    ab: &String,
+    hybrid_len: Option<usize>,
+    merkle: bool,
+) -> (
+    ReefCommitment,
+    PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    Vec<usize>,
+) {
+    // prover information
+    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
+    let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
+    let mut i = 0;
+    for c in ab.clone().chars() {
+        num_ab.insert(Some(c), i);
+        i += 1;
+    }
+    num_ab.insert(None, i + 1); // EPSILON
+    num_ab.insert(Some(26u8 as char), i + 2); // EOF
+
+    let mut udoc = vec![];
+    for c in doc.clone().into_iter() {
+        if !num_ab.contains_key(&Some(c)) {
+            panic!("Character in document that's not in alphabet");
+        }
+        let u = num_ab[&Some(c)];
+        udoc.push(u);
+    }
+
+    // EOF
+    let u = num_ab[&Some(26u8 as char)];
+    udoc.push(u);
+
+    // EPSILON
+    let u = num_ab[&None];
+    udoc.push(u);
+
+    // extend doc
+    let base: usize = 2;
+    let ext_len = base.pow(logmn(udoc.len()) as u32) - udoc.len();
+    udoc.extend(vec![0; ext_len]);
+
+    #[cfg(feature = "metrics")]
+    log::tic(Component::CommitmentGen, "generation");
+    let reef_commit = ReefCommitment::new(udoc.clone(), hybrid_len, merkle, &sc);
+
+    (reef_commit, sc, udoc)
+}
+
+pub fn run_prover(
+    reef_commit: ReefCommitment,
+    sc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     safa: SAFA<char>,
     doc: Vec<char>,
+    udoc: Vec<usize>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
     projections: bool,
     hybrid: bool,
     merkle: bool,
     out_write: Option<PathBuf>,
+) -> (
+    CompressedSNARK<G1, G2, C1, C2, S1, S2>,
+    ProofInfo,
+    Option<ConsistencyProof>,
 ) {
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
@@ -73,14 +136,20 @@ pub fn run_backend(
     let solver_thread = thread::spawn(move || {
         // we do setup here to avoid unsafe passing
         let batch_size = temp_batch_size;
-
-        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-
         let proj = if projections { safa.projection() } else { None };
+
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "r1cs_init");
-        let mut r1cs_converter =
-            R1CS::new(&safa, &doc, batch_size, proj, hybrid, merkle, sc.clone());
+        let mut r1cs_converter = R1CS::new(
+            &safa,
+            udoc,
+            doc.len(),
+            batch_size,
+            proj,
+            hybrid,
+            merkle,
+            sc.clone(),
+        );
 
         #[cfg(feature = "metrics")]
         log::stop(Component::Compiler, "r1cs_init");
@@ -89,15 +158,6 @@ pub fn run_backend(
             r1cs_converter.merkle,
             r1cs_converter.hybrid_len.is_some(),
             r1cs_converter.doc_subset.is_some()
-        );
-
-        #[cfg(feature = "metrics")]
-        log::tic(Component::CommitmentGen, "generation");
-        let reef_commit = ReefCommitment::new(
-            r1cs_converter.udoc.clone(),
-            r1cs_converter.hybrid_len,
-            r1cs_converter.merkle,
-            &sc,
         );
 
         let mut hash_salt = <G1 as Group>::Scalar::zero();
@@ -156,10 +216,12 @@ pub fn run_backend(
     //get args
     let proof_info = recv_setup.recv().unwrap();
 
-    prove_and_verify(recv, recv_qv, proof_info, out_write.clone());
+    let (compressed_snark, consist_proof) = prove(recv, recv_qv, &proof_info, out_write.clone());
 
     // rejoin child
     solver_thread.join().expect("setup/solver thread panicked");
+
+    (compressed_snark, proof_info, consist_proof)
 }
 
 fn setup<'a>(
@@ -634,11 +696,14 @@ fn solve<'a>(
     }
 }
 
-fn prove_and_verify(
+fn prove(
     recv: Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     recv_qv: Receiver<(Vec<Integer>, Integer)>,
-    proof_info: ProofInfo,
+    proof_info: &ProofInfo,
     out_write: Option<PathBuf>,
+) -> (
+    CompressedSNARK<G1, G2, C1, C2, S1, S2>,
+    Option<ConsistencyProof>,
 ) {
     println!("Proving thread starting...");
 
@@ -704,7 +769,7 @@ fn prove_and_verify(
         //Doc dot prod and consistency
         let cp = dc.prove_consistency(
             &proof_info.table,
-            proof_info.proj_chunk_idx,
+            proof_info.proj_chunk_idx.clone(),
             q,
             v,
             proof_info.projections,
@@ -741,6 +806,14 @@ fn prove_and_verify(
         log::space(Component::CommitmentGen, "commitment", commit_sz);
     }
 
+    (compressed_snark, consist_proof)
+}
+
+pub fn run_verifier(
+    compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
+    proof_info: ProofInfo,
+    consist_proof: Option<ConsistencyProof>,
+) {
     verify(
         compressed_snark,
         proof_info.z0_primary,
@@ -890,15 +963,23 @@ mod tests {
         let safa = SAFA::new(&ab[..], &r);
 
         init();
-        run_backend(
-            safa.clone(),
-            doc.clone(),
+
+        let hybrid_len = None; // TODO JESS
+        let (reef_commit, sc, udoc) = run_committer(&doc, &ab, hybrid_len, merkle);
+
+        let (compressed_snark, proof_info, consist_proof) = run_prover(
+            reef_commit,
+            sc,
+            safa,
+            doc,
+            udoc,
             batch_size,
             projections,
             hybrid,
             merkle,
             None,
         );
+        run_verifier(compressed_snark, proof_info, consist_proof);
     }
 
     #[test]
