@@ -18,17 +18,31 @@ cargo build --feature metrics
 ```
 
 ## Usage
-
 ```
-Usage: reef [OPTIONS] --input <FILE> --output <FILE> --re <RE> <COMMAND>
+Usage: reef [OPTIONS] --doc <FILE> --metrics <FILE> --re <RE> --prover-info <FILE> --verifier-info <FILE> --proof <FILE> <ALPHABET>
 
-Commands:
+Alphabet:
   ascii  Accepts ASCII regular-expressions and documents
   utf8   Accepts UTF8 regular-expressions and documents
   dna    Accepts DNA base ASCII files
   help   Print this message or the help of the given subcommand(s)
 
 Options:
+  -i, --doc <FILE>
+  -o, --metrics <FILE>
+  -r, --re <RE>               Perl-style regular expression
+      --prover-info <FILE>
+      --verifier-info <FILE>
+      --proof <FILE>
+  -b, --batch-size <USIZE>    Batch size (override auto select) [default: 0]
+  -p, --projections           Use document projections
+  -y, --hybrid                Use hybrid nlookup
+  -m, --merkle                Use merkle tree for document commitment
+  -n, --negate                Negate the match result
+  -h, --help                  Print help
+  -V, --version               Print version
+
+
   -i, --input <FILE>
   -o, --output <FILE>
   -r, --re <RE>             Perl-style regular expression

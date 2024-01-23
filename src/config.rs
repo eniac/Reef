@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -7,16 +7,37 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
+#[clap(group(
+            ArgGroup::new("mode")
+                .required(true)
+                .args(&["commit", "prove", "verify"]),
+        ))]
 pub struct Options {
     /// Configuration options, charset ["ascii", "utf8", "dna"]
     #[command(subcommand)]
-    pub config: Config,
-    #[arg(short = 'i', long, value_name = "FILE")]
-    pub input: String,
-    #[arg(short = 'o', long, value_name = "FILE")]
-    pub output: PathBuf,
+    pub config: Option<Config>,
+    #[arg(long, default_value_t = false)]
+    commit: bool,
+    #[arg(long, default_value_t = false)]
+    prove: bool,
+    #[arg(long, default_value_t = false)]
+    verify: bool,
+    #[arg(short = 'd', long, value_name = "FILE")]
+    pub doc: Option<String>,
+    #[arg(
+        long,
+        value_name = "FILE",
+        help = "Metrics and other output information"
+    )]
+    pub metrics: PathBuf,
     #[arg(short = 'r', long, help = "Perl-style regular expression")]
-    pub re: String,
+    pub re: Option<String>,
+    #[arg(long, value_name = "FILE")]
+    pub prover_info: Option<PathBuf>,
+    #[arg(long, value_name = "FILE")]
+    pub verifier_info: Option<PathBuf>,
+    #[arg(long, value_name = "FILE")]
+    pub proof: Option<PathBuf>,
     #[arg(
         short = 'b',
         long = "batch-size",
