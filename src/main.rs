@@ -1,11 +1,13 @@
 #![allow(missing_docs, non_snake_case)]
+use bincode;
 use clap::Parser;
 use csv::Writer;
 use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
 use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -15,52 +17,9 @@ use metrics::metrics::{log, log::Component};
 
 fn main() {
     let opt = Options::parse();
-    /*
-        // Alphabet
-        let ab = String::from_iter(opt.config.alphabet());
+    println!("reef");
 
-        // Input document
-        let doc: Vec<char> = if Path::exists(Path::new(&opt.doc)) {
-            opt.config
-                .read_file(&PathBuf::from(&opt.doc))
-                .iter()
-                .map(|c| c.clone())
-                .collect()
-        } else {
-            opt.doc.chars().collect()
-        };
-        println!("reef");
-
-        #[cfg(feature = "metrics")]
-        log::tic(Component::Compiler, "regex_normalization");
-
-        let r = re::simpl(re::new(&opt.re));
-
-        #[cfg(feature = "metrics")]
-        {
-            log::stop(Component::Compiler, "regex_normalization");
-            log::tic(Component::Compiler, "fa_builder");
-        }
-
-        // Compile regex to SAFA
-        let safa = if opt.negate {
-            SAFA::new(&ab, &r).negate()
-        } else {
-            SAFA::new(&ab, &r)
-        };
-
-        // Is document well-formed
-        // nfa.well_formed(&doc);
-
-        #[cfg(feature = "metrics")]
-        log::stop(Component::Compiler, "fa_builder");
-
-        #[cfg(feature = "plot")]
-        safa.write_pdf("main")
-            .expect("Failed to plot NFA to a pdf file");
-
-        init();
-
+    /* TODO deal with
         let file = OpenOptions::new()
             .write(true)
             .append(true)
@@ -86,7 +45,7 @@ fn main() {
                 .unwrap()
                 .as_secs()
                 .to_string(),
-            opt.re,
+            // opt.re, TODO converstaion
             safa.g.edge_count().to_string(), //nedges().to_string(),
             safa.g.node_count().to_string(), //nstates().to_string(),
         ]);
@@ -95,12 +54,66 @@ fn main() {
         let _ = wtr.flush();
         #[cfg(feature = "metrics")]
         log::write_csv(opt.metrics.to_str().unwrap()).unwrap();
+    */
+    let hybrid_len = None; // TODO!! JESS
 
-        let hybrid_len = None; // TODO!! JESS
+    if opt.e2e || opt.commit {
+        // read alphabet
+        let config = opt.config.expect("No alphabet found");
+        let ab = String::from_iter(config.alphabet());
+
+        // read document
+        let doc_string = opt.doc.expect("No document found");
+        let doc: Vec<char> = if Path::exists(Path::new(&doc_string)) {
+            config
+                .read_file(&PathBuf::from(&doc_string))
+                .iter()
+                .map(|c| c.clone())
+                .collect()
+        } else {
+            doc_string.chars().collect()
+        };
+
         let (reef_commit, sc, udoc) = run_committer(&doc, &ab, hybrid_len, opt.merkle);
 
+        // write commitment
+        write(&reef_commit, "name.cmt");
+
+        // write prover info
+    }
+
+    if opt.e2e || opt.prove {
+        // read doc
+        // read prover info
+        // read re
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Compiler, "regex_normalization");
+
+        let r = re::simpl(re::new(&opt.re.expect("Regular Expression not found")));
+
+        #[cfg(feature = "metrics")]
+        {
+            log::stop(Component::Compiler, "regex_normalization");
+            log::tic(Component::Compiler, "fa_builder");
+        }
+
+        // Compile regex to SAFA
+        let safa = if opt.negate {
+            SAFA::new(&ab, &r).negate()
+        } else {
+            SAFA::new(&ab, &r)
+        };
+
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Compiler, "fa_builder");
+
+        #[cfg(feature = "plot")]
+        safa.write_pdf("main")
+            .expect("Failed to plot NFA to a pdf file");
+
+        init();
         let (compressed_snark, proof_info, consist_proof) = run_prover(
-            reef_commit,
+            reef_commit, // replace -> only need doc hash
             sc,
             safa,
             doc,
@@ -111,6 +124,35 @@ fn main() {
             opt.merkle,
             Some(opt.metrics.clone()),
         );
+
+        // write snark, consistency, proof info
+    }
+
+    if opt.e2e || opt.verify {
         run_verifier(compressed_snark, proof_info, consist_proof);
-    */
+    }
+}
+
+fn write<T: serde::ser::Serialize>(obj: &T, file_name: &str) {
+    let file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(file_name)
+        .unwrap();
+
+    let bytes: Vec<u8> = bincode::serialize(obj).expect("Could not serialize");
+    file.write_all(&bytes).unwrap();
+}
+
+fn read<'a, T: serde::de::Deserialize<'a>>(file_name: &str) -> T {
+    let file = OpenOptions::new()
+        .read(true)
+        .open(file_name)
+        .expect(&format!("File {:#?} not found", file_name));
+
+    let mut buffer = Vec::<u8>::new();
+    file.read_to_end(&mut buffer).unwrap();
+    let decoded: T = bincode::deserialize(&buffer[..]).unwrap();
+    decoded
 }

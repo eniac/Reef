@@ -10,18 +10,20 @@ use std::path::PathBuf;
 #[clap(group(
             ArgGroup::new("mode")
                 .required(true)
-                .args(&["commit", "prove", "verify"]),
+                .args(&["commit", "prove", "verify", "e2e"]),
         ))]
 pub struct Options {
     /// Configuration options, charset ["ascii", "utf8", "dna"]
     #[command(subcommand)]
     pub config: Option<Config>,
     #[arg(long, default_value_t = false)]
-    commit: bool,
+    pub commit: bool,
     #[arg(long, default_value_t = false)]
-    prove: bool,
+    pub prove: bool,
     #[arg(long, default_value_t = false)]
-    verify: bool,
+    pub verify: bool,
+    #[arg(long, default_value_t = false)]
+    pub e2e: bool,
     #[arg(short = 'd', long, value_name = "FILE")]
     pub doc: Option<String>,
     #[arg(
