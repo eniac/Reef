@@ -33,16 +33,24 @@ use nova_snark::{
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 use rug::Integer;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-pub struct ProofInfo {
+#[derive(Deserialize, Serialize)]
+pub struct ProverInfo {
+    sc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    ab: String,
+    udoc: Vec<usize>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct VerifierInfo {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
-    commit: ReefCommitment,
     table: Vec<Integer>,
     proj_doc_len: usize,
     proj_chunk_idx: Option<Vec<usize>>,
@@ -59,11 +67,7 @@ pub fn run_committer(
     ab: &String,
     hybrid_len: Option<usize>,
     merkle: bool,
-) -> (
-    ReefCommitment,
-    PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    Vec<usize>,
-) {
+) -> (ReefCommitment, ProverInfo) {
     // prover information
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
@@ -102,7 +106,12 @@ pub fn run_committer(
     log::tic(Component::CommitmentGen, "generation");
     let reef_commit = ReefCommitment::new(udoc.clone(), hybrid_len, merkle, &sc);
 
-    (reef_commit, sc, udoc)
+    let prover_info = ProverInfo {
+        sc,
+        ab: ab.clone(),
+        udoc,
+    };
+    (reef_commit, prover_info)
 }
 
 pub fn run_prover(
@@ -118,7 +127,7 @@ pub fn run_prover(
     out_write: Option<PathBuf>,
 ) -> (
     CompressedSNARK<G1, G2, C1, C2, S1, S2>,
-    ProofInfo,
+    VerifierInfo,
     Option<ConsistencyProof>,
 ) {
     let (sender, recv): (
@@ -126,7 +135,7 @@ pub fn run_prover(
         Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     ) = mpsc::channel();
 
-    let (send_setup, recv_setup): (Sender<ProofInfo>, Receiver<ProofInfo>) = mpsc::channel();
+    let (send_setup, recv_setup): (Sender<VerifierInfo>, Receiver<VerifierInfo>) = mpsc::channel();
 
     let (sender_qv, recv_qv): (
         Sender<(Vec<Integer>, Integer)>,
@@ -187,7 +196,7 @@ pub fn run_prover(
 
         let mc = reef_commit.merkle.clone();
         send_setup
-            .send(ProofInfo {
+            .send(VerifierInfo {
                 pp: Arc::new(Mutex::new(pp)),
                 z0_primary,
                 commit: reef_commit,
@@ -214,14 +223,14 @@ pub fn run_prover(
     });
 
     //get args
-    let proof_info = recv_setup.recv().unwrap();
+    let verifier_info = recv_setup.recv().unwrap();
 
-    let (compressed_snark, consist_proof) = prove(recv, recv_qv, &proof_info, out_write.clone());
+    let (compressed_snark, consist_proof) = prove(recv, recv_qv, &verifier_info, out_write.clone());
 
     // rejoin child
     solver_thread.join().expect("setup/solver thread panicked");
 
-    (compressed_snark, proof_info, consist_proof)
+    (compressed_snark, verifier_info, consist_proof)
 }
 
 fn setup<'a>(
@@ -699,7 +708,7 @@ fn solve<'a>(
 fn prove(
     recv: Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
     recv_qv: Receiver<(Vec<Integer>, Integer)>,
-    proof_info: &ProofInfo,
+    verifier_info: &VerifierInfo,
     out_write: Option<PathBuf>,
 ) -> (
     CompressedSNARK<G1, G2, C1, C2, S1, S2>,
@@ -723,11 +732,11 @@ fn prove(
         log::tic(Component::Prover, format!("prove_{}", i).as_str());
 
         let result = RecursiveSNARK::prove_step(
-            &proof_info.pp.lock().unwrap(),
+            &verifier_info.pp.lock().unwrap(),
             recursive_snark,
             circuit_primary.clone().unwrap(),
             circuit_secondary.clone(),
-            proof_info.z0_primary.clone(),
+            verifier_info.z0_primary.clone(),
             z0_secondary.clone(),
         );
 
@@ -750,7 +759,7 @@ fn prove(
     #[cfg(feature = "metrics")]
     log::tic(Component::Prover, "compressed_snark");
     let res = CompressedSNARK::<_, _, _, _, S1, S2>::prove(
-        &proof_info.pp.lock().unwrap(),
+        &verifier_info.pp.lock().unwrap(),
         &recursive_snark,
     );
     #[cfg(feature = "metrics")]
@@ -760,20 +769,20 @@ fn prove(
     let compressed_snark = res.unwrap();
 
     let mut consist_proof = None;
-    if proof_info.commit.nldoc.is_some() {
-        let dc = proof_info.commit.nldoc.as_ref().unwrap();
+    if verifier_info.commit.nldoc.is_some() {
+        let dc = verifier_info.commit.nldoc.as_ref().unwrap();
         let (q, v) = recv_qv.recv().unwrap();
 
         #[cfg(feature = "metrics")]
         log::tic(Component::Prover, "consistency_proof");
         //Doc dot prod and consistency
         let cp = dc.prove_consistency(
-            &proof_info.table,
-            proof_info.proj_chunk_idx.clone(),
+            &verifier_info.table,
+            verifier_info.proj_chunk_idx.clone(),
             q,
             v,
-            proof_info.projections,
-            proof_info.hybrid_len.is_some(),
+            verifier_info.projections,
+            verifier_info.hybrid_len.is_some(),
         );
         #[cfg(feature = "metrics")]
         log::stop(Component::Prover, "consistency_proof");
@@ -797,7 +806,7 @@ fn prove(
 
     #[cfg(feature = "metrics")]
     {
-        let (commit_sz, consistency_proof_size) = proof_size(&consist_proof, &proof_info.commit);
+        let (commit_sz, consistency_proof_size) = proof_size(&consist_proof, &verifier_info.commit);
         log::space(
             Component::Prover,
             "consistency_proof",
@@ -811,18 +820,18 @@ fn prove(
 
 pub fn run_verifier(
     compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
-    proof_info: ProofInfo,
+    verifier_info: VerifierInfo,
     consist_proof: Option<ConsistencyProof>,
 ) {
     verify(
         compressed_snark,
-        proof_info.z0_primary,
-        proof_info.pp,
-        proof_info.commit,
-        proof_info.table,
-        proof_info.exit_state,
-        proof_info.proj_doc_len,
-        proof_info.hybrid_len,
+        verifier_info.z0_primary,
+        verifier_info.pp,
+        verifier_info.commit,
+        verifier_info.table,
+        verifier_info.exit_state,
+        verifier_info.proj_doc_len,
+        verifier_info.hybrid_len,
         consist_proof,
     );
 }
@@ -967,7 +976,7 @@ mod tests {
         let hybrid_len = None; // TODO JESS
         let (reef_commit, sc, udoc) = run_committer(&doc, &ab, hybrid_len, merkle);
 
-        let (compressed_snark, proof_info, consist_proof) = run_prover(
+        let (compressed_snark, verifier_info, consist_proof) = run_prover(
             reef_commit,
             sc,
             safa,

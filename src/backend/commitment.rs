@@ -37,12 +37,15 @@ use nova_snark::{
 };
 use rand::rngs::OsRng;
 use rug::{integer::Order, Integer};
+use serde::{Deserialize, Serialize};
 
+#[derive(Deserialize, Serialize)]
 pub struct ReefCommitment {
     pub nldoc: Option<NLDocCommitment>,
     pub merkle: Option<MerkleCommitment<<G1 as Group>::Scalar>>,
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct NLDocCommitment {
     // commitment to doc
     pub pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
@@ -58,6 +61,7 @@ pub struct NLDocCommitment {
     cap_vk: SpartanVerifierKey<G1, EE1>,
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct ConsistencyProof {
     // consistency verification
     pub hash_d: <G1 as Group>::Scalar,

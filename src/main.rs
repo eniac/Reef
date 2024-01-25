@@ -6,6 +6,7 @@ use reef::backend::{framework::*, r1cs_helper::init};
 use reef::config::*;
 use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
+use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
@@ -64,27 +65,25 @@ fn main() {
 
         // read document
         let doc_string = opt.doc.expect("No document found");
-        let doc: Vec<char> = if Path::exists(Path::new(&doc_string)) {
-            config
-                .read_file(&PathBuf::from(&doc_string))
-                .iter()
-                .map(|c| c.clone())
-                .collect()
-        } else {
-            doc_string.chars().collect()
-        };
+        let doc = read_doc(doc_string);
 
-        let (reef_commit, sc, udoc) = run_committer(&doc, &ab, hybrid_len, opt.merkle);
+        let (reef_commit, prover_info) = run_committer(&doc, &ab, hybrid_len, opt.merkle);
 
         // write commitment
         write(&reef_commit, "name.cmt");
 
         // write prover info
+        write(&prover_info, "name.prover_info");
     }
 
     if opt.e2e || opt.prove {
         // read doc
+        let doc_string = opt.doc.expect("No document found");
+        let doc = read_doc(doc_string);
+
         // read prover info
+        let prover_info = read("name.prover_info");
+
         // read re
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "regex_normalization");
@@ -99,9 +98,9 @@ fn main() {
 
         // Compile regex to SAFA
         let safa = if opt.negate {
-            SAFA::new(&ab, &r).negate()
+            SAFA::new(&prover_info.ab, &r).negate()
         } else {
-            SAFA::new(&ab, &r)
+            SAFA::new(&prover_info.ab, &r)
         };
 
         #[cfg(feature = "metrics")]
@@ -112,7 +111,7 @@ fn main() {
             .expect("Failed to plot NFA to a pdf file");
 
         init();
-        let (compressed_snark, proof_info, consist_proof) = run_prover(
+        let (compressed_snark, verifier_info, consist_proof) = run_prover(
             reef_commit, // replace -> only need doc hash
             sc,
             safa,
@@ -125,12 +124,32 @@ fn main() {
             Some(opt.metrics.clone()),
         );
 
-        // write snark, consistency, proof info
+        // write snark, consistency, verifier info
+        let proofs = Proofs {
+            compressed_snark,
+            verifier_info,
+            consist_proof,
+        };
+        write(&proofs, "name.proof");
     }
 
     if opt.e2e || opt.verify {
-        run_verifier(compressed_snark, proof_info, consist_proof);
+        // read
+        let proofs = read("name.proof");
+
+        run_verifier(
+            proofs.compressed_snark,
+            proofs.verifier_info,
+            proofs.consist_proof,
+        );
     }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Proofs {
+    compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
+    verifier_info: VerifierInfo,
+    consist_proof: Option<ConsistencyProof>,
 }
 
 fn write<T: serde::ser::Serialize>(obj: &T, file_name: &str) {
@@ -155,4 +174,16 @@ fn read<'a, T: serde::de::Deserialize<'a>>(file_name: &str) -> T {
     file.read_to_end(&mut buffer).unwrap();
     let decoded: T = bincode::deserialize(&buffer[..]).unwrap();
     decoded
+}
+
+fn read_doc(doc_string: &str) -> Vec<char> {
+    if Path::exists(Path::new(&doc_string)) {
+        config
+            .read_file(&PathBuf::from(&doc_string))
+            .iter()
+            .map(|c| c.clone())
+            .collect()
+    } else {
+        doc_string.chars().collect()
+    }
 }
