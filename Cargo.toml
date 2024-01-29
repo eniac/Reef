@@ -9,7 +9,8 @@ hashconsing = { git = "https://github.com/alex-ozdemir/hashconsing.git", branch 
 clap = "4.1.8"
 circ = { git = "https://github.com/jkwoods/circ", branch = "r1cs_pub", features = ["r1cs", "bellman", "smt", "zok"] }
 itertools = "0.10"
-nova-snark ={ git = "https://github.com/sga001/Nova" }
+#nova-snark ={ git = "https://github.com/sga001/Nova" }
+nova-snark = { path = "../nova/" }
 bellperson = { version = "0.24", default-features = false }
 pasta_curves = { version = "0.5.2", features = ["repr-c", "serde"], package = "fil_pasta_curves" }
 ff = "0.12.0"
@@ -25,7 +26,7 @@ merlin = {version = "3.0.0", default-features = false }
 lazy_static = "1.4.0"
 csv = "1.2"
 dashmap = { version = "5.4", optional = true }
-serde = "1.0.162"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.96"
 rayon = "1.7"
 petgraph = "0.6"

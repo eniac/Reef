@@ -48,7 +48,7 @@ pub struct ReefCommitment {
 #[derive(Deserialize, Serialize)]
 pub struct NLDocCommitment {
     // commitment to doc
-    pub pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     single_gens: CommitmentGens<G1>,
     hyrax_gen: HyraxPC<G1>,
     doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,
@@ -82,18 +82,26 @@ impl ReefCommitment {
         doc: Vec<usize>,
         hybrid_len: Option<usize>,
         merkle: bool,
-        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+        pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     ) -> Self {
         if merkle {
             Self {
                 nldoc: None,
-                merkle: Some(MerkleCommitment::new(&doc, pc)),
+                merkle: Some(MerkleCommitment::new(&doc, &pc)),
             }
         } else {
             Self {
-                nldoc: Some(NLDocCommitment::new(doc, hybrid_len, pc)),
+                nldoc: Some(NLDocCommitment::new(doc, hybrid_len, &pc)),
                 merkle: None,
             }
+        }
+    }
+
+    pub fn pc(&self) -> &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> {
+        if self.nldoc.is_none() {
+            panic!("PC not stored in merkle");
+        } else {
+            &self.nldoc.unwrap().pc
         }
     }
 }
@@ -492,7 +500,7 @@ pub fn final_clear_checks(
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ConsistencyCircuit<F: PrimeField> {
     pc: PoseidonConstants<F, typenum::U4>,
     d: F,

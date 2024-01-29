@@ -20,6 +20,14 @@ fn main() {
     let opt = Options::parse();
     println!("reef");
 
+    // read alphabet
+    let config = opt.config.expect("No alphabet found");
+    let ab = String::from_iter(config.alphabet());
+
+    // read doc
+    let doc_string = opt.doc.expect("No document found");
+    let doc = read_doc(doc_string);
+
     /* TODO deal with
         let file = OpenOptions::new()
             .write(true)
@@ -59,14 +67,6 @@ fn main() {
     let hybrid_len = None; // TODO!! JESS
 
     if opt.e2e || opt.commit {
-        // read alphabet
-        let config = opt.config.expect("No alphabet found");
-        let ab = String::from_iter(config.alphabet());
-
-        // read document
-        let doc_string = opt.doc.expect("No document found");
-        let doc = read_doc(doc_string);
-
         let (reef_commit, prover_info) = run_committer(&doc, &ab, hybrid_len, opt.merkle);
 
         // write commitment
@@ -77,13 +77,6 @@ fn main() {
     }
 
     if opt.e2e || opt.prove {
-        // read doc
-        let doc_string = opt.doc.expect("No document found");
-        let doc = read_doc(doc_string);
-
-        // read prover info
-        let prover_info = read("name.prover_info");
-
         // read re
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "regex_normalization");
@@ -98,9 +91,9 @@ fn main() {
 
         // Compile regex to SAFA
         let safa = if opt.negate {
-            SAFA::new(&prover_info.ab, &r).negate()
+            SAFA::new(&ab, &r).negate()
         } else {
-            SAFA::new(&prover_info.ab, &r)
+            SAFA::new(&ab, &r)
         };
 
         #[cfg(feature = "metrics")]
@@ -111,12 +104,11 @@ fn main() {
             .expect("Failed to plot NFA to a pdf file");
 
         init();
-        let (compressed_snark, verifier_info, consist_proof) = run_prover(
+        let (compressed_snark, consist_proof) = run_prover(
             reef_commit, // replace -> only need doc hash
-            sc,
+            reef_commit.pc,
             safa,
             doc,
-            udoc,
             opt.batch_size,
             opt.projections,
             opt.hybrid,
@@ -127,19 +119,37 @@ fn main() {
         // write snark, consistency, verifier info
         let proofs = Proofs {
             compressed_snark,
-            verifier_info,
             consist_proof,
         };
         write(&proofs, "name.proof");
     }
 
     if opt.e2e || opt.verify {
-        // read
+        // read commitment
+        let reef_commitment = read("name.cmt");
+
+        // read re
+        let r = re::simpl(re::new(&opt.re.expect("Regular Expression not found")));
+
+        // Compile regex to SAFA
+        let safa = if opt.negate {
+            SAFA::new(&ab, &r).negate()
+        } else {
+            SAFA::new(&ab, &r)
+        };
+
+        // read proofs
         let proofs = read("name.proof");
 
         run_verifier(
+            reef_commit,
+            safa,
+            doc,
+            opt.batch_size,
+            opt.projections,
+            opt.hybrid,
+            opt.merkle,
             proofs.compressed_snark,
-            proofs.verifier_info,
             proofs.consist_proof,
         );
     }
@@ -148,7 +158,6 @@ fn main() {
 #[derive(Deserialize, Serialize)]
 pub struct Proofs {
     compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
-    verifier_info: VerifierInfo,
     consist_proof: Option<ConsistencyProof>,
 }
 
