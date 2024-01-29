@@ -101,8 +101,28 @@ impl ReefCommitment {
         if self.nldoc.is_none() {
             panic!("PC not stored in merkle");
         } else {
-            &self.nldoc.unwrap().pc
+            &self.nldoc.as_ref().unwrap().pc
         }
+    }
+
+    pub fn hash_salt(&self) -> <G1 as Group>::Scalar {
+        let mut hash_salt = <G1 as Group>::Scalar::zero();
+        if self.nldoc.is_some() {
+            let dc = self.nldoc.as_ref().unwrap();
+            hash_salt = dc.hash_salt;
+        }
+
+        hash_salt
+    }
+
+    pub fn doc_commit_hash(&self) -> <G1 as Group>::Scalar {
+        let mut commit_hash = <G1 as Group>::Scalar::zero();
+        if self.nldoc.is_some() {
+            let dc = self.nldoc.as_ref().unwrap();
+            commit_hash = dc.doc_commit_hash;
+        }
+
+        commit_hash
     }
 }
 

@@ -24,14 +24,14 @@ use std::cmp::max;
 use std::collections::HashSet;
 use std::collections::LinkedList;
 
-pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
-    pub safa: &'a SAFA<C>,
+pub struct R1CS<F: PrimeField, C: Clone + Eq> {
+    pub safa: SAFA<C>,
     foralls_w_kids: FxHashMap<usize, Vec<usize>>,
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     pub max_offsets: usize,
     star_offset: usize,
-    pub doc_hash: Option<F>,
+    pub doc_hash: F,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -65,9 +65,9 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub path_lens: Vec<usize>,
 }
 
-impl<'a, F: PrimeField> R1CS<'a, F, char> {
+impl<F: PrimeField> R1CS<F, char> {
     pub fn new(
-        safa: &'a SAFA<char>,
+        safa: &SAFA<char>,
         udoc: Vec<usize>,
         orig_doc_len: usize,
         batch_size: usize,
@@ -75,6 +75,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         hybrid: bool,
         merkle: bool,
         pcs: PoseidonConstants<F, typenum::U4>,
+        doc_hash: F,
     ) -> Self {
         assert!(udoc.len() > 0);
 
@@ -502,13 +503,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         assert!(cost_model_batch_size > 1);
 
         Self {
-            safa,
+            safa: safa.clone(),
             foralls_w_kids,
             num_ab,
             table,
             max_offsets,
             star_offset,
-            doc_hash: None,
+            doc_hash,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: cost_model_batch_size,
@@ -2266,8 +2267,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         sponge.start(IOPattern(pattern), None, acc);
         let mut query: Vec<F> = match id {
             "nl" => vec![],
-            "nldoc" => vec![self.doc_hash.unwrap()],
-            "nlhybrid" => vec![self.doc_hash.unwrap()],
+            "nldoc" => vec![self.doc_hash],
+            "nlhybrid" => vec![self.doc_hash],
             _ => panic!("weird tag"),
         };
         for cq in combined_qs {
@@ -2570,7 +2571,7 @@ mod tests {
 
             if reef_commit.nldoc.is_some() {
                 let dc = reef_commit.nldoc.as_ref().unwrap();
-                r1cs_converter.doc_hash = Some(dc.doc_commit_hash);
+                r1cs_converter.doc_hash = dc.doc_commit_hash;
             };
 
             let mut running_q: Option<Vec<Integer>> = None;

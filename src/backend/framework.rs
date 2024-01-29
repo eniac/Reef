@@ -59,7 +59,7 @@ pub fn run_committer(
     ab: &String,
     hybrid_len: Option<usize>,
     merkle: bool,
-) -> (ReefCommitment, ProverInfo) {
+) -> ReefCommitment {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
     let udoc = doc_transform(ab, doc);
@@ -73,7 +73,7 @@ pub fn run_committer(
 
 pub fn run_prover(
     reef_commit: ReefCommitment,
-    sc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    ab: &String,
     safa: SAFA<char>,
     doc: Vec<char>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
@@ -98,15 +98,19 @@ pub fn run_prover(
     ) = mpsc::channel();
 
     let solver_thread = thread::spawn(move || {
-        let (r1cs_converter, circ_data, z0_primary, pp, hash_salt) = pub_setup(
-            reef_commit,
-            sc,
-            safa,
-            doc,
+        let hash_salt = reef_commit.hash_salt();
+
+        let (mut r1cs_converter, circ_data, z0_primary, pp) = pub_setup(
+            reef_commit.pc(),
+            ab,
+            &safa,
+            &doc,
             temp_batch_size,
             projections,
             hybrid,
             merkle,
+            hash_salt,
+            reef_commit.doc_commit_hash(),
         );
 
         let mc = reef_commit.merkle.clone();
@@ -384,11 +388,7 @@ fn solve<'a>(
     #[cfg(feature = "metrics")]
     log::stop(Component::Solver, "fa_solver");
 
-    let commit_blind = if r1cs_converter.doc_hash.is_some() {
-        r1cs_converter.doc_hash.unwrap()
-    } else {
-        <G1 as Group>::Scalar::zero()
-    };
+    let commit_blind = r1cs_converter.doc_hash;
 
     let mut i = 0;
     while r1cs_converter.sol_num < sols.len() {
@@ -735,6 +735,7 @@ fn prove(
 
 pub fn run_verifier(
     reef_commit: ReefCommitment,
+    ab: &String,
     safa: SAFA<char>,
     doc: Vec<char>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
@@ -746,15 +747,20 @@ pub fn run_verifier(
     consist_proof: Option<ConsistencyProof>,
 ) {
     // rederive pp, z0, table information
-    let (r1cs_converter, _circ_data, z0_primary, pp, _hash_salt) = pub_setup(
-        reef_commit,
-        safa,
-        doc,
+    let (r1cs_converter, _circ_data, z0_primary, pp) = pub_setup(
+        reef_commit.pc(),
+        ab,
+        &safa,
+        &doc,
         temp_batch_size,
         projections,
         hybrid,
         merkle,
+        reef_commit.hash_salt(),
+        reef_commit.doc_commit_hash(),
     );
+
+    let doc_len = r1cs_converter.doc_len(); // projected;
 
     verify(
         compressed_snark,
@@ -763,7 +769,7 @@ pub fn run_verifier(
         reef_commit,
         r1cs_converter.table,
         r1cs_converter.exit_state,
-        r1cs_converter.doc_len(), // projected
+        doc_len,
         r1cs_converter.hybrid_len,
         consist_proof,
     );
@@ -880,19 +886,21 @@ fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> (usize, us
 }
 
 pub fn pub_setup(
-    reef_commit: ReefCommitment, // todo remove
-    safa: SAFA<char>,
-    doc: Vec<char>,
+    pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+    ab: &String,
+    safa: &SAFA<char>,
+    doc: &Vec<char>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
     projections: bool,
     hybrid: bool,
     merkle: bool,
+    hash_salt: <G1 as Group>::Scalar,
+    commit_hash: <G1 as Group>::Scalar,
 ) -> (
-    R1CS<'static, <G1 as Group>::Scalar, char>,
+    R1CS<<G1 as Group>::Scalar, char>,
     ProverData,
     Vec<<G1 as Group>::Scalar>,
     PublicParams<G1, G2, C1, C2>,
-    <G1 as Group>::Scalar,
 ) {
     let batch_size = temp_batch_size;
     let proj = if projections { safa.projection() } else { None };
@@ -901,14 +909,15 @@ pub fn pub_setup(
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "r1cs_init");
     let mut r1cs_converter = R1CS::new(
-        &safa,
+        safa,
         udoc,
         doc.len(),
         batch_size,
         proj,
         hybrid,
         merkle,
-        reef_commit.pc().clone(),
+        pc.clone(),
+        commit_hash,
     );
 
     #[cfg(feature = "metrics")]
@@ -919,13 +928,6 @@ pub fn pub_setup(
         r1cs_converter.hybrid_len.is_some(),
         r1cs_converter.doc_subset.is_some()
     );
-
-    let mut hash_salt = <G1 as Group>::Scalar::zero();
-    if reef_commit.nldoc.is_some() {
-        let dc = reef_commit.nldoc.as_ref().unwrap();
-        r1cs_converter.doc_hash = Some(dc.doc_commit_hash.clone());
-        hash_salt = dc.hash_salt;
-    }
 
     #[cfg(feature = "metrics")]
     {
@@ -945,7 +947,7 @@ pub fn pub_setup(
     #[cfg(feature = "metrics")]
     log::stop(Component::Compiler, "snark_setup");
 
-    (r1cs_converter, prover_data, z0_primary, pp, hash_salt)
+    (r1cs_converter, prover_data, z0_primary, pp)
 }
 
 pub fn doc_transform(ab: &String, doc: &Vec<char>) -> Vec<usize> {
