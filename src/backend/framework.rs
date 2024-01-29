@@ -73,7 +73,7 @@ pub fn run_committer(
 
 pub fn run_prover(
     reef_commit: ReefCommitment,
-    ab: &String,
+    ab: String,
     safa: SAFA<char>,
     doc: Vec<char>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
@@ -749,7 +749,7 @@ pub fn run_verifier(
     // rederive pp, z0, table information
     let (r1cs_converter, _circ_data, z0_primary, pp) = pub_setup(
         reef_commit.pc(),
-        ab,
+        ab.clone(),
         &safa,
         &doc,
         temp_batch_size,
@@ -887,7 +887,7 @@ fn proof_size(csp: &Option<ConsistencyProof>, rc: &ReefCommitment) -> (usize, us
 
 pub fn pub_setup(
     pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    ab: &String,
+    ab: String,
     safa: &SAFA<char>,
     doc: &Vec<char>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
@@ -904,7 +904,7 @@ pub fn pub_setup(
 ) {
     let batch_size = temp_batch_size;
     let proj = if projections { safa.projection() } else { None };
-    let udoc = doc_transform(ab, &doc);
+    let udoc = doc_transform(&ab, &doc);
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "r1cs_init");

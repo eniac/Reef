@@ -1,8 +1,25 @@
 #![allow(missing_docs, non_snake_case)]
+
+type G1 = pasta_curves::pallas::Point;
+type G2 = pasta_curves::vesta::Point;
+type C1 = NFAStepCircuit<<G1 as Group>::Scalar>;
+type C2 = TrivialTestCircuit<<G2 as Group>::Scalar>;
+type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
+type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
+type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
+type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
+
 use bincode;
 use clap::Parser;
 use csv::Writer;
-use reef::backend::{framework::*, r1cs_helper::init};
+use nova_snark::{
+    provider::pedersen::CompressedCommitment,
+    traits::{circuit::TrivialTestCircuit, Group},
+    CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+};
+use reef::backend::{
+    commitment::ConsistencyProof, framework::*, nova::NFAStepCircuit, r1cs_helper::init,
+};
 use reef::config::*;
 use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
@@ -26,7 +43,15 @@ fn main() {
 
     // read doc
     let doc_string = opt.doc.expect("No document found");
-    let doc = read_doc(doc_string);
+    let doc = if Path::exists(Path::new(&doc_string)) {
+        config
+            .read_file(&PathBuf::from(&doc_string))
+            .iter()
+            .map(|c| c.clone())
+            .collect()
+    } else {
+        doc_string.chars().collect()
+    };
 
     /* TODO deal with
         let file = OpenOptions::new()
@@ -67,21 +92,23 @@ fn main() {
     let hybrid_len = None; // TODO!! JESS
 
     if opt.e2e || opt.commit {
-        let (reef_commit, prover_info) = run_committer(&doc, &ab, hybrid_len, opt.merkle);
+        let reef_commit = run_committer(&doc, &ab, hybrid_len, opt.merkle);
 
         // write commitment
         write(&reef_commit, "name.cmt");
-
-        // write prover info
-        write(&prover_info, "name.prover_info");
     }
 
     if opt.e2e || opt.prove {
+        // read commitment
+        let reef_commit = read("name.cmt");
+
         // read re
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "regex_normalization");
 
-        let r = re::simpl(re::new(&opt.re.expect("Regular Expression not found")));
+        let r = re::simpl(re::new(
+            &opt.re.clone().expect("Regular Expression not found"),
+        ));
 
         #[cfg(feature = "metrics")]
         {
@@ -106,9 +133,9 @@ fn main() {
         init();
         let (compressed_snark, consist_proof) = run_prover(
             reef_commit, // replace -> only need doc hash
-            reef_commit.pc,
+            ab.clone(),
             safa,
-            doc,
+            doc.clone(),
             opt.batch_size,
             opt.projections,
             opt.hybrid,
@@ -116,7 +143,7 @@ fn main() {
             Some(opt.metrics.clone()),
         );
 
-        // write snark, consistency, verifier info
+        // write snark, consistency
         let proofs = Proofs {
             compressed_snark,
             consist_proof,
@@ -126,7 +153,7 @@ fn main() {
 
     if opt.e2e || opt.verify {
         // read commitment
-        let reef_commitment = read("name.cmt");
+        let reef_commit = read("name.cmt");
 
         // read re
         let r = re::simpl(re::new(&opt.re.expect("Regular Expression not found")));
@@ -139,10 +166,11 @@ fn main() {
         };
 
         // read proofs
-        let proofs = read("name.proof");
+        let proofs: Proofs = read("name.proof");
 
         run_verifier(
             reef_commit,
+            &ab,
             safa,
             doc,
             opt.batch_size,
@@ -162,7 +190,7 @@ pub struct Proofs {
 }
 
 fn write<T: serde::ser::Serialize>(obj: &T, file_name: &str) {
-    let file = OpenOptions::new()
+    let mut file = OpenOptions::new()
         .write(true)
         .append(true)
         .create(true)
@@ -173,8 +201,8 @@ fn write<T: serde::ser::Serialize>(obj: &T, file_name: &str) {
     file.write_all(&bytes).unwrap();
 }
 
-fn read<'a, T: serde::de::Deserialize<'a>>(file_name: &str) -> T {
-    let file = OpenOptions::new()
+fn read<T: serde::de::DeserializeOwned>(file_name: &str) -> T {
+    let mut file = OpenOptions::new()
         .read(true)
         .open(file_name)
         .expect(&format!("File {:#?} not found", file_name));
@@ -183,16 +211,4 @@ fn read<'a, T: serde::de::Deserialize<'a>>(file_name: &str) -> T {
     file.read_to_end(&mut buffer).unwrap();
     let decoded: T = bincode::deserialize(&buffer[..]).unwrap();
     decoded
-}
-
-fn read_doc(doc_string: &str) -> Vec<char> {
-    if Path::exists(Path::new(&doc_string)) {
-        config
-            .read_file(&PathBuf::from(&doc_string))
-            .iter()
-            .map(|c| c.clone())
-            .collect()
-    } else {
-        doc_string.chars().collect()
-    }
 }
