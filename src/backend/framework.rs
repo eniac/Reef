@@ -33,6 +33,8 @@ use nova_snark::{
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 use rug::Integer;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -985,6 +987,30 @@ pub fn doc_transform(ab: &String, doc: &Vec<char>) -> Vec<usize> {
     udoc
 }
 
+pub fn write<T: serde::ser::Serialize>(obj: &T, file_name: &str) {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(file_name)
+        .unwrap();
+
+    let bytes: Vec<u8> = bincode::serialize(obj).expect("Could not serialize");
+    file.write_all(&bytes).unwrap();
+}
+
+pub fn read<T: serde::de::DeserializeOwned>(file_name: &str) -> T {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .open(file_name)
+        .expect(&format!("File {:#?} not found", file_name));
+
+    let mut buffer = Vec::<u8>::new();
+    file.read_to_end(&mut buffer).unwrap();
+    let decoded: T = bincode::deserialize(&buffer[..]).unwrap();
+    decoded
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -1008,20 +1034,35 @@ mod tests {
         init();
 
         let hybrid_len = None; // TODO JESS
-        let (reef_commit, sc, udoc) = run_committer(&doc, &ab, hybrid_len, merkle);
+        let reef_commit = run_committer(&doc, &ab, hybrid_len, merkle);
+        write(&reef_commit, &format!("{}.cmt", rstr));
 
         let (compressed_snark, consist_proof) = run_prover(
             reef_commit,
-            sc,
-            safa,
-            doc,
+            ab.clone(),
+            safa.clone(),
+            doc.clone(),
             batch_size,
             projections,
             hybrid,
             merkle,
             None,
         );
-        run_verifier(compressed_snark, proof_info, consist_proof);
+
+        let reef_commit_2 = read(&format!("{}.cmt", rstr));
+
+        run_verifier(
+            reef_commit_2,
+            &ab,
+            safa,
+            doc,
+            batch_size,
+            projections,
+            hybrid,
+            merkle,
+            compressed_snark,
+            consist_proof,
+        );
     }
 
     #[test]

@@ -2377,9 +2377,8 @@ pub fn ceil_div(a: usize, b: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::backend::commitment::final_clear_checks;
-    use crate::backend::commitment::ReefCommitment;
-    use crate::backend::framework::run_committer;
+    use crate::backend::commitment::{final_clear_checks, ReefCommitment};
+    use crate::backend::framework::{doc_transform, run_committer};
     use crate::backend::r1cs::*;
     use crate::frontend::regex::re;
     use crate::frontend::safa::SAFA;
@@ -2564,15 +2563,21 @@ mod tests {
 
         for b in batch_sizes {
             let hybrid_len = None; // TODO JESS
-            let (reef_commit, sc, udoc) = run_committer(&chars, &ab, hybrid_len, merkle);
+            let reef_commit = run_committer(&chars, &ab, hybrid_len, merkle);
+            let udoc = doc_transform(&ab, &chars);
+            let doc_hash = reef_commit.doc_commit_hash();
 
-            let mut r1cs_converter =
-                R1CS::new(&safa, udoc, chars.len(), b, proj, hybrid, merkle, sc);
-
-            if reef_commit.nldoc.is_some() {
-                let dc = reef_commit.nldoc.as_ref().unwrap();
-                r1cs_converter.doc_hash = dc.doc_commit_hash;
-            };
+            let mut r1cs_converter = R1CS::new(
+                &safa,
+                udoc,
+                chars.len(),
+                b,
+                proj,
+                hybrid,
+                merkle,
+                reef_commit.pc().clone(),
+                doc_hash,
+            );
 
             let mut running_q: Option<Vec<Integer>> = None;
             let mut running_v: Option<Integer> = None;

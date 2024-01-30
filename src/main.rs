@@ -25,7 +25,6 @@ use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -187,28 +186,4 @@ fn main() {
 pub struct Proofs {
     compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
     consist_proof: Option<ConsistencyProof>,
-}
-
-fn write<T: serde::ser::Serialize>(obj: &T, file_name: &str) {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(file_name)
-        .unwrap();
-
-    let bytes: Vec<u8> = bincode::serialize(obj).expect("Could not serialize");
-    file.write_all(&bytes).unwrap();
-}
-
-fn read<T: serde::de::DeserializeOwned>(file_name: &str) -> T {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .open(file_name)
-        .expect(&format!("File {:#?} not found", file_name));
-
-    let mut buffer = Vec::<u8>::new();
-    file.read_to_end(&mut buffer).unwrap();
-    let decoded: T = bincode::deserialize(&buffer[..]).unwrap();
-    decoded
 }
