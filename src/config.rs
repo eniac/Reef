@@ -24,6 +24,20 @@ pub struct Options {
     pub verify: bool,
     #[arg(long, default_value_t = false)]
     pub e2e: bool,
+    #[arg(
+        short = 'f',
+        long,
+        value_name = "FILE",
+        help = "Optional name for .cmt file"
+    )]
+    pub cmt_name: Option<String>,
+    #[arg(
+        short = 'f',
+        long,
+        value_name = "FILE",
+        help = "Optional name for .proof file"
+    )]
+    pub proof_name: Option<String>,
     #[arg(short = 'd', long, value_name = "FILE")]
     pub doc: Option<String>,
     #[arg(
@@ -31,15 +45,9 @@ pub struct Options {
         value_name = "FILE",
         help = "Metrics and other output information"
     )]
-    pub metrics: PathBuf,
+    pub metrics: Option<PathBuf>,
     #[arg(short = 'r', long, help = "Perl-style regular expression")]
     pub re: Option<String>,
-    #[arg(long, value_name = "FILE")]
-    pub prover_info: Option<PathBuf>,
-    #[arg(long, value_name = "FILE")]
-    pub verifier_info: Option<PathBuf>,
-    #[arg(long, value_name = "FILE")]
-    pub proof: Option<PathBuf>,
     #[arg(
         short = 'b',
         long = "batch-size",

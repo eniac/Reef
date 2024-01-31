@@ -68,6 +68,7 @@ pub fn run_committer(
 
     #[cfg(feature = "metrics")]
     log::tic(Component::CommitmentGen, "generation");
+
     let reef_commit = ReefCommitment::new(udoc.clone(), hybrid_len, merkle, sc);
 
     reef_commit
