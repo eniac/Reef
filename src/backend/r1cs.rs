@@ -2576,10 +2576,12 @@ mod tests {
             let reef_commit = run_committer(&chars, &ab, hybrid_len, merkle);
             let udoc = doc_transform(&ab, &chars);
             let doc_hash = reef_commit.doc_commit_hash();
+            let udoc_len = udoc.len();
 
             let mut r1cs_converter = R1CS::new(
                 &safa,
-                udoc,
+                Some(udoc),
+                udoc_len,
                 chars.len(),
                 b,
                 proj,
@@ -2653,7 +2655,7 @@ mod tests {
             let cost_estimate = full_round_cost_model(
                 &safa,
                 b,
-                r1cs_converter.udoc.len(),
+                r1cs_converter.udoc.as_ref().unwrap().len(),
                 hybrid,
                 r1cs_converter.hybrid_len,
                 false,
