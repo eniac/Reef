@@ -69,7 +69,7 @@ pub fn run_committer(
     #[cfg(feature = "metrics")]
     log::tic(Component::CommitmentGen, "generation");
 
-    let reef_commit = ReefCommitment::new(udoc.clone(), hybrid_len, merkle, sc);
+    let reef_commit = ReefCommitment::new(udoc.clone(), doc.len(), hybrid_len, merkle, sc);
 
     reef_commit
 }
@@ -103,11 +103,15 @@ pub fn run_prover(
     let solver_thread = thread::spawn(move || {
         let hash_salt = reef_commit.hash_salt();
 
+        let udoc = doc_transform(&ab, &doc);
+        let udoc_len = udoc.len();
         let (mut r1cs_converter, circ_data, z0_primary, pp) = pub_setup(
             reef_commit.pc(),
             ab,
             &safa,
-            &doc,
+            Some(udoc),
+            udoc_len,
+            doc.len(),
             temp_batch_size,
             projections,
             hybrid,
@@ -205,13 +209,13 @@ fn setup<'a>(
         z.append(&mut vec![<G1 as Group>::Scalar::zero(); q_len]);
         z.push(int_to_ff(r1cs_converter.table[0].clone()));
         z.append(&mut vec![<G1 as Group>::Scalar::zero(); qd_len]);
-        let d = calc_d(
-            &[
-                <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
-                hash_salt,
-            ],
-            &r1cs_converter.pc,
-        );
+
+        let d0 = if r1cs_converter.udoc.is_some() {
+            <G1 as Group>::Scalar::from(r1cs_converter.udoc.as_ref().unwrap()[0] as u64)
+        } else {
+            <G1 as Group>::Scalar::zero()
+        };
+        let d = calc_d(&[d0, hash_salt], &r1cs_converter.pc);
         z.push(d);
     } else {
         let hq_len = logmn(r1cs_converter.hybrid_len.unwrap());
@@ -251,7 +255,7 @@ fn setup<'a>(
                 opposite: <G1 as Group>::Scalar::zero(),
             });
 
-            for _h in 0..(logmn(r1cs_converter.udoc.len()) - 1) {
+            for _h in 0..(logmn(r1cs_converter.udoc_len) - 1) {
                 sub_w.push(MerkleWit {
                     l_or_r: true,
                     opposite_idx: None,
@@ -315,7 +319,7 @@ fn setup<'a>(
         full_round_cost_model(
             &r1cs_converter.safa,
             r1cs_converter.batch_size,
-            r1cs_converter.idoc.len(),
+            r1cs_converter.udoc_len,
             is_hybrid,
             r1cs_converter.hybrid_len,
             false,
@@ -496,7 +500,13 @@ fn solve<'a>(
 
             let doc_v = match doc_running_v {
                 Some(rv) => int_to_ff(rv),
-                None => <G1 as Group>::Scalar::from(r1cs_converter.udoc[0] as u64),
+                None => {
+                    if r1cs_converter.udoc.is_some() {
+                        <G1 as Group>::Scalar::from(r1cs_converter.udoc.as_ref().unwrap()[0] as u64)
+                    } else {
+                        <G1 as Group>::Scalar::zero()
+                    }
+                }
             };
             let doc_v_hash = calc_d(&[doc_v, hash_salt], &r1cs_converter.pc);
 
@@ -740,7 +750,6 @@ pub fn run_verifier(
     reef_commit: ReefCommitment,
     ab: &String,
     safa: SAFA<char>,
-    doc: Vec<char>,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
     projections: bool,
     hybrid: bool,
@@ -754,7 +763,9 @@ pub fn run_verifier(
         reef_commit.pc(),
         ab.clone(),
         &safa,
-        &doc,
+        None,
+        reef_commit.udoc_len,
+        reef_commit.orig_doc_len,
         temp_batch_size,
         projections,
         hybrid,
@@ -892,7 +903,9 @@ pub fn pub_setup(
     pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     ab: String,
     safa: &SAFA<char>,
-    doc: &Vec<char>,
+    udoc: Option<Vec<usize>>,
+    udoc_len: usize,
+    doc_len: usize,
     temp_batch_size: usize, // this may be 0 if not overridden, only use to feed into R1CS object
     projections: bool,
     hybrid: bool,
@@ -907,14 +920,14 @@ pub fn pub_setup(
 ) {
     let batch_size = temp_batch_size;
     let proj = if projections { safa.projection() } else { None };
-    let udoc = doc_transform(&ab, &doc);
 
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "r1cs_init");
     let mut r1cs_converter = R1CS::new(
         safa,
         udoc,
-        doc.len(),
+        udoc_len,
+        doc_len,
         batch_size,
         proj,
         hybrid,
@@ -1056,7 +1069,6 @@ mod tests {
             reef_commit_2,
             &ab,
             safa,
-            doc,
             batch_size,
             projections,
             hybrid,

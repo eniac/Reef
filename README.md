@@ -14,7 +14,7 @@ cargo build
 
 With metrics:
 ```
-cargo build --feature metrics
+cargo build --features metrics
 ```
 
 ## Usage

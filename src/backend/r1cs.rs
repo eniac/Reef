@@ -40,8 +40,9 @@ pub struct R1CS<F: PrimeField, C: Clone + Eq> {
     pub_inputs: Vec<Term>,
     pub batch_size: usize,
     orig_doc_len: usize,
-    pub udoc: Vec<usize>,
-    pub idoc: Vec<Integer>,
+    pub udoc: Option<Vec<usize>>,
+    pub udoc_len: usize,
+    pub idoc: Option<Vec<Integer>>,
     ep_num: usize,
     // circuit
     pub max_branches: usize,
@@ -68,7 +69,8 @@ pub struct R1CS<F: PrimeField, C: Clone + Eq> {
 impl<F: PrimeField> R1CS<F, char> {
     pub fn new(
         safa: &SAFA<char>,
-        udoc: Vec<usize>,
+        udoc: Option<Vec<usize>>, // only optional for verifier
+        udoc_len: usize,
         orig_doc_len: usize,
         batch_size: usize,
         projection: Option<usize>,
@@ -77,9 +79,10 @@ impl<F: PrimeField> R1CS<F, char> {
         pcs: PoseidonConstants<F, typenum::U4>,
         doc_hash: F,
     ) -> Self {
-        assert!(udoc.len() > 0);
-
-        println!("udoc: {:#?}", udoc.clone());
+        assert!(udoc_len > 0);
+        if udoc.is_some() {
+            assert_eq!(udoc.as_ref().unwrap().len(), udoc_len);
+        }
 
         // character conversions
         let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
@@ -91,8 +94,8 @@ impl<F: PrimeField> R1CS<F, char> {
         num_ab.insert(None, i + 1); // EPSILON
         num_ab.insert(Some(26u8 as char), i + 2); // EOF
 
-        assert!(udoc.len() >= orig_doc_len);
-        assert!(udoc.len().next_power_of_two() == udoc.len());
+        assert!(udoc_len >= orig_doc_len);
+        assert!(udoc_len.next_power_of_two() == udoc_len);
 
         // generate T
         let mut num_states = safa.g.node_count();
@@ -383,9 +386,14 @@ impl<F: PrimeField> R1CS<F, char> {
         }
 
         // generate usize doc
-        let mut int_doc = vec![];
-        for u in udoc.clone().into_iter() {
-            int_doc.push(Integer::from(u));
+        let mut int_doc = None;
+
+        if udoc.is_some() {
+            let mut idoc = vec![];
+            for u in udoc.as_ref().unwrap().clone().into_iter() {
+                idoc.push(Integer::from(u));
+            }
+            int_doc = Some(idoc);
         }
 
         // EPSILON
@@ -398,15 +406,15 @@ impl<F: PrimeField> R1CS<F, char> {
 
         let mut proj_chunk_idx = None;
         let doc_subset = if projection.is_some() {
-            if (udoc.len().next_power_of_two() <= table.len()) && hybrid {
+            if (udoc_len.next_power_of_two() <= table.len()) && hybrid {
                 panic!(
                     "Doc len {} <= table size {} already. Projections AND hybrid not useful together, choose one.",
-                udoc.len().next_power_of_two(), table.len());
+                udoc_len.next_power_of_two(), table.len());
             }
 
             let real_start = projection.unwrap();
-            let mut chunk_len = udoc.len().next_power_of_two() / 2;
-            let mut e = udoc.len().next_power_of_two();
+            let mut chunk_len = udoc_len.next_power_of_two() / 2;
+            let mut e = udoc_len.next_power_of_two();
             let mut s = 0;
             let mut end = e;
             let mut start = 0;
@@ -420,7 +428,7 @@ impl<F: PrimeField> R1CS<F, char> {
                     s += chunk_len;
                 }
                 e = s + chunk_len;
-                assert!(end <= udoc.len().next_power_of_two());
+                assert!(end <= udoc_len.next_power_of_two());
 
                 // try to go smaller
                 chunk_len = chunk_len / 2
@@ -442,7 +450,7 @@ impl<F: PrimeField> R1CS<F, char> {
                 None
             } else {
                 // calculate chunk idx
-                let num_chunks = udoc.len().next_power_of_two() / chunk_len;
+                let num_chunks = udoc_len.next_power_of_two() / chunk_len;
                 let mut chunk_idx = start / chunk_len;
                 let mut chunk_idx_vec = vec![];
                 for _i in 0..logmn(num_chunks) {
@@ -465,7 +473,7 @@ impl<F: PrimeField> R1CS<F, char> {
             let ds = doc_subset.unwrap();
             ds.1 - ds.0
         } else {
-            udoc.len()
+            udoc_len
         };
 
         let hybrid_len = if hybrid {
@@ -485,7 +493,7 @@ impl<F: PrimeField> R1CS<F, char> {
             };
             cost_model_batch_size = opt_cost_model_select(
                 safa,
-                udoc.len(),
+                udoc_len,
                 hybrid,
                 hybrid_len,
                 project,
@@ -514,7 +522,8 @@ impl<F: PrimeField> R1CS<F, char> {
             pub_inputs: Vec::new(),
             batch_size: cost_model_batch_size,
             orig_doc_len,
-            udoc,          // usizes
+            udoc, // usizes
+            udoc_len,
             idoc: int_doc, // big ints
             ep_num,
             max_branches,
@@ -539,7 +548,7 @@ impl<F: PrimeField> R1CS<F, char> {
             let ds = self.doc_subset.unwrap();
             ds.1 - ds.0
         } else {
-            self.udoc.len().next_power_of_two()
+            self.udoc_len.next_power_of_two()
         }
     }
 
@@ -960,7 +969,7 @@ impl<F: PrimeField> R1CS<F, char> {
         }
 
         // if pop, check new_cursor < prev
-        let cur_bit_limit = logmn(self.udoc.len()) + 1;
+        let cur_bit_limit = logmn(self.udoc_len) + 1;
         let cursor_overflow = term(
             Op::BvBinPred(BvBinPred::Uge),
             vec![
@@ -1048,7 +1057,7 @@ impl<F: PrimeField> R1CS<F, char> {
             );
             self.assertions.push(cursor_plus);
 
-            let bit_limit = logmn(max(self.udoc.len(), self.max_offsets)) + 1;
+            let bit_limit = logmn(max(self.udoc_len, self.max_offsets)) + 1;
 
             let cur_overflow = term(
                 Op::BvBinPred(BvBinPred::Uge),
@@ -2048,20 +2057,21 @@ impl<F: PrimeField> R1CS<F, char> {
         let mut doc_v = vec![];
         let mut doc_q = vec![];
         let proj_doc;
+        let idoc = self.idoc.as_ref().unwrap();
         if self.doc_subset.is_some() {
             let ds = self.doc_subset.unwrap();
-            proj_doc = &self.idoc[ds.0..ds.1];
+            proj_doc = &idoc[ds.0..ds.1];
             for i in 0..self.batch_size {
                 let access_at = cursor_access[i];
                 doc_q.push(access_at - ds.0);
-                doc_v.push(self.idoc[access_at].clone());
+                doc_v.push(idoc[access_at].clone());
             }
         } else {
-            proj_doc = &self.idoc;
+            proj_doc = &idoc;
             for i in 0..self.batch_size {
                 let access_at = cursor_access[i];
                 doc_q.push(access_at);
-                doc_v.push(self.idoc[access_at].clone());
+                doc_v.push(idoc[access_at].clone());
             }
         };
 

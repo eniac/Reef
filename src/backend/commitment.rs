@@ -41,8 +41,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub struct ReefCommitment {
+    // one or the other
     pub nldoc: Option<NLDocCommitment>,
     pub merkle: Option<MerkleCommitment<<G1 as Group>::Scalar>>,
+    pub orig_doc_len: usize,
+    pub udoc_len: usize,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -80,19 +83,25 @@ pub struct ConsistencyProof {
 impl ReefCommitment {
     pub fn new(
         doc: Vec<usize>,
+        orig_doc_len: usize,
         hybrid_len: Option<usize>,
         merkle: bool,
         pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     ) -> Self {
+        let udoc_len = doc.len();
         if merkle {
             Self {
                 nldoc: None,
                 merkle: Some(MerkleCommitment::new(&doc, &pc)),
+                orig_doc_len,
+                udoc_len,
             }
         } else {
             Self {
                 nldoc: Some(NLDocCommitment::new(doc, hybrid_len, &pc)),
                 merkle: None,
+                orig_doc_len,
+                udoc_len,
             }
         }
     }

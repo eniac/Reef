@@ -40,10 +40,6 @@ fn main() {
     let config = opt.config.expect("No alphabet found");
     let ab = String::from_iter(config.alphabet());
 
-    // TODO DELETE
-    let doc_string = opt.doc.expect("No document found");
-    let doc = read_doc(doc_string, &config);
-
     let hybrid_len = None; // TODO!! JESS
 
     if opt.e2e || opt.commit {
@@ -51,26 +47,25 @@ fn main() {
         metrics_file(opt, doc);
 
         // read doc
-        let doc_string = opt.doc.expect("No document found");
-        let doc = read_doc(doc_string, &config);
+        let doc_string = opt.doc.as_ref().expect("No document found");
+        let doc = read_doc(&doc_string, &config);
 
         let reef_commit = run_committer(&doc, &ab, hybrid_len, opt.merkle);
 
         // write commitment
         write(
             &reef_commit,
-            &get_name(opt.file_name.clone(), &doc_string, "cmt"),
+            &get_name(opt.cmt_name.clone(), &doc_string, "cmt"),
         );
     }
 
     if opt.e2e || opt.prove {
         // read doc
         let doc_string = opt.doc.expect("No document found");
-        let doc = read_doc(doc_string, &config);
+        let doc = read_doc(&doc_string, &config);
 
         // read commitment
-        let reef_commit = read(&get_name(opt.file_name.clone(), &doc_string, "cmt"));
-
+        let reef_commit = read(&get_name(opt.cmt_name.clone(), &doc_string, "cmt"));
         // read re
         #[cfg(feature = "metrics")]
         log::tic(Component::Compiler, "regex_normalization");
@@ -120,7 +115,7 @@ fn main() {
         write(
             &proofs,
             &get_name(
-                opt.file_name.clone(),
+                opt.proof_name.clone(),
                 opt.re.as_ref().expect("Regular Expression not found"),
                 "proof",
             ),
@@ -129,7 +124,7 @@ fn main() {
 
     if opt.e2e || opt.verify {
         // read commitment
-        let reef_commit = read(&get_name(opt.file_name.clone(), &doc_string, "cmt"));
+        let reef_commit = read(&format!("{}.cmt", &opt.cmt_name.clone().unwrap()));
 
         // read re
         let r = re::simpl(re::new(
@@ -145,7 +140,7 @@ fn main() {
 
         // read proofs
         let proofs: Proofs = read(&get_name(
-            opt.file_name.clone(),
+            opt.proof_name.clone(),
             opt.re.as_ref().expect("Regular Expression not found"),
             "proof",
         ));
@@ -154,7 +149,6 @@ fn main() {
             reef_commit,
             &ab,
             safa,
-            doc,
             opt.batch_size,
             opt.projections,
             opt.hybrid,
@@ -171,10 +165,10 @@ pub struct Proofs {
     consist_proof: Option<ConsistencyProof>,
 }
 
-fn read_doc(doc_string: String, config: &Config) -> Vec<char> {
-    let doc = if Path::exists(Path::new(&doc_string)) {
+fn read_doc(doc_string: &String, config: &Config) -> Vec<char> {
+    let doc = if Path::exists(Path::new(doc_string)) {
         config
-            .read_file(&PathBuf::from(&doc_string))
+            .read_file(&PathBuf::from(doc_string))
             .iter()
             .map(|c| c.clone())
             .collect()
