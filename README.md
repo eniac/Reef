@@ -27,15 +27,6 @@ Alphabet:
   dna    Accepts DNA base ASCII files
   help   Print this message or the help of the given subcommand(s)
 
-Usage: reef [OPTIONS] <--commit|--prove|--verify|--e2e> [COMMAND]
-
-Commands:
-  ascii  Accepts ASCII regular-expressions and documents
-  utf8   Accepts UTF8 regular-expressions and documents
-  snort  Accepts .pcap files and Snort rules
-  dna    Accepts DNA base ASCII files
-  help   Print this message or the help of the given subcommand(s)
-
 Options:
       --commit
       --prove

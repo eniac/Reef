@@ -2075,6 +2075,8 @@ impl<F: PrimeField> R1CS<F, char> {
             }
         };
 
+        println!("doc q {:#?}, v {:#?}", doc_q.clone(), doc_v.clone());
+
         let mut next_running_q = None;
         let mut next_running_v = None;
         let mut next_doc_running_q = None;
@@ -2561,7 +2563,6 @@ mod tests {
         rstr: String,
         doc: String,
         batch_sizes: Vec<usize>,
-        expected_match: bool,
         proj: Option<usize>,
         hybrid: bool,
         merkle: bool,
@@ -2579,6 +2580,8 @@ mod tests {
         let chars: Vec<char> = doc.chars().collect();
 
         for b in batch_sizes {
+            println!("batch size {:#?}", b);
+
             let reef_commit = run_committer(&chars, &ab, merkle);
             let udoc = doc_transform(&ab, &chars);
             let doc_hash = reef_commit.doc_commit_hash();
@@ -2603,7 +2606,7 @@ mod tests {
             let mut doc_running_v: Option<Integer> = None;
             let mut hybrid_running_q: Option<Vec<Integer>> = None;
             let mut hybrid_running_v: Option<Integer> = None;
-            let mut merkle_lookups = None;
+            let mut _merkle_lookups = None;
 
             let mut doc_idx = 0;
 
@@ -2628,7 +2631,7 @@ mod tests {
                     hybrid_running_q,
                     hybrid_running_v,
                     doc_idx,
-                    merkle_lookups,
+                    _merkle_lookups,
                 ) = r1cs_converter.gen_wit_i(
                     &mut sols,
                     i,
@@ -2696,8 +2699,6 @@ mod tests {
                     r1cs_converter.hybrid_len.is_some(),
                 );
 
-                let cap_d = consist_proof.hash_d.clone();
-
                 dc.verify_consistency(consist_proof)
             }
 
@@ -2713,14 +2714,6 @@ mod tests {
         }
     }
 
-    fn reg(s: &str) -> String {
-        s.to_string()
-    }
-
-    fn ab(s: &str) -> String {
-        s.to_string()
-    }
-
     #[test]
     fn new_bug() {
         init();
@@ -2730,7 +2723,6 @@ mod tests {
                 .to_string(),
             "q1w2e3r4".to_string(),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2747,7 +2739,6 @@ mod tests {
 
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string(),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2763,7 +2754,6 @@ mod tests {
             "^.{10}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG".to_string(),
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string(),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2776,10 +2766,10 @@ mod tests {
         init();
         test_func_no_hash(
             (0..128).filter_map(std::char::from_u32).collect(),
-            reg("^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
-            ab("B6u$r@s#R5mE"),
-            vec![2,3,4,6],
-            true,
+            "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
+                .to_string(),
+            format!("B6u$r@s#R5mE"),
+            vec![2, 3, 4, 6],
             None,
             false,
             false,
@@ -2791,11 +2781,10 @@ mod tests {
     fn sub_proj() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^................aaaaaa$"),
-            ab("ddddddddddddddddaaaaaa"),
+            format!("abcd"),
+            format!("^................aaaaaa$"),
+            format!("ddddddddddddddddaaaaaa"),
             vec![2],
-            true,
             Some(16),
             false,
             false,
@@ -2807,11 +2796,10 @@ mod tests {
     fn merkle() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^(?=a)ab(?=c)cd$"),
-            ab("abcd"),
+            format!("abcd"),
+            format!("^(?=a)ab(?=c)cd$"),
+            format!("abcd"),
             vec![2],
-            true,
             None,
             false,
             true,
@@ -2823,11 +2811,10 @@ mod tests {
     fn proj_hybrid() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^.....................d$"),
-            ab("bbbbbbbbaabbccddaabbdd"),
+            format!("abcd"),
+            format!("^.....................d$"),
+            format!("bbbbbbbbaabbccddaabbdd"),
             vec![2],
-            true,
             Some(18),
             true,
             false,
@@ -2838,11 +2825,10 @@ mod tests {
     #[should_panic]
     fn proj_and_hybrid_bad() {
         test_func_no_hash(
-            ab("abcd"),
-            reg("^.....c$"),
-            ab("aabbcc"),
+            format!("abcd"),
+            format!("^.....c$"),
+            format!("aabbcc"),
             vec![2],
-            true,
             Some(5),
             true,
             false,
@@ -2855,11 +2841,10 @@ mod tests {
         init();
 
         test_func_no_hash(
-            ab("ab"),
-            reg("^ab$"),
-            ab("ab"),
+            format!("ab"),
+            format!("^ab$"),
+            format!("ab"),
             vec![2],
-            true,
             None,
             true,
             false,
@@ -2873,11 +2858,10 @@ mod tests {
 
         // proj upper
         test_func_no_hash(
-            ab("abcd"),
-            reg("^.....c$"),
-            ab("aabbcc"),
+            format!("abcd"),
+            format!("^.....c$"),
+            format!("aabbcc"),
             vec![2],
-            true,
             Some(5), // (4,8)
             false,
             false,
@@ -2889,11 +2873,10 @@ mod tests {
     fn naive_1() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^(?=a)ab(?=c)cd$"),
-            ab("abcd"),
+            format!("abcd"),
+            format!("^(?=a)ab(?=c)cd$"),
+            format!("abcd"),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2905,11 +2888,10 @@ mod tests {
     fn naive_2() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^(?=a)ab(?=c)cd$"),
-            ab("abcd"),
+            format!("abcd"),
+            format!("^(?=a)ab(?=c)cd$"),
+            format!("abcd"),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2921,11 +2903,10 @@ mod tests {
     fn nfa_2() {
         init();
         test_func_no_hash(
-            ab("ab"),
-            reg("^ab$"),
-            ab("ab"),
+            format!("ab"),
+            format!("^ab$"),
+            format!("ab"),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2937,33 +2918,30 @@ mod tests {
     fn nfa_star() {
         init();
         test_func_no_hash(
-            ab("ab"),
-            reg("^a*b*$"),
-            ab("aaab"),
+            format!("ab"),
+            format!("^a*b*$"),
+            format!("aaab"),
             vec![2],
-            true,
             None,
             false,
             false,
             false,
         );
         test_func_no_hash(
-            ab("ab"),
-            reg("^a*b*$"),
-            ab("aaaaaabbbbbbbbbbbbbb"),
+            format!("ab"),
+            format!("^a*b*$"),
+            format!("aaaaaabbbbbbbbbbbbbb"),
             vec![2, 4],
-            true,
             None,
             false,
             false,
             false,
         );
         test_func_no_hash(
-            ab("ab"),
-            reg("^a*b*$"),
-            ab("aaaaaaaaaaab"),
+            format!("ab"),
+            format!("^a*b*$"),
+            format!("aaaaaaaaaaab"),
             vec![2, 4],
-            true,
             None,
             false,
             false,
@@ -2974,13 +2952,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn nfa_bad_1() {
+        // not a match
         init();
         test_func_no_hash(
-            ab("ab"),
-            reg("^a$"),
-            ab("c"),
+            format!("ab"),
+            format!("^a$"),
+            format!("c"),
             vec![2],
-            false,
             None,
             false,
             false,
@@ -2992,11 +2970,10 @@ mod tests {
     fn nfa_ok_substring() {
         init();
         test_func_no_hash(
-            ab("helowrd"),
-            reg("^hello.*$"),
-            ab("helloworld"),
+            format!("helowrd"),
+            format!("^hello.*$"),
+            format!("helloworld"),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -3008,11 +2985,10 @@ mod tests {
     fn weird_batch_size() {
         init();
         test_func_no_hash(
-            ab("helowrd"),
-            reg("^hello.*$"),
-            ab("helloworld"),
+            format!("helowrd"),
+            format!("^hello.*$"),
+            format!("helloworld"),
             vec![2, 3, 4, 6, 7],
-            true,
             None,
             false,
             false,
@@ -3024,11 +3000,10 @@ mod tests {
     fn r1cs_q_overflow() {
         init();
         test_func_no_hash(
-            ab("abcdefg"),
-            reg("^gaa*bb*cc*dd*ee*f$"),
-            ab("gaaaaaabbbbbbccccccddddddeeeeeef"),
+            format!("abcdefg"),
+            format!("^gaa*bb*cc*dd*ee*f$"),
+            format!("gaaaaaabbbbbbccccccddddddeeeeeef"),
             vec![33],
-            true,
             None,
             false,
             false,
@@ -3036,11 +3011,10 @@ mod tests {
         );
 
         test_func_no_hash(
-            ab("abcdefg"),
-            reg("^gaaaaaabbbbbbccccccddddddeeeeeef$"),
-            ab("gaaaaaabbbbbbccccccddddddeeeeeef"),
+            "abcdefg".to_string(),
+            format!("^gaaaaaabbbbbbccccccddddddeeeeeef$"),
+            format!("gaaaaaabbbbbbccccccddddddeeeeeef"),
             vec![33],
-            true,
             None,
             false,
             false,
