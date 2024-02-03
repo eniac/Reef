@@ -18,7 +18,6 @@ use crate::{
     },
     frontend::safa::SAFA,
 };
-use bincode;
 use circ::target::r1cs::{wit_comp::StagedWitCompEvaluator, ProverData};
 use fxhash::FxHashMap;
 use generic_array::typenum;
@@ -34,7 +33,10 @@ use nova_snark::{
 };
 use rug::Integer;
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::fs::{File, OpenOptions};
+use std::io::BufReader;
+use std::io::BufWriter;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -44,6 +46,7 @@ use std::thread;
 
 pub struct ProverInfo {
     commit: ReefCommitment,
+    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
@@ -90,6 +93,9 @@ pub fn run_prover(
     CompressedSNARK<G1, G2, C1, C2, S1, S2>,
     Option<ConsistencyProof>,
 ) {
+    // okay to regen
+    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
     let (sender, recv): (
         Sender<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
         Receiver<Option<NFAStepCircuit<<G1 as Group>::Scalar>>>,
@@ -108,7 +114,7 @@ pub fn run_prover(
         let udoc = doc_transform(&ab, &doc);
         let udoc_len = udoc.len();
         let (mut r1cs_converter, circ_data, z0_primary, pp) = pub_setup(
-            reef_commit.pc(),
+            &sc,
             ab,
             &safa,
             Some(udoc),
@@ -125,6 +131,7 @@ pub fn run_prover(
         let mc = reef_commit.merkle.clone();
         send_setup
             .send(ProverInfo {
+                pc: sc,
                 pp: Arc::new(Mutex::new(pp)),
                 z0_primary,
                 commit: reef_commit,
@@ -707,6 +714,7 @@ fn prove(
         log::tic(Component::Prover, "consistency_proof");
         //Doc dot prod and consistency
         let cp = dc.prove_consistency(
+            &prover_info.pc,
             &prover_info.table,
             prover_info.proj_chunk_idx.clone(),
             q,
@@ -760,9 +768,11 @@ pub fn run_verifier(
     compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
     consist_proof: Option<ConsistencyProof>,
 ) {
+    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
     // rederive pp, z0, table information
     let (r1cs_converter, _circ_data, z0_primary, pp) = pub_setup(
-        reef_commit.pc(),
+        &sc,
         ab.clone(),
         &safa,
         None,
@@ -1004,26 +1014,14 @@ pub fn doc_transform(ab: &String, doc: &Vec<char>) -> Vec<usize> {
 }
 
 pub fn write<T: serde::ser::Serialize>(obj: &T, file_name: &str) {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open(file_name)
-        .unwrap();
-
-    let bytes: Vec<u8> = bincode::serialize(obj).expect("Could not serialize");
-    file.write_all(&bytes).unwrap();
+    let data = serde_json::to_string(&obj).expect("Could not serialize");
+    fs::write(file_name, data).expect("Unable to write file");
 }
 
 pub fn read<T: serde::de::DeserializeOwned>(file_name: &str) -> T {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .open(file_name)
-        .expect(&format!("File {:#?} not found", file_name));
+    let data = fs::read(file_name).expect("Unable to read file");
+    let decoded = bincode::deserialize(&data).expect("Could not deserialize");
 
-    let mut buffer = Vec::<u8>::new();
-    file.read_to_end(&mut buffer).unwrap();
-    let decoded: T = bincode::deserialize(&buffer[..]).unwrap();
     decoded
 }
 

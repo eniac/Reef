@@ -50,9 +50,9 @@ pub struct ReefCommitment {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(bound = "")]
 pub struct NLDocCommitment {
     // commitment to doc
-    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     single_gens: CommitmentGens<G1>,
     hyrax_gen: HyraxPC<G1>,
     doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,
@@ -104,14 +104,6 @@ impl ReefCommitment {
                 orig_doc_len,
                 udoc_len,
             }
-        }
-    }
-
-    pub fn pc(&self) -> &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> {
-        if self.nldoc.is_none() {
-            &self.merkle.as_ref().unwrap().pc
-        } else {
-            &self.nldoc.as_ref().unwrap().pc
         }
     }
 
@@ -206,7 +198,6 @@ impl NLDocCommitment {
         let commit_doc_hash = ro.squeeze(256);
 
         return Self {
-            pc: pc.clone(),
             single_gens: single_gen.clone(),
             hyrax_gen,
             doc_poly: poly,
@@ -222,6 +213,7 @@ impl NLDocCommitment {
 
     pub fn prove_consistency(
         &self,
+        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
         table: &Vec<Integer>,
         proj_chunk_idx: Option<Vec<usize>>,
         q: Vec<Integer>,
@@ -232,7 +224,7 @@ impl NLDocCommitment {
         let v_ff = int_to_ff(v);
         let q_ff = q.clone().into_iter().map(|x| int_to_ff(x)).collect();
 
-        let cap_d = calc_d(&[v_ff, self.hash_salt], &self.pc);
+        let cap_d = calc_d(&[v_ff, self.hash_salt], pc);
         let cap_z = vec![cap_d];
 
         let (ipa, running_q, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
@@ -264,7 +256,7 @@ impl NLDocCommitment {
 
         // CAP circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
-            ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt);
+            ConsistencyCircuit::new(pc, cap_d, v_ff, self.hash_salt);
 
         let cap_res = SpartanSNARK::cap_prove(
             &self.cap_pk,

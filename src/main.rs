@@ -21,8 +21,20 @@ use std::time::SystemTime;
 #[cfg(feature = "metrics")]
 use metrics::metrics::{log, log::Component};
 
+use nova_snark::provider::hyrax_pc::PolyCommit;
 use reef::backend::commitment::NLDocCommitment;
 type G1 = pasta_curves::pallas::Point;
+use generic_array::typenum;
+use neptune::poseidon::PoseidonConstants;
+use nova_snark::provider::pedersen::CommitmentGens;
+use nova_snark::spartan::direct::SpartanProverKey;
+use nova_snark::spartan::polynomial::MultilinearPolynomial;
+use std::fs;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::BufWriter;
+use std::io::Write;
+type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
 fn main() {
     let doc = vec!['a', 'b', 'c', 'c'];
@@ -30,21 +42,11 @@ fn main() {
 
     let reef_commit = run_committer(&doc, &ab, false);
 
-    let bytes: Vec<u8> =
-        bincode::serialize::<<G1 as Group>::Scalar>(&reef_commit.nldoc.unwrap().doc_commit_hash)
-            .expect("Could not serialize");
+    // write commitment
+    write(&reef_commit.nldoc.unwrap().doc_commit_hash, "test_file");
 
-    let rc2: <G1 as Group>::Scalar = bincode::deserialize::<<G1 as Group>::Scalar>(&bytes).unwrap();
-
-    println!("thing {:#?}", rc2);
-
-    /*
-        // write commitment
-        write(&reef_commit.nldoc.unwrap().doc_commit_hash, "test_file");
-
-        // read commitment
-        let reef_commit_in: <G1 as Group>::Scalar = read("test_file");
-    */
+    // read commitment
+    let reef_commit_in: <G1 as Group>::Scalar = read("test_file");
 
     /*
         let opt = Options::parse();
