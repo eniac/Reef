@@ -310,37 +310,46 @@ impl NLDocCommitment {
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
-        // hybrid
-        let q_hybrid = if !hybrid {
+        let running_q = if !hybrid && !proj {
             assert_eq!(q.len(), self.q_len);
             q
-        } else {
+        } else if hybrid && !proj {
             // adjusting for potentially "small" document commitment
             assert!(q.len() >= self.q_len + 1);
 
-            // TODO rm
-            println!("CHECK real q len {} smaller q {}", q.len(), self.q_len);
-            println!("using {} - {}", (q.len() - self.q_len), q.len());
-
             let mut q_prime = vec![];
             for i in (q.len() - self.q_len)..(q.len()) {
-                // (q.len() - self.q_len)
                 q_prime.push(q[i]);
             }
             q_prime
-        };
-
-        let running_q: Vec<<G1 as Group>::Scalar> = if proj {
+        } else if !hybrid && proj {
             let mut q_add: Vec<<G1 as Group>::Scalar> = proj_chunk_idx
                 .unwrap()
                 .into_iter()
                 .map(|x| <G1 as Group>::Scalar::from(x as u64))
                 .collect();
 
-            q_add.extend(q_hybrid);
+            q_add.extend(q);
             q_add
         } else {
-            q_hybrid
+            // both
+
+            let mut q_add: Vec<<G1 as Group>::Scalar> = proj_chunk_idx
+                .unwrap()
+                .into_iter()
+                .map(|x| <G1 as Group>::Scalar::from(x as u64))
+                .collect();
+
+            let new_q_len = self.q_len - q_add.len();
+            assert!(q.len() >= new_q_len + 1);
+
+            let mut q_prime = vec![];
+            for i in (q.len() - new_q_len)..(q.len()) {
+                q_prime.push(q[i]);
+            }
+
+            q_add.extend(q_prime);
+            q_add
         };
 
         // set up

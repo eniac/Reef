@@ -2101,20 +2101,12 @@ impl<F: PrimeField> R1CS<F, char> {
             let half_len = self.hybrid_len.unwrap() / 2;
 
             let mut hybrid_table = self.table.clone();
-            println!("Hybrid table {:#?}", hybrid_table.clone());
-            println!("proj doc {:#?}", proj_doc.clone());
             while hybrid_table.len() < self.hybrid_len.unwrap() {
                 hybrid_table.append(&mut proj_doc.to_vec());
-                println!(
-                    "proj doc len {}, next p2 {}",
-                    proj_doc.len(),
-                    proj_doc.len().next_power_of_two()
-                );
                 hybrid_table.append(&mut vec![
                     Integer::from(0);
                     proj_doc.len().next_power_of_two() - proj_doc.len()
                 ]);
-                println!("Hybrid table {:#?}", hybrid_table.clone());
             }
 
             let mut hybrid_q = q.clone();
@@ -2719,13 +2711,11 @@ mod tests {
     }
 
     fn reg(s: &str) -> String {
-        let mut d = s.to_string();
-        d
+        s.to_string()
     }
 
     fn ab(s: &str) -> String {
-        let mut a = s.to_string();
-        a
+        s.to_string()
     }
 
     #[test]
@@ -2733,7 +2723,8 @@ mod tests {
         init();
         test_func_no_hash(
             (0..128).filter_map(std::char::from_u32).collect(),
-            reg("^(?=.*[A-Z].*[A-Z])(?=.*[^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
+            "^(?=.*[A-Z].*[A-Z])(?=.*[^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
+                .to_string(),
             "q1w2e3r4".to_string(),
             vec![2],
             true,
@@ -2748,10 +2739,10 @@ mod tests {
     fn make_safa_bug() {
         init();
         test_func_no_hash(
-            ab("ATGC"),
-            reg("^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG$"),
+            "ATGC".to_string(),
+            "^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG$".to_string(),
 
-        ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string(),
             vec![2],
             true,
             None,
@@ -2765,9 +2756,9 @@ mod tests {
     fn multiple_ranges_bug() {
         init();
         test_func_no_hash(
-            ab("ATGC"),
-            reg("^.{10}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG"),
-            ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+            "ATGC".to_string(),
+            "^.{10}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG".to_string(),
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string(),
             vec![2],
             true,
             None,
@@ -2842,7 +2833,7 @@ mod tests {
     }
     #[test]
     #[should_panic]
-    fn proj_hybrid_panic() {
+    fn proj_and_hybrid_bad() {
         test_func_no_hash(
             ab("abcd"),
             reg("^.....c$"),

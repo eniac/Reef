@@ -33,6 +33,7 @@ use nova_snark::{
     CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
 };
 use rug::Integer;
+use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -51,6 +52,12 @@ pub struct ProverInfo {
     exit_state: usize,
     projections: bool,
     hybrid_len: Option<usize>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Proofs {
+    pub compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
+    pub consist_proof: Option<ConsistencyProof>,
 }
 
 #[cfg(feature = "metrics")]

@@ -58,21 +58,21 @@ Options:
 There are four different "parties" that can run reef. They all require an
 `alphabet` mode. Running `--commit` requires `--doc`. Running `--prove` (or
 `--e2e`) requires `--doc` and `--re`. Running `--verify` only requires `--re`.
-It's important that each party uses the same alphabet, document, and regular
-expression.
+It's important that each party uses the same alphabet, document, regular
+expression, and merkle/projection/hybrid flags (when appropriate).
 
 Note that you can use `--cmt-name` and `--proof-name` to choose names for your
 commitment and proof files. This is optional - Reef will choose a name for the
 commitment/proof based on the document/regex if you do not - except in the case of
-verification, when you are required to specify the proof file name
+verification, when you are required to specify the commitment file name
 (verification does not read the document).
 
 A good starting point is to generate the proof that `aaaaaaaab` matches the regex `.*b`.
 ```
-$ echo aaaaaaaab > document.txt
-$ reef -d document.txt --commit ascii
-$ reef -d document.txt -r ".*b" --prove ascii
-$ reef -r ".*b" --verify --proof-name TODO ascii
+$ echo aaaaaaaab > document
+$ reef -d document --commit ascii
+$ reef -d document -r ".*b" --prove ascii
+$ reef -r ".*b" --verify --cmt-name document.cmt ascii
 ```
 Note that you can use the same document commitment to generate proofs for
 multiple different regexes.
