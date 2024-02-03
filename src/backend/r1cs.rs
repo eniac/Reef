@@ -2101,8 +2101,21 @@ impl<F: PrimeField> R1CS<F, char> {
             let half_len = self.hybrid_len.unwrap() / 2;
 
             let mut hybrid_table = self.table.clone();
-            hybrid_table.append(&mut proj_doc.to_vec());
-            hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
+            println!("Hybrid table {:#?}", hybrid_table.clone());
+            println!("proj doc {:#?}", proj_doc.clone());
+            while hybrid_table.len() < self.hybrid_len.unwrap() {
+                hybrid_table.append(&mut proj_doc.to_vec());
+                println!(
+                    "proj doc len {}, next p2 {}",
+                    proj_doc.len(),
+                    proj_doc.len().next_power_of_two()
+                );
+                hybrid_table.append(&mut vec![
+                    Integer::from(0);
+                    proj_doc.len().next_power_of_two() - proj_doc.len()
+                ]);
+                println!("Hybrid table {:#?}", hybrid_table.clone());
+            }
 
             let mut hybrid_q = q.clone();
             for qd in doc_q {
@@ -2572,8 +2585,7 @@ mod tests {
         let chars: Vec<char> = doc.chars().collect();
 
         for b in batch_sizes {
-            let hybrid_len = None; // TODO JESS
-            let reef_commit = run_committer(&chars, &ab, hybrid_len, merkle);
+            let reef_commit = run_committer(&chars, &ab, merkle);
             let udoc = doc_transform(&ab, &chars);
             let doc_hash = reef_commit.doc_commit_hash();
             let udoc_len = udoc.len();

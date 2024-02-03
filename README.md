@@ -27,12 +27,22 @@ Alphabet:
   dna    Accepts DNA base ASCII files
   help   Print this message or the help of the given subcommand(s)
 
+Usage: reef [OPTIONS] <--commit|--prove|--verify|--e2e> [COMMAND]
+
+Commands:
+  ascii  Accepts ASCII regular-expressions and documents
+  utf8   Accepts UTF8 regular-expressions and documents
+  snort  Accepts .pcap files and Snort rules
+  dna    Accepts DNA base ASCII files
+  help   Print this message or the help of the given subcommand(s)
+
 Options:
       --commit
       --prove
       --verify
       --e2e
-  -f, --file-name <FILE>    Optional name for .cmt and .proof files
+      --cmt-name <FILE>     Optional name for .cmt file
+      --proof-name <FILE>   Optional name for .proof file
   -d, --doc <FILE>
       --metrics <FILE>      Metrics and other output information
   -r, --re <RE>             Perl-style regular expression
@@ -51,12 +61,18 @@ There are four different "parties" that can run reef. They all require an
 It's important that each party uses the same alphabet, document, and regular
 expression.
 
+Note that you can use `--cmt-name` and `--proof-name` to choose names for your
+commitment and proof files. This is optional - Reef will choose a name for the
+commitment/proof based on the document/regex if you do not - except in the case of
+verification, when you are required to specify the proof file name
+(verification does not read the document).
+
 A good starting point is to generate the proof that `aaaaaaaab` matches the regex `.*b`.
 ```
 $ echo aaaaaaaab > document.txt
 $ reef -d document.txt --commit ascii
 $ reef -d document.txt -r ".*b" --prove ascii
-$ reef -r ".*b" --verify ascii
+$ reef -r ".*b" --verify --proof-name TODO ascii
 ```
 Note that you can use the same document commitment to generate proofs for
 multiple different regexes.

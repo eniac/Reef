@@ -9,13 +9,11 @@ type EE2 = nova_snark::provider::ipa_pc::EvaluationEngine<G2>;
 type S1 = nova_snark::spartan::RelaxedR1CSSNARK<G1, EE1>;
 type S2 = nova_snark::spartan::RelaxedR1CSSNARK<G2, EE2>;
 
-use bincode;
 use clap::Parser;
 use csv::Writer;
 use nova_snark::{
-    provider::pedersen::CompressedCommitment,
     traits::{circuit::TrivialTestCircuit, Group},
-    CompressedSNARK, PublicParams, RecursiveSNARK, StepCounterType, FINAL_EXTERNAL_COUNTER,
+    CompressedSNARK,
 };
 use reef::backend::{
     commitment::ConsistencyProof, framework::*, nova::NFAStepCircuit, r1cs_helper::init,
@@ -24,7 +22,7 @@ use reef::config::*;
 use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -40,8 +38,6 @@ fn main() {
     let config = opt.config.expect("No alphabet found");
     let ab = String::from_iter(config.alphabet());
 
-    let hybrid_len = None; // TODO!! JESS
-
     if opt.e2e || opt.commit {
         #[cfg(feature = "metrics")]
         metrics_file(opt, doc);
@@ -50,7 +46,7 @@ fn main() {
         let doc_string = opt.doc.as_ref().expect("No document found");
         let doc = read_doc(&doc_string, &config);
 
-        let reef_commit = run_committer(&doc, &ab, hybrid_len, opt.merkle);
+        let reef_commit = run_committer(&doc, &ab, opt.merkle);
 
         // write commitment
         write(
@@ -61,7 +57,7 @@ fn main() {
 
     if opt.e2e || opt.prove {
         // read doc
-        let doc_string = opt.doc.expect("No document found");
+        let doc_string = opt.doc.as_ref().expect("No document found");
         let doc = read_doc(&doc_string, &config);
 
         // read commitment
@@ -124,7 +120,13 @@ fn main() {
 
     if opt.e2e || opt.verify {
         // read commitment
-        let reef_commit = read(&format!("{}.cmt", &opt.cmt_name.clone().unwrap()));
+        let reef_commit = if opt.verify {
+            read(&format!("{}.cmt", &opt.cmt_name.clone().unwrap()))
+        } else {
+            // read doc
+            let doc_string = opt.doc.expect("No document found");
+            read(&get_name(opt.cmt_name.clone(), &doc_string, "cmt"))
+        };
 
         // read re
         let r = re::simpl(re::new(

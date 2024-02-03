@@ -2,6 +2,7 @@ type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
+use crate::backend::costs::logmn;
 use crate::backend::merkle_tree::MerkleCommitment;
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::verifier_mle_eval;
@@ -62,6 +63,7 @@ pub struct NLDocCommitment {
     // consistency verification
     cap_pk: SpartanProverKey<G1, EE1>,
     cap_vk: SpartanVerifierKey<G1, EE1>,
+    q_len: usize,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -84,7 +86,6 @@ impl ReefCommitment {
     pub fn new(
         doc: Vec<usize>,
         orig_doc_len: usize,
-        hybrid_len: Option<usize>,
         merkle: bool,
         pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
     ) -> Self {
@@ -98,7 +99,7 @@ impl ReefCommitment {
             }
         } else {
             Self {
-                nldoc: Some(NLDocCommitment::new(doc, hybrid_len, &pc)),
+                nldoc: Some(NLDocCommitment::new(doc, &pc)),
                 merkle: None,
                 orig_doc_len,
                 udoc_len,
@@ -108,7 +109,7 @@ impl ReefCommitment {
 
     pub fn pc(&self) -> &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4> {
         if self.nldoc.is_none() {
-            panic!("PC not stored in merkle");
+            &self.merkle.as_ref().unwrap().pc
         } else {
             &self.nldoc.as_ref().unwrap().pc
         }
@@ -136,11 +137,7 @@ impl ReefCommitment {
 }
 
 impl NLDocCommitment {
-    pub fn new(
-        doc: Vec<usize>,
-        hybrid_len: Option<usize>,
-        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    ) -> Self
+    pub fn new(doc: Vec<usize>, pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>) -> Self
     where
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,
@@ -163,11 +160,8 @@ impl NLDocCommitment {
         let salt = <G1 as Group>::Scalar::random(&mut OsRng);
 
         // commitment to document
-        let doc_ext_len = if hybrid_len.is_some() {
-            hybrid_len.unwrap() / 2
-        } else {
-            doc.len().next_power_of_two()
-        };
+        let doc_ext_len = doc.len().next_power_of_two();
+        let q_len = logmn(doc_ext_len);
 
         let mut doc_ext: Vec<<G1 as Group>::Scalar> = doc
             .into_iter()
@@ -222,6 +216,7 @@ impl NLDocCommitment {
             hash_salt: salt,
             cap_pk,
             cap_vk,
+            q_len,
         };
     }
 
@@ -317,10 +312,19 @@ impl NLDocCommitment {
 
         // hybrid
         let q_hybrid = if !hybrid {
+            assert_eq!(q.len(), self.q_len);
             q
         } else {
+            // adjusting for potentially "small" document commitment
+            assert!(q.len() >= self.q_len + 1);
+
+            // TODO rm
+            println!("CHECK real q len {} smaller q {}", q.len(), self.q_len);
+            println!("using {} - {}", (q.len() - self.q_len), q.len());
+
             let mut q_prime = vec![];
-            for i in 1..(q.len()) {
+            for i in (q.len() - self.q_len)..(q.len()) {
+                // (q.len() - self.q_len)
                 q_prime.push(q[i]);
             }
             q_prime

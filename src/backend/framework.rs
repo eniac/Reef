@@ -56,12 +56,7 @@ pub struct ProverInfo {
 #[cfg(feature = "metrics")]
 use metrics::metrics::{log, log::Component};
 
-pub fn run_committer(
-    doc: &Vec<char>,
-    ab: &String,
-    hybrid_len: Option<usize>,
-    merkle: bool,
-) -> ReefCommitment {
+pub fn run_committer(doc: &Vec<char>, ab: &String, merkle: bool) -> ReefCommitment {
     let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
 
     let udoc = doc_transform(ab, doc);
@@ -69,7 +64,7 @@ pub fn run_committer(
     #[cfg(feature = "metrics")]
     log::tic(Component::CommitmentGen, "generation");
 
-    let reef_commit = ReefCommitment::new(udoc.clone(), doc.len(), hybrid_len, merkle, sc);
+    let reef_commit = ReefCommitment::new(udoc.clone(), doc.len(), merkle, sc);
 
     reef_commit
 }
@@ -1047,8 +1042,7 @@ mod tests {
 
         init();
 
-        let hybrid_len = None; // TODO JESS
-        let reef_commit = run_committer(&doc, &ab, hybrid_len, merkle);
+        let reef_commit = run_committer(&doc, &ab, merkle);
         write(&reef_commit, &format!("{}.cmt", rstr));
 
         let (compressed_snark, consist_proof) = run_prover(

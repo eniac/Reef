@@ -24,19 +24,9 @@ pub struct Options {
     pub verify: bool,
     #[arg(long, default_value_t = false)]
     pub e2e: bool,
-    #[arg(
-        short = 'f',
-        long,
-        value_name = "FILE",
-        help = "Optional name for .cmt file"
-    )]
+    #[arg(long, value_name = "FILE", help = "Optional name for .cmt file")]
     pub cmt_name: Option<String>,
-    #[arg(
-        short = 'f',
-        long,
-        value_name = "FILE",
-        help = "Optional name for .proof file"
-    )]
+    #[arg(long, value_name = "FILE", help = "Optional name for .proof file")]
     pub proof_name: Option<String>,
     #[arg(short = 'd', long, value_name = "FILE")]
     pub doc: Option<String>,

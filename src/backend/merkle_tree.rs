@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct MerkleCommitment<F: PrimeField> {
     pub commitment: F,
+    pub pc: PoseidonConstants<F, typenum::U4>,
     tree: Vec<Vec<F>>,
     doc: Vec<F>,
 }
@@ -72,6 +73,7 @@ impl<F: PrimeField> MerkleCommitment<F> {
 
         Self {
             commitment: next_level[0],
+            pc: pc.clone(),
             tree,
             doc: doc_f,
         }
