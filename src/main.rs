@@ -36,149 +36,162 @@ use std::io::BufWriter;
 use std::io::Write;
 type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
+#[derive(Deserialize, Serialize)]
+#[serde(bound = "")]
+pub struct Fake {
+    // commitment to doc
+    single_gens: CommitmentGens<G1>,
+    /*    hyrax_gen: HyraxPC<G1>,
+        doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,
+        pub doc_commit: PolyCommit<G1>,
+        doc_decommit: PolyCommitBlinds<G1>,
+        pub doc_commit_hash: <G1 as Group>::Scalar,
+        pub hash_salt: <G1 as Group>::Scalar,
+        // consistency verification
+        cap_pk: SpartanProverKey<G1, EE1>,
+        cap_vk: SpartanVerifierKey<G1, EE1>,
+        q_len: usize,
+    */
+}
+
 fn main() {
-    let doc = vec!['a', 'b', 'c', 'c'];
-    let ab = format!("abc");
+    let opt = Options::parse();
+    println!("reef");
 
-    let reef_commit = run_committer(&doc, &ab, false);
+    // read alphabet
+    let config = opt.config.expect("No alphabet found");
+    let ab = String::from_iter(config.alphabet());
 
-    // write commitment
-    write(&reef_commit.nldoc.unwrap().doc_commit_hash, "test_file");
+    if opt.e2e || opt.commit {
+        #[cfg(feature = "metrics")]
+        metrics_file(opt, doc);
 
-    // read commitment
-    let reef_commit_in: <G1 as Group>::Scalar = read("test_file");
+        // read doc
+        let doc_string = opt.doc.as_ref().expect("No document found");
+        let doc = read_doc(&doc_string, &config);
 
-    /*
-        let opt = Options::parse();
-        println!("reef");
+        let reef_commit = run_committer(&doc, &ab, opt.merkle);
 
-        // read alphabet
-        let config = opt.config.expect("No alphabet found");
-        let ab = String::from_iter(config.alphabet());
+        // write commitment
+        let cmt_data = bincode::serialize(&reef_commit).expect("Could not serialize");
+        fs::write(get_name(opt.cmt_name.clone(), &doc_string, "cmt"), cmt_data)
+            .expect("Unable to write file");
+    }
 
-        if opt.e2e || opt.commit {
-            #[cfg(feature = "metrics")]
-            metrics_file(opt, doc);
+    if opt.e2e || opt.prove {
+        // read doc
+        let doc_string = opt.doc.as_ref().expect("No document found");
+        let doc = read_doc(&doc_string, &config);
 
-            // read doc
-            let doc_string = opt.doc.as_ref().expect("No document found");
-            let doc = read_doc(&doc_string, &config);
+        // read commitment
+        let cmt_data = fs::read(get_name(opt.cmt_name.clone(), &doc_string, "cmt"))
+            .expect("Unable to read file");
+        let reef_commit: ReefCommitment =
+            bincode::deserialize(&cmt_data).expect("Could not deserialize");
 
-            let reef_commit = run_committer(&doc, &ab, opt.merkle);
+        // read re
+        #[cfg(feature = "metrics")]
+        log::tic(Component::Compiler, "regex_normalization");
 
-            // write commitment
-            write(
-                &reef_commit,
-                &get_name(opt.cmt_name.clone(), &doc_string, "cmt"),
-            );
+        let r = re::simpl(re::new(
+            &opt.re.clone().expect("Regular Expression not found"),
+        ));
+
+        #[cfg(feature = "metrics")]
+        {
+            log::stop(Component::Compiler, "regex_normalization");
+            log::tic(Component::Compiler, "fa_builder");
         }
 
-        if opt.e2e || opt.prove {
-            // read doc
-            let doc_string = opt.doc.as_ref().expect("No document found");
-            let doc = read_doc(&doc_string, &config);
+        // Compile regex to SAFA
+        let safa = if opt.negate {
+            SAFA::new(&ab, &r).negate()
+        } else {
+            SAFA::new(&ab, &r)
+        };
 
-            // read commitment
-            let reef_commit: ReefCommitment = read(&get_name(opt.cmt_name.clone(), &doc_string, "cmt"));
+        #[cfg(feature = "metrics")]
+        log::stop(Component::Compiler, "fa_builder");
 
-            // read re
-            #[cfg(feature = "metrics")]
-            log::tic(Component::Compiler, "regex_normalization");
+        #[cfg(feature = "plot")]
+        safa.write_pdf("main")
+            .expect("Failed to plot NFA to a pdf file");
 
-            let r = re::simpl(re::new(
-                &opt.re.clone().expect("Regular Expression not found"),
-            ));
+        init();
+        let (compressed_snark, consist_proof) = run_prover(
+            reef_commit, // replace -> only need doc hash
+            ab.clone(),
+            safa,
+            doc.clone(),
+            opt.batch_size,
+            opt.projections,
+            opt.hybrid,
+            opt.merkle,
+            opt.metrics.clone(),
+        );
 
-            #[cfg(feature = "metrics")]
-            {
-                log::stop(Component::Compiler, "regex_normalization");
-                log::tic(Component::Compiler, "fa_builder");
-            }
-
-            // Compile regex to SAFA
-            let safa = if opt.negate {
-                SAFA::new(&ab, &r).negate()
-            } else {
-                SAFA::new(&ab, &r)
-            };
-
-            #[cfg(feature = "metrics")]
-            log::stop(Component::Compiler, "fa_builder");
-
-            #[cfg(feature = "plot")]
-            safa.write_pdf("main")
-                .expect("Failed to plot NFA to a pdf file");
-
-            init();
-            let (compressed_snark, consist_proof) = run_prover(
-                reef_commit, // replace -> only need doc hash
-                ab.clone(),
-                safa,
-                doc.clone(),
-                opt.batch_size,
-                opt.projections,
-                opt.hybrid,
-                opt.merkle,
-                opt.metrics.clone(),
-            );
-
-            // write snark, consistency
-            let proofs = Proofs {
-                compressed_snark,
-                consist_proof,
-            };
-            write(
-                &proofs,
-                &get_name(
-                    opt.proof_name.clone(),
-                    opt.re.as_ref().expect("Regular Expression not found"),
-                    "proof",
-                ),
-            );
-        }
-
-        if opt.e2e || opt.verify {
-            // read commitment
-            let reef_commit: ReefCommitment = if opt.verify {
-                read(&format!("{}.cmt", &opt.cmt_name.clone().unwrap()))
-            } else {
-                // read doc
-                let doc_string = opt.doc.expect("No document found");
-                read(&get_name(opt.cmt_name.clone(), &doc_string, "cmt"))
-            };
-
-            // read re
-            let r = re::simpl(re::new(
-                opt.re.as_ref().expect("Regular Expression not found"),
-            ));
-
-            // Compile regex to SAFA
-            let safa = if opt.negate {
-                SAFA::new(&ab, &r).negate()
-            } else {
-                SAFA::new(&ab, &r)
-            };
-
-            // read proofs
-            let proofs: Proofs = read(&get_name(
+        // write snark, consistency
+        let proofs = Proofs {
+            compressed_snark,
+            consist_proof,
+        };
+        let proof_data = bincode::serialize(&proofs).expect("Could not serialize");
+        fs::write(
+            get_name(
                 opt.proof_name.clone(),
                 opt.re.as_ref().expect("Regular Expression not found"),
                 "proof",
-            ));
+            ),
+            proof_data,
+        )
+        .expect("Unable to write file");
+    }
 
-            run_verifier(
-                reef_commit,
-                &ab,
-                safa,
-                opt.batch_size,
-                opt.projections,
-                opt.hybrid,
-                opt.merkle,
-                proofs.compressed_snark,
-                proofs.consist_proof,
-            );
-        }
-    */
+    if opt.e2e || opt.verify {
+        // read commitment
+        let file_name = if opt.verify {
+            format!("{}.cmt", &opt.cmt_name.clone().unwrap())
+        } else {
+            let doc_string = opt.doc.expect("No document found");
+            get_name(opt.cmt_name.clone(), &doc_string, "cmt")
+        };
+        let cmt_data = fs::read(file_name).expect("Unable to read file");
+        let reef_commit: ReefCommitment =
+            bincode::deserialize(&cmt_data).expect("Could not deserialize");
+
+        // read re
+        let r = re::simpl(re::new(
+            opt.re.as_ref().expect("Regular Expression not found"),
+        ));
+
+        // Compile regex to SAFA
+        let safa = if opt.negate {
+            SAFA::new(&ab, &r).negate()
+        } else {
+            SAFA::new(&ab, &r)
+        };
+
+        // read proofs
+        let proof_data = fs::read(get_name(
+            opt.proof_name.clone(),
+            opt.re.as_ref().expect("Regular Expression not found"),
+            "proof",
+        ))
+        .expect("Unable to read file");
+        let proofs: Proofs = bincode::deserialize(&proof_data).expect("Could not deserialize");
+
+        run_verifier(
+            reef_commit,
+            &ab,
+            safa,
+            opt.batch_size,
+            opt.projections,
+            opt.hybrid,
+            opt.merkle,
+            proofs.compressed_snark,
+            proofs.consist_proof,
+        );
+    }
 }
 
 fn read_doc(doc_string: &String, config: &Config) -> Vec<char> {

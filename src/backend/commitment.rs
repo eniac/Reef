@@ -53,7 +53,7 @@ pub struct ReefCommitment {
 #[serde(bound = "")]
 pub struct NLDocCommitment {
     // commitment to doc
-    single_gens: CommitmentGens<G1>,
+    pub single_gens: CommitmentGens<G1>,
     hyrax_gen: HyraxPC<G1>,
     doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,
     pub doc_commit: PolyCommit<G1>,

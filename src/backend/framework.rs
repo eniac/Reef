@@ -1013,18 +1013,6 @@ pub fn doc_transform(ab: &String, doc: &Vec<char>) -> Vec<usize> {
     udoc
 }
 
-pub fn write<T: serde::ser::Serialize>(obj: &T, file_name: &str) {
-    let data = serde_json::to_string(&obj).expect("Could not serialize");
-    fs::write(file_name, data).expect("Unable to write file");
-}
-
-pub fn read<T: serde::de::DeserializeOwned>(file_name: &str) -> T {
-    let data = fs::read(file_name).expect("Unable to read file");
-    let decoded = bincode::deserialize(&data).expect("Could not deserialize");
-
-    decoded
-}
-
 #[cfg(test)]
 mod tests {
 
