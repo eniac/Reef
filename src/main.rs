@@ -2,17 +2,11 @@
 
 use clap::Parser;
 use csv::Writer;
-use nova_snark::{
-    traits::{circuit::TrivialTestCircuit, Group},
-    CompressedSNARK,
-};
-use reef::backend::{
-    commitment::ReefCommitment, framework::*, nova::NFAStepCircuit, r1cs_helper::init,
-};
+use reef::backend::{commitment::ReefCommitment, framework::*, r1cs_helper::init};
 use reef::config::*;
 use reef::frontend::regex::re;
 use reef::frontend::safa::SAFA;
-use serde::{Deserialize, Serialize};
+use std::fs;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
@@ -20,39 +14,6 @@ use std::time::SystemTime;
 
 #[cfg(feature = "metrics")]
 use metrics::metrics::{log, log::Component};
-
-use nova_snark::provider::hyrax_pc::PolyCommit;
-use reef::backend::commitment::NLDocCommitment;
-type G1 = pasta_curves::pallas::Point;
-use generic_array::typenum;
-use neptune::poseidon::PoseidonConstants;
-use nova_snark::provider::pedersen::CommitmentGens;
-use nova_snark::spartan::direct::SpartanProverKey;
-use nova_snark::spartan::polynomial::MultilinearPolynomial;
-use std::fs;
-use std::fs::File;
-use std::io::BufReader;
-use std::io::BufWriter;
-use std::io::Write;
-type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
-
-#[derive(Deserialize, Serialize)]
-#[serde(bound = "")]
-pub struct Fake {
-    // commitment to doc
-    single_gens: CommitmentGens<G1>,
-    /*    hyrax_gen: HyraxPC<G1>,
-        doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,
-        pub doc_commit: PolyCommit<G1>,
-        doc_decommit: PolyCommitBlinds<G1>,
-        pub doc_commit_hash: <G1 as Group>::Scalar,
-        pub hash_salt: <G1 as Group>::Scalar,
-        // consistency verification
-        cap_pk: SpartanProverKey<G1, EE1>,
-        cap_vk: SpartanVerifierKey<G1, EE1>,
-        q_len: usize,
-    */
-}
 
 fn main() {
     let opt = Options::parse();

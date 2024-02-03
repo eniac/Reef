@@ -2567,6 +2567,8 @@ mod tests {
         merkle: bool,
         negate: bool,
     ) {
+        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
         let r = re::simpl(re::new(&rstr));
         let safa = if negate {
             SAFA::new(&ab[..], &r).negate()
@@ -2591,7 +2593,7 @@ mod tests {
                 proj,
                 hybrid,
                 merkle,
-                reef_commit.pc().clone(),
+                sc.clone(),
                 doc_hash,
             );
 
@@ -2685,6 +2687,7 @@ mod tests {
 
                 let dc = reef_commit.nldoc.unwrap();
                 let consist_proof = dc.prove_consistency(
+                    &sc,
                     &r1cs_converter.table,
                     r1cs_converter.proj_chunk_idx,
                     priv_rq,

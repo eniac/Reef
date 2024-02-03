@@ -33,11 +33,6 @@ use nova_snark::{
 };
 use rug::Integer;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::fs::{File, OpenOptions};
-use std::io::BufReader;
-use std::io::BufWriter;
-use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -50,9 +45,7 @@ pub struct ProverInfo {
     pp: Arc<Mutex<PublicParams<G1, G2, C1, C2>>>,
     z0_primary: Vec<<G1 as Group>::Scalar>,
     table: Vec<Integer>,
-    proj_doc_len: usize,
     proj_chunk_idx: Option<Vec<usize>>,
-    exit_state: usize,
     projections: bool,
     hybrid_len: Option<usize>,
 }
@@ -136,9 +129,7 @@ pub fn run_prover(
                 z0_primary,
                 commit: reef_commit,
                 table: r1cs_converter.table.clone(),
-                proj_doc_len: r1cs_converter.doc_len(), // projected
                 proj_chunk_idx: r1cs_converter.proj_chunk_idx.clone(),
-                exit_state: r1cs_converter.exit_state,
                 projections: r1cs_converter.doc_subset.is_some(),
                 hybrid_len: r1cs_converter.hybrid_len,
             })
@@ -1020,6 +1011,7 @@ mod tests {
     use crate::backend::r1cs_helper::init;
     use crate::frontend::regex::re;
     use crate::frontend::safa::SAFA;
+    use std::fs;
 
     fn backend_test(
         ab: String,
@@ -1036,7 +1028,9 @@ mod tests {
         init();
 
         let reef_commit = run_committer(&doc, &ab, merkle);
-        write(&reef_commit, &format!("{}.cmt", rstr));
+
+        let cmt_data = bincode::serialize(&reef_commit).expect("Could not serialize");
+        fs::write(format!("{}.cmt", rstr), cmt_data).expect("Unable to write file");
 
         let (compressed_snark, consist_proof) = run_prover(
             reef_commit,
@@ -1050,7 +1044,9 @@ mod tests {
             None,
         );
 
-        let reef_commit_2 = read(&format!("{}.cmt", rstr));
+        let cmt_data = fs::read(format!("{}.cmt", rstr)).expect("Unable to read file");
+        let reef_commit_2: ReefCommitment =
+            bincode::deserialize(&cmt_data).expect("Could not deserialize");
 
         run_verifier(
             reef_commit_2,
