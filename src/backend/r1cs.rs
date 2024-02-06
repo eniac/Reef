@@ -2076,8 +2076,6 @@ impl<F: PrimeField> R1CS<F, char> {
             }
         };
 
-        println!("doc q {:#?}, v {:#?}", doc_q.clone(), doc_v.clone());
-
         let mut next_running_q = None;
         let mut next_running_v = None;
         let mut next_doc_running_q = None;
@@ -2185,13 +2183,6 @@ impl<F: PrimeField> R1CS<F, char> {
         running_v: Option<Integer>,
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
-        println!(
-            "lookups {:#?},{:#?} in table {:#?}",
-            q.clone(),
-            v.clone(),
-            table.clone()
-        );
-
         let sc_l = logmn(table.len()); // sum check rounds
 
         let num_vs = v.len();

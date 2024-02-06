@@ -16,6 +16,7 @@ use neptune::{
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::circuit::SpongeCircuit,
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
+    Strength,
 };
 use nova_snark::{
     errors::NovaError,
@@ -135,7 +136,6 @@ impl NLDocCommitment {
         G2: Group<Base = <G1 as Group>::Scalar>,
     {
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(
-            &pc,
             <G1 as Group>::Scalar::zero(),
             <G1 as Group>::Scalar::zero(),
             <G1 as Group>::Scalar::zero(),
@@ -256,7 +256,7 @@ impl NLDocCommitment {
 
         // CAP circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
-            ConsistencyCircuit::new(pc, cap_d, v_ff, self.hash_salt);
+            ConsistencyCircuit::new(cap_d, v_ff, self.hash_salt);
 
         let cap_res = SpartanSNARK::cap_prove(
             &self.cap_pk,
@@ -536,20 +536,14 @@ pub fn final_clear_checks(
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ConsistencyCircuit<F: PrimeField> {
-    pc: PoseidonConstants<F, typenum::U4>,
     d: F,
     v: F,
     s: F,
 }
 
 impl<F: PrimeField> ConsistencyCircuit<F> {
-    pub fn new(pc: &PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
-        ConsistencyCircuit {
-            pc: pc.clone(),
-            d,
-            v,
-            s,
-        }
+    pub fn new(d: F, v: F, s: F) -> Self {
+        ConsistencyCircuit { d, v, s }
     }
 }
 
@@ -575,6 +569,8 @@ where
     where
         CS: ConstraintSystem<F>,
     {
+        // can't store this, bc can't be serialized
+        let pc = Sponge::<F, typenum::U4>::api_constants(Strength::Standard);
         let d_in = z[0].clone();
 
         //v at index 0 (but technically 1 since io is allocated first)
@@ -584,7 +580,7 @@ where
         //poseidon(v,s) == d
         let d_calc = {
             let acc = &mut cs.namespace(|| "d hash circuit");
-            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+            let mut sponge = SpongeCircuit::new_with_constants(&pc, Mode::Simplex);
 
             sponge.start(
                 IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),

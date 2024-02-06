@@ -744,6 +744,15 @@ fn prove(
         log::space(Component::CommitmentGen, "commitment", commit_sz);
     }
 
+    // TODO JESS DELETE
+    let res = compressed_snark.verify(
+        &prover_info.pp.lock().unwrap(),
+        FINAL_EXTERNAL_COUNTER,
+        prover_info.z0_primary.clone(),
+        z0_secondary,
+    );
+    assert!(res.is_ok());
+
     (compressed_snark, consist_proof)
 }
 
@@ -1031,7 +1040,7 @@ mod tests {
         let reef_commit = run_committer(&doc, &ab, merkle);
 
         let cmt_data = bincode::serialize(&reef_commit).expect("Could not serialize");
-        fs::write(format!("{}.cmt", rstr), cmt_data).expect("Unable to write file");
+        fs::write(format!("reg_{}.cmt", rstr), cmt_data).expect("Unable to write file");
 
         let (compressed_snark, consist_proof) = run_prover(
             reef_commit,
@@ -1045,7 +1054,7 @@ mod tests {
             None,
         );
 
-        let cmt_data = fs::read(format!("{}.cmt", rstr)).expect("Unable to read file");
+        let cmt_data = fs::read(format!("reg_{}.cmt", rstr)).expect("Unable to read file");
         let reef_commit_2: ReefCommitment =
             bincode::deserialize(&cmt_data).expect("Could not deserialize");
 

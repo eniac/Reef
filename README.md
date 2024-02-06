@@ -9,12 +9,12 @@ The details of Reef are described in our paper: [Reef: Fast Succinct Non-Interac
 ## Compile
 
 ```
-cargo build
+cargo build --release
 ```
 
 With metrics:
 ```
-cargo build --features metrics
+cargo build --release --features metrics
 ```
 
 ## Usage

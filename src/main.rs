@@ -111,11 +111,12 @@ fn main() {
     if opt.e2e || opt.verify {
         // read commitment
         let file_name = if opt.verify {
-            format!("{}.cmt", &opt.cmt_name.clone().unwrap())
+            format!("{}", &opt.cmt_name.clone().unwrap())
         } else {
             let doc_string = opt.doc.expect("No document found");
             get_name(opt.cmt_name.clone(), &doc_string, true)
         };
+
         let cmt_data = fs::read(file_name).expect("Unable to read file");
         let reef_commit: ReefCommitment =
             bincode::deserialize(&cmt_data).expect("Could not deserialize");
@@ -141,6 +142,9 @@ fn main() {
         .expect("Unable to read file");
         let proofs: Proofs = bincode::deserialize(&proof_data).expect("Could not deserialize");
 
+        if opt.verify {
+            init();
+        }
         run_verifier(
             reef_commit,
             &ab,
