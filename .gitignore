@@ -13,3 +13,5 @@ slow*
 *.sym
 *.r1cs
 *.txt
+*.cmt
+*.proof

@@ -9,28 +9,33 @@ The details of Reef are described in our paper: [Reef: Fast Succinct Non-Interac
 ## Compile
 
 ```
-cargo build
+cargo build --release
 ```
 
 With metrics:
 ```
-cargo build --features metrics
+cargo build --release --features metrics
 ```
 
 ## Usage
-
 ```
-Usage: reef [OPTIONS] --input <FILE> --output <FILE> --re <RE> <COMMAND>
+Usage: reef [OPTIONS] <--commit|--prove|--verify|--e2e> [ALPHABET]
 
-Commands:
+Alphabet:
   ascii  Accepts ASCII regular-expressions and documents
   utf8   Accepts UTF8 regular-expressions and documents
   dna    Accepts DNA base ASCII files
   help   Print this message or the help of the given subcommand(s)
 
 Options:
-  -i, --input <FILE>
-  -o, --output <FILE>
+      --commit
+      --prove
+      --verify
+      --e2e
+      --cmt-name <FILE>     Optional name for .cmt file
+      --proof-name <FILE>   Optional name for .proof file
+  -d, --doc <FILE>
+      --metrics <FILE>      Metrics and other output information
   -r, --re <RE>             Perl-style regular expression
   -b, --batch-size <USIZE>  Batch size (override auto select) [default: 0]
   -p, --projections         Use document projections
@@ -41,17 +46,32 @@ Options:
   -V, --version             Print version
 ```
 
+There are four different "parties" that can run reef. They all require an
+`alphabet` mode. Running `--commit` requires `--doc`. Running `--prove` (or
+`--e2e`) requires `--doc` and `--re`. Running `--verify` only requires `--re`.
+It's important that each party uses the same alphabet, document, regular
+expression, and merkle/projection/hybrid flags (when appropriate).
+
+Note that you can use `--cmt-name` and `--proof-name` to choose names for your
+commitment and proof files. This is optional - Reef will choose a name for the
+commitment/proof based on the document/regex if you do not - except in the case of
+verification, when you are required to specify the commitment file name
+(verification does not read the document).
+
 A good starting point is to generate the proof that `aaaaaaaab` matches the regex `.*b`.
-
 ```
-$ echo aaaaaaaab > input.txt
-$ reef -i input.txt -o metrics.txt -r ".*b" ascii
+$ echo aaaaaaaab > document
+$ reef -d document --commit ascii
+$ reef -d document -r ".*b" --prove ascii
+$ reef -r ".*b" --verify --cmt-name document.cmt ascii
 ```
+Note that you can use the same document commitment to generate proofs for
+multiple different regexes.
 
-or another example
+Or another example, with metrics and end-to-end running.
 ```
 $ echo "hello world happy to be here" > hello.txt
-$ reef -i hello.txt -o metrics.txt -r "hello.*" ascii
+$ reef -d hello.txt --metrics metrics.txt -r "hello.*" --e2e ascii
 ```
 
 ## Reproducing Baseline Results
@@ -59,12 +79,12 @@ If you're interested in reproducing our baseline results (DFA and DFA with recur
 
 For DFA 
 ```
-cargo build --features naive
+cargo build --release --features naive
 ```
 
 For DFA with Recursion
 ```
-cargo build --features nwr
+cargo build --release --features nwr
 ```
 
 Thank you for using Reef,

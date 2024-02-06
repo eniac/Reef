@@ -2,6 +2,7 @@ type G1 = pasta_curves::pallas::Point;
 type G2 = pasta_curves::vesta::Point;
 type EE1 = nova_snark::provider::ipa_pc::EvaluationEngine<G1>;
 
+use crate::backend::costs::logmn;
 use crate::backend::merkle_tree::MerkleCommitment;
 use crate::backend::nova::int_to_ff;
 use crate::backend::r1cs_helper::verifier_mle_eval;
@@ -15,6 +16,7 @@ use neptune::{
     sponge::api::{IOPattern, SpongeAPI, SpongeOp},
     sponge::circuit::SpongeCircuit,
     sponge::vanilla::{Mode, Sponge, SpongeTrait},
+    Strength,
 };
 use nova_snark::{
     errors::NovaError,
@@ -37,16 +39,22 @@ use nova_snark::{
 };
 use rand::rngs::OsRng;
 use rug::{integer::Order, Integer};
+use serde::{Deserialize, Serialize};
 
+#[derive(Deserialize, Serialize)]
 pub struct ReefCommitment {
+    // one or the other
     pub nldoc: Option<NLDocCommitment>,
     pub merkle: Option<MerkleCommitment<<G1 as Group>::Scalar>>,
+    pub orig_doc_len: usize,
+    pub udoc_len: usize,
 }
 
+#[derive(Deserialize, Serialize)]
+#[serde(bound = "")]
 pub struct NLDocCommitment {
     // commitment to doc
-    pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    single_gens: CommitmentGens<G1>,
+    pub single_gens: CommitmentGens<G1>,
     hyrax_gen: HyraxPC<G1>,
     doc_poly: MultilinearPolynomial<<G1 as Group>::Scalar>,
     pub doc_commit: PolyCommit<G1>,
@@ -56,8 +64,10 @@ pub struct NLDocCommitment {
     // consistency verification
     cap_pk: SpartanProverKey<G1, EE1>,
     cap_vk: SpartanVerifierKey<G1, EE1>,
+    q_len: usize,
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct ConsistencyProof {
     // consistency verification
     pub hash_d: <G1 as Group>::Scalar,
@@ -76,36 +86,56 @@ pub struct ConsistencyProof {
 impl ReefCommitment {
     pub fn new(
         doc: Vec<usize>,
-        hybrid_len: Option<usize>,
+        orig_doc_len: usize,
         merkle: bool,
-        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+        pc: Option<PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>>,
     ) -> Self {
+        let udoc_len = doc.len();
         if merkle {
             Self {
                 nldoc: None,
-                merkle: Some(MerkleCommitment::new(&doc, pc)),
+                merkle: Some(MerkleCommitment::new(&doc, &pc.unwrap())),
+                orig_doc_len,
+                udoc_len,
             }
         } else {
             Self {
-                nldoc: Some(NLDocCommitment::new(doc, hybrid_len, pc)),
+                nldoc: Some(NLDocCommitment::new(doc)),
                 merkle: None,
+                orig_doc_len,
+                udoc_len,
             }
         }
+    }
+
+    pub fn hash_salt(&self) -> <G1 as Group>::Scalar {
+        let mut hash_salt = <G1 as Group>::Scalar::zero();
+        if self.nldoc.is_some() {
+            let dc = self.nldoc.as_ref().unwrap();
+            hash_salt = dc.hash_salt;
+        }
+
+        hash_salt
+    }
+
+    pub fn doc_commit_hash(&self) -> <G1 as Group>::Scalar {
+        let mut commit_hash = <G1 as Group>::Scalar::zero();
+        if self.nldoc.is_some() {
+            let dc = self.nldoc.as_ref().unwrap();
+            commit_hash = dc.doc_commit_hash;
+        }
+
+        commit_hash
     }
 }
 
 impl NLDocCommitment {
-    pub fn new(
-        doc: Vec<usize>,
-        hybrid_len: Option<usize>,
-        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
-    ) -> Self
+    pub fn new(doc: Vec<usize>) -> Self
     where
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,
     {
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> = ConsistencyCircuit::new(
-            &pc,
             <G1 as Group>::Scalar::zero(),
             <G1 as Group>::Scalar::zero(),
             <G1 as Group>::Scalar::zero(),
@@ -122,11 +152,8 @@ impl NLDocCommitment {
         let salt = <G1 as Group>::Scalar::random(&mut OsRng);
 
         // commitment to document
-        let doc_ext_len = if hybrid_len.is_some() {
-            hybrid_len.unwrap() / 2
-        } else {
-            doc.len().next_power_of_two()
-        };
+        let doc_ext_len = doc.len().next_power_of_two();
+        let q_len = logmn(doc_ext_len);
 
         let mut doc_ext: Vec<<G1 as Group>::Scalar> = doc
             .into_iter()
@@ -171,7 +198,6 @@ impl NLDocCommitment {
         let commit_doc_hash = ro.squeeze(256);
 
         return Self {
-            pc: pc.clone(),
             single_gens: single_gen.clone(),
             hyrax_gen,
             doc_poly: poly,
@@ -181,11 +207,13 @@ impl NLDocCommitment {
             hash_salt: salt,
             cap_pk,
             cap_vk,
+            q_len,
         };
     }
 
     pub fn prove_consistency(
         &self,
+        pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
         table: &Vec<Integer>,
         proj_chunk_idx: Option<Vec<usize>>,
         q: Vec<Integer>,
@@ -196,7 +224,7 @@ impl NLDocCommitment {
         let v_ff = int_to_ff(v);
         let q_ff = q.clone().into_iter().map(|x| int_to_ff(x)).collect();
 
-        let cap_d = calc_d(&[v_ff, self.hash_salt], &self.pc);
+        let cap_d = calc_d(&[v_ff, self.hash_salt], pc);
         let cap_z = vec![cap_d];
 
         let (ipa, running_q, v_commit, v_decommit, v_prime_commit, v_prime_decommit, v_prime) =
@@ -228,7 +256,7 @@ impl NLDocCommitment {
 
         // CAP circuit
         let cap_circuit: ConsistencyCircuit<<G1 as Group>::Scalar> =
-            ConsistencyCircuit::new(&self.pc, cap_d, v_ff, self.hash_salt);
+            ConsistencyCircuit::new(cap_d, v_ff, self.hash_salt);
 
         let cap_res = SpartanSNARK::cap_prove(
             &self.cap_pk,
@@ -274,28 +302,46 @@ impl NLDocCommitment {
     ) {
         let mut p_transcript = Transcript::new(b"dot_prod_proof");
 
-        // hybrid
-        let q_hybrid = if !hybrid {
+        let running_q = if !hybrid && !proj {
+            assert_eq!(q.len(), self.q_len);
             q
-        } else {
+        } else if hybrid && !proj {
+            // adjusting for potentially "small" document commitment
+            assert!(q.len() >= self.q_len + 1);
+
             let mut q_prime = vec![];
-            for i in 1..(q.len()) {
+            for i in (q.len() - self.q_len)..(q.len()) {
                 q_prime.push(q[i]);
             }
             q_prime
-        };
-
-        let running_q: Vec<<G1 as Group>::Scalar> = if proj {
+        } else if !hybrid && proj {
             let mut q_add: Vec<<G1 as Group>::Scalar> = proj_chunk_idx
                 .unwrap()
                 .into_iter()
                 .map(|x| <G1 as Group>::Scalar::from(x as u64))
                 .collect();
 
-            q_add.extend(q_hybrid);
+            q_add.extend(q);
             q_add
         } else {
-            q_hybrid
+            // both
+
+            let mut q_add: Vec<<G1 as Group>::Scalar> = proj_chunk_idx
+                .unwrap()
+                .into_iter()
+                .map(|x| <G1 as Group>::Scalar::from(x as u64))
+                .collect();
+
+            let new_q_len = self.q_len - q_add.len();
+            assert!(q.len() >= new_q_len + 1);
+
+            let mut q_prime = vec![];
+            for i in (q.len() - new_q_len)..(q.len()) {
+                q_prime.push(q[i]);
+            }
+
+            q_add.extend(q_prime);
+            q_add
         };
 
         // set up
@@ -488,22 +534,16 @@ pub fn final_clear_checks(
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ConsistencyCircuit<F: PrimeField> {
-    pc: PoseidonConstants<F, typenum::U4>,
     d: F,
     v: F,
     s: F,
 }
 
 impl<F: PrimeField> ConsistencyCircuit<F> {
-    pub fn new(pc: &PoseidonConstants<F, typenum::U4>, d: F, v: F, s: F) -> Self {
-        ConsistencyCircuit {
-            pc: pc.clone(),
-            d,
-            v,
-            s,
-        }
+    pub fn new(d: F, v: F, s: F) -> Self {
+        ConsistencyCircuit { d, v, s }
     }
 }
 
@@ -529,6 +569,8 @@ where
     where
         CS: ConstraintSystem<F>,
     {
+        // can't store this, bc can't be serialized
+        let pc = Sponge::<F, typenum::U4>::api_constants(Strength::Standard);
         let d_in = z[0].clone();
 
         //v at index 0 (but technically 1 since io is allocated first)
@@ -538,7 +580,7 @@ where
         //poseidon(v,s) == d
         let d_calc = {
             let acc = &mut cs.namespace(|| "d hash circuit");
-            let mut sponge = SpongeCircuit::new_with_constants(&self.pc, Mode::Simplex);
+            let mut sponge = SpongeCircuit::new_with_constants(&pc, Mode::Simplex);
 
             sponge.start(
                 IOPattern(vec![SpongeOp::Absorb(2), SpongeOp::Squeeze(1)]),

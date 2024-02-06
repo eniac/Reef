@@ -24,14 +24,14 @@ use std::cmp::max;
 use std::collections::HashSet;
 use std::collections::LinkedList;
 
-pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
-    pub safa: &'a SAFA<C>,
+pub struct R1CS<F: PrimeField, C: Clone + Eq> {
+    pub safa: SAFA<C>,
     foralls_w_kids: FxHashMap<usize, Vec<usize>>,
     pub num_ab: FxHashMap<Option<C>, usize>,
     pub table: Vec<Integer>,
     pub max_offsets: usize,
     star_offset: usize,
-    pub doc_hash: Option<F>,
+    pub doc_hash: F,
     assertions: Vec<Term>,
     // perhaps a misleading name, by "public inputs", we mean "circ leaves these wires exposed from
     // the black box, and will not optimize them away"
@@ -39,8 +39,10 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     // sticking out here
     pub_inputs: Vec<Term>,
     pub batch_size: usize,
-    pub udoc: Vec<usize>,
-    pub idoc: Vec<Integer>,
+    orig_doc_len: usize,
+    pub udoc: Option<Vec<usize>>,
+    pub udoc_len: usize,
+    pub idoc: Option<Vec<Integer>>,
     ep_num: usize,
     // circuit
     pub max_branches: usize,
@@ -64,27 +66,37 @@ pub struct R1CS<'a, F: PrimeField, C: Clone + Eq> {
     pub path_lens: Vec<usize>,
 }
 
-impl<'a, F: PrimeField> R1CS<'a, F, char> {
+impl<F: PrimeField> R1CS<F, char> {
     pub fn new(
-        safa: &'a SAFA<char>,
-        doc: &Vec<char>,
+        ab: &String,
+        safa: &SAFA<char>,
+        udoc: Option<Vec<usize>>, // only optional for verifier
+        udoc_len: usize,
+        orig_doc_len: usize,
         batch_size: usize,
         projection: Option<usize>,
         hybrid: bool,
         merkle: bool,
         pcs: PoseidonConstants<F, typenum::U4>,
+        doc_hash: F,
     ) -> Self {
-        assert!(doc.len() > 0);
+        assert!(udoc_len > 0);
+        if udoc.is_some() {
+            assert_eq!(udoc.as_ref().unwrap().len(), udoc_len);
+        }
 
         // character conversions
         let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
         let mut i = 0;
-        for c in safa.ab.clone() {
+        for c in ab.clone().chars() {
             num_ab.insert(Some(c), i);
             i += 1;
         }
         num_ab.insert(None, i + 1); // EPSILON
         num_ab.insert(Some(26u8 as char), i + 2); // EOF
+
+        assert!(udoc_len >= orig_doc_len);
+        assert!(udoc_len.next_power_of_two() == udoc_len);
 
         // generate T
         let mut num_states = safa.g.node_count();
@@ -349,6 +361,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         ));
 
         let mut table: Vec<Integer> = set_table.into_iter().collect();
+        table.sort();
 
         // need to round out table size
         let base: usize = 2;
@@ -375,34 +388,18 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // generate usize doc
-        let mut usize_doc = vec![];
-        let mut int_doc = vec![];
-        for c in doc.clone().into_iter() {
-            if !num_ab.contains_key(&Some(c)) {
-                panic!("Character in document that's not in alphabet");
+        let mut int_doc = None;
+
+        if udoc.is_some() {
+            let mut idoc = vec![];
+            for u in udoc.as_ref().unwrap().clone().into_iter() {
+                idoc.push(Integer::from(u));
             }
-            let u = num_ab[&Some(c)];
-            usize_doc.push(u);
-            int_doc.push(Integer::from(u));
+            int_doc = Some(idoc);
         }
 
-        // EOF
-        let u = num_ab[&Some(26u8 as char)];
-        usize_doc.push(u);
-        int_doc.push(Integer::from(u));
-
         // EPSILON
-        let ep_num = usize_doc.len();
-        let u = num_ab[&None];
-        usize_doc.push(u);
-        int_doc.push(Integer::from(u));
-
-        // extend doc
-        let base: usize = 2;
-        let orig_len = usize_doc.len();
-        let ext_len = base.pow(logmn(usize_doc.len()) as u32) - usize_doc.len();
-        usize_doc.extend(vec![0; ext_len]);
-        int_doc.extend(vec![Integer::from(0); ext_len]);
+        let ep_num = orig_doc_len + 1;
 
         let mut stack = vec![];
         for _i in 0..max_stack {
@@ -411,20 +408,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
 
         let mut proj_chunk_idx = None;
         let doc_subset = if projection.is_some() {
-            if (usize_doc.len().next_power_of_two() <= table.len()) && hybrid {
+            if (udoc_len.next_power_of_two() <= table.len()) && hybrid {
                 panic!(
                     "Doc len {} <= table size {} already. Projections AND hybrid not useful together, choose one.",
-                usize_doc.len().next_power_of_two(), table.len());
+                udoc_len.next_power_of_two(), table.len());
             }
 
             let real_start = projection.unwrap();
-            let mut chunk_len = usize_doc.len().next_power_of_two() / 2;
-            let mut e = usize_doc.len().next_power_of_two();
+            let mut chunk_len = udoc_len.next_power_of_two() / 2;
+            let mut e = udoc_len.next_power_of_two();
             let mut s = 0;
             let mut end = e;
             let mut start = 0;
 
-            while e >= orig_len {
+            while e >= orig_doc_len {
                 end = e;
                 start = s;
 
@@ -433,7 +430,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                     s += chunk_len;
                 }
                 e = s + chunk_len;
-                assert!(end <= usize_doc.len().next_power_of_two());
+                assert!(end <= udoc_len.next_power_of_two());
 
                 // try to go smaller
                 chunk_len = chunk_len / 2
@@ -443,7 +440,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             assert!(chunk_len.next_power_of_two() == chunk_len);
 
             assert!(start <= real_start);
-            assert!(end >= orig_len);
+            assert!(end >= orig_doc_len);
             assert!(start % chunk_len == 0);
 
             // proj vs hybrid calc
@@ -455,7 +452,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
                 None
             } else {
                 // calculate chunk idx
-                let num_chunks = usize_doc.len().next_power_of_two() / chunk_len;
+                let num_chunks = udoc_len.next_power_of_two() / chunk_len;
                 let mut chunk_idx = start / chunk_len;
                 let mut chunk_idx_vec = vec![];
                 for _i in 0..logmn(num_chunks) {
@@ -478,7 +475,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let ds = doc_subset.unwrap();
             ds.1 - ds.0
         } else {
-            usize_doc.len()
+            udoc_len
         };
 
         let hybrid_len = if hybrid {
@@ -498,7 +495,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             };
             cost_model_batch_size = opt_cost_model_select(
                 safa,
-                usize_doc.len(),
+                udoc_len,
                 hybrid,
                 hybrid_len,
                 project,
@@ -516,18 +513,20 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         assert!(cost_model_batch_size > 1);
 
         Self {
-            safa,
+            safa: safa.clone(),
             foralls_w_kids,
             num_ab,
             table,
             max_offsets,
             star_offset,
-            doc_hash: None,
+            doc_hash,
             assertions: Vec::new(),
             pub_inputs: Vec::new(),
             batch_size: cost_model_batch_size,
-            udoc: usize_doc, // usizes
-            idoc: int_doc,   // big ints
+            orig_doc_len,
+            udoc, // usizes
+            udoc_len,
+            idoc: int_doc, // big ints
             ep_num,
             max_branches,
             max_stack,
@@ -551,7 +550,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let ds = self.doc_subset.unwrap();
             ds.1 - ds.0
         } else {
-            self.udoc.len().next_power_of_two()
+            self.udoc_len.next_power_of_two()
         }
     }
 
@@ -972,7 +971,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         }
 
         // if pop, check new_cursor < prev
-        let cur_bit_limit = logmn(self.udoc.len()) + 1;
+        let cur_bit_limit = logmn(self.udoc_len) + 1;
         let cursor_overflow = term(
             Op::BvBinPred(BvBinPred::Uge),
             vec![
@@ -1060,7 +1059,7 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             );
             self.assertions.push(cursor_plus);
 
-            let bit_limit = logmn(max(self.udoc.len(), self.max_offsets)) + 1;
+            let bit_limit = logmn(max(self.udoc_len, self.max_offsets)) + 1;
 
             let cur_overflow = term(
                 Op::BvBinPred(BvBinPred::Uge),
@@ -2060,20 +2059,21 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         let mut doc_v = vec![];
         let mut doc_q = vec![];
         let proj_doc;
+        let idoc = self.idoc.as_ref().unwrap();
         if self.doc_subset.is_some() {
             let ds = self.doc_subset.unwrap();
-            proj_doc = &self.idoc[ds.0..ds.1];
+            proj_doc = &idoc[ds.0..ds.1];
             for i in 0..self.batch_size {
                 let access_at = cursor_access[i];
                 doc_q.push(access_at - ds.0);
-                doc_v.push(self.idoc[access_at].clone());
+                doc_v.push(idoc[access_at].clone());
             }
         } else {
-            proj_doc = &self.idoc;
+            proj_doc = &idoc;
             for i in 0..self.batch_size {
                 let access_at = cursor_access[i];
                 doc_q.push(access_at);
-                doc_v.push(self.idoc[access_at].clone());
+                doc_v.push(idoc[access_at].clone());
             }
         };
 
@@ -2103,8 +2103,13 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
             let half_len = self.hybrid_len.unwrap() / 2;
 
             let mut hybrid_table = self.table.clone();
-            hybrid_table.append(&mut proj_doc.to_vec());
-            hybrid_table.append(&mut vec![Integer::from(0); half_len - proj_doc.len()]); // need??
+            while hybrid_table.len() < self.hybrid_len.unwrap() {
+                hybrid_table.append(&mut proj_doc.to_vec());
+                hybrid_table.append(&mut vec![
+                    Integer::from(0);
+                    proj_doc.len().next_power_of_two() - proj_doc.len()
+                ]);
+            }
 
             let mut hybrid_q = q.clone();
             for qd in doc_q {
@@ -2279,8 +2284,8 @@ impl<'a, F: PrimeField> R1CS<'a, F, char> {
         sponge.start(IOPattern(pattern), None, acc);
         let mut query: Vec<F> = match id {
             "nl" => vec![],
-            "nldoc" => vec![self.doc_hash.unwrap()],
-            "nlhybrid" => vec![self.doc_hash.unwrap()],
+            "nldoc" => vec![self.doc_hash],
+            "nlhybrid" => vec![self.doc_hash],
             _ => panic!("weird tag"),
         };
         for cq in combined_qs {
@@ -2389,8 +2394,8 @@ pub fn ceil_div(a: usize, b: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::backend::commitment::final_clear_checks;
-    use crate::backend::commitment::ReefCommitment;
+    use crate::backend::commitment::{final_clear_checks, ReefCommitment};
+    use crate::backend::framework::{doc_transform, run_committer};
     use crate::backend::r1cs::*;
     use crate::frontend::regex::re;
     use crate::frontend::safa::SAFA;
@@ -2435,13 +2440,8 @@ mod tests {
             let mut eq_a = gen_eq_table(&claims, &qs, &last_q.clone().into_iter().rev().collect());
 
             // claim check
-            let (_, running_v) = prover_mle_partial_eval(
-                &evals,
-                &last_q,
-                &(0..evals.len()).collect(),
-                true,
-                None,
-            );
+            let (_, running_v) =
+                prover_mle_partial_eval(&evals, &last_q, &(0..evals.len()).collect(), true, None);
             term += running_v * &claims[3];
 
             let mut claim: Integer = evals
@@ -2487,22 +2487,11 @@ mod tests {
             }
 
             // next
-            let (_, next_running_v) = prover_mle_partial_eval(
-                &table,
-                &sc_rs,
-                &(0..table.len()).collect(),
-                true,
-                None,
-            );
+            let (_, next_running_v) =
+                prover_mle_partial_eval(&table, &sc_rs, &(0..table.len()).collect(), true, None);
 
             // sanity check
-            let (_, eq_term) = prover_mle_partial_eval(
-                &claims,
-                &sc_rs,
-                &qs,
-                false,
-                Some(&last_q),
-            );
+            let (_, eq_term) = prover_mle_partial_eval(&claims, &sc_rs, &qs, false, Some(&last_q));
             assert_eq!(
                 claim, // last claim
                 (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
@@ -2574,12 +2563,13 @@ mod tests {
         rstr: String,
         doc: String,
         batch_sizes: Vec<usize>,
-        expected_match: bool,
         proj: Option<usize>,
         hybrid: bool,
         merkle: bool,
         negate: bool,
     ) {
+        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
+
         let r = re::simpl(re::new(&rstr));
         let safa = if negate {
             SAFA::new(&ab[..], &r).negate()
@@ -2589,22 +2579,27 @@ mod tests {
 
         let chars: Vec<char> = doc.chars().collect();
 
-        let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-
         for b in batch_sizes {
-            let mut r1cs_converter = R1CS::new(&safa, &chars, b, proj, hybrid, merkle, sc.clone());
+            println!("batch size {:#?}", b);
 
-            let reef_commit = ReefCommitment::new(
-                r1cs_converter.udoc.clone(),
-                r1cs_converter.hybrid_len,
+            let reef_commit = run_committer(&chars, &ab, merkle);
+            let udoc = doc_transform(&ab, &chars);
+            let doc_hash = reef_commit.doc_commit_hash();
+            let udoc_len = udoc.len();
+
+            let mut r1cs_converter = R1CS::new(
+                &ab,
+                &safa,
+                Some(udoc),
+                udoc_len,
+                chars.len(),
+                b,
+                proj,
+                hybrid,
                 merkle,
-                &sc,
+                sc.clone(),
+                doc_hash,
             );
-
-            if reef_commit.nldoc.is_some() {
-                let dc = reef_commit.nldoc.as_ref().unwrap();
-                r1cs_converter.doc_hash = Some(dc.doc_commit_hash);
-            };
 
             let mut running_q: Option<Vec<Integer>> = None;
             let mut running_v: Option<Integer> = None;
@@ -2612,7 +2607,7 @@ mod tests {
             let mut doc_running_v: Option<Integer> = None;
             let mut hybrid_running_q: Option<Vec<Integer>> = None;
             let mut hybrid_running_v: Option<Integer> = None;
-            let mut merkle_lookups = None;
+            let mut _merkle_lookups = None;
 
             let mut doc_idx = 0;
 
@@ -2637,7 +2632,7 @@ mod tests {
                     hybrid_running_q,
                     hybrid_running_v,
                     doc_idx,
-                    merkle_lookups,
+                    _merkle_lookups,
                 ) = r1cs_converter.gen_wit_i(
                     &mut sols,
                     i,
@@ -2670,7 +2665,7 @@ mod tests {
             let cost_estimate = full_round_cost_model(
                 &safa,
                 b,
-                r1cs_converter.udoc.len(),
+                r1cs_converter.udoc.as_ref().unwrap().len(),
                 hybrid,
                 r1cs_converter.hybrid_len,
                 false,
@@ -2696,6 +2691,7 @@ mod tests {
 
                 let dc = reef_commit.nldoc.unwrap();
                 let consist_proof = dc.prove_consistency(
+                    &sc,
                     &r1cs_converter.table,
                     r1cs_converter.proj_chunk_idx,
                     priv_rq,
@@ -2703,8 +2699,6 @@ mod tests {
                     r1cs_converter.doc_subset.is_some(),
                     r1cs_converter.hybrid_len.is_some(),
                 );
-
-                let cap_d = consist_proof.hash_d.clone();
 
                 dc.verify_consistency(consist_proof)
             }
@@ -2721,25 +2715,15 @@ mod tests {
         }
     }
 
-    fn reg(s: &str) -> String {
-        let mut d = s.to_string();
-        d
-    }
-
-    fn ab(s: &str) -> String {
-        let mut a = s.to_string();
-        a
-    }
-
     #[test]
     fn new_bug() {
         init();
         test_func_no_hash(
             (0..128).filter_map(std::char::from_u32).collect(),
-            reg("^(?=.*[A-Z].*[A-Z])(?=.*[^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
+            "^(?=.*[A-Z].*[A-Z])(?=.*[^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
+                .to_string(),
             "q1w2e3r4".to_string(),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2751,12 +2735,11 @@ mod tests {
     fn make_safa_bug() {
         init();
         test_func_no_hash(
-            ab("ATGC"),
-            reg("^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG$"),
+            "ATGC".to_string(),
+            "^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG$".to_string(),
 
-        ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string(),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2768,11 +2751,10 @@ mod tests {
     fn multiple_ranges_bug() {
         init();
         test_func_no_hash(
-            ab("ATGC"),
-            reg("^.{10}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG"),
-            ab("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+            "ATGC".to_string(),
+            "^.{10}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG".to_string(),
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string(),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2785,10 +2767,10 @@ mod tests {
         init();
         test_func_no_hash(
             (0..128).filter_map(std::char::from_u32).collect(),
-            reg("^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"),
-            ab("B6u$r@s#R5mE"),
-            vec![2,3,4,6],
-            true,
+            "^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$"
+                .to_string(),
+            format!("B6u$r@s#R5mE"),
+            vec![2, 3, 4, 6],
             None,
             false,
             false,
@@ -2800,11 +2782,10 @@ mod tests {
     fn sub_proj() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^................aaaaaa$"),
-            ab("ddddddddddddddddaaaaaa"),
+            format!("abcd"),
+            format!("^................aaaaaa$"),
+            format!("ddddddddddddddddaaaaaa"),
             vec![2],
-            true,
             Some(16),
             false,
             false,
@@ -2816,11 +2797,10 @@ mod tests {
     fn merkle() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^(?=a)ab(?=c)cd$"),
-            ab("abcd"),
+            format!("abcd"),
+            format!("^(?=a)ab(?=c)cd$"),
+            format!("abcd"),
             vec![2],
-            true,
             None,
             false,
             true,
@@ -2832,11 +2812,10 @@ mod tests {
     fn proj_hybrid() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^.....................d$"),
-            ab("bbbbbbbbaabbccddaabbdd"),
+            format!("abcd"),
+            format!("^.....................d$"),
+            format!("bbbbbbbbaabbccddaabbdd"),
             vec![2],
-            true,
             Some(18),
             true,
             false,
@@ -2845,13 +2824,12 @@ mod tests {
     }
     #[test]
     #[should_panic]
-    fn proj_hybrid_panic() {
+    fn proj_and_hybrid_bad() {
         test_func_no_hash(
-            ab("abcd"),
-            reg("^.....c$"),
-            ab("aabbcc"),
+            format!("abcd"),
+            format!("^.....c$"),
+            format!("aabbcc"),
             vec![2],
-            true,
             Some(5),
             true,
             false,
@@ -2864,11 +2842,10 @@ mod tests {
         init();
 
         test_func_no_hash(
-            ab("ab"),
-            reg("^ab$"),
-            ab("ab"),
+            format!("ab"),
+            format!("^ab$"),
+            format!("ab"),
             vec![2],
-            true,
             None,
             true,
             false,
@@ -2882,11 +2859,10 @@ mod tests {
 
         // proj upper
         test_func_no_hash(
-            ab("abcd"),
-            reg("^.....c$"),
-            ab("aabbcc"),
+            format!("abcd"),
+            format!("^.....c$"),
+            format!("aabbcc"),
             vec![2],
-            true,
             Some(5), // (4,8)
             false,
             false,
@@ -2898,11 +2874,10 @@ mod tests {
     fn naive_1() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^(?=a)ab(?=c)cd$"),
-            ab("abcd"),
+            format!("abcd"),
+            format!("^(?=a)ab(?=c)cd$"),
+            format!("abcd"),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2914,11 +2889,10 @@ mod tests {
     fn naive_2() {
         init();
         test_func_no_hash(
-            ab("abcd"),
-            reg("^(?=a)ab(?=c)cd$"),
-            ab("abcd"),
+            format!("abcd"),
+            format!("^(?=a)ab(?=c)cd$"),
+            format!("abcd"),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2930,11 +2904,10 @@ mod tests {
     fn nfa_2() {
         init();
         test_func_no_hash(
-            ab("ab"),
-            reg("^ab$"),
-            ab("ab"),
+            format!("ab"),
+            format!("^ab$"),
+            format!("ab"),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -2946,33 +2919,30 @@ mod tests {
     fn nfa_star() {
         init();
         test_func_no_hash(
-            ab("ab"),
-            reg("^a*b*$"),
-            ab("aaab"),
+            format!("ab"),
+            format!("^a*b*$"),
+            format!("aaab"),
             vec![2],
-            true,
             None,
             false,
             false,
             false,
         );
         test_func_no_hash(
-            ab("ab"),
-            reg("^a*b*$"),
-            ab("aaaaaabbbbbbbbbbbbbb"),
+            format!("ab"),
+            format!("^a*b*$"),
+            format!("aaaaaabbbbbbbbbbbbbb"),
             vec![2, 4],
-            true,
             None,
             false,
             false,
             false,
         );
         test_func_no_hash(
-            ab("ab"),
-            reg("^a*b*$"),
-            ab("aaaaaaaaaaab"),
+            format!("ab"),
+            format!("^a*b*$"),
+            format!("aaaaaaaaaaab"),
             vec![2, 4],
-            true,
             None,
             false,
             false,
@@ -2983,13 +2953,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn nfa_bad_1() {
+        // not a match
         init();
         test_func_no_hash(
-            ab("ab"),
-            reg("^a$"),
-            ab("c"),
+            format!("ab"),
+            format!("^a$"),
+            format!("c"),
             vec![2],
-            false,
             None,
             false,
             false,
@@ -3001,11 +2971,10 @@ mod tests {
     fn nfa_ok_substring() {
         init();
         test_func_no_hash(
-            ab("helowrd"),
-            reg("^hello.*$"),
-            ab("helloworld"),
+            format!("helowrd"),
+            format!("^hello.*$"),
+            format!("helloworld"),
             vec![2],
-            true,
             None,
             false,
             false,
@@ -3017,11 +2986,10 @@ mod tests {
     fn weird_batch_size() {
         init();
         test_func_no_hash(
-            ab("helowrd"),
-            reg("^hello.*$"),
-            ab("helloworld"),
+            "helowrd".to_string(),
+            "^hello.*$".to_string(),
+            "helloworld".to_string(),
             vec![2, 3, 4, 6, 7],
-            true,
             None,
             false,
             false,
@@ -3033,11 +3001,10 @@ mod tests {
     fn r1cs_q_overflow() {
         init();
         test_func_no_hash(
-            ab("abcdefg"),
-            reg("^gaa*bb*cc*dd*ee*f$"),
-            ab("gaaaaaabbbbbbccccccddddddeeeeeef"),
+            format!("abcdefg"),
+            format!("^gaa*bb*cc*dd*ee*f$"),
+            format!("gaaaaaabbbbbbccccccddddddeeeeeef"),
             vec![33],
-            true,
             None,
             false,
             false,
@@ -3045,11 +3012,10 @@ mod tests {
         );
 
         test_func_no_hash(
-            ab("abcdefg"),
-            reg("^gaaaaaabbbbbbccccccddddddeeeeeef$"),
-            ab("gaaaaaabbbbbbccccccddddddeeeeeef"),
+            "abcdefg".to_string(),
+            format!("^gaaaaaabbbbbbccccccddddddeeeeeef$"),
+            format!("gaaaaaabbbbbbccccccddddddeeeeeef"),
             vec![33],
-            true,
             None,
             false,
             false,
