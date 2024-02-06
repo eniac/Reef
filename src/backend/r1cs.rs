@@ -68,6 +68,7 @@ pub struct R1CS<F: PrimeField, C: Clone + Eq> {
 
 impl<F: PrimeField> R1CS<F, char> {
     pub fn new(
+        ab: &String,
         safa: &SAFA<char>,
         udoc: Option<Vec<usize>>, // only optional for verifier
         udoc_len: usize,
@@ -87,7 +88,7 @@ impl<F: PrimeField> R1CS<F, char> {
         // character conversions
         let mut num_ab: FxHashMap<Option<char>, usize> = FxHashMap::default();
         let mut i = 0;
-        for c in safa.ab.clone() {
+        for c in ab.clone().chars() {
             num_ab.insert(Some(c), i);
             i += 1;
         }
@@ -1551,6 +1552,7 @@ impl<F: PrimeField> R1CS<F, char> {
 
     fn nlookup_doc_commit(&mut self, priv_lookups: Vec<Term>) {
         let len = self.doc_len();
+        println!("len {:#?}", len);
         self.q_ordering_circuit("nldoc", len);
         self.nlookup_gadget(priv_lookups, len, "nldoc");
     }
@@ -2184,6 +2186,13 @@ impl<F: PrimeField> R1CS<F, char> {
         running_v: Option<Integer>,
         id: &str,
     ) -> (FxHashMap<String, Value>, Vec<Integer>, Integer) {
+        println!(
+            "lookups {:#?},{:#?} in table {:#?}",
+            q.clone(),
+            v.clone(),
+            table.clone()
+        );
+
         let sc_l = logmn(table.len()); // sum check rounds
 
         let num_vs = v.len();
@@ -2588,6 +2597,7 @@ mod tests {
             let udoc_len = udoc.len();
 
             let mut r1cs_converter = R1CS::new(
+                &ab,
                 &safa,
                 Some(udoc),
                 udoc_len,
@@ -2985,9 +2995,9 @@ mod tests {
     fn weird_batch_size() {
         init();
         test_func_no_hash(
-            format!("helowrd"),
-            format!("^hello.*$"),
-            format!("helloworld"),
+            "helowrd".to_string(),
+            "^hello.*$".to_string(),
+            "helloworld".to_string(),
             vec![2, 3, 4, 6, 7],
             None,
             false,

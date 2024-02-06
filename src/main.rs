@@ -35,7 +35,7 @@ fn main() {
 
         // write commitment
         let cmt_data = bincode::serialize(&reef_commit).expect("Could not serialize");
-        fs::write(get_name(opt.cmt_name.clone(), &doc_string, "cmt"), cmt_data)
+        fs::write(get_name(opt.cmt_name.clone(), &doc_string, true), cmt_data)
             .expect("Unable to write file");
     }
 
@@ -45,7 +45,7 @@ fn main() {
         let doc = read_doc(&doc_string, &config);
 
         // read commitment
-        let cmt_data = fs::read(get_name(opt.cmt_name.clone(), &doc_string, "cmt"))
+        let cmt_data = fs::read(get_name(opt.cmt_name.clone(), &doc_string, true))
             .expect("Unable to read file");
         let reef_commit: ReefCommitment =
             bincode::deserialize(&cmt_data).expect("Could not deserialize");
@@ -101,7 +101,7 @@ fn main() {
             get_name(
                 opt.proof_name.clone(),
                 opt.re.as_ref().expect("Regular Expression not found"),
-                "proof",
+                false,
             ),
             proof_data,
         )
@@ -114,7 +114,7 @@ fn main() {
             format!("{}.cmt", &opt.cmt_name.clone().unwrap())
         } else {
             let doc_string = opt.doc.expect("No document found");
-            get_name(opt.cmt_name.clone(), &doc_string, "cmt")
+            get_name(opt.cmt_name.clone(), &doc_string, true)
         };
         let cmt_data = fs::read(file_name).expect("Unable to read file");
         let reef_commit: ReefCommitment =
@@ -136,7 +136,7 @@ fn main() {
         let proof_data = fs::read(get_name(
             opt.proof_name.clone(),
             opt.re.as_ref().expect("Regular Expression not found"),
-            "proof",
+            false,
         ))
         .expect("Unable to read file");
         let proofs: Proofs = bincode::deserialize(&proof_data).expect("Could not deserialize");
@@ -169,11 +169,15 @@ fn read_doc(doc_string: &String, config: &Config) -> Vec<char> {
     doc
 }
 
-fn get_name(opt_1: Option<String>, rgx_or_doc: &str, ending: &str) -> String {
+fn get_name(opt_1: Option<String>, rgx_or_doc: &str, cmt_or_prf: bool) -> String {
     if opt_1.is_some() {
         format!("{}", opt_1.unwrap())
     } else {
-        format!("{}.{}", rgx_or_doc, ending)
+        if cmt_or_prf {
+            format!("{}.cmt", rgx_or_doc)
+        } else {
+            format!("reg_{}.proof", rgx_or_doc)
+        }
     }
 }
 

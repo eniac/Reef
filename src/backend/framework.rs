@@ -927,6 +927,7 @@ pub fn pub_setup(
     #[cfg(feature = "metrics")]
     log::tic(Component::Compiler, "r1cs_init");
     let mut r1cs_converter = R1CS::new(
+        &ab,
         safa,
         udoc,
         udoc_len,
