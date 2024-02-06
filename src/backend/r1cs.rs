@@ -1552,7 +1552,6 @@ impl<F: PrimeField> R1CS<F, char> {
 
     fn nlookup_doc_commit(&mut self, priv_lookups: Vec<Term>) {
         let len = self.doc_len();
-        println!("len {:#?}", len);
         self.q_ordering_circuit("nldoc", len);
         self.nlookup_gadget(priv_lookups, len, "nldoc");
     }
