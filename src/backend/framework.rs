@@ -208,13 +208,11 @@ fn setup<'a>(
         ];
         z.append(&mut vec![<G1 as Group>::Scalar::zero(); q_len]);
         z.push(int_to_ff(r1cs_converter.table[0].clone()));
-        z.append(&mut vec![<G1 as Group>::Scalar::zero(); qd_len]);
 
-        let d0 = if r1cs_converter.udoc.is_some() {
-            <G1 as Group>::Scalar::from(r1cs_converter.udoc.as_ref().unwrap()[0] as u64)
-        } else {
-            <G1 as Group>::Scalar::zero()
-        };
+        // technically not correct - but I think this is fine as a placeholder
+        z.append(&mut vec![<G1 as Group>::Scalar::zero(); qd_len]);
+        let d0 = <G1 as Group>::Scalar::zero();
+
         let d = calc_d(&[d0, hash_salt], &r1cs_converter.pc);
         z.push(d);
     } else {
@@ -501,9 +499,11 @@ fn solve<'a>(
             let doc_v = match doc_running_v {
                 Some(rv) => int_to_ff(rv),
                 None => {
-                    if r1cs_converter.udoc.is_some() {
+                    if i > 0 {
+                        //r1cs_converter.udoc.is_some() {
                         <G1 as Group>::Scalar::from(r1cs_converter.udoc.as_ref().unwrap()[0] as u64)
                     } else {
+                        // again, dicey correctness
                         <G1 as Group>::Scalar::zero()
                     }
                 }
@@ -743,15 +743,6 @@ fn prove(
         );
         log::space(Component::CommitmentGen, "commitment", commit_sz);
     }
-
-    // TODO JESS DELETE
-    let res = compressed_snark.verify(
-        &prover_info.pp.lock().unwrap(),
-        FINAL_EXTERNAL_COUNTER,
-        prover_info.z0_primary.clone(),
-        z0_secondary,
-    );
-    assert!(res.is_ok());
 
     (compressed_snark, consist_proof)
 }

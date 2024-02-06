@@ -361,6 +361,7 @@ impl<F: PrimeField> R1CS<F, char> {
         ));
 
         let mut table: Vec<Integer> = set_table.into_iter().collect();
+        table.sort();
 
         // need to round out table size
         let base: usize = 2;
