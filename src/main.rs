@@ -24,12 +24,12 @@ fn main() {
     let ab = String::from_iter(config.alphabet());
 
     if opt.e2e || opt.commit {
-        #[cfg(feature = "metrics")]
-        metrics_file(opt, doc);
-
         // read doc
         let doc_string = opt.doc.as_ref().expect("No document found");
         let doc = read_doc(&doc_string, &config);
+
+        #[cfg(feature = "metrics")]
+        metrics_file(opt.metrics.clone(), opt.hybrid, opt.projections, doc_string);
 
         let reef_commit = run_committer(&doc, &ab, opt.merkle);
 
@@ -185,13 +185,13 @@ fn get_name(opt_1: Option<String>, rgx_or_doc: &str, cmt_or_prf: bool) -> String
     }
 }
 
-fn metrics_file(opt: Options, doc: String) {
-    assert!(opt.metrics.is_some());
+fn metrics_file(metrics: Option<PathBuf>, hybrid: bool, projections: bool, doc: &String) {
+    assert!(metrics.is_some());
     let file = OpenOptions::new()
         .write(true)
         .append(true)
         .create(true)
-        .open(opt.metrics.clone().unwrap())
+        .open(metrics.clone().unwrap())
         .unwrap();
     let mut wtr = Writer::from_writer(file);
     let mut title = doc.clone();
@@ -199,7 +199,7 @@ fn metrics_file(opt: Options, doc: String) {
         title = title[..10].to_string();
     }
     let test_type;
-    if opt.hybrid | opt.projections {
+    if hybrid | projections {
         test_type = "reef";
     } else {
         test_type = "safa+nlookup";
@@ -220,5 +220,5 @@ fn metrics_file(opt: Options, doc: String) {
     let _ = wtr.write_record(&[spacer, spacer, spacer, spacer, "\n"]);
     let _ = wtr.flush();
     #[cfg(feature = "metrics")]
-    log::write_csv(opt.metrics.unwrap().to_str().unwrap()).unwrap();
+    log::write_csv(metrics.unwrap().to_str().unwrap()).unwrap();
 }

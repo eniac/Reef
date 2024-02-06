@@ -1,14 +1,12 @@
 pub mod log {
     use csv::Writer;
     use dashmap::DashMap;
-    use std::fmt::Display;
-    use std::io::Result;
-    use std::time::{Duration, Instant};
-    use std::fs::OpenOptions;
-    use std::path::Path;
     use lazy_static::lazy_static;
-
-
+    use std::fmt::Display;
+    use std::fs::OpenOptions;
+    use std::io::Result;
+    use std::path::Path;
+    use std::time::{Duration, Instant};
 
     lazy_static! {
         pub static ref TIMER: DashMap<Test, Time> = DashMap::new();
@@ -32,7 +30,7 @@ pub mod log {
                 Component::Prover => write!(f, "P"),
                 Component::Solver => write!(f, "S"),
                 Component::Verifier => write!(f, "V"),
-                Component::CommitmentGen => write!(f,"CG"),
+                Component::CommitmentGen => write!(f, "CG"),
             }
         }
     }
@@ -41,7 +39,7 @@ pub mod log {
     pub enum TestType {
         Constraints,
         Runtime,
-        Size
+        Size,
     }
 
     impl Display for TestType {
@@ -54,7 +52,7 @@ pub mod log {
         }
     }
 
-    pub type Test = (TestType,Component, String);
+    pub type Test = (TestType, Component, String);
 
     #[derive(PartialEq, Eq, Debug, Clone)]
     pub enum Time {
@@ -65,28 +63,28 @@ pub mod log {
 
     use Time::*;
     pub fn r1cs(comp: Component, test: &str, num_constraints: usize) {
-        if R1CS.contains_key(&(TestType::Constraints,comp.clone(), test.to_string())) {
+        if R1CS.contains_key(&(TestType::Constraints, comp.clone(), test.to_string())) {
             panic!("Trying to write multiple r1cs for same test")
         } else {
             R1CS.insert(
-                (TestType::Constraints,comp, test.to_string()),
+                (TestType::Constraints, comp, test.to_string()),
                 num_constraints,
             );
         }
     }
 
-    pub fn space(comp: Component, test: &str,  sz_bytes: usize) {
+    pub fn space(comp: Component, test: &str, sz_bytes: usize) {
         if SPACE.contains_key(&(TestType::Size, comp.clone(), test.to_string())) {
             panic!("Trying to write multiple sizes for same test")
         } else {
-            SPACE.insert((TestType::Size,comp, test.to_string()), sz_bytes);
+            SPACE.insert((TestType::Size, comp, test.to_string()), sz_bytes);
         }
     }
 
     pub fn tic(comp: Component, test: &str) {
-        if TIMER.contains_key(&(TestType::Runtime,comp.clone(), test.to_string())) {
+        if TIMER.contains_key(&(TestType::Runtime, comp.clone(), test.to_string())) {
             TIMER.alter(
-                &(TestType::Runtime,comp, test.to_string()),
+                &(TestType::Runtime, comp, test.to_string()),
                 |_, v| match v {
                     Started(start_time) => Finished(start_time.elapsed()),
                     Finished(duration) => Restarted(duration, Instant::now()),
@@ -113,20 +111,24 @@ pub mod log {
     }
 
     pub fn clear_finished() {
-        TIMER.retain(|_, v|
-          match v {
+        TIMER.retain(|_, v| match v {
             Started(_) | Restarted(_, _) => true,
-            Finished(_) => false
-          })
+            Finished(_) => false,
+        })
     }
 
     pub fn write_csv(out: &str) -> Result<()> {
-      println!("Writing timer data to {}", out);
-      let mut write_header = true;
-      if Path::new(&out).exists() {
-        write_header = false;
-      }
-      let file = OpenOptions::new().write(true).append(true).create(true).open(out).unwrap();
+        println!("Writing timer data to {}", out);
+        let mut write_header = true;
+        if Path::new(&out).exists() {
+            write_header = false;
+        }
+        let file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open(out)
+            .unwrap();
         let mut wtr = Writer::from_writer(file);
 
         if write_header {
@@ -144,7 +146,7 @@ pub mod log {
                 ])?;
             }
         }
-        println!("times");
+        //println!("times");
         for ((test_type, c, test), value) in R1CS.clone().into_iter() {
             wtr.write_record(&[
                 test_type.to_string(),
@@ -154,7 +156,7 @@ pub mod log {
                 "constraints".to_string(),
             ])?;
         }
-        println!("r1cs");
+        //println!("r1cs");
 
         for ((test_type, c, test), value) in SPACE.clone().into_iter() {
             wtr.write_record(&[
@@ -165,7 +167,7 @@ pub mod log {
                 "bytes".to_string(),
             ])?;
         }
-        println!("space");
+        //println!("space");
         wtr.flush()?;
         clear_finished();
         R1CS.clear();
