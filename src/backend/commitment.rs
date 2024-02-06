@@ -88,19 +88,19 @@ impl ReefCommitment {
         doc: Vec<usize>,
         orig_doc_len: usize,
         merkle: bool,
-        pc: PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>,
+        pc: Option<PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>>,
     ) -> Self {
         let udoc_len = doc.len();
         if merkle {
             Self {
                 nldoc: None,
-                merkle: Some(MerkleCommitment::new(&doc, &pc)),
+                merkle: Some(MerkleCommitment::new(&doc, &pc.unwrap())),
                 orig_doc_len,
                 udoc_len,
             }
         } else {
             Self {
-                nldoc: Some(NLDocCommitment::new(doc, &pc)),
+                nldoc: Some(NLDocCommitment::new(doc)),
                 merkle: None,
                 orig_doc_len,
                 udoc_len,
@@ -130,7 +130,7 @@ impl ReefCommitment {
 }
 
 impl NLDocCommitment {
-    pub fn new(doc: Vec<usize>, pc: &PoseidonConstants<<G1 as Group>::Scalar, typenum::U4>) -> Self
+    pub fn new(doc: Vec<usize>) -> Self
     where
         G1: Group<Base = <G2 as Group>::Scalar>,
         G2: Group<Base = <G1 as Group>::Scalar>,

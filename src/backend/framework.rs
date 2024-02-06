@@ -60,14 +60,12 @@ pub struct Proofs {
 use metrics::metrics::{log, log::Component};
 
 pub fn run_committer(doc: &Vec<char>, ab: &String, merkle: bool) -> ReefCommitment {
-    let sc = Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(Strength::Standard);
-
     let udoc = doc_transform(ab, doc);
 
     #[cfg(feature = "metrics")]
     log::tic(Component::CommitmentGen, "generation");
 
-    let reef_commit = ReefCommitment::new(udoc.clone(), doc.len(), merkle, sc);
+    let reef_commit = ReefCommitment::new(udoc.clone(), doc.len(), merkle, None);
 
     reef_commit
 }

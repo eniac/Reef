@@ -79,12 +79,12 @@ If you're interested in reproducing our baseline results (DFA and DFA with recur
 
 For DFA 
 ```
-cargo build --feature naive
+cargo build --release --feature naive
 ```
 
 For DFA with Recursion
 ```
-cargo build --feature nwr
+cargo build --release --feature nwr
 ```
 
 Thank you for using Reef,

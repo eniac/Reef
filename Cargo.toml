@@ -55,8 +55,8 @@ plot = []
 reef = []
 
 
-[profile.release]
-debug = true
+[profile.test]
+opt-level = 3
 
 [profile.performance]
 inherits = "release"
