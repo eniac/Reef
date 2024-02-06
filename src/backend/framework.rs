@@ -65,7 +65,15 @@ pub fn run_committer(doc: &Vec<char>, ab: &String, merkle: bool) -> ReefCommitme
     #[cfg(feature = "metrics")]
     log::tic(Component::CommitmentGen, "generation");
 
-    let reef_commit = ReefCommitment::new(udoc.clone(), doc.len(), merkle, None);
+    let sc = if !merkle {
+        None
+    } else {
+        Some(Sponge::<<G1 as Group>::Scalar, typenum::U4>::api_constants(
+            Strength::Standard,
+        ))
+    };
+
+    let reef_commit = ReefCommitment::new(udoc.clone(), doc.len(), merkle, sc);
 
     reef_commit
 }
