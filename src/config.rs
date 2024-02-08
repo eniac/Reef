@@ -10,7 +10,7 @@ use std::path::PathBuf;
 #[clap(group(
             ArgGroup::new("mode")
                 .required(true)
-                .args(&["commit", "prove", "verify", "e2e"]),
+                .args(&["commit", "prove", "verify", "e2e","baselines"]),
         ))]
 pub struct Options {
     /// Configuration options, charset ["ascii", "utf8", "dna"]
@@ -76,6 +76,8 @@ pub struct Options {
         value_name = "NEGATE",
         help = "Negate the match result"
     )]
+    pub baselines: bool,
+    #[arg(long, default_value_t = false)]
     pub negate: bool,
 }
 
