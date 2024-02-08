@@ -76,9 +76,10 @@ pub struct Options {
         value_name = "NEGATE",
         help = "Negate the match result"
     )]
-    pub baselines: bool,
-    #[arg(long, default_value_t = false)]
     pub negate: bool,
+    #[arg(long, default_value_t = false)]
+    pub baselines: bool
+
 }
 
 #[derive(Debug, Subcommand)]

@@ -29,10 +29,10 @@ fn main() {
         let doc_string = opt.doc.as_ref().expect("No document found");
         let doc = read_doc(&doc_string, &config);
         #[cfg(feature = "nwr")]
-        naive_wr::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output,opt.batch_size.clone());
+        naive_wr::naive_bench(opt.re.expect("Regular Expression not found"), ab, doc.iter().collect::<String>(), opt.metrics.expect("Output file not found"),opt.batch_size.clone());
         
         #[cfg(feature = "naive")]
-        naive::naive_bench(opt.re, ab, doc.iter().collect::<String>(), opt.output);
+        naive::naive_bench(opt.re.expect("Regular Expression not found"), ab, doc.iter().collect::<String>(), opt.metrics.expect("Output file not found"));
     } else {
         if opt.e2e || opt.commit {
             // read doc
