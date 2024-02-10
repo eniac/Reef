@@ -1,0 +1,139 @@
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/BRCA1_base+primary --metrics ./tests/results/timings/brca1_var1_nonmatch1 --re ^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG -n dna"
+	User time (seconds): 1145.53
+	System time (seconds): 1889.49
+	Percent of CPU this job got: 438%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 11:32.14
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 17041008
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 7713532
+	Voluntary context switches: 2414715
+	Involuntary context switches: 162512
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 4198200
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/BRCA1_base+primary --metrics ./tests/results/timings/brca1_var2_nonmatch1 --re ^.{43050079}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG.*AGCCTACAAGAAAGTACGAGATTTAGTCAACTTGTTGAAGAGCTATTGAAAATCATTTGTGCTTTTCAGCTTGACACAGGTTTGGAGT.*ATGCAAACAGCTATAATTTTGCAAAAAAGGAAAATAACTCTCCTGAACATCTAAAAGATGAAGTTTCTATCATCCAAAGTATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG -n dna"
+	User time (seconds): 1395.06
+	System time (seconds): 1917.38
+	Percent of CPU this job got: 458%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 12:01.75
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 17037708
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 8003835
+	Voluntary context switches: 2411360
+	Involuntary context switches: 149988
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 4198216
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+Command terminated by signal 7
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/BRCA1_base+var1 --metrics ./tests/results/timings/brca1_var1_match --re ^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG dna"
+	User time (seconds): 2462.73
+	System time (seconds): 2006.28
+	Percent of CPU this job got: 178%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 41:39.52
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 136824968
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 36995966
+	Voluntary context switches: 2249526
+	Involuntary context switches: 151539
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 4198104
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/BRCA1_base+var1 --metrics ./tests/results/timings/brca1_var2_nonmatch2 --re ^.{43050079}ATGCTGAAACTTCTCAACCAGAAGAAAGGGCCTTCACAGTGTCCTTTATGTAAGAATGATATAACCAAAAG.*AGCCTACAAGAAAGTACGAGATTTAGTCAACTTGTTGAAGAGCTATTGAAAATCATTTGTGCTTTTCAGCTTGACACAGGTTTGGAGT.*ATGCAAACAGCTATAATTTTGCAAAAAAGGAAAATAACTCTCCTGAACATCTAAAAGATGAAGTTTCTATCATCCAAAGTATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG -n dna"
+	User time (seconds): 1405.70
+	System time (seconds): 1891.13
+	Percent of CPU this job got: 453%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 12:07.59
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 17142016
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 7954007
+	Voluntary context switches: 2369739
+	Involuntary context switches: 169283
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 4198224
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/BRCA1_base+var2 --metrics ./tests/results/timings/brca1_var1_nonmatch2 --re ^.{43052424}ATGGGCTACAGAAACCGTGCCAAAAGACTTCTACAGAGTGAACCCGAAAATCCTTCCTTG -n dna"
+	User time (seconds): 1125.93
+	System time (seconds): 1884.96
+	Percent of CPU this job got: 433%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 11:33.93
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 16993132
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 7719615
+	Voluntary context switches: 2391318
+	Involuntary context switches: 162522
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 4198200
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/BRCA2_base+primary --metrics ./tests/results/timings/brca2_var1_nonmatch --re ^.{32317478}CACAACTAAGGAACGTCAAGAGATACAGAATCCAAATTTTACCGCACCTGGTCAAGAATTTCTGTCTAAATCTCATTTGTATGAACATCTGACTTTGGAAAAATCTTCAAGCAATTTAGCAGTTTCAGGACATCCATTTTATCAAGTTTCTGCTACAAGAAATGAAAAAATGAGACACTTGATTACTACAGGCAGACCAACCAAAGTCTTTGTTCCACCTTTTAAAACTAAATCACATTTTCACAGAGTTGAACAGTGTGTTAGGAATATTAACTTGGAGGAAAACAGACAAAAGCAAAACATTGATGGACATGGCTCTGATGATAGTAAAAATAAGATTAATGACAATGAGATTCATCAGTTTAACAAAAACAACTCCAATCAAGCAGTAGCTGTAACTTTCACAAAGTGTGAAGAAGAACCTTTAG.*ATTTAATTACAAGTCTTCAGAATGCCAGAGATATACAGGATATGCGAATTAAGAAGAAACAAAGGCAACGCGTCTTTCCACAGCCAGGCAGTCTGTATCTTGCAAAAACATCCACTCTGCCTCGAATCTCTCTGAAAGCAGCAGTAGGAGGCCAAGTTCCCTCTGCGTGTTCTCATAAACAG.*CTGTATACGTATGGCGTTTCTAAACATTGCATAAAAATTAACAGCAAAAATGCAGAGTCTTTTCAGTTTCACACTGAAGATTATTTTGGTAAGGAAAGTTTATGGACTGGAAAAGGAATACAGTTGGCTGATGGTGGATGGCTCATACCCTCCAATGATGGAAAGGCTGGAAAAGAAGAATTTTATAG.*GGCTCTGTGTGACACTCCAGGTGTGGATCCAAAGCTTATTTCTAGAATTTGGGTTTATAATCACTATAGATGGATCATATGGAAACTGGCAGCTATGGAATGTGCCTTTCCTAAGGAATTTGCTAATAGATGCCTAAGCCCAGAAAGGGTGCTTCTTCAACTAAAATACAG -n dna"
+	User time (seconds): 1429.86
+	System time (seconds): 954.90
+	Percent of CPU this job got: 487%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 8:09.60
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 9335132
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 4660610
+	Voluntary context switches: 1243346
+	Involuntary context switches: 115589
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2100536
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

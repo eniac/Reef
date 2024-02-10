@@ -39,8 +39,8 @@ fn main() {
             let doc_string = opt.doc.as_ref().expect("No document found");
             let doc = read_doc(&doc_string, &config);
 
-            #[cfg(feature = "metrics")]
-            metrics_file(opt.metrics.clone(), opt.hybrid, opt.projections, doc_string);
+            // #[cfg(feature = "metrics")]
+            // metrics_file(opt.metrics.clone(), opt.hybrid, opt.projections, doc_string);
 
             let reef_commit = run_committer(&doc, &ab, opt.merkle);
 
@@ -88,6 +88,9 @@ fn main() {
             #[cfg(feature = "plot")]
             safa.write_pdf("main")
                 .expect("Failed to plot NFA to a pdf file");
+
+            #[cfg(feature = "metrics")]
+            metrics_file(opt.metrics.clone(), opt.hybrid, opt.projections, &doc_string.clone(),doc.len(),&opt.re.clone().expect("No Regex"),safa.g.edge_count(), safa.g.node_count());
 
             init();
             let (compressed_snark, consist_proof) = run_prover(
@@ -197,7 +200,7 @@ fn get_name(opt_1: Option<String>, rgx_or_doc: &str, cmt_or_prf: bool) -> String
     }
 }
 
-fn metrics_file(metrics: Option<PathBuf>, hybrid: bool, projections: bool, doc: &String) {
+fn metrics_file(metrics: Option<PathBuf>, hybrid: bool, projections: bool, doc: &String, doc_len: usize, re: &String, safa_edges: usize, safa_states: usize) {
     assert!(metrics.is_some());
     let file = OpenOptions::new()
         .write(true)
@@ -217,16 +220,19 @@ fn metrics_file(metrics: Option<PathBuf>, hybrid: bool, projections: bool, doc: 
         test_type = "safa+nlookup";
     };
     let _ = wtr.write_record(&[
-        format!("{}_{}", title, doc.len()),
+        format!("{}_{}", title, doc_len),
         test_type.to_string(),
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs()
             .to_string(),
-        format!("--"), //opt.re,
-        format!("--"), //safa.g.edge_count().to_string(), //nedges().to_string(),
-        format!("--"), //safa.g.node_count().to_string(), //nstates().to_string(),
+        // format!("--"), //
+        re.to_string(),
+        // format!("--"), 
+        safa_edges.to_string(), //nedges().to_string(),
+        // format!("--"), //
+        safa_states.to_string(), //nstates().to_string(),
     ]);
     let spacer = "---------";
     let _ = wtr.write_record(&[spacer, spacer, spacer, spacer, "\n"]);
