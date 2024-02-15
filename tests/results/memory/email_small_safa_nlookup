@@ -1,87 +1,41 @@
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 489.08
-	System time (seconds): 19.80
-	Percent of CPU this job got: 620%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:22.07
+	User time (seconds): 491.10
+	System time (seconds): 18.03
+	Percent of CPU this job got: 622%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.83
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 745812
+	Maximum resident set size (kbytes): 748876
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 443410
-	Voluntary context switches: 175981
-	Involuntary context switches: 74376
+	Minor (reclaiming a frame) page faults: 437167
+	Voluntary context switches: 176989
+	Involuntary context switches: 69273
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2384
+	File system outputs: 2400
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 494.39
-	System time (seconds): 18.96
-	Percent of CPU this job got: 628%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.71
+	User time (seconds): 485.47
+	System time (seconds): 21.46
+	Percent of CPU this job got: 621%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.52
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 748204
+	Maximum resident set size (kbytes): 760024
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 466229
-	Voluntary context switches: 175174
-	Involuntary context switches: 78702
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2384
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 485.45
-	System time (seconds): 17.94
-	Percent of CPU this job got: 620%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.18
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 739480
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 434261
-	Voluntary context switches: 174853
-	Involuntary context switches: 77893
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2408
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 492.88
-	System time (seconds): 19.26
-	Percent of CPU this job got: 619%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:22.64
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 752392
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 438695
-	Voluntary context switches: 171490
-	Involuntary context switches: 64528
+	Minor (reclaiming a frame) page faults: 443854
+	Voluntary context switches: 175143
+	Involuntary context switches: 68660
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 2392
@@ -91,138 +45,184 @@
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 487.63
-	System time (seconds): 18.31
-	Percent of CPU this job got: 625%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:20.94
+	User time (seconds): 485.48
+	System time (seconds): 21.12
+	Percent of CPU this job got: 618%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.93
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 758024
+	Maximum resident set size (kbytes): 749336
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 448864
-	Voluntary context switches: 178790
-	Involuntary context switches: 81642
+	Minor (reclaiming a frame) page faults: 447437
+	Voluntary context switches: 180112
+	Involuntary context switches: 90727
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2384
+	File system outputs: 2392
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 483.85
-	System time (seconds): 22.40
-	Percent of CPU this job got: 622%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.35
+	User time (seconds): 482.66
+	System time (seconds): 19.41
+	Percent of CPU this job got: 612%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.96
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 748556
+	Maximum resident set size (kbytes): 749200
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 442238
-	Voluntary context switches: 171951
-	Involuntary context switches: 82208
+	Minor (reclaiming a frame) page faults: 463005
+	Voluntary context switches: 172215
+	Involuntary context switches: 75498
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2384
+	File system outputs: 2424
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 488.69
-	System time (seconds): 21.90
-	Percent of CPU this job got: 617%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:22.68
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 748248
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 438568
-	Voluntary context switches: 168029
-	Involuntary context switches: 63949
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2384
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 486.05
-	System time (seconds): 18.95
-	Percent of CPU this job got: 622%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.15
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 750300
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 426605
-	Voluntary context switches: 173358
-	Involuntary context switches: 68480
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2376
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 483.59
-	System time (seconds): 19.47
-	Percent of CPU this job got: 624%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:20.59
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 762160
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 448667
-	Voluntary context switches: 174559
-	Involuntary context switches: 67001
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2384
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
-	User time (seconds): 487.86
-	System time (seconds): 19.93
+	User time (seconds): 485.26
+	System time (seconds): 19.27
 	Percent of CPU this job got: 621%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.70
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.12
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 739076
+	Maximum resident set size (kbytes): 736324
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 453473
-	Voluntary context switches: 169577
-	Involuntary context switches: 81215
+	Minor (reclaiming a frame) page faults: 438665
+	Voluntary context switches: 173822
+	Involuntary context switches: 82988
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 2376
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
+	User time (seconds): 488.67
+	System time (seconds): 18.94
+	Percent of CPU this job got: 611%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:23.03
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 748224
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 449722
+	Voluntary context switches: 178632
+	Involuntary context switches: 83977
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2400
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
+	User time (seconds): 496.72
+	System time (seconds): 20.20
+	Percent of CPU this job got: 638%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.02
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 758468
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 424466
+	Voluntary context switches: 178791
+	Involuntary context switches: 71689
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2368
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
+	User time (seconds): 485.61
+	System time (seconds): 24.69
+	Percent of CPU this job got: 623%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.83
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 747696
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 444547
+	Voluntary context switches: 173609
+	Involuntary context switches: 67266
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2360
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
+	User time (seconds): 487.39
+	System time (seconds): 17.53
+	Percent of CPU this job got: 621%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.30
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 758788
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 453454
+	Voluntary context switches: 168808
+	Involuntary context switches: 67711
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2400
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
+	User time (seconds): 492.49
+	System time (seconds): 19.16
+	Percent of CPU this job got: 627%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:21.51
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 758616
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 442723
+	Voluntary context switches: 175153
+	Involuntary context switches: 79431
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2408
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0

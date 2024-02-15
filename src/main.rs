@@ -167,6 +167,7 @@ fn main() {
                 opt.projections,
                 opt.hybrid,
                 opt.merkle,
+                opt.metrics.clone(),
                 proofs.compressed_snark,
                 proofs.consist_proof,
             );

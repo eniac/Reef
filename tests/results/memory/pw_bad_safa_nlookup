@@ -1,2091 +1,21 @@
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 390.60
-	System time (seconds): 18.76
-	Percent of CPU this job got: 971%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.13
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 336652
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 269550
-	Voluntary context switches: 173196
-	Involuntary context switches: 84069
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 389.90
-	System time (seconds): 16.98
-	Percent of CPU this job got: 985%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.29
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 327624
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 264606
-	Voluntary context switches: 168910
-	Involuntary context switches: 76429
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2336
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 388.43
-	System time (seconds): 22.76
-	Percent of CPU this job got: 988%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.61
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 323232
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 264746
-	Voluntary context switches: 174123
-	Involuntary context switches: 67985
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 373.12
-	System time (seconds): 16.66
-	Percent of CPU this job got: 948%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.08
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 357324
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 245675
-	Voluntary context switches: 160185
-	Involuntary context switches: 75351
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 380.84
-	System time (seconds): 25.58
-	Percent of CPU this job got: 968%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.96
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 337268
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 274155
-	Voluntary context switches: 179774
-	Involuntary context switches: 86434
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.80
-	System time (seconds): 21.96
-	Percent of CPU this job got: 983%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.45
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 315936
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 292680
-	Voluntary context switches: 176806
-	Involuntary context switches: 78342
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 378.57
-	System time (seconds): 23.08
-	Percent of CPU this job got: 967%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.50
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 340128
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 245168
-	Voluntary context switches: 169601
-	Involuntary context switches: 68474
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 387.34
-	System time (seconds): 21.72
-	Percent of CPU this job got: 982%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.62
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 321104
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 303216
-	Voluntary context switches: 177749
-	Involuntary context switches: 76529
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 395.74
-	System time (seconds): 18.94
-	Percent of CPU this job got: 1002%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.37
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 333092
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 256874
-	Voluntary context switches: 169018
-	Involuntary context switches: 68766
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 388.88
-	System time (seconds): 21.72
-	Percent of CPU this job got: 981%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.81
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 332772
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 255209
-	Voluntary context switches: 172866
-	Involuntary context switches: 70180
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 392.07
-	System time (seconds): 21.64
-	Percent of CPU this job got: 981%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.17
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 335868
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 242249
-	Voluntary context switches: 172632
-	Involuntary context switches: 89591
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.12
-	System time (seconds): 17.75
-	Percent of CPU this job got: 967%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.62
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 320328
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 282548
-	Voluntary context switches: 172470
-	Involuntary context switches: 79673
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.26
-	System time (seconds): 20.57
-	Percent of CPU this job got: 968%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.91
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 330412
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 260556
-	Voluntary context switches: 173576
-	Involuntary context switches: 84734
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 373.09
-	System time (seconds): 17.45
-	Percent of CPU this job got: 956%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.82
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 341368
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 241468
-	Voluntary context switches: 166942
-	Involuntary context switches: 78053
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2336
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 382.22
-	System time (seconds): 22.45
-	Percent of CPU this job got: 969%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.72
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 336356
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 273644
-	Voluntary context switches: 170839
-	Involuntary context switches: 63595
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.10
-	System time (seconds): 21.90
-	Percent of CPU this job got: 991%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.17
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 324140
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 1
-	Minor (reclaiming a frame) page faults: 259159
-	Voluntary context switches: 167264
-	Involuntary context switches: 70204
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 383.54
-	System time (seconds): 25.94
-	Percent of CPU this job got: 976%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.93
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 341100
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 291239
-	Voluntary context switches: 191708
-	Involuntary context switches: 59704
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2344
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 390.22
-	System time (seconds): 18.04
-	Percent of CPU this job got: 974%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.89
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 322020
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 272807
-	Voluntary context switches: 173130
-	Involuntary context switches: 76485
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 384.07
-	System time (seconds): 20.72
-	Percent of CPU this job got: 981%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.23
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 343988
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 246956
-	Voluntary context switches: 164533
-	Involuntary context switches: 70971
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.65
-	System time (seconds): 19.24
-	Percent of CPU this job got: 977%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.53
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 328056
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 253354
-	Voluntary context switches: 173001
-	Involuntary context switches: 78909
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 381.61
-	System time (seconds): 28.84
-	Percent of CPU this job got: 979%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.92
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 334420
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 292413
-	Voluntary context switches: 186365
-	Involuntary context switches: 68325
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 381.57
-	System time (seconds): 21.96
-	Percent of CPU this job got: 998%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.39
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 323060
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 253189
-	Voluntary context switches: 166056
-	Involuntary context switches: 80604
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 399.50
-	System time (seconds): 22.67
-	Percent of CPU this job got: 1009%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.83
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 342356
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 256807
-	Voluntary context switches: 171459
-	Involuntary context switches: 96313
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 357.70
-	System time (seconds): 24.00
-	Percent of CPU this job got: 935%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.78
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 318992
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 258880
-	Voluntary context switches: 160308
-	Involuntary context switches: 76854
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 389.62
-	System time (seconds): 22.83
-	Percent of CPU this job got: 983%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.92
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 340988
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 260726
-	Voluntary context switches: 178311
-	Involuntary context switches: 68842
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 379.42
-	System time (seconds): 21.68
-	Percent of CPU this job got: 964%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.59
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 312800
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 268406
-	Voluntary context switches: 169578
-	Involuntary context switches: 65477
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.33
-	System time (seconds): 20.89
-	Percent of CPU this job got: 980%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.44
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 323772
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 252820
-	Voluntary context switches: 172904
-	Involuntary context switches: 74282
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 378.79
-	System time (seconds): 22.26
-	Percent of CPU this job got: 967%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.43
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 336696
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 230565
-	Voluntary context switches: 165508
-	Involuntary context switches: 60090
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 387.32
-	System time (seconds): 20.97
-	Percent of CPU this job got: 998%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.90
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 349072
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 229320
-	Voluntary context switches: 172538
-	Involuntary context switches: 71419
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2336
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 392.41
-	System time (seconds): 19.40
-	Percent of CPU this job got: 979%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.04
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 330860
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 259229
-	Voluntary context switches: 175092
-	Involuntary context switches: 83448
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 384.25
-	System time (seconds): 18.85
-	Percent of CPU this job got: 969%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.58
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 341668
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 271374
-	Voluntary context switches: 179074
-	Involuntary context switches: 64814
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 376.39
-	System time (seconds): 23.27
-	Percent of CPU this job got: 968%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.27
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 333740
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 254428
-	Voluntary context switches: 170967
-	Involuntary context switches: 54118
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.05
-	System time (seconds): 21.14
-	Percent of CPU this job got: 961%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.23
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 331536
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 248727
-	Voluntary context switches: 171578
-	Involuntary context switches: 62015
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 370.36
-	System time (seconds): 22.62
-	Percent of CPU this job got: 952%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.27
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 324024
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 275697
-	Voluntary context switches: 165471
-	Involuntary context switches: 63320
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 387.39
-	System time (seconds): 23.01
-	Percent of CPU this job got: 987%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.57
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 337744
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 272012
-	Voluntary context switches: 176068
-	Involuntary context switches: 89925
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 384.13
-	System time (seconds): 20.02
-	Percent of CPU this job got: 987%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.93
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 328348
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 232781
-	Voluntary context switches: 176443
-	Involuntary context switches: 93546
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 390.90
-	System time (seconds): 19.69
-	Percent of CPU this job got: 981%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.82
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 339628
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 253072
-	Voluntary context switches: 177816
-	Involuntary context switches: 67582
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.03
-	System time (seconds): 24.94
-	Percent of CPU this job got: 977%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.94
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 317064
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 262836
-	Voluntary context switches: 165845
-	Involuntary context switches: 64497
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2352
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.03
-	System time (seconds): 17.41
-	Percent of CPU this job got: 965%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.79
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 333560
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 285478
-	Voluntary context switches: 182557
-	Involuntary context switches: 85806
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 391.01
-	System time (seconds): 20.00
-	Percent of CPU this job got: 977%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.03
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 338720
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 245317
-	Voluntary context switches: 170611
-	Involuntary context switches: 79267
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 374.27
-	System time (seconds): 22.94
-	Percent of CPU this job got: 955%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.59
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 331144
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 253657
-	Voluntary context switches: 166135
-	Involuntary context switches: 79760
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.31
-	System time (seconds): 19.59
-	Percent of CPU this job got: 979%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.44
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 322668
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 263742
-	Voluntary context switches: 170145
-	Involuntary context switches: 68125
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.84
-	System time (seconds): 18.85
-	Percent of CPU this job got: 983%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.13
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 329368
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 243233
-	Voluntary context switches: 163477
-	Involuntary context switches: 66383
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 370.64
-	System time (seconds): 22.69
-	Percent of CPU this job got: 964%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.78
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 328308
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 266836
-	Voluntary context switches: 162982
-	Involuntary context switches: 62934
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 380.86
-	System time (seconds): 25.23
-	Percent of CPU this job got: 978%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.49
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 323304
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 260004
-	Voluntary context switches: 171300
-	Involuntary context switches: 71295
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2336
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.27
-	System time (seconds): 21.22
-	Percent of CPU this job got: 981%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.41
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 344044
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 249240
-	Voluntary context switches: 174236
-	Involuntary context switches: 64987
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 379.77
-	System time (seconds): 24.61
-	Percent of CPU this job got: 960%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.10
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 336672
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 284463
-	Voluntary context switches: 173829
-	Involuntary context switches: 51851
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 391.06
-	System time (seconds): 19.41
-	Percent of CPU this job got: 979%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.91
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 329276
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 277381
-	Voluntary context switches: 170300
-	Involuntary context switches: 86425
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 380.68
-	System time (seconds): 19.85
-	Percent of CPU this job got: 963%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.57
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 336452
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 257302
-	Voluntary context switches: 170152
-	Involuntary context switches: 80449
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 376.81
-	System time (seconds): 21.21
-	Percent of CPU this job got: 960%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.42
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 325724
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 259526
-	Voluntary context switches: 169244
-	Involuntary context switches: 87705
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 382.31
-	System time (seconds): 23.77
-	Percent of CPU this job got: 984%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.26
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 336916
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 271119
-	Voluntary context switches: 178154
-	Involuntary context switches: 56968
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.11
-	System time (seconds): 22.20
-	Percent of CPU this job got: 971%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.02
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 309244
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 262287
-	Voluntary context switches: 166945
-	Involuntary context switches: 64312
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2344
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 377.88
-	System time (seconds): 19.72
-	Percent of CPU this job got: 951%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.79
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 347040
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 236790
-	Voluntary context switches: 166390
-	Involuntary context switches: 67733
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 369.96
-	System time (seconds): 20.24
-	Percent of CPU this job got: 946%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.24
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 334688
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 243297
-	Voluntary context switches: 164065
-	Involuntary context switches: 65813
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.84
-	System time (seconds): 23.61
-	Percent of CPU this job got: 981%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.80
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 340960
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 316500
-	Voluntary context switches: 195766
-	Involuntary context switches: 78384
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 389.20
-	System time (seconds): 19.25
-	Percent of CPU this job got: 975%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.86
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 332480
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 233776
-	Voluntary context switches: 173633
-	Involuntary context switches: 84696
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 383.62
-	System time (seconds): 17.36
-	Percent of CPU this job got: 973%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.17
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 338416
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 256273
-	Voluntary context switches: 167641
-	Involuntary context switches: 66477
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 396.36
-	System time (seconds): 15.62
-	Percent of CPU this job got: 996%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.33
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 341736
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 244233
-	Voluntary context switches: 169073
-	Involuntary context switches: 70374
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 388.41
-	System time (seconds): 20.83
-	Percent of CPU this job got: 980%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.72
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 331168
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 277420
-	Voluntary context switches: 173280
-	Involuntary context switches: 75052
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 389.71
-	System time (seconds): 21.69
-	Percent of CPU this job got: 981%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.90
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 333076
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 265955
-	Voluntary context switches: 171470
-	Involuntary context switches: 84624
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 387.36
-	System time (seconds): 23.17
-	Percent of CPU this job got: 992%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.37
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 341808
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 274678
-	Voluntary context switches: 187352
-	Involuntary context switches: 78031
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 375.26
-	System time (seconds): 23.57
-	Percent of CPU this job got: 954%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.80
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 326980
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 276817
-	Voluntary context switches: 171831
-	Involuntary context switches: 79614
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.75
-	System time (seconds): 18.63
-	Percent of CPU this job got: 954%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.46
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 340788
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 245386
-	Voluntary context switches: 166246
-	Involuntary context switches: 61096
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 363.88
-	System time (seconds): 22.13
-	Percent of CPU this job got: 948%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.67
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 338888
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 231449
-	Voluntary context switches: 162067
-	Involuntary context switches: 77207
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 388.56
-	System time (seconds): 20.44
-	Percent of CPU this job got: 982%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.61
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 328864
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 257066
-	Voluntary context switches: 170861
-	Involuntary context switches: 74517
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 381.24
-	System time (seconds): 20.08
-	Percent of CPU this job got: 984%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.76
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 330768
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 271106
-	Voluntary context switches: 167961
-	Involuntary context switches: 54521
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2336
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 384.15
-	System time (seconds): 27.04
-	Percent of CPU this job got: 973%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.25
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 342708
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 293647
-	Voluntary context switches: 185363
-	Involuntary context switches: 88311
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.64
-	System time (seconds): 20.36
-	Percent of CPU this job got: 989%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.12
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 348836
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 9
-	Minor (reclaiming a frame) page faults: 239284
-	Voluntary context switches: 163444
-	Involuntary context switches: 57888
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 379.35
-	System time (seconds): 28.08
-	Percent of CPU this job got: 975%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.77
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 339752
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 265826
-	Voluntary context switches: 174857
-	Involuntary context switches: 76674
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 383.53
-	System time (seconds): 19.96
+	User time (seconds): 383.73
+	System time (seconds): 20.78
 	Percent of CPU this job got: 966%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.76
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 338192
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 258299
-	Voluntary context switches: 169510
-	Involuntary context switches: 74016
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.31
-	System time (seconds): 17.36
-	Percent of CPU this job got: 965%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.70
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 327668
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 252999
-	Voluntary context switches: 168681
-	Involuntary context switches: 75361
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.78
-	System time (seconds): 19.46
-	Percent of CPU this job got: 976%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.48
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 322368
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 266204
-	Voluntary context switches: 166986
-	Involuntary context switches: 68269
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.49
-	System time (seconds): 22.57
-	Percent of CPU this job got: 996%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.96
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 346852
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 239022
-	Voluntary context switches: 168781
-	Involuntary context switches: 61356
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 364.21
-	System time (seconds): 23.47
-	Percent of CPU this job got: 943%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.10
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 340248
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 246997
-	Voluntary context switches: 162882
-	Involuntary context switches: 84097
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.98
-	System time (seconds): 18.06
-	Percent of CPU this job got: 966%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.92
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 341712
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 262716
-	Voluntary context switches: 170544
-	Involuntary context switches: 58256
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 385.24
-	System time (seconds): 25.08
-	Percent of CPU this job got: 975%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.07
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 313544
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 283676
-	Voluntary context switches: 172844
-	Involuntary context switches: 70279
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 382.41
-	System time (seconds): 27.78
-	Percent of CPU this job got: 965%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.46
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 338660
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 302364
-	Voluntary context switches: 189543
-	Involuntary context switches: 76286
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 387.04
-	System time (seconds): 20.48
-	Percent of CPU this job got: 964%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.23
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 317896
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 316196
-	Voluntary context switches: 193221
-	Involuntary context switches: 64915
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 382.74
-	System time (seconds): 22.01
-	Percent of CPU this job got: 959%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.17
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 334604
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 284477
-	Voluntary context switches: 181015
-	Involuntary context switches: 81175
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 376.95
-	System time (seconds): 24.61
-	Percent of CPU this job got: 965%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.58
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 331272
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 290189
-	Voluntary context switches: 179349
-	Involuntary context switches: 74679
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 378.52
-	System time (seconds): 18.53
-	Percent of CPU this job got: 961%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.29
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 330160
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 278764
-	Voluntary context switches: 173393
-	Involuntary context switches: 79866
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 388.27
-	System time (seconds): 18.91
-	Percent of CPU this job got: 996%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.87
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 323036
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 272044
-	Voluntary context switches: 175012
-	Involuntary context switches: 73126
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 395.29
-	System time (seconds): 18.67
-	Percent of CPU this job got: 992%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.70
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 328460
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 247232
-	Voluntary context switches: 169075
-	Involuntary context switches: 57429
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 369.19
-	System time (seconds): 19.06
-	Percent of CPU this job got: 942%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.20
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 327380
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 276950
-	Voluntary context switches: 162926
-	Involuntary context switches: 83563
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.89
-	System time (seconds): 23.79
-	Percent of CPU this job got: 992%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.36
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 335164
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 270801
-	Voluntary context switches: 178501
-	Involuntary context switches: 87763
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 387.16
-	System time (seconds): 21.44
-	Percent of CPU this job got: 979%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.71
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 338468
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 259107
-	Voluntary context switches: 174531
-	Involuntary context switches: 75927
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 388.94
-	System time (seconds): 21.76
-	Percent of CPU this job got: 989%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.49
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 341244
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 242094
-	Voluntary context switches: 176774
-	Involuntary context switches: 56949
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2328
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 384.16
-	System time (seconds): 22.60
-	Percent of CPU this job got: 972%
 	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.84
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 323136
+	Maximum resident set size (kbytes): 321996
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 275964
-	Voluntary context switches: 174288
-	Involuntary context switches: 103417
+	Minor (reclaiming a frame) page faults: 238501
+	Voluntary context switches: 169980
+	Involuntary context switches: 79596
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 392.66
-	System time (seconds): 21.71
-	Percent of CPU this job got: 997%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.56
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 334284
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 282552
-	Voluntary context switches: 181184
-	Involuntary context switches: 78927
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 382.48
-	System time (seconds): 23.18
-	Percent of CPU this job got: 970%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.79
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 332952
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 289994
-	Voluntary context switches: 180436
-	Involuntary context switches: 88325
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2336
-	Socket messages sent: 0
-	Socket messages received: 0
-	Signals delivered: 0
-	Page size (bytes): 4096
-	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.89
-	System time (seconds): 23.75
-	Percent of CPU this job got: 988%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.52
-	Average shared text size (kbytes): 0
-	Average unshared data size (kbytes): 0
-	Average stack size (kbytes): 0
-	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 343368
-	Average resident set size (kbytes): 0
-	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 260322
-	Voluntary context switches: 168956
-	Involuntary context switches: 92751
-	Swaps: 0
-	File system inputs: 0
-	File system outputs: 2320
+	File system outputs: 2312
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
@@ -2093,65 +23,65 @@
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
 	User time (seconds): 379.96
-	System time (seconds): 21.21
-	Percent of CPU this job got: 959%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.79
+	System time (seconds): 20.01
+	Percent of CPU this job got: 970%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.22
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 319228
+	Maximum resident set size (kbytes): 336680
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 257938
-	Voluntary context switches: 167048
-	Involuntary context switches: 103227
+	Minor (reclaiming a frame) page faults: 256745
+	Voluntary context switches: 175538
+	Involuntary context switches: 82370
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2328
+	File system outputs: 2304
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 392.57
-	System time (seconds): 18.02
-	Percent of CPU this job got: 989%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.48
+	User time (seconds): 386.69
+	System time (seconds): 19.44
+	Percent of CPU this job got: 967%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.97
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 331184
+	Maximum resident set size (kbytes): 337424
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 249092
-	Voluntary context switches: 166148
-	Involuntary context switches: 73710
+	Minor (reclaiming a frame) page faults: 254460
+	Voluntary context switches: 165548
+	Involuntary context switches: 52285
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2320
+	File system outputs: 2304
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 374.97
-	System time (seconds): 19.25
-	Percent of CPU this job got: 955%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.23
+	User time (seconds): 370.92
+	System time (seconds): 17.69
+	Percent of CPU this job got: 945%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.09
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 324708
+	Maximum resident set size (kbytes): 328292
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 278247
-	Voluntary context switches: 167482
-	Involuntary context switches: 76077
+	Minor (reclaiming a frame) page faults: 280103
+	Voluntary context switches: 172292
+	Involuntary context switches: 86116
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 2320
@@ -2161,112 +91,227 @@
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 395.41
-	System time (seconds): 17.23
-	Percent of CPU this job got: 995%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.46
+	User time (seconds): 385.97
+	System time (seconds): 18.95
+	Percent of CPU this job got: 964%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.00
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 334384
+	Maximum resident set size (kbytes): 337468
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 254850
-	Voluntary context switches: 175753
-	Involuntary context switches: 66685
+	Minor (reclaiming a frame) page faults: 251021
+	Voluntary context switches: 169360
+	Involuntary context switches: 86041
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2336
+	File system outputs: 2304
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 392.62
-	System time (seconds): 20.06
-	Percent of CPU this job got: 990%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.66
+	User time (seconds): 380.68
+	System time (seconds): 23.86
+	Percent of CPU this job got: 981%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.22
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 313224
+	Maximum resident set size (kbytes): 324912
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 273843
-	Voluntary context switches: 166738
-	Involuntary context switches: 72796
+	Minor (reclaiming a frame) page faults: 243061
+	Voluntary context switches: 173230
+	Involuntary context switches: 62189
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2320
+	File system outputs: 2304
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 386.61
-	System time (seconds): 19.00
-	Percent of CPU this job got: 964%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.04
+	User time (seconds): 381.53
+	System time (seconds): 27.14
+	Percent of CPU this job got: 986%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.41
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 344088
+	Maximum resident set size (kbytes): 326508
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 251849
-	Voluntary context switches: 168969
-	Involuntary context switches: 79241
+	Minor (reclaiming a frame) page faults: 261182
+	Voluntary context switches: 163784
+	Involuntary context switches: 60552
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2320
+	File system outputs: 2312
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 391.62
-	System time (seconds): 18.40
-	Percent of CPU this job got: 997%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.10
+	User time (seconds): 390.05
+	System time (seconds): 19.61
+	Percent of CPU this job got: 991%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.30
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 327900
+	Maximum resident set size (kbytes): 312024
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 249653
-	Voluntary context switches: 172318
-	Involuntary context switches: 69841
+	Minor (reclaiming a frame) page faults: 281989
+	Voluntary context switches: 173589
+	Involuntary context switches: 65590
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2328
+	File system outputs: 2312
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 393.03
-	System time (seconds): 25.61
-	Percent of CPU this job got: 1012%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.34
+	User time (seconds): 380.89
+	System time (seconds): 19.69
+	Percent of CPU this job got: 936%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.78
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 338028
+	Maximum resident set size (kbytes): 320856
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 290270
-	Voluntary context switches: 180551
-	Involuntary context switches: 94561
+	Minor (reclaiming a frame) page faults: 269455
+	Voluntary context switches: 177572
+	Involuntary context switches: 76960
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 391.94
+	System time (seconds): 14.93
+	Percent of CPU this job got: 971%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.89
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 337328
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 263906
+	Voluntary context switches: 176200
+	Involuntary context switches: 74467
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 378.40
+	System time (seconds): 22.11
+	Percent of CPU this job got: 962%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.61
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 328924
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 261718
+	Voluntary context switches: 171441
+	Involuntary context switches: 71992
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 382.77
+	System time (seconds): 23.53
+	Percent of CPU this job got: 972%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.79
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 309976
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 279125
+	Voluntary context switches: 172137
+	Involuntary context switches: 63377
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 396.02
+	System time (seconds): 17.78
+	Percent of CPU this job got: 974%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.47
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 331480
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 250096
+	Voluntary context switches: 177778
+	Involuntary context switches: 74069
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 365.86
+	System time (seconds): 21.33
+	Percent of CPU this job got: 958%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.39
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 326536
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 268405
+	Voluntary context switches: 163484
+	Involuntary context switches: 77403
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 2320
@@ -2275,24 +320,1979 @@
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
-	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
-	User time (seconds): 384.82
-	System time (seconds): 21.36
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 387.86
+	System time (seconds): 20.45
+	Percent of CPU this job got: 971%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.04
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 331700
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 251862
+	Voluntary context switches: 172991
+	Involuntary context switches: 71553
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 381.16
+	System time (seconds): 21.29
 	Percent of CPU this job got: 979%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.07
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 325504
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 259486
+	Voluntary context switches: 168300
+	Involuntary context switches: 72624
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 395.48
+	System time (seconds): 22.82
+	Percent of CPU this job got: 994%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.05
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 328684
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 262733
+	Voluntary context switches: 181014
+	Involuntary context switches: 89455
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 383.88
+	System time (seconds): 19.96
+	Percent of CPU this job got: 975%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.40
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 314644
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 271697
+	Voluntary context switches: 170617
+	Involuntary context switches: 78960
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 380.52
+	System time (seconds): 22.96
+	Percent of CPU this job got: 963%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.88
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 339252
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 262775
+	Voluntary context switches: 180466
+	Involuntary context switches: 77262
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 383.87
+	System time (seconds): 20.89
+	Percent of CPU this job got: 968%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.80
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 334452
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 258863
+	Voluntary context switches: 170813
+	Involuntary context switches: 61313
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 384.32
+	System time (seconds): 21.19
+	Percent of CPU this job got: 981%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.29
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 333196
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 254058
+	Voluntary context switches: 173594
+	Involuntary context switches: 61963
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 385.74
+	System time (seconds): 22.69
+	Percent of CPU this job got: 979%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.68
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 321068
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 261811
+	Voluntary context switches: 177435
+	Involuntary context switches: 86429
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 379.55
+	System time (seconds): 18.80
+	Percent of CPU this job got: 937%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.47
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 331224
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 267081
+	Voluntary context switches: 169356
+	Involuntary context switches: 59074
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 370.04
+	System time (seconds): 17.95
+	Percent of CPU this job got: 939%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.28
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 336076
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 240003
+	Voluntary context switches: 161734
+	Involuntary context switches: 81550
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2320
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 387.82
+	System time (seconds): 24.22
+	Percent of CPU this job got: 992%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.50
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 331036
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 260299
+	Voluntary context switches: 181477
+	Involuntary context switches: 61761
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 386.99
+	System time (seconds): 18.68
+	Percent of CPU this job got: 980%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.39
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 319460
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 269502
+	Voluntary context switches: 177225
+	Involuntary context switches: 80051
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 389.08
+	System time (seconds): 20.07
+	Percent of CPU this job got: 969%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.20
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 340508
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 258537
+	Voluntary context switches: 169212
+	Involuntary context switches: 53516
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 380.51
+	System time (seconds): 21.60
+	Percent of CPU this job got: 954%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.10
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 329224
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 271116
+	Voluntary context switches: 170993
+	Involuntary context switches: 50139
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 385.97
+	System time (seconds): 21.20
+	Percent of CPU this job got: 968%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.04
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 331332
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 259446
+	Voluntary context switches: 171101
+	Involuntary context switches: 60465
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 383.61
+	System time (seconds): 17.12
+	Percent of CPU this job got: 962%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.63
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 329400
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 248880
+	Voluntary context switches: 169551
+	Involuntary context switches: 54987
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 394.52
+	System time (seconds): 20.59
+	Percent of CPU this job got: 1002%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.39
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 329580
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 290846
+	Voluntary context switches: 192148
+	Involuntary context switches: 89186
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 387.61
+	System time (seconds): 18.28
+	Percent of CPU this job got: 984%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.25
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 327724
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 279235
+	Voluntary context switches: 177897
+	Involuntary context switches: 62828
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 387.85
+	System time (seconds): 17.97
+	Percent of CPU this job got: 968%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.89
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 336272
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 251712
+	Voluntary context switches: 170173
+	Involuntary context switches: 68147
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 367.56
+	System time (seconds): 23.78
+	Percent of CPU this job got: 947%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.32
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 328996
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 269663
+	Voluntary context switches: 164976
+	Involuntary context switches: 71857
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2320
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 381.15
+	System time (seconds): 22.14
+	Percent of CPU this job got: 962%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.88
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 335340
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 253068
+	Voluntary context switches: 176962
+	Involuntary context switches: 79295
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 393.81
+	System time (seconds): 16.30
+	Percent of CPU this job got: 998%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.07
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 338072
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 236001
+	Voluntary context switches: 175205
+	Involuntary context switches: 55163
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 390.89
+	System time (seconds): 19.85
+	Percent of CPU this job got: 990%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.47
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 328724
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 280832
+	Voluntary context switches: 172347
+	Involuntary context switches: 70328
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 380.72
+	System time (seconds): 23.44
+	Percent of CPU this job got: 977%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.35
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 327800
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 249490
+	Voluntary context switches: 170378
+	Involuntary context switches: 79449
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 384.74
+	System time (seconds): 22.79
+	Percent of CPU this job got: 964%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.23
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 320976
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 280218
+	Voluntary context switches: 187499
+	Involuntary context switches: 65060
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 384.94
+	System time (seconds): 24.01
+	Percent of CPU this job got: 965%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.33
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 341512
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 281904
+	Voluntary context switches: 179224
+	Involuntary context switches: 64310
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 385.60
+	System time (seconds): 20.75
+	Percent of CPU this job got: 961%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.27
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 332916
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 250448
+	Voluntary context switches: 170659
+	Involuntary context switches: 68749
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 379.12
+	System time (seconds): 24.95
+	Percent of CPU this job got: 987%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.91
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 329340
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 241643
+	Voluntary context switches: 169863
+	Involuntary context switches: 66174
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 372.03
+	System time (seconds): 23.25
+	Percent of CPU this job got: 968%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.79
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 345516
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 268902
+	Voluntary context switches: 174154
+	Involuntary context switches: 81092
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 371.50
+	System time (seconds): 19.57
+	Percent of CPU this job got: 957%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.83
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 326572
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 276670
+	Voluntary context switches: 168994
+	Involuntary context switches: 64125
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2320
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 389.76
+	System time (seconds): 21.09
+	Percent of CPU this job got: 986%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.64
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 340724
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 256450
+	Voluntary context switches: 175820
+	Involuntary context switches: 65882
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 376.43
+	System time (seconds): 24.55
+	Percent of CPU this job got: 977%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.00
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 319940
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 331286
+	Voluntary context switches: 190488
+	Involuntary context switches: 75850
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 383.07
+	System time (seconds): 20.47
+	Percent of CPU this job got: 969%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.63
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 334920
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 254709
+	Voluntary context switches: 171916
+	Involuntary context switches: 68040
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 386.70
+	System time (seconds): 24.03
+	Percent of CPU this job got: 993%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.33
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 342776
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 251897
+	Voluntary context switches: 177396
+	Involuntary context switches: 71693
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 386.56
+	System time (seconds): 17.57
+	Percent of CPU this job got: 971%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.58
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 339496
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 252306
+	Voluntary context switches: 174309
+	Involuntary context switches: 63791
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 385.51
+	System time (seconds): 21.96
+	Percent of CPU this job got: 972%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.87
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 340016
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 259627
+	Voluntary context switches: 172871
+	Involuntary context switches: 73839
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 378.34
+	System time (seconds): 22.05
+	Percent of CPU this job got: 964%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.52
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 337208
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 248636
+	Voluntary context switches: 167168
+	Involuntary context switches: 60862
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 385.09
+	System time (seconds): 17.01
+	Percent of CPU this job got: 974%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.24
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 336440
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 249412
+	Voluntary context switches: 171878
+	Involuntary context switches: 50446
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 385.56
+	System time (seconds): 19.18
+	Percent of CPU this job got: 969%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.73
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 343624
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 242113
+	Voluntary context switches: 173364
+	Involuntary context switches: 61273
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 370.32
+	System time (seconds): 19.42
+	Percent of CPU this job got: 956%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.73
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 328820
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 233622
+	Voluntary context switches: 164988
+	Involuntary context switches: 72747
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 394.54
+	System time (seconds): 16.79
+	Percent of CPU this job got: 990%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.54
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 335084
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 237779
+	Voluntary context switches: 171163
+	Involuntary context switches: 72761
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 374.89
+	System time (seconds): 22.00
+	Percent of CPU this job got: 975%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.68
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 323912
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 268317
+	Voluntary context switches: 170719
+	Involuntary context switches: 58374
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 384.83
+	System time (seconds): 18.46
+	Percent of CPU this job got: 967%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.68
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 331800
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 250742
+	Voluntary context switches: 172176
+	Involuntary context switches: 76940
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 378.26
+	System time (seconds): 20.72
+	Percent of CPU this job got: 969%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.16
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 320516
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 236759
+	Voluntary context switches: 172893
+	Involuntary context switches: 71555
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 389.06
+	System time (seconds): 23.04
+	Percent of CPU this job got: 994%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.42
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 330356
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 250339
+	Voluntary context switches: 179549
+	Involuntary context switches: 74481
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 388.27
+	System time (seconds): 22.65
+	Percent of CPU this job got: 991%
 	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.45
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 349540
+	Maximum resident set size (kbytes): 340136
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 255293
-	Voluntary context switches: 166544
-	Involuntary context switches: 67512
+	Minor (reclaiming a frame) page faults: 259174
+	Voluntary context switches: 174013
+	Involuntary context switches: 60957
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2328
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 388.28
+	System time (seconds): 18.71
+	Percent of CPU this job got: 980%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.49
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 329936
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 259477
+	Voluntary context switches: 170906
+	Involuntary context switches: 72117
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 381.48
+	System time (seconds): 22.57
+	Percent of CPU this job got: 982%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.11
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 319856
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 281007
+	Voluntary context switches: 178712
+	Involuntary context switches: 63195
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 384.30
+	System time (seconds): 28.28
+	Percent of CPU this job got: 994%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.50
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 340940
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 289578
+	Voluntary context switches: 188201
+	Involuntary context switches: 77319
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 369.89
+	System time (seconds): 24.02
+	Percent of CPU this job got: 961%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.95
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 320364
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 264882
+	Voluntary context switches: 163198
+	Involuntary context switches: 55857
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 392.17
+	System time (seconds): 20.39
+	Percent of CPU this job got: 980%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.08
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 328656
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 263653
+	Voluntary context switches: 177005
+	Involuntary context switches: 58991
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 392.02
+	System time (seconds): 20.50
+	Percent of CPU this job got: 986%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.82
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 345056
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 239708
+	Voluntary context switches: 171499
+	Involuntary context switches: 85774
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 382.10
+	System time (seconds): 21.26
+	Percent of CPU this job got: 965%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.76
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 335784
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 255230
+	Voluntary context switches: 173644
+	Involuntary context switches: 63762
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 384.14
+	System time (seconds): 19.54
+	Percent of CPU this job got: 967%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.70
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 342080
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 249215
+	Voluntary context switches: 167313
+	Involuntary context switches: 67120
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 380.99
+	System time (seconds): 19.85
+	Percent of CPU this job got: 964%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.54
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 320784
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 254622
+	Voluntary context switches: 168059
+	Involuntary context switches: 81779
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 388.65
+	System time (seconds): 21.65
+	Percent of CPU this job got: 986%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.57
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 335844
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 260017
+	Voluntary context switches: 173329
+	Involuntary context switches: 60049
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 381.60
+	System time (seconds): 19.61
+	Percent of CPU this job got: 976%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.09
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 332620
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 254582
+	Voluntary context switches: 173450
+	Involuntary context switches: 56666
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 385.45
+	System time (seconds): 21.24
+	Percent of CPU this job got: 981%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.44
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 324952
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 267170
+	Voluntary context switches: 172623
+	Involuntary context switches: 56741
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 383.21
+	System time (seconds): 19.88
+	Percent of CPU this job got: 962%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.88
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 338768
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 247579
+	Voluntary context switches: 167559
+	Involuntary context switches: 78011
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 371.69
+	System time (seconds): 20.86
+	Percent of CPU this job got: 959%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.92
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 313036
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 257691
+	Voluntary context switches: 167142
+	Involuntary context switches: 74851
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 397.62
+	System time (seconds): 18.47
+	Percent of CPU this job got: 1001%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.56
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 342148
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 250618
+	Voluntary context switches: 171451
+	Involuntary context switches: 82047
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 390.79
+	System time (seconds): 20.03
+	Percent of CPU this job got: 998%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.14
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 324408
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 266109
+	Voluntary context switches: 166620
+	Involuntary context switches: 59135
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 383.49
+	System time (seconds): 19.62
+	Percent of CPU this job got: 960%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.94
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 327104
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 263166
+	Voluntary context switches: 170968
+	Involuntary context switches: 71977
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 381.14
+	System time (seconds): 22.43
+	Percent of CPU this job got: 973%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.47
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 316344
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 12
+	Minor (reclaiming a frame) page faults: 260757
+	Voluntary context switches: 174143
+	Involuntary context switches: 58427
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 391.16
+	System time (seconds): 19.84
+	Percent of CPU this job got: 989%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.55
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 332180
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 256927
+	Voluntary context switches: 166877
+	Involuntary context switches: 64982
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 387.43
+	System time (seconds): 20.36
+	Percent of CPU this job got: 983%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.44
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 339968
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 255083
+	Voluntary context switches: 171708
+	Involuntary context switches: 76693
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 381.94
+	System time (seconds): 21.26
+	Percent of CPU this job got: 955%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.22
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 325792
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 253481
+	Voluntary context switches: 168092
+	Involuntary context switches: 46460
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 391.33
+	System time (seconds): 21.13
+	Percent of CPU this job got: 989%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.67
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 322760
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 258431
+	Voluntary context switches: 172938
+	Involuntary context switches: 81439
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 385.85
+	System time (seconds): 20.11
+	Percent of CPU this job got: 978%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.50
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 339148
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 257630
+	Voluntary context switches: 174149
+	Involuntary context switches: 76431
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 382.32
+	System time (seconds): 21.56
+	Percent of CPU this job got: 973%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.47
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 326484
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 267658
+	Voluntary context switches: 163606
+	Involuntary context switches: 65355
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 381.08
+	System time (seconds): 25.47
+	Percent of CPU this job got: 963%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.20
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 333004
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 303144
+	Voluntary context switches: 200948
+	Involuntary context switches: 66206
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 383.76
+	System time (seconds): 20.51
+	Percent of CPU this job got: 964%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.91
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 335624
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 248731
+	Voluntary context switches: 167087
+	Involuntary context switches: 56102
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 387.99
+	System time (seconds): 17.96
+	Percent of CPU this job got: 969%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.87
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 329424
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 252070
+	Voluntary context switches: 166935
+	Involuntary context switches: 73758
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 388.14
+	System time (seconds): 21.47
+	Percent of CPU this job got: 995%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.16
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 316116
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 275282
+	Voluntary context switches: 165714
+	Involuntary context switches: 65593
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 387.34
+	System time (seconds): 17.45
+	Percent of CPU this job got: 962%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.07
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 336020
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 248528
+	Voluntary context switches: 162816
+	Involuntary context switches: 68878
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 391.51
+	System time (seconds): 15.98
+	Percent of CPU this job got: 979%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.58
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 324208
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 250049
+	Voluntary context switches: 173543
+	Involuntary context switches: 63666
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 12341234 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 387.99
+	System time (seconds): 17.67
+	Percent of CPU this job got: 956%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.42
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 337536
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 243636
+	Voluntary context switches: 175985
+	Involuntary context switches: 61745
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc qwerty --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 384.11
+	System time (seconds): 21.78
+	Percent of CPU this job got: 974%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.64
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 317436
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 267280
+	Voluntary context switches: 172545
+	Involuntary context switches: 65064
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 1234561 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 389.87
+	System time (seconds): 20.01
+	Percent of CPU this job got: 962%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:42.60
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 337220
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 255296
+	Voluntary context switches: 168452
+	Involuntary context switches: 73244
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc vip --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 372.45
+	System time (seconds): 18.87
+	Percent of CPU this job got: 950%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.16
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 335204
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 252085
+	Voluntary context switches: 159608
+	Involuntary context switches: 56746
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc jordan23 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 383.53
+	System time (seconds): 19.56
+	Percent of CPU this job got: 968%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.62
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 352892
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 268871
+	Voluntary context switches: 167815
+	Involuntary context switches: 50945
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc family --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 382.72
+	System time (seconds): 21.82
+	Percent of CPU this job got: 976%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.42
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 325236
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 258812
+	Voluntary context switches: 171930
+	Involuntary context switches: 67806
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 11111111 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 379.10
+	System time (seconds): 22.15
+	Percent of CPU this job got: 965%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.55
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 342608
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 253147
+	Voluntary context switches: 173435
+	Involuntary context switches: 63823
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc 123qwe --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 387.12
+	System time (seconds): 19.10
+	Percent of CPU this job got: 984%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.28
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 318384
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 307868
+	Voluntary context switches: 182905
+	Involuntary context switches: 68732
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc freedom --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 388.64
+	System time (seconds): 20.41
+	Percent of CPU this job got: 978%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.79
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 333888
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 249240
+	Voluntary context switches: 177162
+	Involuntary context switches: 63587
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2312
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc password1 --metrics ./tests/results/timings/bad_pass --re ^(?=.*[A-Z].*[A-Z])(?=.*[!%^@#$&*])(?=.*[0-9].*[0-9])(?=.*[a-z].*[a-z].*[a-z]).{12}$ -n ascii"
+	User time (seconds): 396.50
+	System time (seconds): 17.35
+	Percent of CPU this job got: 996%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:41.54
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 343316
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 257712
+	Voluntary context switches: 174006
+	Involuntary context switches: 73989
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 2304
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0

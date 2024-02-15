@@ -74,6 +74,9 @@ pub fn run_committer(doc: &Vec<char>, ab: &String, merkle: bool) -> ReefCommitme
     };
 
     let reef_commit = ReefCommitment::new(udoc.clone(), doc.len(), merkle, sc);
+    
+    #[cfg(feature = "metrics")]
+    log::stop(Component::CommitmentGen, "generation");
 
     reef_commit
 }
@@ -125,6 +128,7 @@ pub fn run_prover(
             merkle,
             hash_salt,
             reef_commit.doc_commit_hash(),
+            true
         );
 
         let mc = reef_commit.merkle.clone();
@@ -748,6 +752,7 @@ fn prove(
             consistency_proof_size,
         );
         log::space(Component::CommitmentGen, "commitment", commit_sz);
+        log::write_csv(&out_write.clone().unwrap().as_path().display().to_string()).unwrap();
     }
 
     (compressed_snark, consist_proof)
@@ -761,7 +766,7 @@ pub fn run_verifier(
     projections: bool,
     hybrid: bool,
     merkle: bool,
-
+    out_write: Option<PathBuf>,
     compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
     consist_proof: Option<ConsistencyProof>,
 ) {
@@ -781,6 +786,7 @@ pub fn run_verifier(
         merkle,
         reef_commit.hash_salt(),
         reef_commit.doc_commit_hash(),
+        false
     );
 
     let doc_len = r1cs_converter.doc_len(); // projected;
@@ -796,6 +802,9 @@ pub fn run_verifier(
         r1cs_converter.hybrid_len,
         consist_proof,
     );
+
+    #[cfg(feature = "metrics")]
+    log::write_csv(&out_write.clone().unwrap().as_path().display().to_string()).unwrap();
 }
 
 fn verify(
@@ -921,6 +930,7 @@ pub fn pub_setup(
     merkle: bool,
     hash_salt: <G1 as Group>::Scalar,
     commit_hash: <G1 as Group>::Scalar,
+    prover: bool,
 ) -> (
     R1CS<<G1 as Group>::Scalar, char>,
     ProverData,
@@ -930,8 +940,12 @@ pub fn pub_setup(
     let batch_size = temp_batch_size;
     let proj = if projections { safa.projection() } else { None };
 
-    #[cfg(feature = "metrics")]
-    log::tic(Component::Compiler, "r1cs_init");
+    #[cfg(feature = "metrics")] {
+        if prover {
+            log::tic(Component::Compiler, "r1cs_init");
+        }
+    }
+    
     let mut r1cs_converter = R1CS::new(
         &ab,
         safa,
@@ -947,7 +961,11 @@ pub fn pub_setup(
     );
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "r1cs_init");
+    {
+        if prover {
+            log::stop(Component::Compiler, "r1cs_init");
+        }
+    }
     println!(
         "Merkle: {} / Hybrid: {} / Projections: {}",
         r1cs_converter.merkle,
@@ -957,21 +975,26 @@ pub fn pub_setup(
 
     #[cfg(feature = "metrics")]
     {
-        log::stop(Component::CommitmentGen, "generation");
-        log::tic(Component::Compiler, "constraint_generation");
+        if prover{
+            log::tic(Component::Compiler, "constraint_generation");
+        }
     }
 
     let (prover_data, _verifier_data) = r1cs_converter.to_circuit();
 
     #[cfg(feature = "metrics")]
     {
-        log::stop(Component::Compiler, "constraint_generation");
-        log::tic(Component::Compiler, "snark_setup");
+        if prover {
+            log::stop(Component::Compiler, "constraint_generation");
+            log::tic(Component::Compiler, "snark_setup");
+        }
     }
     let (z0_primary, pp) = setup(&r1cs_converter, &prover_data, hash_salt);
 
     #[cfg(feature = "metrics")]
-    log::stop(Component::Compiler, "snark_setup");
+    if prover {
+        log::stop(Component::Compiler, "snark_setup");
+    }
 
     (r1cs_converter, prover_data, z0_primary, pp)
 }

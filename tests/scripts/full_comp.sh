@@ -1,5 +1,5 @@
-cargo clean 
-cargo build --release --features 'metrics'
+# cargo clean 
+# cargo build --release --features 'metrics'
 echo "reef"
 ./tests/scripts/reef.sh &> out_reef
 
