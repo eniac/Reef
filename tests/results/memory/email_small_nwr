@@ -1,0 +1,23 @@
+	Command being timed: "./target/release/reef --baselines --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --batch-size 5 --re ^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$ ascii"
+	User time (seconds): 15307.98
+	System time (seconds): 214.52
+	Percent of CPU this job got: 133%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:13:31
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1661068
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 141
+	Minor (reclaiming a frame) page faults: 9650503
+	Voluntary context switches: 1265049
+	Involuntary context switches: 297612
+	Swaps: 0
+	File system inputs: 30056
+	File system outputs: 1812128
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
