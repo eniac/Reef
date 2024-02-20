@@ -3,9 +3,9 @@
 # echo "reef"
 # ./tests/scripts/reef.sh &> out_reef
 
-echo "safa+nlookup"
-./tests/scripts/safa_nlookup.sh &> out_safa_nlookup
-echo "end safa+nlookup"
+# echo "safa+nlookup"
+# ./tests/scripts/safa_nlookup.sh &> out_safa_nlookup
+# echo "end safa+nlookup"
 
 cargo clean 
 cargo build --release --features 'metrics,nwr'
