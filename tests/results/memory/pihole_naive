@@ -1,0 +1,368 @@
+	Command being timed: "./target/release/reef --baselines --doc ad.stackoverflow.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1234567 --metrics ./tests/results/timings/pihole --re ^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+\.){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-] ascii"
+	User time (seconds): 2532.13
+	System time (seconds): 144.31
+	Percent of CPU this job got: 428%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 10:24.09
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 4991400
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 3
+	Minor (reclaiming a frame) page faults: 6158688
+	Voluntary context switches: 176389
+	Involuntary context switches: 34789
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 1693384
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323 --metrics ./tests/results/timings/pihole --re ^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-] ascii"
+	User time (seconds): 1179.01
+	System time (seconds): 74.35
+	Percent of CPU this job got: 580%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:36.02
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1985876
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 3293695
+	Voluntary context switches: 149486
+	Involuntary context switches: 37191
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 642096
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc adimage101.testingads.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-5000379 --metrics ./tests/results/timings/pihole --re ^(.+[_.-])?telemetry[_.-] ascii"
+	User time (seconds): 749.13
+	System time (seconds): 45.31
+	Percent of CPU this job got: 475%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:47.09
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1236504
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 2111545
+	Voluntary context switches: 131208
+	Involuntary context switches: 25527
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 504616
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc adimage101.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=12 --metrics ./tests/results/timings/pihole --re ^adim(age|g)s?[0-9]*[_.-] ascii"
+	User time (seconds): 472.84
+	System time (seconds): 31.65
+	Percent of CPU this job got: 480%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:45.09
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 743440
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 7
+	Minor (reclaiming a frame) page faults: 1232109
+	Voluntary context switches: 118122
+	Involuntary context switches: 21782
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 264328
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc adtracker101.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId= --metrics ./tests/results/timings/pihole --re ^adtrack(er|ing)?[0-9]*[_.-] ascii"
+	User time (seconds): 484.16
+	System time (seconds): 28.31
+	Percent of CPU this job got: 431%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:58.77
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 823316
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 7
+	Minor (reclaiming a frame) page faults: 1513356
+	Voluntary context switches: 112912
+	Involuntary context switches: 26039
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 315408
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc advertising101.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&click1 --metrics ./tests/results/timings/pihole --re ^advert(s|is(ing|ements?))?[0-9]*[_.-] ascii"
+	User time (seconds): 706.59
+	System time (seconds): 48.76
+	Percent of CPU this job got: 536%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:20.85
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1036780
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 12
+	Minor (reclaiming a frame) page faults: 1800792
+	Voluntary context switches: 133966
+	Involuntary context switches: 26110
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 401208
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc affiliate.link.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickI --metrics ./tests/results/timings/pihole --re ^aff(iliat(es?|ion))?[_.-] ascii"
+	User time (seconds): 494.26
+	System time (seconds): 29.45
+	Percent of CPU this job got: 423%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:03.52
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 856740
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 3
+	Minor (reclaiming a frame) page faults: 1642455
+	Voluntary context switches: 116909
+	Involuntary context switches: 22832
+	Swaps: 0
+	File system inputs: 8
+	File system outputs: 332576
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc analytics.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=123 --metrics ./tests/results/timings/pihole --re ^analytics?[_.-] ascii"
+	User time (seconds): 478.63
+	System time (seconds): 25.03
+	Percent of CPU this job got: 463%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:48.61
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 745128
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 10
+	Minor (reclaiming a frame) page faults: 1279063
+	Voluntary context switches: 113253
+	Involuntary context switches: 30788
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 281336
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc banners.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=12345 --metrics ./tests/results/timings/pihole --re ^banners?[_.-] ascii"
+	User time (seconds): 464.41
+	System time (seconds): 23.37
+	Percent of CPU this job got: 490%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:39.51
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 738848
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1114479
+	Voluntary context switches: 117357
+	Involuntary context switches: 35269
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 247256
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc beacons2212.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1 --metrics ./tests/results/timings/pihole --re ^beacons?[0-9]*[_.-] ascii"
+	User time (seconds): 466.86
+	System time (seconds): 27.83
+	Percent of CPU this job got: 493%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:40.31
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 740344
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 1151132
+	Voluntary context switches: 115862
+	Involuntary context switches: 25348
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 247296
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc counters223.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=2 --metrics ./tests/results/timings/pihole --re ^count(ers?)?[0-9]*[_.-] ascii"
+	User time (seconds): 469.87
+	System time (seconds): 26.17
+	Percent of CPU this job got: 469%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:45.74
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 743580
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1226575
+	Voluntary context switches: 118088
+	Involuntary context switches: 30590
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 264272
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc mads.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=11233456 --metrics ./tests/results/timings/pihole --re ^mads\. ascii"
+	User time (seconds): 349.93
+	System time (seconds): 17.41
+	Percent of CPU this job got: 415%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:28.44
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 738240
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 963373
+	Voluntary context switches: 108409
+	Involuntary context switches: 48797
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 196248
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc pixel.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&click --metrics ./tests/results/timings/pihole --re ^pixels?[-.] ascii"
+	User time (seconds): 461.90
+	System time (seconds): 29.11
+	Percent of CPU this job got: 522%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:33.91
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 691728
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 11
+	Minor (reclaiming a frame) page faults: 1041279
+	Voluntary context switches: 116961
+	Involuntary context switches: 18586
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 222048
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc statistics19902.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037 --metrics ./tests/results/timings/pihole --re ^stat(s|istics)?[0-9]*[_.-] ascii"
+	User time (seconds): 486.69
+	System time (seconds): 27.88
+	Percent of CPU this job got: 454%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:53.21
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 745976
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1370620
+	Voluntary context switches: 117892
+	Involuntary context switches: 23476
+	Swaps: 0
+	File system inputs: 8
+	File system outputs: 298360
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc ad.stackoverflow.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1234567 --metrics ./tests/results/timings/pihole --re ^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+\.){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-] ascii"
+	User time (seconds): 2521.80
+	System time (seconds): 151.70
+	Percent of CPU this job got: 434%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 10:15.80
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 5048040
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 6894250
+	Voluntary context switches: 172037
+	Involuntary context switches: 34681
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 1693400
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+	Command being timed: "./target/release/reef --baselines --doc adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323 --metrics ./tests/results/timings/pihole --re ^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-] ascii"
+	User time (seconds): 1205.46
+	System time (seconds): 83.51
+	Percent of CPU this job got: 596%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:35.92
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2063952
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 8
+	Minor (reclaiming a frame) page faults: 3194248
+	Voluntary context switches: 153462
+	Involuntary context switches: 31230
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 642104
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
