@@ -3700,4 +3700,19 @@ R,P,prove_99,2591747,μs
 R,P,prove+wit,124864034896,μs
 R,V,snark_verification,4186987,μs
 R,P,compressed_snark,14420247,μs
-S,P,compressed_snark_size,27280,bytes
+S,P,compressed_snark_size,27280,bytesMessage-ID_415,naive,1709169175,"^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michael_Maggi_Jun2001\\Notes Folders\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$",55853,433
+---------,---------,---------,---------,"
+R,CG,generation,26286,μs
+R,C,constraint_generation,4725590336,μs
+R,C,regex_normalization,58691,μs
+R,C,fa_builder,40407660,μs
+R,S,fa_solver,3718274,μs
+NOC,C,circuit,23219806,constraints
+S,CG,commitment,32,bytes
+R,C,snark_setup,4069812770,μs
+R,S,witness_generation,8414634920,μs
+R,P,prove_0,203363496,μs
+R,V,snark_verification,50279578,μs
+S,P,snark_size,18440,bytes
+Message-ID_1000,naive,1709187387,"^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$",130673,1013
+---------,---------,---------,---------,"
