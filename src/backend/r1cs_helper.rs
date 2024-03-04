@@ -486,7 +486,9 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
 
     for b in 0..pow {
         table_t[b] = &table_t[b] * (Integer::from(1) - &r_i) + &table_t[b + pow] * &r_i;
+        table_t[b] = table_t[b].clone().rem_floor(cfg().field().modulus());
         table_eq[b] = &table_eq[b] * (Integer::from(1) - &r_i) + &table_eq[b + pow] * &r_i;
+        table_eq[b] = table_eq[b].clone().rem_floor(cfg().field().modulus());
     }
 
     (r_i, xsq, x, con)
@@ -520,6 +522,7 @@ pub(crate) fn gen_eq_table(
         }
 
         eq_t[i] += term;
+        eq_t[i] = eq_t[i].clone().rem_floor(cfg().field().modulus());
     }
 
     eq_t

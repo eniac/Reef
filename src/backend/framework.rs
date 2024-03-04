@@ -761,7 +761,6 @@ pub fn run_verifier(
     projections: bool,
     hybrid: bool,
     merkle: bool,
-
     compressed_snark: CompressedSNARK<G1, G2, C1, C2, S1, S2>,
     consist_proof: Option<ConsistencyProof>,
 ) {
@@ -1028,6 +1027,7 @@ mod tests {
         projections: bool,
         hybrid: bool,
         merkle: bool,
+        cmt_name: &str,
     ) {
         let r = re::simpl(re::new(&rstr));
         let safa = SAFA::new(&ab[..], &r);
@@ -1037,7 +1037,7 @@ mod tests {
         let reef_commit = run_committer(&doc, &ab, merkle);
 
         let cmt_data = bincode::serialize(&reef_commit).expect("Could not serialize");
-        fs::write(format!("reg_{}.cmt", rstr), cmt_data).expect("Unable to write file");
+        fs::write(format!("{}.cmt", cmt_name), cmt_data).expect("Unable to write file");
 
         let (compressed_snark, consist_proof) = run_prover(
             reef_commit,
@@ -1051,7 +1051,7 @@ mod tests {
             None,
         );
 
-        let cmt_data = fs::read(format!("reg_{}.cmt", rstr)).expect("Unable to read file");
+        let cmt_data = fs::read(format!("{}.cmt", cmt_name)).expect("Unable to read file");
         let reef_commit_2: ReefCommitment =
             bincode::deserialize(&cmt_data).expect("Could not deserialize");
 
@@ -1078,6 +1078,7 @@ mod tests {
             false,
             false,
             false,
+            "e2e_sub_proj",
         );
     }
 
@@ -1091,6 +1092,7 @@ mod tests {
             false,
             false,
             true,
+            "e2e_merkle",
         );
     }
 
@@ -1104,6 +1106,7 @@ mod tests {
             false,
             true,
             false,
+            "e2e_hybrid",
         );
     }
 
@@ -1117,6 +1120,7 @@ mod tests {
             false,
             false,
             false,
+            "e2e_proj",
         );
     }
 
@@ -1132,6 +1136,7 @@ mod tests {
             false,
             false,
             false,
+            "e2e_q_overflow",
         );
     }
 
@@ -1145,6 +1150,7 @@ mod tests {
             false,
             false,
             false,
+            "e2e_nest_forall",
         );
     }
 
@@ -1161,6 +1167,7 @@ mod tests {
             false,
             false,
             false,
+            "e2e_nl",
         );
     }
 }
