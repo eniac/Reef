@@ -2439,6 +2439,8 @@ mod tests {
 
             let mut eq_a = gen_eq_table(&claims, &qs, &last_q.clone().into_iter().rev().collect());
 
+            println!("EQ TABLE {:#?}", eq_a);
+
             // claim check
             let (_, running_v) =
                 prover_mle_partial_eval(&evals, &last_q, &(0..evals.len()).collect(), true, None);
