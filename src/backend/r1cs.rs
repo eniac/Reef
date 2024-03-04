@@ -2350,9 +2350,13 @@ impl<F: PrimeField> R1CS<F, char> {
             // sanity
             if i > 1 {
                 assert_eq!(
-                    prev_g_r.clone().rem_floor(cfg().field().modulus()),
+                    prev_g_r
+                        .clone()
+                        .rem_floor(cfg().field().modulus())
+                        .keep_bits(255),
                     (g_xsq.clone() + g_x.clone() + g_const.clone() + g_const.clone())
                         .rem_floor(cfg().field().modulus())
+                        .keep_bits(255)
                 );
             }
 
@@ -2367,7 +2371,7 @@ impl<F: PrimeField> R1CS<F, char> {
 
         // last claim = g_v(r_v)
         let mut last_claim = g_xsq * &sc_r * &sc_r + g_x * &sc_r + g_const;
-        last_claim = last_claim.rem_floor(cfg().field().modulus());
+        last_claim = last_claim.rem_floor(cfg().field().modulus()).keep_bits(255);
         wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
 
         // update running claim
@@ -2453,8 +2457,11 @@ mod tests {
                 .sum();
 
             assert_eq!(
-                term.rem_floor(cfg().field().modulus()),
-                claim.clone().rem_floor(cfg().field().modulus())
+                term.rem_floor(cfg().field().modulus()).keep_bits(255),
+                claim
+                    .clone()
+                    .rem_floor(cfg().field().modulus())
+                    .keep_bits(255)
             );
 
             let sc =
@@ -2478,12 +2485,12 @@ mod tests {
 
                 let g0_g1 = Integer::from(2) * &con + &x + &xsq;
                 assert_eq!(
-                    claim.rem_floor(cfg().field().modulus()),
-                    g0_g1.rem_floor(cfg().field().modulus())
+                    claim.rem_floor(cfg().field().modulus()).keep_bits(255),
+                    g0_g1.rem_floor(cfg().field().modulus()).keep_bits(255)
                 );
 
                 claim = xsq * &r_i * &r_i + x * &r_i + con;
-                claim = claim.rem_floor(cfg().field().modulus());
+                claim = claim.rem_floor(cfg().field().modulus()).keep_bits(255);
 
                 sc_rs.push(r_i);
             }
@@ -2496,7 +2503,9 @@ mod tests {
             let (_, eq_term) = prover_mle_partial_eval(&claims, &sc_rs, &qs, false, Some(&last_q));
             assert_eq!(
                 claim, // last claim
-                (eq_term * next_running_v.clone()).rem_floor(cfg().field().modulus())
+                (eq_term * next_running_v.clone())
+                    .rem_floor(cfg().field().modulus())
+                    .keep_bits(255)
             );
 
             sponge.finish(acc).unwrap();
@@ -2534,19 +2543,25 @@ mod tests {
                     if ((x_1 == -1) ^ (x_2 == -1) ^ (x_3 == -1)) & !(x_1 + x_2 + x_3 == -3) {
                         if x_1 == -1 {
                             assert_eq!(
-                                (coeff.clone() + con.clone()).rem_floor(cfg().field().modulus()),
+                                (coeff.clone() + con.clone())
+                                    .rem_floor(cfg().field().modulus())
+                                    .keep_bits(255),
                                 table[(4 + x_2 * 2 + x_3) as usize]
                             );
                             assert_eq!(con.clone(), table[(x_2 * 2 + x_3) as usize]);
                         } else if x_2 == -1 {
                             assert_eq!(
-                                (coeff.clone() + con.clone()).rem_floor(cfg().field().modulus()),
+                                (coeff.clone() + con.clone())
+                                    .rem_floor(cfg().field().modulus())
+                                    .keep_bits(255),
                                 table[(x_1 * 4 + 2 + x_3) as usize]
                             );
                             assert_eq!(con.clone(), table[(x_1 * 4 + x_3) as usize]);
                         } else if x_3 == -1 {
                             assert_eq!(
-                                (coeff.clone() + con.clone()).rem_floor(cfg().field().modulus()),
+                                (coeff.clone() + con.clone())
+                                    .rem_floor(cfg().field().modulus())
+                                    .keep_bits(255),
                                 table[(x_1 * 4 + x_2 * 2 + 1) as usize]
                             );
                             assert_eq!(con.clone(), table[(x_1 * 4 + x_2 * 2) as usize]);

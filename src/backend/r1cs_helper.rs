@@ -469,12 +469,9 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
         con += ti_0 * ei_0;
     }
 
-    xsq = xsq.rem_floor(cfg().field().modulus());
-    xsq.keep_bits_mut(254);
-    x = x.rem_floor(cfg().field().modulus());
-    x.keep_bits_mut(254);
-    con = con.rem_floor(cfg().field().modulus());
-    con.keep_bits_mut(254);
+    xsq = xsq.rem_floor(cfg().field().modulus()).keep_bits(255);
+    x = x.rem_floor(cfg().field().modulus()).keep_bits(255);
+    con = con.rem_floor(cfg().field().modulus()).keep_bits(255);
 
     let query = vec![
         int_to_ff(con.clone()),
@@ -489,11 +486,15 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
 
     for b in 0..pow {
         table_t[b] = &table_t[b] * (Integer::from(1) - &r_i) + &table_t[b + pow] * &r_i;
-        table_t[b] = table_t[b].clone().rem_floor(cfg().field().modulus());
-        table_t[b].keep_bits_mut(254);
+        table_t[b] = table_t[b]
+            .clone()
+            .rem_floor(cfg().field().modulus())
+            .keep_bits(255);
         table_eq[b] = &table_eq[b] * (Integer::from(1) - &r_i) + &table_eq[b + pow] * &r_i;
-        table_eq[b] = table_eq[b].clone().rem_floor(cfg().field().modulus());
-        table_eq[b].keep_bits_mut(254);
+        table_eq[b] = table_eq[b]
+            .clone()
+            .rem_floor(cfg().field().modulus())
+            .keep_bits(255);
     }
 
     (r_i, xsq, x, con)
@@ -527,8 +528,10 @@ pub(crate) fn gen_eq_table(
         }
 
         eq_t[i] += term;
-        eq_t[i] = eq_t[i].clone().rem_floor(cfg().field().modulus());
-        eq_t[i].keep_bits_mut(254);
+        eq_t[i] = eq_t[i]
+            .clone()
+            .rem_floor(cfg().field().modulus())
+            .keep_bits(255);
     }
 
     eq_t
@@ -614,8 +617,10 @@ pub(crate) fn prover_mle_partial_eval(
     }
     hole_coeff -= &minus_coeff;
     (
-        hole_coeff.rem_floor(cfg().field().modulus()),
-        minus_coeff.rem_floor(cfg().field().modulus()),
+        hole_coeff.rem_floor(cfg().field().modulus()).keep_bits(255),
+        minus_coeff
+            .rem_floor(cfg().field().modulus())
+            .keep_bits(255),
     )
 }
 
