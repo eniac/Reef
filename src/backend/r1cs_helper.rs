@@ -470,8 +470,11 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
     }
 
     xsq = xsq.rem_floor(cfg().field().modulus()).keep_bits(255);
+    xsq.shrink_to(255);
     x = x.rem_floor(cfg().field().modulus()).keep_bits(255);
+    x.shrink_to(255);
     con = con.rem_floor(cfg().field().modulus()).keep_bits(255);
+    con.shrink_to(255);
 
     let query = vec![
         int_to_ff(con.clone()),
@@ -490,11 +493,13 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
             .clone()
             .rem_floor(cfg().field().modulus())
             .keep_bits(255);
+        table_t[b].shrink_to(255);
         table_eq[b] = &table_eq[b] * (Integer::from(1) - &r_i) + &table_eq[b + pow] * &r_i;
         table_eq[b] = table_eq[b]
             .clone()
             .rem_floor(cfg().field().modulus())
             .keep_bits(255);
+        table_eq[b].shrink_to(255);
     }
 
     (r_i, xsq, x, con)
@@ -532,6 +537,7 @@ pub(crate) fn gen_eq_table(
             .clone()
             .rem_floor(cfg().field().modulus())
             .keep_bits(255);
+        eq_t[i].shrink_to(255);
     }
 
     eq_t
@@ -616,12 +622,15 @@ pub(crate) fn prover_mle_partial_eval(
         }
     }
     hole_coeff -= &minus_coeff;
-    (
-        hole_coeff.rem_floor(cfg().field().modulus()).keep_bits(255),
-        minus_coeff
-            .rem_floor(cfg().field().modulus())
-            .keep_bits(255),
-    )
+
+    let mut ret_hc = hole_coeff.rem_floor(cfg().field().modulus()).keep_bits(255);
+    ret_hc.shrink_to(255);
+    let mut ret_mc = minus_coeff
+        .rem_floor(cfg().field().modulus())
+        .keep_bits(255);
+    ret_mc.shrink_to(255);
+
+    (ret_hc, ret_mc)
 }
 
 // external full "partial" eval for table check

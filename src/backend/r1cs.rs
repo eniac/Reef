@@ -2372,6 +2372,7 @@ impl<F: PrimeField> R1CS<F, char> {
         // last claim = g_v(r_v)
         let mut last_claim = g_xsq * &sc_r * &sc_r + g_x * &sc_r + g_const;
         last_claim = last_claim.rem_floor(cfg().field().modulus()).keep_bits(255);
+        last_claim.shrink_to(255);
         wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
 
         // update running claim
@@ -2491,6 +2492,7 @@ mod tests {
 
                 claim = xsq * &r_i * &r_i + x * &r_i + con;
                 claim = claim.rem_floor(cfg().field().modulus()).keep_bits(255);
+                claim.shrink_to(255);
 
                 sc_rs.push(r_i);
             }
