@@ -1,41 +1,41 @@
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1018.54
-	System time (seconds): 30.20
-	Percent of CPU this job got: 231%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:33.24
+	User time (seconds): 1030.43
+	System time (seconds): 29.74
+	Percent of CPU this job got: 233%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:33.96
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1046804
+	Maximum resident set size (kbytes): 1067524
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 916071
-	Voluntary context switches: 214075
-	Involuntary context switches: 54865
+	Minor (reclaiming a frame) page faults: 789209
+	Voluntary context switches: 226619
+	Involuntary context switches: 88936
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2432
+	File system outputs: 2464
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1026.30
-	System time (seconds): 33.35
-	Percent of CPU this job got: 234%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:31.80
+	User time (seconds): 1024.11
+	System time (seconds): 34.82
+	Percent of CPU this job got: 233%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:34.12
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1067008
+	Maximum resident set size (kbytes): 1069568
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 795027
-	Voluntary context switches: 232101
-	Involuntary context switches: 90252
+	Minor (reclaiming a frame) page faults: 867203
+	Voluntary context switches: 233517
+	Involuntary context switches: 79855
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 2448
@@ -45,184 +45,184 @@
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1037.33
-	System time (seconds): 35.57
-	Percent of CPU this job got: 236%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:33.28
+	User time (seconds): 1040.33
+	System time (seconds): 36.05
+	Percent of CPU this job got: 235%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:36.50
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1056972
+	Maximum resident set size (kbytes): 1073248
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 814725
-	Voluntary context switches: 227284
-	Involuntary context switches: 84669
+	Minor (reclaiming a frame) page faults: 935185
+	Voluntary context switches: 234398
+	Involuntary context switches: 80738
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2440
+	File system outputs: 2448
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1016.76
-	System time (seconds): 31.01
-	Percent of CPU this job got: 231%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:33.43
+	User time (seconds): 1018.04
+	System time (seconds): 37.93
+	Percent of CPU this job got: 229%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:39.30
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1059784
+	Maximum resident set size (kbytes): 1051376
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 923761
-	Voluntary context switches: 223471
-	Involuntary context switches: 56853
+	Minor (reclaiming a frame) page faults: 1002492
+	Voluntary context switches: 232264
+	Involuntary context switches: 73971
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2432
+	File system outputs: 2448
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1011.85
-	System time (seconds): 36.76
-	Percent of CPU this job got: 231%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:33.21
+	User time (seconds): 1027.91
+	System time (seconds): 32.83
+	Percent of CPU this job got: 232%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:36.63
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1038108
+	Maximum resident set size (kbytes): 1059908
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 806254
-	Voluntary context switches: 221998
-	Involuntary context switches: 58276
+	Minor (reclaiming a frame) page faults: 1141670
+	Voluntary context switches: 238128
+	Involuntary context switches: 79140
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2440
+	File system outputs: 2464
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1010.62
-	System time (seconds): 35.06
-	Percent of CPU this job got: 231%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:31.05
+	User time (seconds): 1021.16
+	System time (seconds): 34.77
+	Percent of CPU this job got: 232%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:33.66
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1037952
+	Maximum resident set size (kbytes): 1061376
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 880094
-	Voluntary context switches: 220351
-	Involuntary context switches: 68589
+	Minor (reclaiming a frame) page faults: 781452
+	Voluntary context switches: 222123
+	Involuntary context switches: 90244
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2424
+	File system outputs: 2456
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1027.37
-	System time (seconds): 30.23
-	Percent of CPU this job got: 233%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:33.90
+	User time (seconds): 1022.04
+	System time (seconds): 31.52
+	Percent of CPU this job got: 232%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:32.50
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1043732
+	Maximum resident set size (kbytes): 1064244
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 925289
-	Voluntary context switches: 223911
-	Involuntary context switches: 67838
+	Minor (reclaiming a frame) page faults: 814491
+	Voluntary context switches: 231253
+	Involuntary context switches: 83458
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2424
+	File system outputs: 2456
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1025.22
-	System time (seconds): 30.99
+	User time (seconds): 1034.23
+	System time (seconds): 36.34
 	Percent of CPU this job got: 234%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:31.28
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:36.08
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1062256
+	Maximum resident set size (kbytes): 1037336
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 894112
-	Voluntary context switches: 223512
-	Involuntary context switches: 80049
+	Minor (reclaiming a frame) page faults: 800128
+	Voluntary context switches: 236221
+	Involuntary context switches: 88648
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2432
+	File system outputs: 2440
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1028.45
-	System time (seconds): 35.67
+	User time (seconds): 1034.65
+	System time (seconds): 36.97
 	Percent of CPU this job got: 236%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:30.87
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:33.35
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1007144
+	Maximum resident set size (kbytes): 1044432
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 937706
-	Voluntary context switches: 227748
-	Involuntary context switches: 81930
+	Minor (reclaiming a frame) page faults: 883848
+	Voluntary context switches: 231213
+	Involuntary context switches: 77197
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2440
+	File system outputs: 2464
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
 	Page size (bytes): 4096
 	Exit status: 0
 	Command being timed: "./target/release/reef --e2e --cmt-name cmt --proof-name proof --doc ./tests/docs/email_med --metrics ./tests/results/timings/email_dkim --re ^Message-ID: .*[[:space:]]Date: Tue, 11 Jul 2000 11:11:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Reimbursement of Individually Billed Items[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Enron Announcements[[:space:]]X-To: All Enron Employees North America[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\Michelle_Lokay_Dec2000_June2001_1\\Notes Folders\\Corporate[[:space:]]X-Origin: LOKAY-M[[:space:]]X-FileName: mlokay\.nsf[[:space:]]*The memo distributed on June 27 on Reimbursement of Individually Billed Items [[:space:]]requires[[:space:]]clarification\.  The intent of the memo was to give employees an alternate [[:space:]]method[[:space:]]of paying for pagers, cell phones, etc\.  Employees can continue to submit [[:space:]]these[[:space:]]invoices to Accounts Payable for processing or  pay these items with their [[:space:]]corporate[[:space:]]American Express card and request reimbursement through an expense report\.  [[:space:]]Either[[:space:]]way is an acceptable way to process these small dollar high volume invoices\.$ ascii"
-	User time (seconds): 1017.18
-	System time (seconds): 32.31
-	Percent of CPU this job got: 230%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:35.90
+	User time (seconds): 1025.87
+	System time (seconds): 38.45
+	Percent of CPU this job got: 231%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:40.70
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 1039304
+	Maximum resident set size (kbytes): 1059852
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 787427
-	Voluntary context switches: 217214
-	Involuntary context switches: 64133
+	Minor (reclaiming a frame) page faults: 1040886
+	Voluntary context switches: 231325
+	Involuntary context switches: 76017
 	Swaps: 0
 	File system inputs: 0
-	File system outputs: 2440
+	File system outputs: 2456
 	Socket messages sent: 0
 	Socket messages received: 0
 	Signals delivered: 0
