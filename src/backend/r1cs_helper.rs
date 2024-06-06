@@ -18,6 +18,7 @@ use petgraph::{
     visit::EdgeRef,
     Graph,
 };
+use memory_stats::memory_stats;
 use rug::{integer::Order, ops::RemRounding, Assign, Integer};
 use std::collections::HashSet;
 use std::collections::LinkedList;
@@ -469,9 +470,12 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
         con += ti_0 * ei_0;
     }
 
-    xsq = xsq.rem_floor(cfg().field().modulus());
-    x = x.rem_floor(cfg().field().modulus());
-    con = con.rem_floor(cfg().field().modulus());
+    xsq = xsq.rem_floor(cfg().field().modulus()).keep_bits(255);
+    xsq.shrink_to(255);
+    x = x.rem_floor(cfg().field().modulus()).keep_bits(255);
+    x.shrink_to(255);
+    con = con.rem_floor(cfg().field().modulus()).keep_bits(255);
+    con.shrink_to(255);
 
     let query = vec![
         int_to_ff(con.clone()),
@@ -486,7 +490,11 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
 
     for b in 0..pow {
         table_t[b] = &table_t[b] * (Integer::from(1) - &r_i) + &table_t[b + pow] * &r_i;
+        table_t[b] = table_t[b].clone().rem_floor(cfg().field().modulus()).keep_bits(255);
+        table_t[b].shrink_to(255);
         table_eq[b] = &table_eq[b] * (Integer::from(1) - &r_i) + &table_eq[b + pow] * &r_i;
+        table_eq[b] = table_eq[b].clone().rem_floor(cfg().field().modulus()).keep_bits(255);
+        table_eq[b].shrink_to(255);
     }
 
     (r_i, xsq, x, con)
@@ -500,27 +508,55 @@ pub(crate) fn gen_eq_table(
     let base: usize = 2;
     let ell: usize = last_q.len();
 
+    // if let Some(usage) = memory_stats() {
+    //     println!("start {}", usage.physical_mem);
+    // }
+
     let t_len = base.pow(ell as u32);
     assert_eq!(rs.len(), qs.len() + 1);
 
+    println!("ell {}", ell);
+    println!("t_len {}", t_len);
+
     let mut eq_t = vec![Integer::from(0); t_len];
+
+    // if let Some(usage) = memory_stats() {
+    //     println!("eq_t {}", usage.physical_mem);
+    // }
 
     for i in 0..qs.len() {
         eq_t[qs[i]] += &rs[i];
     }
 
+    // if let Some(usage) = memory_stats() {
+    //     println!("post qs {}", usage.physical_mem);
+    // }
+
+    println!("eq t len {}", eq_t.len());
+
     for i in 0..eq_t.len() {
         let mut term = rs[qs.len()].clone();
 
         for j in (0..ell).rev() {
+            // if i%10000000==0 {
+            //     if let Some(usage) = memory_stats() {
+            //         println!("{} {} {}", i ,j ,usage.physical_mem);
+            //     }            
+            // }
             let xi = (i >> j) & 1;
 
             term *= Integer::from(xi) * &last_q[j]
                 + Integer::from(1 - xi) * (Integer::from(1) - &last_q[j]);
         }
-
         eq_t[i] += term;
+        eq_t[i] = eq_t[i].clone().rem_floor(cfg().field().modulus()).keep_bits(255);
+        eq_t[i].shrink_to(255);
     }
+
+    // if let Some(usage) = memory_stats() {
+    //     println!("end {}", usage.physical_mem);
+    //     println!("eq_t {}", eq_t[0].significant_bits());
+    // }
 
     eq_t
 }

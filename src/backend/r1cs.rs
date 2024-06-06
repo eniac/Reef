@@ -8,6 +8,7 @@ use circ::ir::{opt::*, proof::Constraints, term::*};
 use circ::target::r1cs::{opt::reduce_linearities, trans::to_r1cs, ProverData, VerifierData};
 use ff::PrimeField;
 use fxhash::FxHashMap;
+use memory_stats::memory_stats;
 use generic_array::typenum;
 use neptune::{
     poseidon::PoseidonConstants,
@@ -2146,6 +2147,10 @@ impl<F: PrimeField> R1CS<F, char> {
             assert!(doc_running_q.is_some() || batch_num == 0);
             assert!(doc_running_v.is_some() || batch_num == 0);
 
+            // if let Some(usage) = memory_stats() {
+            //     println!("prenldoc {}", usage.virtual_mem);
+            //     println!("prenldoc {}", usage.physical_mem);
+            // }
             let (w, drq, drv) = self.wit_nlookup_gadget(
                 wits,
                 proj_doc,
@@ -2155,6 +2160,10 @@ impl<F: PrimeField> R1CS<F, char> {
                 doc_running_v,
                 "nldoc",
             );
+            // if let Some(usage) = memory_stats() {
+            //     println!("postnldoc {}", usage.virtual_mem);
+            //     println!("postnldoc {}", usage.physical_mem);
+            // }
             wits = w;
             next_doc_running_q = Some(drq);
             next_doc_running_v = Some(drv);
@@ -2309,11 +2318,13 @@ impl<F: PrimeField> R1CS<F, char> {
         let rand = SpongeAPI::squeeze(&mut sponge, 1, acc);
         let claim_r = Integer::from_digits(rand[0].to_repr().as_ref(), Order::Lsf);
         wits.insert(format!("{}_claim_r", id), new_wit(claim_r.clone()));
+        
 
         let mut rs = vec![claim_r.clone()];
         for i in 1..(q.len() + 1) {
             rs.push(rs[i - 1].clone() * claim_r.clone());
         }
+
         // make eq table for this round
         let mut eq_table =
             gen_eq_table(&rs, &q, &prev_running_q.clone().into_iter().rev().collect());
@@ -2330,6 +2341,9 @@ impl<F: PrimeField> R1CS<F, char> {
             "nlhybrid" => table.to_vec(),
             _ => panic!("weird tag"),
         };
+        // if let Some(usage) = memory_stats() {
+        //     println!("eq table {}", usage.physical_mem);
+        // }
 
         // generate polynomial g's for sum check
         let mut sc_rs = vec![];
@@ -2350,9 +2364,9 @@ impl<F: PrimeField> R1CS<F, char> {
             // sanity
             if i > 1 {
                 assert_eq!(
-                    prev_g_r.clone().rem_floor(cfg().field().modulus()),
+                    prev_g_r.clone().rem_floor(cfg().field().modulus()).keep_bits(255),
                     (g_xsq.clone() + g_x.clone() + g_const.clone() + g_const.clone())
-                        .rem_floor(cfg().field().modulus())
+                        .rem_floor(cfg().field().modulus()).keep_bits(255)
                 );
             }
 
@@ -2367,7 +2381,8 @@ impl<F: PrimeField> R1CS<F, char> {
 
         // last claim = g_v(r_v)
         let mut last_claim = g_xsq * &sc_r * &sc_r + g_x * &sc_r + g_const;
-        last_claim = last_claim.rem_floor(cfg().field().modulus());
+        last_claim = last_claim.rem_floor(cfg().field().modulus()).keep_bits(255);
+        last_claim.shrink_to(255);
         wits.insert(format!("{}_sc_last_claim", id), new_wit(last_claim.clone()));
 
         // update running claim
@@ -2481,7 +2496,8 @@ mod tests {
                 );
 
                 claim = xsq * &r_i * &r_i + x * &r_i + con;
-                claim = claim.rem_floor(cfg().field().modulus());
+                claim = claim.rem_floor(cfg().field().modulus()).keep_bits(255);
+                claim.shrink_to(255);
 
                 sc_rs.push(r_i);
             }
