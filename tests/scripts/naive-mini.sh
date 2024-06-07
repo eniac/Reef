@@ -1,3 +1,7 @@
+mdkir -p ../results/memory
+mdkir -p ../results/timings
+mkdir -p ../../match_cpp
+
 cargo clean 
 cargo build --release --features 'metrics,naive'
 

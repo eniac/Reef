@@ -1,8 +1,11 @@
+mdkir -p ../results/memory
+mdkir -p ../results/timings
+mkdir -p ../../match_cpp
+
 cargo clean 
 cargo build --release --features 'metrics,naive'
 
 echo 'pihole'
-for i in {1..10}; do
 RUST_BACKTRACE=1 /usr/bin/time -v -a -o ./tests/results/memory/pihole_naive ./target/release/reef --baselines --doc "ad.stackoverflow.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=1234567" --metrics ./tests/results/timings/pihole --re "^ad([sxv]?[0-9]*|system)[_.-]([^.[:space:]]+\.){1,}|[_.-]ad([sxv]?[0-9]*|system)[_.-]" ascii;
 RUST_BACKTRACE=1 /usr/bin/time -v -a -o ./tests/results/memory/pihole_naive ./target/release/reef --baselines --doc 'adimage101.adserver99.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-1234323' --metrics ./tests/results/timings/pihole --re "^(.+[_.-])?adse?rv(er?|ice)?s?[0-9]*[_.-]" ascii;
 RUST_BACKTRACE=1 /usr/bin/time -v -a -o ./tests/results/memory/pihole_naive ./target/release/reef --baselines --doc "adimage101.testingads.telemetry.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-5000379" --metrics ./tests/results/timings/pihole --re "^(.+[_.-])?telemetry[_.-]" ascii;
@@ -17,9 +20,7 @@ RUST_BACKTRACE=1 /usr/bin/time -v -a -o ./tests/results/memory/pihole_naive ./ta
 RUST_BACKTRACE=1 /usr/bin/time -v -a -o ./tests/results/memory/pihole_naive ./target/release/reef --baselines --doc "mads.testingads.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&clickId=11233456" --metrics ./tests/results/timings/pihole --re "^mads\." ascii;
 RUST_BACKTRACE=1 /usr/bin/time -v -a -o ./tests/results/memory/pihole_naive ./target/release/reef --baselines --doc "pixel.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037&click1234" --metrics ./tests/results/timings/pihole --re "^pixels?[-.]" ascii;
 RUST_BACKTRACE=1 /usr/bin/time -v -a -o ./tests/results/memory/pihole_naive ./target/release/reef --baselines --doc "statistics19902.testing.facebook.com/uid?=abd?utm_source=partnerize&utm_medium=affiliate&utm_campaign=88849&utm_content=2-500037" --metrics ./tests/results/timings/pihole --re "^stat(s|istics)?[0-9]*[_.-]" ascii;
-done
+
 
 echo 'email'
-for i in {1..10}; do
 RUST_BACKTRACE=1 /usr/bin/time -v -a -o ./tests/results/memory/email_small_naive ./target/release/reef --baselines --doc ./tests/docs/email_small --metrics ./tests/results/timings/email_dkim --re "^Message-ID: .*[[:space:]]Date: Tue, 8 May 2001 09:16:00 -0700 \(PDT\)[[:space:]]From: .*[[:space:]]To: .*[[:space:]]Subject: Re:[[:space:]]Mime-Version: 1\.0[[:space:]]Content-Type: text\/plain; charset=us-ascii[[:space:]]Content-Transfer-Encoding: 7bit[[:space:]]X-From: Mike Maggi[[:space:]]X-To: Amanda Huble[[:space:]]X-cc: [[:space:]]X-bcc: [[:space:]]X-Folder: \\\\Michael_Maggi_Jun2001\\\\Notes Folders\\\\Sent[[:space:]]X-Origin: Maggi-M[[:space:]]X-FileName: mmaggi\.nsf[[:space:]]*at 5:00$" ascii
-done 
