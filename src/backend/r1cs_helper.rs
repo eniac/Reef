@@ -11,6 +11,7 @@ use circ::ir::term::*;
 use ff::PrimeField;
 use fxhash::FxHashMap;
 use generic_array::typenum;
+use memory_stats::memory_stats;
 use neptune::sponge::{api::SpongeAPI, vanilla::Sponge};
 use petgraph::{
     graph::{EdgeIndex, NodeIndex},
@@ -18,7 +19,6 @@ use petgraph::{
     visit::EdgeRef,
     Graph,
 };
-use memory_stats::memory_stats;
 use rug::{integer::Order, ops::RemRounding, Assign, Integer};
 use std::collections::HashSet;
 use std::collections::LinkedList;
@@ -490,10 +490,16 @@ pub(crate) fn linear_mle_product<F: PrimeField>(
 
     for b in 0..pow {
         table_t[b] = &table_t[b] * (Integer::from(1) - &r_i) + &table_t[b + pow] * &r_i;
-        table_t[b] = table_t[b].clone().rem_floor(cfg().field().modulus()).keep_bits(255);
+        table_t[b] = table_t[b]
+            .clone()
+            .rem_floor(cfg().field().modulus())
+            .keep_bits(255);
         table_t[b].shrink_to(255);
         table_eq[b] = &table_eq[b] * (Integer::from(1) - &r_i) + &table_eq[b + pow] * &r_i;
-        table_eq[b] = table_eq[b].clone().rem_floor(cfg().field().modulus()).keep_bits(255);
+        table_eq[b] = table_eq[b]
+            .clone()
+            .rem_floor(cfg().field().modulus())
+            .keep_bits(255);
         table_eq[b].shrink_to(255);
     }
 
@@ -515,9 +521,6 @@ pub(crate) fn gen_eq_table(
     let t_len = base.pow(ell as u32);
     assert_eq!(rs.len(), qs.len() + 1);
 
-    println!("ell {}", ell);
-    println!("t_len {}", t_len);
-
     let mut eq_t = vec![Integer::from(0); t_len];
 
     // if let Some(usage) = memory_stats() {
@@ -532,8 +535,6 @@ pub(crate) fn gen_eq_table(
     //     println!("post qs {}", usage.physical_mem);
     // }
 
-    println!("eq t len {}", eq_t.len());
-
     for i in 0..eq_t.len() {
         let mut term = rs[qs.len()].clone();
 
@@ -541,7 +542,7 @@ pub(crate) fn gen_eq_table(
             // if i%10000000==0 {
             //     if let Some(usage) = memory_stats() {
             //         println!("{} {} {}", i ,j ,usage.physical_mem);
-            //     }            
+            //     }
             // }
             let xi = (i >> j) & 1;
 
@@ -549,7 +550,10 @@ pub(crate) fn gen_eq_table(
                 + Integer::from(1 - xi) * (Integer::from(1) - &last_q[j]);
         }
         eq_t[i] += term;
-        eq_t[i] = eq_t[i].clone().rem_floor(cfg().field().modulus()).keep_bits(255);
+        eq_t[i] = eq_t[i]
+            .clone()
+            .rem_floor(cfg().field().modulus())
+            .keep_bits(255);
         eq_t[i].shrink_to(255);
     }
 

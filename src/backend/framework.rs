@@ -21,12 +21,12 @@ use crate::{
 use circ::target::r1cs::{wit_comp::StagedWitCompEvaluator, ProverData};
 use fxhash::FxHashMap;
 use generic_array::typenum;
+use memory_stats::memory_stats;
 use neptune::{
     poseidon::PoseidonConstants,
     sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
-use memory_stats::memory_stats;
 use nova_snark::{
     provider::pedersen::CompressedCommitment,
     traits::{circuit::TrivialTestCircuit, Group},
@@ -75,7 +75,7 @@ pub fn run_committer(doc: &Vec<char>, ab: &String, merkle: bool) -> ReefCommitme
     };
 
     let reef_commit = ReefCommitment::new(udoc.clone(), doc.len(), merkle, sc);
-    
+
     #[cfg(feature = "metrics")]
     log::stop(Component::CommitmentGen, "generation");
 
@@ -129,7 +129,7 @@ pub fn run_prover(
             merkle,
             hash_salt,
             reef_commit.doc_commit_hash(),
-            true
+            true,
         );
 
         let mc = reef_commit.merkle.clone();
@@ -323,7 +323,7 @@ fn setup<'a>(
         Some(_) => true,
         _ => false,
     };
-    println!(
+    /*println!(
         "Estimated Number of constraints: {}",
         full_round_cost_model(
             &r1cs_converter.safa,
@@ -349,7 +349,7 @@ fn setup<'a>(
     println!(
         "Number of variables (secondary circuit): {}",
         pp.num_variables().1
-    );
+    );*/
 
     let z0_primary = z;
 
@@ -413,10 +413,12 @@ fn solve<'a>(
             Component::Solver,
             format!("witness_generation_{}", i).as_str(),
         );
+        /*
         if let Some(usage) = memory_stats() {
             println!("pre wit gen {}", usage.virtual_mem);
             println!("pre wit gen {}", usage.physical_mem);
-        }
+        }*/
+
         (
             wits,
             next_state,
@@ -440,10 +442,12 @@ fn solve<'a>(
             hybrid_running_v.clone(),
             prev_cursor.clone(),
         );
+        /*
         if let Some(usage) = memory_stats() {
             println!("post r1cs converted gen wit {}", usage.virtual_mem);
             println!("post r1cs converted gen wit {}", usage.physical_mem);
-        }
+        }*/
+
         stack_ptr_popped = r1cs_converter.stack_ptr;
         stack_out = vec![];
         for (cur, kid) in &r1cs_converter.stack {
@@ -571,10 +575,12 @@ fn solve<'a>(
             ]
         };
 
+        /*
         if let Some(usage) = memory_stats() {
             println!("post running q {}", usage.virtual_mem);
             println!("post running q {}", usage.physical_mem);
-        }
+        }*/
+
         let values: Option<Vec<_>> = Some(wits).map(|values| {
             let mut evaluator = StagedWitCompEvaluator::new(&circ_data.precompute);
             let mut ffs = Vec::new();
@@ -619,10 +625,10 @@ fn solve<'a>(
 
         #[cfg(feature = "metrics")]
         {
-            if let Some(usage) = memory_stats() {
+            /*if let Some(usage) = memory_stats() {
             println!("witness_{} virtual {}", i, usage.virtual_mem);
             println!("witness_{} physical {}", i, usage.physical_mem);
-            }
+            }*/
             log::stop(
                 Component::Solver,
                 format!("witness_generation_{}", i).as_str(),
@@ -698,10 +704,10 @@ fn prove(
         #[cfg(feature = "metrics")]
         {
             log::stop(Component::Prover, format!("prove_{}", i).as_str());
-            if let Some(usage) = memory_stats() {
+            /*if let Some(usage) = memory_stats() {
                 println!("prove_{} virtual {}", i, usage.virtual_mem);
                 println!("prove_{} physical {}", i, usage.physical_mem);
-            }
+            }*/
             log::write_csv(&out_write.clone().unwrap().as_path().display().to_string()).unwrap();
         }
 
@@ -807,7 +813,7 @@ pub fn run_verifier(
         merkle,
         reef_commit.hash_salt(),
         reef_commit.doc_commit_hash(),
-        false
+        false,
     );
 
     let doc_len = r1cs_converter.doc_len(); // projected;
@@ -961,12 +967,13 @@ pub fn pub_setup(
     let batch_size = temp_batch_size;
     let proj = if projections { safa.projection() } else { None };
 
-    #[cfg(feature = "metrics")] {
+    #[cfg(feature = "metrics")]
+    {
         if prover {
             log::tic(Component::Compiler, "r1cs_init");
         }
     }
-    
+
     let mut r1cs_converter = R1CS::new(
         &ab,
         safa,
@@ -996,7 +1003,7 @@ pub fn pub_setup(
 
     #[cfg(feature = "metrics")]
     {
-        if prover{
+        if prover {
             log::tic(Component::Compiler, "constraint_generation");
         }
     }

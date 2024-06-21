@@ -1,6 +1,5 @@
 mkdir -p ../results/memory
 mkdir -p ../results/timings
-mkdir -p ../../match_cpp
 
 cargo clean 
 cargo build --release --features 'metrics,naive'
