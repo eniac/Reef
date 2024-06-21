@@ -26,6 +26,7 @@ use neptune::{
     sponge::vanilla::{Sponge, SpongeTrait},
     Strength,
 };
+use memory_stats::memory_stats;
 use nova_snark::{
     provider::pedersen::CompressedCommitment,
     traits::{circuit::TrivialTestCircuit, Group},
@@ -412,6 +413,10 @@ fn solve<'a>(
             Component::Solver,
             format!("witness_generation_{}", i).as_str(),
         );
+        if let Some(usage) = memory_stats() {
+            println!("pre wit gen {}", usage.virtual_mem);
+            println!("pre wit gen {}", usage.physical_mem);
+        }
         (
             wits,
             next_state,
@@ -435,6 +440,10 @@ fn solve<'a>(
             hybrid_running_v.clone(),
             prev_cursor.clone(),
         );
+        if let Some(usage) = memory_stats() {
+            println!("post r1cs converted gen wit {}", usage.virtual_mem);
+            println!("post r1cs converted gen wit {}", usage.physical_mem);
+        }
         stack_ptr_popped = r1cs_converter.stack_ptr;
         stack_out = vec![];
         for (cur, kid) in &r1cs_converter.stack {
@@ -562,6 +571,10 @@ fn solve<'a>(
             ]
         };
 
+        if let Some(usage) = memory_stats() {
+            println!("post running q {}", usage.virtual_mem);
+            println!("post running q {}", usage.physical_mem);
+        }
         let values: Option<Vec<_>> = Some(wits).map(|values| {
             let mut evaluator = StagedWitCompEvaluator::new(&circ_data.precompute);
             let mut ffs = Vec::new();
@@ -606,6 +619,10 @@ fn solve<'a>(
 
         #[cfg(feature = "metrics")]
         {
+            if let Some(usage) = memory_stats() {
+            println!("witness_{} virtual {}", i, usage.virtual_mem);
+            println!("witness_{} physical {}", i, usage.physical_mem);
+            }
             log::stop(
                 Component::Solver,
                 format!("witness_generation_{}", i).as_str(),
@@ -681,6 +698,10 @@ fn prove(
         #[cfg(feature = "metrics")]
         {
             log::stop(Component::Prover, format!("prove_{}", i).as_str());
+            if let Some(usage) = memory_stats() {
+                println!("prove_{} virtual {}", i, usage.virtual_mem);
+                println!("prove_{} physical {}", i, usage.physical_mem);
+            }
             log::write_csv(&out_write.clone().unwrap().as_path().display().to_string()).unwrap();
         }
 
