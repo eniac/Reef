@@ -1,5 +1,5 @@
-mdkir -p ../results/memory
-mdkir -p ../results/timings
+mkdir -p ../results/memory
+mkdir -p ../results/timings
 mkdir -p ../../match_cpp
 
 cargo clean 
