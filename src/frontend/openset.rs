@@ -55,7 +55,7 @@ impl<C: Display + Debug + Step + Default + Ord + Copy + Clone> OpenRange<C> {
 
     pub fn len(&self) -> Option<usize> {
         let e = self.end?;
-        Step::steps_between(&self.start, &e)
+        Step::steps_between(&self.start, &e).1
     }
 
     pub fn union(&self, o: &Self) -> OpenSet<C> {
